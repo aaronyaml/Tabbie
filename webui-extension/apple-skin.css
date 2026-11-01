@@ -602,3 +602,7 @@ input[type="checkbox"], input[type="radio"] { accent-color: var(--hx-accent); }
   animation: hx-think-glint 2.2s linear infinite; }
 @keyframes hx-think-glint { from { background-position: 100% 0; } to { background-position: -50% 0; } }
 @media (prefers-reduced-motion: reduce) { .agent-activity-thinking .thinking-card-label { animation: none !important; } }
+
+/* Select chevron: upstream draws it as the select's background-image with no-repeat, but some later
+ * panel rules (Kanban filters, bulk bar…) re-set `background`, and the arrow tiled across the field. */
+select { background-repeat: no-repeat !important; background-position: right 10px center !important; padding-right: 28px !important; }

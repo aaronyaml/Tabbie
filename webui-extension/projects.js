@@ -104,6 +104,17 @@
     syncNav();
   }
 
+  // True when the click is on the rail/drawer tab of the panel already showing under an overlay
+  // (Projects, Motion studio). Upstream treats that as "collapse the sidebar"; overlays swallow it.
+  window.hxSameTab = window.hxSameTab || ((t) => {
+    const tab = t.closest('.rail .nav-tab[data-panel], .sidebar-nav .nav-tab[data-panel]');
+    let cur = 'chat';
+    try { if (typeof _currentPanel !== 'undefined' && _currentPanel) cur = _currentPanel; } catch (_) {}
+    let desktop = true;  // desktop: keep the sidebar as the user left it (open or collapsed); phone: let the drawer close
+    try { desktop = _isDesktopWidth(); } catch (_) {}
+    return !!tab && tab.dataset.panel === cur && desktop;
+  });
+
   // ── nav entries (rail + drawer), right under Motion / Chat ──
   function navButtons() {
     const anchorRail = document.getElementById('hxMotionRail') || document.querySelector('.rail .rail-btn.nav-tab[data-panel="chat"]');
@@ -138,7 +149,10 @@
       open();
       return;
     }
-    if (isOpen() && t.closest('.rail .nav-tab, .sidebar-nav .nav-tab, #btnNewChat, #btnTitlebarNewChat, .session-item, .hx-rec')) close();
+    if (isOpen() && t.closest('.rail .nav-tab, .sidebar-nav .nav-tab, #btnNewChat, #btnTitlebarNewChat, .session-item, .hx-rec')) {
+      close();
+      if (window.hxSameTab(t)) { e.preventDefault(); e.stopPropagation(); }  // see motion.js: no sidebar collapse
+    }
   }, true);
   document.addEventListener('keydown', (e) => {
     if (e.key !== 'Escape' || !isOpen()) return;

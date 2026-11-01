@@ -139,7 +139,12 @@
     }
     // Any other primary nav entry, "+" or a session leaves the studio.
     if (t.closest('.rail .nav-tab, .sidebar-nav .nav-tab, #btnNewChat, #btnTitlebarNewChat, .session-item, .hx-rec')) {
-      if (window.hxStudio && window.hxStudio.isOpen()) window.hxStudio.close({ keepChat: !!t.closest('.session-item, #btnNewChat, #btnTitlebarNewChat') });
+      if (window.hxStudio && window.hxStudio.isOpen()) {
+        window.hxStudio.close({ keepChat: !!t.closest('.session-item, #btnNewChat, #btnTitlebarNewChat') });
+        // The studio sits over the panel the WebUI still thinks is open, so upstream would read a
+        // click on that tab as "same tab again" and collapse the sidebar. Closing the studio is the switch.
+        if (window.hxSameTab && window.hxSameTab(t)) { e.preventDefault(); e.stopPropagation(); }
+      }
     }
   }, true);
 

@@ -14,6 +14,12 @@
  *  - history.pushState/replaceState are wrapped: while the studio is open it owns the address bar
  *    (window.__hxMoRoute), and a /session/<sid> URL for a motion session is written as /motion/<sid>.
  * motion-studio.js keeps __hxMoRoute in step with what the studio shows.
+ *
+ * Page routes (/kanban, /settings, /projects, …; Caddy serves the app shell for them):
+ *  - on load, /<panel> becomes upstream's own "?panel=<panel>" launch intent (Projects: opened by
+ *    routes.js), and window.__hxPanelRoute holds "/<panel>" so the session restore can't take the bar;
+ *  - while a page other than Chat is showing, a /session/<sid> or "/" URL is written as that page's
+ *    route instead. routes.js keeps __hxPanelRoute in step with the page on screen.
  */
 (function () {
   'use strict';
@@ -33,6 +39,20 @@
   };
   window.__hxMoRoute = null;
   window.__hxMoQuietUntil = 0;
+  var PANEL = /^\/(tasks|kanban|skills|memory|workspaces|profiles|todos|insights|logs|settings|projects)\/?$/;
+  window.__hxPanelRoute = null;
+  window.__hxBootPanel = null;
+  var pr = L.pathname.match(PANEL);
+  if (pr) {
+    window.__hxPanelRoute = '/' + pr[1];
+    window.__hxBootPanel = pr[1];
+    var q = new URLSearchParams(L.search);
+    if (pr[1] !== 'projects') q.set('panel', pr[1]);
+    var qs = q.toString();
+    rep.call(H, H.state, '', '/' + (qs ? '?' + qs : '') + L.hash);
+    var pb = D.querySelector('base');  // "/kanban/" would have made the base "/kanban/"
+    if (pb) pb.setAttribute('href', L.origin + '/');
+  }
 
   var m = L.pathname.match(MO);
   if (!m) {
@@ -58,6 +78,7 @@
     if (window.__hxMoRoute) return window.__hxMoRoute;
     var u;
     try { u = new URL(String(url), D.baseURI); } catch (_) { return url; }
+    if (window.__hxPanelRoute && (u.pathname === '/' || SESS.test(u.pathname))) return window.__hxPanelRoute;
     var k = u.pathname.match(SESS);
     if (k && known(dec(k[1]))) return '/motion/' + k[1] + u.hash;
     return url;

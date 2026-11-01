@@ -15,7 +15,7 @@
 
   const API = 'api/extensions/cc-agents/sidecar/executor';
   const AGENTS_API = 'api/extensions/cc-agents/sidecar/agents';
-  const AGENTS = [['claude', 'Claude Code'], ['codex', 'Codex']];
+  const AGENTS = [['claude', 'Claude'], ['codex', 'OpenAI']];
   const PROVIDER_ICON = { anthropic: 'AiBrain01Icon', openai: 'AiMagicIcon' };
   const EFFORT_LABEL = { '': 'Auto', low: 'Low', medium: 'Medium', high: 'High' };
   const FALLBACK = {

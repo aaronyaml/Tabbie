@@ -90,25 +90,43 @@ flowchart LR
 
 ## Install
 
+Open the **Terminal** app and paste:
+
 ```bash
-git clone <this repo> ~/hermes      # the path ~/hermes is required for now
+git clone https://github.com/aaronyaml/Tabbie.git ~/hermes   # the path ~/hermes is required for now
 cd ~/hermes
-bin/setup                           # asks Claude Code / Codex / both, checks tools, writes local config
+bin/setup
 ```
 
-Skip the question with `bin/setup --agents claude`, `--agents codex` or `--agents claude,codex`.
+`bin/setup` is a guided setup screen. It goes through every step in order, explains each one, and
+asks before installing or changing anything. The first run takes about 10–15 minutes:
 
-`bin/setup` is safe to re-run. It:
+| Step | What happens |
+|---|---|
+| 1. About you | Your first name, for the greeting on the chat home ("Morning, Sam", "Afternoon, Sam", "Evening, Sam") |
+| 2. Coding agents | **Claude only**, **OpenAI only**, or **Claude and OpenAI** ([what each means](#choosing-claude-code-codex-or-both)) |
+| 3. Tools | Checks Homebrew, git, Python, Hermes Agent, Claude Code and/or Codex, and Caddy. Offers to install what's missing |
+| 4. Sign in | Opens each provider's own login in your browser (hub model, Claude Code, Codex). No API keys |
+| 5. Local files | Folders, settings, the WebUI, the private memory store, plugins, and the hub's worker timeout (your Hermes config is backed up first) |
+| 6. WebUI password | Asks for a password (hidden as you type) and saves it where only you can read it |
+| 7. Background services | Installs and starts the services so Tabbie runs whenever your Mac is on |
+| 8. Secure address | Sets up `https://hermes.local` and offers to trust its certificate on this Mac |
+| 9. Your phone | Home Wi-Fi instructions, and optionally Tailscale for anywhere ([details](#use-tabbie-on-your-phone-anywhere-tailscale)) |
+| 10. Check | Runs `bin/hub health` and shows the address to open |
 
-- saves your agent choice to `config/agents.yaml` (git-ignored) and only checks for the CLIs you picked;
-- creates `state/`, `general/` and `workspaces/` (all git-ignored);
-- copies `config/projects.example.yaml` → `config/projects.yaml`;
-- writes `webui-extension/local.js` (your home folder and first name, git-ignored);
-- clones the upstream WebUI into `hermes-webui/` and writes its `.env` from
-  `config/webui.env.example`;
-- appends the hub rules (`config/SOUL.hub.md`) to `~/.hermes/SOUL.md`;
-- creates the memory store `memory/`, which is its own private git repo and is never pushed here;
-- symlinks the four plugins into `~/.hermes/plugins/`.
+It's safe to run again any time: finished steps are ticked and skipped, and anything marked `!`
+tells you exactly what to do. When services are already running it asks before restarting them.
+
+Skip the questions with flags: `bin/setup --yes` uses defaults and leaves sign-ins, the password and
+phone setup for later. Answer some ahead of time with `--agents claude|codex|claude,codex`,
+`--name Sam` and `--services`.
+
+Everything it writes on your Mac is git-ignored: `config/agents.yaml`, `config/projects.yaml`,
+`webui-extension/local.js`, `hermes-webui/` and its `.env`, `state/`, `general/`, `workspaces/`, and
+`memory/` (its own private git repo). It also appends the hub rules to `~/.hermes/SOUL.md` and
+symlinks the four plugins into `~/.hermes/plugins/`.
+
+The sections below explain each part in more detail, if you'd rather do things by hand.
 
 ### Sign in (once per provider)
 
@@ -172,9 +190,136 @@ Caddy, open `http://127.0.0.1:8787` on the Mac itself.
 
 Open the app with `bin/hub` (or go to `https://hermes.local`).
 
+### Use Tabbie on your phone, anywhere (Tailscale)
+
+`https://hermes.local` only works when your phone is on the same Wi-Fi as your Mac. To reach
+Tabbie from anywhere (mobile data, work, travelling) use **[Tailscale](https://tailscale.com)**.
+It's a free, private network (a "VPN") between your own devices. Your Mac stays invisible to the
+rest of the internet: only devices signed in to *your* Tailscale account can reach it.
+
+You'll do this once. It takes about 10 minutes and needs no networking knowledge.
+
+**What you need:** your Mac (with Tabbie running), your phone, and an email account to sign in
+with (Google, Apple, Microsoft or GitHub).
+
+#### Step 1: Create a Tailscale account
+
+1. Go to [tailscale.com](https://tailscale.com) and click **Get started**.
+2. Sign in with Google, Apple, Microsoft or GitHub. The personal plan is free.
+
+Use this **same account** on every device below.
+
+#### Step 2: Put Tailscale on your Mac
+
+1. Install **Tailscale** from the [Mac App Store](https://apps.apple.com/app/tailscale/id1475387142)
+   (or from [tailscale.com/download](https://tailscale.com/download)).
+2. Open it. A small Tailscale icon appears in the menu bar at the top of the screen.
+3. Click the icon and choose **Log in**. Sign in with the account from step 1.
+4. If macOS asks to **allow a VPN configuration** or a **system extension**, click **Allow**.
+   It may send you to System Settings › Privacy & Security to approve it.
+5. The menu bar icon should now say **Connected**.
+
+#### Step 3: Turn on secure links (once per account)
+
+1. Open the [Tailscale admin console](https://login.tailscale.com/admin/dns) and go to the **DNS** tab.
+2. Make sure **MagicDNS** is on.
+3. Scroll to **HTTPS Certificates** and click **Enable HTTPS**.
+
+This gives your Mac a private web address with a padlock, such as `https://my-mac.tail1234.ts.net`.
+
+#### Step 4: Share Tabbie on your private network
+
+Open the **Terminal** app on your Mac (press ⌘ Space, type *Terminal*, press Return). Paste this
+line and press Return:
+
+```bash
+/Applications/Tailscale.app/Contents/MacOS/Tailscale serve --bg 8788
+```
+
+> Didn't install Caddy (no `https://hermes.local`)? Use `8787` instead of `8788` at the end.
+> Installed Tailscale with Homebrew instead of the app? The command is just `tailscale serve --bg 8788`.
+
+It prints your Tabbie address, ending in `.ts.net`. **Write it down** (or copy it into a note on
+your phone). You only do this once: it keeps working after restarts.
+
+> ⚠️ Use `serve`, **never** `funnel`. *Funnel* puts your Mac on the public internet. *Serve* keeps it
+> private to your own devices.
+
+#### Step 5: Put Tailscale on your phone
+
+**iPhone / iPad**
+
+1. Install **Tailscale** from the [App Store](https://apps.apple.com/app/tailscale/id1470499037).
+2. Open it and sign in with the **same account** as your Mac.
+3. When iOS asks **"Tailscale would like to add VPN configurations"**, tap **Allow**, then enter
+   your passcode or use Face ID.
+4. Flip the switch at the top to **Connected**. A small **VPN** badge appears in the status bar.
+
+**Android**
+
+1. Install **Tailscale** from [Google Play](https://play.google.com/store/apps/details?id=com.tailscale.ipn).
+2. Open it and sign in with the **same account** as your Mac.
+3. When Android asks to set up a **VPN connection**, tap **OK**.
+4. Make sure the switch shows **Connected**. A key icon appears in the status bar.
+
+In the app's device list you should see your Mac.
+
+#### Step 6: Open Tabbie and add it to your home screen
+
+1. On your phone, open the `.ts.net` address from step 4 in **Safari** (iPhone) or **Chrome** (Android).
+2. Log in with your WebUI password (the one in `hermes-webui/.env`).
+3. Add it to your home screen so it opens like an app:
+   - **iPhone:** tap the **Share** button (square with an arrow), then **Add to Home Screen**.
+   - **Android:** tap the **⋮** menu, then **Add to Home screen** (or **Install app**).
+
+Done. Tabbie now works from anywhere your phone has internet.
+
+#### Day-to-day tips
+
+- **The Tailscale switch must be on** on your phone. Turn it off to stop all access.
+  On iPhone, Tailscale's settings can turn it on automatically when needed (*VPN On Demand*).
+- **Your Mac must be on, awake and logged in.** In System Settings › Battery (or Energy Saver) ›
+  Options, turn on **Prevent automatic sleeping on power adapter when the display is off**,
+  and keep it plugged in. The screen can be off and locked.
+- **One VPN at a time on phones.** If you use another VPN app, switch it off while you use Tabbie.
+- **Add more devices** (an iPad, a laptop) the same way: install Tailscale, sign in with the same
+  account, open the same address.
+- **Lost a phone?** Remove it in the [Tailscale admin console](https://login.tailscale.com/admin/machines)
+  (⋯ › Remove) and change your WebUI password.
+
+#### If it doesn't load
+
+1. Check that **both** the Mac and the phone show **Connected** in Tailscale.
+2. Check that the Mac is awake and Tabbie is running: on the Mac, run `bin/hub health`.
+3. On the Mac, run `/Applications/Tailscale.app/Contents/MacOS/Tailscale serve status`. It should
+   show your `.ts.net` address, `(tailnet only)`, and `proxy http://127.0.0.1:8788` (or `8787`).
+   If it's empty, repeat step 4.
+4. A "certificate" error on the first visit usually clears after a minute. HTTPS links are created
+   on first use.
+
+To stop sharing Tabbie over Tailscale: `/Applications/Tailscale.app/Contents/MacOS/Tailscale serve reset`.
+
+**Why this is safe:** Tailscale Serve only answers devices signed in to your Tailscale account.
+Caddy also refuses anything that isn't a home-network or Tailscale address, and the WebUI still
+asks for your password. Nothing is opened on your router, and port 8787 is never exposed to the internet.
+
 ---
 
 ## Using it
+
+### Page addresses
+
+Every page has its own address, so a refresh (or a bookmark) lands you back on it instead of the chat:
+
+| Address | Page |
+|---|---|
+| `/` or `/session/<id>` | Chat |
+| `/projects` | Projects |
+| `/motion`, `/motion/<id>` | Motion studio |
+| `/tasks`, `/kanban`, `/todos`, `/skills`, `/memory`, `/workspaces`, `/profiles`, `/insights`, `/logs`, `/settings` | That page |
+
+These go through Caddy (`https://hermes.local` or your Tailscale address). On the bare
+`http://127.0.0.1:8787` only the chat addresses work.
 
 ### Routing
 

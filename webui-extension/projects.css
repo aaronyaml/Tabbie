@@ -198,3 +198,10 @@ html.hx-proj-open #hxProjects { display: block; position: fixed; top: 0; right: 
 .hxp-break { overflow-wrap: anywhere; }
 
 .hxp-scrim.is-steady, .hxp-scrim.is-steady .hxp-sheet { animation: none; }
+
+/* ── rail / drawer entry: "on" while Projects is open, the previous tab's highlight steps back ── */
+html.hx-proj-open .rail .rail-btn.nav-tab.active:not(.hxp-nav),
+html.hx-proj-open .sidebar-nav .nav-tab.active:not(.hxp-nav) { background: transparent !important; color: var(--hx-text-2) !important; }
+html.hx-proj-open .rail .rail-btn.nav-tab.active:not(.hxp-nav):hover { background: var(--hover-bg) !important; color: var(--hx-text) !important; }
+html.hx-proj-open .nav-tab.active:not(.hxp-nav) svg[data-hi] { stroke-width: 1.5 !important; }
+.rail-btn.hxp-nav.hxp-on, .sidebar-nav .nav-tab.hxp-nav.hxp-on { background: var(--hx-fill-2) !important; color: var(--hx-text) !important; }

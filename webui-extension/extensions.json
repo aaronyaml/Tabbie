@@ -15,7 +15,7 @@
         "spaces-projects.js?v=4"
       ],
       "stylesheets": [
-        "spaces-projects.css?v=4"
+        "spaces-projects.css?v=5"
       ]
     },
     {
@@ -25,7 +25,7 @@
         "apple-skin.js?v=9"
       ],
       "stylesheets": [
-        "apple-skin.css?v=13"
+        "apple-skin.css?v=14"
       ]
     },
     {
@@ -178,7 +178,7 @@
       "id": "motion",
       "name": "Motion studio (Zoetie)",
       "scripts": [
-        "motion.js?v=6",
+        "motion.js?v=8",
         "motion-scrub.js?v=6",
         "motion-studio.js?v=19"
       ],
@@ -191,17 +191,25 @@
       "id": "projects",
       "name": "Projects (multi-folder, memory, Dreamer)",
       "scripts": [
-        "projects.js?v=4"
+        "projects.js?v=6"
       ],
       "stylesheets": [
-        "projects.css?v=4"
+        "projects.css?v=5"
       ]
+    },
+    {
+      "id": "routes",
+      "name": "Page addresses (/kanban, /projects, …)",
+      "scripts": [
+        "routes.js?v=1"
+      ],
+      "stylesheets": []
     },
     {
       "id": "model-picker",
       "name": "Model picker",
       "scripts": [
-        "model-picker.js?v=3"
+        "model-picker.js?v=4"
       ],
       "stylesheets": [
         "model-picker.css?v=2"

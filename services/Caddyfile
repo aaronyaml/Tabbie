@@ -51,6 +51,22 @@
 			}
 		}
 	}
+	# Page routes: /kanban, /settings, /projects, … are the app shell for "/" (motion-boot.js turns the
+	# path into the page to open, routes.js keeps the address bar on the page you're looking at).
+	@page_shell path_regexp page_shell ^/(tasks|kanban|skills|memory|workspaces|profiles|todos|insights|logs|settings|projects)/?$
+	handle @page_shell {
+		rewrite * /
+		reverse_proxy 127.0.0.1:8787 {
+			header_up X-Forwarded-Proto https
+			@to_login {
+				status 3xx
+				header Location login*
+			}
+			handle_response @to_login {
+				redir * /login?next={http.request.orig_uri.path} 302
+			}
+		}
+	}
 	# First script of the app shell: motion-boot.js, which then loads the upstream file (?orig=1).
 	@pwa_boot {
 		path /static/pwa-startup.js
