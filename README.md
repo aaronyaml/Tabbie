@@ -106,7 +106,7 @@ asks before installing or changing anything. The first run takes about 10–15 m
 | 1. About you | Your first name, for the greeting on the chat home ("Morning, Sam", "Afternoon, Sam", "Evening, Sam") |
 | 2. Coding agents | **Claude only**, **OpenAI only**, or **Claude and OpenAI** ([what each means](#choosing-claude-code-codex-or-both)) |
 | 3. Tools | Checks Homebrew, git, Python, Hermes Agent, Claude Code and/or Codex, and Caddy. Offers to install what's missing |
-| 4. Sign in | Opens each provider's own login in your browser (hub model, Claude Code, Codex). No API keys |
+| 4. Sign in | Opens each provider's own login in your browser: the hub (ChatGPT or Claude login, your choice when you use both), Claude Code, Codex. No API keys. The WebUI's own first-run wizard, which asks for API keys, is switched off |
 | 5. Local files | Folders, settings, the WebUI, the private memory store, plugins, and the hub's worker timeout (your Hermes config is backed up first) |
 | 6. WebUI password | Asks for a password (hidden as you type) and saves it where only you can read it |
 | 7. Background services | Installs and starts the services so Tabbie runs whenever your Mac is on |
@@ -132,7 +132,7 @@ The sections below explain each part in more detail, if you'd rather do things b
 
 | Provider | Needed for | Command |
 |---|---|---|
-| Hermes hub model | the dispatcher | `hermes setup` (pick any provider Hermes supports; e.g. `hermes auth add openai-codex --type oauth`) |
+| Hermes hub model | chat + routing | Your **ChatGPT** login (`hermes auth add openai-codex --type oauth`) or your **Claude** login (`hermes auth add anthropic --type oauth`). `bin/setup` picks the one matching your agents and asks when you have both. Never an API key |
 | Claude Code (if enabled) | executing work | `claude auth login` (must show `claude.ai` in `claude auth status`) |
 | Codex (if enabled) | planner, takeover, or executing work in a Codex-only setup | `codex login` |
 | Higgsfield (optional) | image/video generation | `higgsfield auth login` |
@@ -306,6 +306,25 @@ asks for your password. Nothing is opened on your router, and port 8787 is never
 ---
 
 ## Using it
+
+### Updates
+
+Tabbie checks GitHub ([aaronyaml/Tabbie](https://github.com/aaronyaml/Tabbie)) for a newer version
+about once an hour. Checking is read-only: nothing is downloaded until you say so.
+
+- **In the WebUI**, a card appears bottom-right: *Tabbie update available*, with the list of changes.
+  **Update** downloads it. **Later** hides it until something newer comes out.
+- **In the Terminal**, run `bin/hub update`. It shows the changes and asks before downloading.
+
+After downloading:
+- **Restart now**, or answer yes in the Terminal, restarts the services that changed. It waits if a
+  request is running.
+- Interface-only updates just need a page reload.
+- If the update changed setup steps, it tells you to run `bin/setup` again.
+
+Your settings and the files you've edited are never overwritten. If an update would change a file
+you've edited, it stops and tells you which file, and nothing changes. To check another repo or
+branch (e.g. your fork), or to turn checking off, edit `updates:` in `config/router.yaml`.
 
 ### Page addresses
 

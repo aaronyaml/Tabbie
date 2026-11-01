@@ -1,0 +1,27 @@
+/* Tabbie — update card (updates.js). Bottom-right on desktop, a sheet above the composer on phones. */
+#hxUpdate {
+  position: fixed; right: 16px; bottom: 16px; z-index: 900; width: 340px; max-width: calc(100vw - 32px);
+  padding: 14px 14px 12px; border-radius: 14px; background: var(--hx-raised, var(--bg)); color: var(--hx-text, var(--text));
+  box-shadow: 0 12px 32px rgba(0,0,0,.18), 0 0 0 0.5px var(--hx-hair, rgba(127,127,127,.25));
+  font: 13px/1.4 var(--font-ui, -apple-system, system-ui, sans-serif);
+  opacity: 0; transform: translateY(8px); transition: opacity .2s var(--hx-ease, ease), transform .2s var(--hx-ease, ease);
+}
+#hxUpdate.is-in { opacity: 1; transform: none; }
+.hx-up-head { display: flex; align-items: baseline; justify-content: space-between; gap: 8px; }
+.hx-up-head b { font-size: 14px; font-weight: 600; letter-spacing: -.01em; }
+.hx-up-head span { color: var(--hx-text-2, var(--muted)); font-size: 12px; white-space: nowrap; }
+.hx-up-list { margin: 8px 0 0; padding-left: 18px; color: var(--hx-text-2, var(--muted)); max-height: 132px; overflow: auto; }
+.hx-up-list li { margin: 2px 0; }
+.hx-up-note { margin: 8px 0 0; color: var(--hx-text-2, var(--muted)); font-size: 12px; }
+.hx-up-note code { font-size: 11px; }
+.hx-up-err { color: var(--hx-orange, #c2410c); }
+.hx-up-btns { display: flex; justify-content: flex-end; gap: 8px; margin-top: 12px; }
+.hx-up-btns button {
+  height: 30px; padding: 0 14px; border: 0; border-radius: 8px; cursor: pointer;
+  background: var(--hx-fill, rgba(127,127,127,.12)); color: var(--hx-text, var(--text)); font: 500 13px/1 var(--font-ui, system-ui);
+}
+.hx-up-btns .hx-up-go { background: var(--hx-accent, #3054FD); color: #fff; }
+.hx-up-btns button:disabled { opacity: .6; cursor: default; }
+.hx-up-btns button:focus-visible { outline: 2px solid var(--focus-ring, var(--hx-accent, #3054FD)); outline-offset: 2px; }
+@media (max-width: 640px) { #hxUpdate { left: 12px; right: 12px; bottom: calc(84px + env(safe-area-inset-bottom)); width: auto; } }
+@media (prefers-reduced-motion: reduce) { #hxUpdate { transition: none; } }

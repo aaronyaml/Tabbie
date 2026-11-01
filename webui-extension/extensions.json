@@ -206,6 +206,16 @@
       "stylesheets": []
     },
     {
+      "id": "updates",
+      "name": "Tabbie updates (asks before downloading)",
+      "scripts": [
+        "updates.js?v=1"
+      ],
+      "stylesheets": [
+        "updates.css?v=1"
+      ]
+    },
+    {
       "id": "model-picker",
       "name": "Model picker",
       "scripts": [

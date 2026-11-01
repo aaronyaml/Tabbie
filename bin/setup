@@ -172,10 +172,37 @@ signin() {  # label, check command, login command
     warn "$1 — not signed in. Later: $3"
   fi
 }
-# The hub (chat + routing) needs a model too: the same company you picked above, no API key needed.
-if [ "$USE_CODEX" = 1 ]; then HUB_HINT="OpenAI Codex (your ChatGPT login)"; else HUB_HINT="Anthropic (your Claude login)"; fi
-dim "Hub model: in Hermes' setup, pick ${HUB_HINT}."
-signin "Hermes hub model (chat + routing)" "hermes auth list 2>/dev/null | grep -qiE 'oauth|api|token'" "hermes setup"
+# The hub (chat + routing) runs on the same subscription login as the agents: ChatGPT (openai-codex)
+# or Claude (anthropic, signed in with your Claude account). Never an API key.
+backup_hermes_config() {
+  [ -n "${HCFG_SAVED:-}" ] && return
+  local cfg; cfg="$(hermes config path 2>/dev/null)"
+  BK="backups/setup-$(date +%Y%m%d-%H%M%S)"
+  [ -f "$cfg" ] && mkdir -p "$BK" && cp "$cfg" "$BK/" && HCFG_SAVED=1 && dim "Hermes config backed up to $BK/"
+}
+CUR_HUB="$(hermes config get model.provider 2>/dev/null | tail -1 | tr -d '[:space:]')"
+if [ "$USE_CODEX$USE_CLAUDE" = 11 ]; then
+  HUB=openai-codex; [ "$CUR_HUB" = anthropic ] && HUB=anthropic
+  if [ "$ASK" = 1 ]; then
+    say "The hub chats with you and routes each job. Which login should it use?"
+    say "1) ChatGPT (recommended: quick, and leaves your Claude limits for real work)   2) Claude"
+    D1=1; [ "$HUB" = anthropic ] && D1=2
+    read -r -p "  Pick 1 or 2 [$D1]: " pick
+    case "${pick:-$D1}" in 2) HUB=anthropic ;; *) HUB=openai-codex ;; esac
+  fi
+elif [ "$USE_CODEX" = 1 ]; then HUB=openai-codex
+else HUB=anthropic
+fi
+if [ "$HUB" = openai-codex ]; then HUB_LABEL="ChatGPT"; HUB_MODEL=gpt-6.1-sol; else HUB_LABEL="Claude"; HUB_MODEL=claude-sonnet-5-5; fi
+signin "Hub on your $HUB_LABEL login" "hermes auth list 2>/dev/null | grep -A3 '^$HUB ' | grep -q oauth" "hermes auth add $HUB --type oauth"
+if [ "$CUR_HUB" != "$HUB" ]; then
+  backup_hermes_config
+  hermes config set model.provider "$HUB" >/dev/null 2>&1 && hermes config set model.default "$HUB_MODEL" >/dev/null 2>&1 \
+    && ok "Hub model: $HUB_MODEL ($HUB_LABEL login). Change it any time: hermes model" \
+    || warn "Couldn't set the hub model. Run: hermes model"
+else
+  ok "Hub model: $(hermes config get model.default 2>/dev/null | tail -1) ($HUB_LABEL login)"
+fi
 [ "$USE_CLAUDE" = 1 ] && signin "Claude Code" "claude auth status | grep -q '\"authMethod\": \"claude.ai\"'" "claude auth login"
 [ "$USE_CODEX" = 1 ]  && signin "Codex (ChatGPT)" "codex login status 2>&1 | grep -q ChatGPT" "codex login"
 
@@ -192,7 +219,12 @@ fi
 if [ -d hermes-webui ] && [ ! -f hermes-webui/.env ]; then
   sed "s|__HOME__|$HOME|g" config/webui.env.example > hermes-webui/.env
 fi
-[ -f hermes-webui/.env ] && chmod 600 hermes-webui/.env && ok "hermes-webui/.env"
+if [ -f hermes-webui/.env ]; then
+  # bin/setup does the WebUI's first-run job (provider login, model, workspace), so its own wizard
+  # (which offers API-key providers) stays off.
+  grep -q '^HERMES_WEBUI_SKIP_ONBOARDING=' hermes-webui/.env || printf '\nHERMES_WEBUI_SKIP_ONBOARDING=1\n' >> hermes-webui/.env
+  chmod 600 hermes-webui/.env && ok "hermes-webui/.env"
+fi
 PYTHONPATH="$HERMES" python3 -m hmem.cli init >/dev/null && ok "Memory store (memory/, private)"
 if ! grep -q "## Command Centre role" "$HOME/.hermes/SOUL.md" 2>/dev/null; then
   mkdir -p "$HOME/.hermes"; { echo; tail -n +2 config/SOUL.hub.md; } >> "$HOME/.hermes/SOUL.md"
@@ -204,10 +236,9 @@ ok "Plugins linked into ~/.hermes/plugins/"
 # Workers can run for an hour: the hub must wait for them (backup first, like every config change).
 T="$(hermes config get timeouts.tools.sequential_call 2>/dev/null | tr -dc '0-9')"
 if [ "${T:-0}" -lt 3900 ]; then
-  CFG="$(hermes config path 2>/dev/null)"; BK="backups/setup-$(date +%Y%m%d-%H%M%S)"
-  [ -f "$CFG" ] && mkdir -p "$BK" && cp "$CFG" "$BK/"
+  backup_hermes_config
   hermes config set timeouts.tools.sequential_call 3900 >/dev/null 2>&1 \
-    && ok "Hub waits up to 65 min for workers${CFG:+ (old config saved in $BK/)}" \
+    && ok "Hub waits up to 65 min for workers" \
     || warn "Couldn't set the hub timeout. Add timeouts.tools.sequential_call: 3900 to ~/.hermes/config.yaml"
 else
   ok "Hub waits up to $((T / 60)) min for workers"

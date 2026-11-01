@@ -60,3 +60,10 @@ memory:
   dream_window_days: 60           # how far back each cycle looks
   dream_llm: false                # true = claude -p (subscription, no tools) rephrases proposals; verified against evidence
   dream_skills: false             # skill candidates are reported; proposing them stays manual (`hmem propose skill`)
+
+# Updates: Tabbie checks this GitHub repo for a newer version (read-only, hourly) and asks before
+# downloading it (WebUI card or `bin/hub update`). check: false turns the check off.
+updates:
+  repo: aaronyaml/Tabbie
+  branch: main
+  check: true

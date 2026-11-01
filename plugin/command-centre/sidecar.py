@@ -11,6 +11,7 @@ GET /request?id=<request id>        -> one request's agents + question rounds
 GET /executor?id=<webui session id> -> the conversation's executor choice + the picker catalog
 POST /executor {id, provider, model, effort} -> set it (composer model picker)
 GET /agents, POST /agents {enabled}  -> which coding agents this install uses (Claude Code, Codex, both)
+GET /update[?force=1], POST /update, POST /update/restart -> Tabbie updates from GitHub (asked first)
 GET|POST /projects/*, GET /fs/*      -> Projects UI (hmem/api.py): registry, memory, Dreamer, proposals
 """
 
@@ -40,6 +41,7 @@ agents = importlib.import_module("cc_sidecar_pkg.agents")
 common = importlib.import_module("cc_sidecar_pkg.common")
 executor_choice = importlib.import_module("cc_sidecar_pkg.executor_choice")
 providers = importlib.import_module("cc_sidecar_pkg.providers")
+updates = importlib.import_module("cc_sidecar_pkg.updates")
 _HERMES_HOME = str(PKG.parents[1])  # ~/hermes: hmem (memory + Projects) lives here
 if _HERMES_HOME not in sys.path:
     sys.path.insert(0, _HERMES_HOME)
@@ -197,6 +199,18 @@ def set_agents(body: dict) -> tuple[int, dict]:
     return 200, agents_payload()
 
 
+def update_payload(force: bool = False) -> dict:
+    s = updates.settings()
+    if not s.get("check", True):
+        return {"available": False, "disabled": True}
+    return {**updates.check(force), "pending_restart": updates.pending_restart()}
+
+
+def _exit_soon() -> None:
+    """Restart the sidecar after this reply is sent; launchd (KeepAlive) starts the new code."""
+    threading.Thread(target=lambda: (__import__("time").sleep(1.0), os._exit(0)), daemon=True).start()
+
+
 def set_executor(body: dict) -> tuple[int, dict]:
     sid = str(body.get("id") or "")
     if not _SID.match(sid):
@@ -246,6 +260,8 @@ class Handler(BaseHTTPRequestHandler):
                 return self._send(200, executor_payload(sid))
             if u.path == "/agents":
                 return self._send(200, agents_payload())
+            if u.path == "/update":
+                return self._send(200, update_payload(q.get("force") == "1"))
             if u.path == "/title":
                 return self._send(200, title_for(q.get("text", "")))
             if u.path == "/request":
@@ -275,6 +291,12 @@ class Handler(BaseHTTPRequestHandler):
                 return self._send(*set_executor(body))
             if u.path == "/agents" and isinstance(body, dict):
                 return self._send(*set_agents(body))
+            if u.path == "/update":
+                res = updates.apply()
+                return self._send(200 if res["ok"] else 409, res)
+            if u.path == "/update/restart":
+                res = updates.restart(after_reply=_exit_soon)
+                return self._send(200 if res["ok"] else 409, res)
         except json.JSONDecodeError:
             return self._send(400, {"error": "bad json"})
         except Exception as exc:
