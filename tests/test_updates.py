@@ -79,3 +79,31 @@ def test_needs():
     assert up._needs(["webui-extension/x.js"]) == ["reload"]
     assert up._needs(["plugin/command-centre/router.py"]) == ["gateway", "sidecar"]
     assert up._needs(["services/Caddyfile", "bin/setup", "README.md"]) == ["caddy", "setup"]
+
+
+def test_restart_waits_until_idle(tmp_path, monkeypatch):
+    import time as _t
+    _root(tmp_path, monkeypatch)
+    up._save_state({"needs": ["gateway"]})
+    state = {"busy": True}
+    restarted = []
+    monkeypatch.setattr(up, "busy", lambda: state["busy"])
+    monkeypatch.setattr(up, "restart", lambda after_reply=None: restarted.append(1) or up._save_state({}) or {"ok": True})
+    monkeypatch.setattr(up, "POLL", 0.02)
+    monkeypatch.setattr(up, "IDLE_GRACE", 0.06)
+    up._waiter["thread"] = None
+    assert up.restart_when_idle() == {"ok": True, "waiting": True}
+    assert up.waiting()
+    _t.sleep(0.15)
+    assert not restarted  # a Motion render / worker is still running
+    state["busy"] = False
+    _t.sleep(0.3)
+    assert restarted == [1] and not up.waiting()
+
+
+def test_restart_now_when_idle(tmp_path, monkeypatch):
+    _root(tmp_path, monkeypatch)
+    up._save_state({"needs": ["gateway"]})
+    monkeypatch.setattr(up, "busy", lambda: False)
+    monkeypatch.setattr(up, "restart", lambda after_reply=None: {"ok": True, "restarted": ["gateway"]})
+    assert up.restart_when_idle() == {"ok": True, "restarted": ["gateway"]}

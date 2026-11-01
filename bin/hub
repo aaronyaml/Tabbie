@@ -99,7 +99,11 @@ if u.pending_restart():
     if not ask("Restart Tabbie's services now to finish? (waits if a request is running)"):
         print("Later: bin/hub update"); sys.exit(0)
     if u.busy():
-        print("A request is running. Run bin/hub update again when it finishes."); sys.exit(1)
+        # the sidecar watches for idle and restarts then (updates.resume on its start)
+        st = u._state(); st["restart_when_idle"] = True; u._save_state(st)
+        os.system(f"launchctl kickstart -k gui/{os.getuid()}/ai.hermes.cc-sidecar >/dev/null 2>&1")
+        print("Something is running (a request, a worker or a Motion render). Tabbie restarts by itself once it's idle.")
+        sys.exit(0)
     need = u.pending_restart()
     res = u.restart(after_reply=lambda: os.system(f"launchctl kickstart -k gui/{os.getuid()}/ai.hermes.cc-sidecar >/dev/null 2>&1"))
     print("Restarted: " + ", ".join(res.get("restarted") or need) if res["ok"] else res["error"])

@@ -11,7 +11,8 @@ GET /request?id=<request id>        -> one request's agents + question rounds
 GET /executor?id=<webui session id> -> the conversation's executor choice + the picker catalog
 POST /executor {id, provider, model, effort} -> set it (composer model picker)
 GET /agents, POST /agents {enabled}  -> which coding agents this install uses (Claude Code, Codex, both)
-GET /update[?force=1], POST /update, POST /update/restart -> Tabbie updates from GitHub (asked first)
+GET /update[?force=1], POST /update, POST /update/restart -> Tabbie updates from GitHub (asked first;
+                                     the restart waits until nothing is running)
 POST /hub {provider}, POST /hub/claude-login -> finish the hub's sign-in from the WebUI (hub_setup.py)
 GET|POST /projects/*, GET /fs/*      -> Projects UI (hmem/api.py): registry, memory, Dreamer, proposals
 GET /motion/status, POST /motion/ensure -> the Motion studio folder (created from the template when missing,
@@ -209,7 +210,7 @@ def update_payload(force: bool = False) -> dict:
     s = updates.settings()
     if not s.get("check", True):
         return {"available": False, "disabled": True}
-    return {**updates.check(force), "pending_restart": updates.pending_restart()}
+    return {**updates.check(force), "pending_restart": updates.pending_restart(), "restart_waiting": updates.waiting()}
 
 
 def _exit_soon() -> None:
@@ -313,7 +314,7 @@ class Handler(BaseHTTPRequestHandler):
                 res = hub_setup.claude_login()
                 return self._send(200 if res["ok"] else 400, res)
             if u.path == "/update/restart":
-                res = updates.restart(after_reply=_exit_soon)
+                res = updates.restart_when_idle(after_reply=_exit_soon)
                 return self._send(200 if res["ok"] else 409, res)
         except json.JSONDecodeError:
             return self._send(400, {"error": "bad json"})
@@ -327,6 +328,7 @@ def main():
     ThreadingHTTPServer.allow_reuse_address = True
     srv = ThreadingHTTPServer((HOST, PORT), Handler)
     srv.daemon_threads = True
+    updates.resume(after_reply=_exit_soon)  # a restart deferred until Tabbie is idle
     srv.serve_forever()
 
 

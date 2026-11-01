@@ -194,7 +194,7 @@ def busy() -> bool:
                 continue
             if st in ("executing", "planning"):
                 return True
-    out = subprocess.run(["pgrep", "-f", r"claude -p|codex exec"], capture_output=True, text=True)
+    out = subprocess.run(["pgrep", "-f", r"claude -p|codex exec|remotion render"], capture_output=True, text=True)
     return bool(out.stdout.strip())
 
 
@@ -222,3 +222,54 @@ def restart(after_reply=None) -> dict:
         after_reply()
         done.append("sidecar")
     return {"ok": True, "restarted": done}
+
+
+# ---------------------------------------------------------------- restart when idle
+# Downloading an update never touches running work (Motion's studio folder is git-ignored and
+# workers keep their files open). Only the restart could cut something off, so it waits: for any
+# request, worker or Motion render to finish, then IDLE_GRACE seconds more so the hub can finish
+# writing its reply. The wish survives a sidecar restart (state file); the sidecar resumes it.
+IDLE_GRACE = 90
+POLL = 15
+_waiter: dict = {"thread": None}
+
+
+def waiting() -> bool:
+    return bool(_state().get("restart_when_idle")) and bool(pending_restart())
+
+
+def restart_when_idle(after_reply=None) -> dict:
+    """Restart now when nothing is running, else as soon as Tabbie has been idle for IDLE_GRACE s."""
+    if not pending_restart():
+        return {"ok": True, "restarted": []}
+    if not busy():
+        return restart(after_reply)
+    st = _state()
+    st["restart_when_idle"] = True
+    _save_state(st)
+    resume(after_reply)
+    return {"ok": True, "waiting": True}
+
+
+def resume(after_reply=None) -> None:
+    """Start the idle watcher if a deferred restart is pending (sidecar start, or a new request)."""
+    t = _waiter["thread"]
+    if not waiting() or (t and t.is_alive()):
+        return
+    import threading
+
+    def watch():
+        quiet = 0
+        while waiting():
+            quiet = 0 if busy() else quiet + POLL
+            if quiet >= IDLE_GRACE:
+                st = _state()
+                st.pop("restart_when_idle", None)
+                _save_state(st)
+                restart(after_reply)
+                return
+            time.sleep(POLL)
+
+    _waiter["thread"] = threading.Thread(target=watch, daemon=True, name="tabbie-update-restart")
+    _waiter["thread"].start()
+

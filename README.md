@@ -358,8 +358,10 @@ checker existed need one manual update first: `cd ~/hermes && git pull`, then `b
 - **In the Terminal**, run `bin/hub update`. It shows the changes and asks before downloading.
 
 After downloading:
-- **Restart now**, or answer yes in the Terminal, restarts the services that changed. It waits if a
-  request is running.
+- **Restart now**, or answer yes in the Terminal, restarts the services that changed. Updating never
+  interrupts work: downloading leaves running jobs (and the Motion studio folder) alone, and if a
+  request, worker or Motion render is running, the restart is scheduled instead and happens by itself
+  about a minute after everything finishes.
 - Interface-only updates just need a page reload.
 - If the update changed setup steps, it tells you to run `bin/setup` again.
 

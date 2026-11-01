@@ -2,7 +2,7 @@
  * Data: cc-agents sidecar via the WebUI's authenticated proxy:
  *   GET  …/sidecar/update          -> {available, ahead_by, commits, remote, pending_restart}
  *   POST …/sidecar/update          -> download it (fast-forward; local edits are never overwritten)
- *   POST …/sidecar/update/restart  -> restart what it touched, only when no request is running
+ *   POST …/sidecar/update/restart  -> restart what it touched now, or once nothing is running ({waiting: true})
  * "Later" hides the card until GitHub has something newer than what you dismissed.
  */
 (() => {
@@ -60,12 +60,16 @@
     const setup = needs.includes('setup') ? '<p class="hx-up-note">This update changed setup steps: run <code>bin/setup</code> on the Mac when convenient.</p>' : '';
     if (restart) {
       show(`<div class="hx-up-head"><b>Update downloaded</b>${res.from ? `<span>${esc(res.from)} → ${esc(res.to)}</span>` : ''}</div>`
-        + `<p class="hx-up-note">Restart Tabbie's services to finish. It waits if a request is running. A chat reply being written right now would stop.</p>${setup}`
+        + `<p class="hx-up-note">Restart Tabbie's services to finish. If anything is running (a request, a worker or a Motion render) it waits until that's done, so nothing is cut off.</p>${setup}`
         + `<div class="hx-up-btns"><button type="button" data-later-restart>Later</button><button type="button" class="hx-up-go" data-restart>Restart now</button></div>`);
     } else {
       show(`<div class="hx-up-head"><b>Update downloaded</b>${res.from ? `<span>${esc(res.from)} → ${esc(res.to)}</span>` : ''}</div>${setup}`
         + `<div class="hx-up-btns"><button type="button" class="hx-up-go" data-reload>Reload page</button></div>`);
     }
+  }
+  function waitingCard() {
+    show(`<div class="hx-up-head"><b>Restart scheduled</b></div><p class="hx-up-note">Tabbie is busy (a request, a worker or a Motion render), so nothing is restarted now. It restarts by itself a minute or so after everything finishes. Keep working.</p>`
+      + `<div class="hx-up-btns"><button type="button" data-close>OK</button></div>`);
   }
   function error(msg, retry) {
     show(`<div class="hx-up-head"><b>Couldn't update</b></div><p class="hx-up-note hx-up-err">${esc(msg)}</p>`
@@ -87,7 +91,8 @@
     if (t.hasAttribute('data-restart')) {
       busy('Restarting…');
       try {
-        await call('/restart', 'POST');
+        const r = await call('/restart', 'POST');
+        if (r && r.waiting) { waitingCard(); return; }
         setTimeout(() => location.reload(), 4000);  // gateway + sidecar come back in a few seconds
       } catch (err) { error(err.message || 'Try again later.', 'restart'); }
     }
@@ -101,7 +106,7 @@
     try { j = await call(force ? '?force=1' : '', 'GET'); }
     catch (err) { console.warn('[Tabbie updates] check failed:', err && err.message); return; }  // sidecar down / not allowed yet
     if (j.note) console.info('[Tabbie updates]', j.note);
-    if (j.pending_restart && j.pending_restart.length) { finished({ needs: j.pending_restart }); return; }
+    if (j.pending_restart && j.pending_restart.length) { if (!j.restart_waiting) finished({ needs: j.pending_restart }); return; }
     if (!j.available) {
       // A copy that can't fast-forward says so once per GitHub version, so it isn't silently stuck.
       if (j.note && j.remote && /can't update automatically/.test(j.note) && get(KEY) !== j.remote) {
