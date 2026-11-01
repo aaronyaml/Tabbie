@@ -1,0 +1,76 @@
+/* Spaces & Projects extension — scoped to .hxsp-* ; inherits WebUI theme tokens. */
+.hxsp-ico{display:inline-flex;align-items:center;justify-content:center;flex-shrink:0;line-height:0;}
+.hxsp-muted{font-size:12px;color:var(--muted);padding:4px 0;}
+.hxsp-icon-btn{display:inline-flex;align-items:center;justify-content:center;width:28px;height:28px;padding:0;border:none;border-radius:var(--radius-md,6px);background:transparent;color:var(--muted);cursor:pointer;flex-shrink:0;}
+.hxsp-icon-btn:hover,.hxsp-icon-btn.on{background:var(--hover-bg);color:var(--text);}
+.hxsp-icon-btn:focus-visible,.hxsp-ws-toggle:focus-visible,.hxsp-def:focus-visible,.hxsp-swatch:focus-visible{outline:2px solid var(--accent);outline-offset:1px;}
+
+/* folder list */
+.hxsp-folder-list{list-style:none;margin:0;padding:0;display:flex;flex-wrap:wrap;gap:6px;}
+.hxsp-folder-list li{display:inline-flex;align-items:center;gap:5px;max-width:100%;padding:3px 8px;border:1px solid var(--border);border-radius:999px;background:var(--surface-subtle,transparent);color:var(--text);font-size:12px;line-height:1.4;}
+.hxsp-folder-list li span:last-child{overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+.hxsp-folder-list .hxsp-ico{color:var(--muted);}
+.hxsp-folders-card .detail-card-title-row{margin-bottom:10px;}
+
+/* workspace picker rows */
+.ws-opt.hxsp-ws-opt{position:relative;padding-right:44px;}
+.hxsp-ws-toggle{position:absolute;top:6px;right:8px;width:30px;height:30px;display:inline-flex;align-items:center;justify-content:center;padding:0;border:none;border-radius:8px;background:transparent;color:var(--muted);cursor:pointer;}
+.hxsp-ws-toggle:hover,.hxsp-ws-toggle.on{background:var(--hover-bg);color:var(--text);}
+.hxsp-ws-children{width:100%;padding:4px 0 2px;cursor:default;}
+.hxsp-ws-children .hxsp-folder-list li{font-size:11px;padding:2px 7px;}
+
+/* chip context-menu item (matches the native inline-styled rows) */
+.hxsp-ctx-item{padding:7px 14px;cursor:pointer;font-size:13px;color:var(--text);}
+.hxsp-ctx-item:hover,.hxsp-ctx-item:focus-visible{background:var(--hover-bg);outline:none;}
+
+/* project sheet (reuses .app-dialog*, adds layout) */
+.hxsp-overlay{z-index:10050;}
+.hxsp-dialog{width:min(520px,100%);max-height:min(86vh,760px);display:flex;flex-direction:column;}
+.hxsp-head-right{display:flex;align-items:center;gap:8px;min-width:0;}
+.hxsp-switch{max-width:160px;height:32px;padding:0 8px;border:1px solid var(--border2,var(--border));border-radius:10px;background:var(--input-bg,transparent);color:var(--text);font-size:13px;}
+.hxsp-scroll{flex:1 1 auto;min-height:0;overflow-y:auto;-webkit-overflow-scrolling:touch;overscroll-behavior:contain;margin:0 -4px;padding:0 4px;}
+.hxsp-label{display:block;margin:14px 0 0;font-size:11px;font-weight:600;letter-spacing:.05em;text-transform:uppercase;color:var(--muted);}
+.hxsp-label:first-child{margin-top:4px;}
+.hxsp-label-row{display:flex;align-items:baseline;justify-content:space-between;gap:8px;}
+.hxsp-count{font-size:11px;font-weight:500;letter-spacing:0;text-transform:none;}
+.hxsp-dialog .app-dialog-input.hxsp-name,.hxsp-dialog .app-dialog-input.hxsp-filter{margin-top:6px;}
+.hxsp-swatches{display:flex;flex-wrap:wrap;gap:8px;margin-top:8px;}
+.hxsp-swatch{width:28px;height:28px;padding:0;border-radius:50%;border:2px solid transparent;cursor:pointer;box-shadow:inset 0 0 0 1px rgba(0,0,0,.15);}
+.hxsp-swatch.none{background:transparent;border-color:var(--border2,var(--border));background-image:linear-gradient(135deg,transparent 45%,var(--muted) 45%,var(--muted) 55%,transparent 55%);}
+.hxsp-swatch.on{border-color:var(--text);box-shadow:0 0 0 2px var(--surface,transparent) inset;}
+.hxsp-space-list{margin-top:8px;border:1px solid var(--border);border-radius:12px;overflow:hidden;}
+.hxsp-space{padding:4px 8px 4px 4px;border-top:1px solid var(--border);}
+.hxsp-space-top{display:flex;align-items:center;gap:6px;min-width:0;}
+.hxsp-space:first-child{border-top:none;}
+.hxsp-space.on{background:var(--accent-bg);}
+.hxsp-space[hidden]{display:none!important;}
+.hxsp-space-main{flex:1 1 auto;min-width:0;display:flex;align-items:center;gap:8px;padding:4px;cursor:pointer;min-height:36px;}
+.hxsp-cb{width:18px;height:18px;margin:0;flex-shrink:0;accent-color:var(--accent);cursor:pointer;}
+.hxsp-space-text{min-width:0;display:flex;flex-direction:column;}
+.hxsp-space-name{font-size:14px;color:var(--text);font-weight:500;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+.hxsp-space-path{font-size:11px;color:var(--muted);opacity:.8;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+.hxsp-def{flex-shrink:0;height:28px;padding:0 10px;border:1px solid var(--border2,var(--border));border-radius:999px;background:transparent;color:var(--muted);font-size:12px;font-weight:500;cursor:pointer;white-space:nowrap;}
+.hxsp-def:disabled{opacity:.35;cursor:default;}
+.hxsp-def.on{border-color:var(--accent);background:var(--accent-bg-strong);color:var(--accent-text,var(--accent));font-weight:600;}
+.hxsp-row-folders{padding:2px 4px 6px 34px;}
+.hxsp-row-folders[hidden]{display:none!important;}
+.hxsp-hint{margin-top:8px;font-size:12px;color:var(--muted);}
+.hxsp-error{margin-top:10px;font-size:13px;color:var(--error);}
+.hxsp-error[hidden]{display:none;}
+.hxsp-actions{margin-top:14px;flex-shrink:0;}
+
+/* iPhone / narrow: bottom sheet, 16px inputs (no iOS zoom), bigger targets */
+@media (max-width:640px){
+  .hxsp-overlay{align-items:flex-end;padding:0;}
+  .hxsp-dialog{width:100%;max-height:calc(100dvh - 24px - env(safe-area-inset-top,0px));border-radius:18px 18px 0 0;border-bottom:none;padding:14px 16px calc(14px + env(safe-area-inset-bottom,0px));}
+  .hxsp-dialog .app-dialog-input,.hxsp-switch{font-size:16px;}
+  .hxsp-switch{max-width:140px;height:36px;}
+  .hxsp-space-main{min-height:44px;}
+  .hxsp-cb{width:20px;height:20px;}
+  .hxsp-def{height:32px;}
+  .hxsp-icon-btn{width:34px;height:34px;}
+  .hxsp-swatch{width:32px;height:32px;}
+  .hxsp-actions{display:grid;grid-template-columns:1fr 1fr;gap:10px;}
+  .hxsp-actions .app-dialog-btn{min-width:0;min-height:44px;}
+  .hxsp-ws-toggle{width:36px;height:36px;top:4px;}
+}

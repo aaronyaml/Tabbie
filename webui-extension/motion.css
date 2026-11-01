@@ -1,0 +1,21 @@
+/* Tabbie — Motion (motion.js): sidebar entry, Zoetie in motion sessions. The studio is motion-studio.css. */
+
+/* ── sidebar entry: same look as its neighbours; "on" while the studio is open ── */
+html.hx-studio-open .rail .rail-btn.nav-tab.active,
+html.hx-studio-open .sidebar-nav .nav-tab.active { background: transparent !important; color: var(--hx-text-2) !important; }
+html.hx-studio-open .rail .rail-btn.nav-tab.active:hover { background: var(--hover-bg) !important; color: var(--hx-text) !important; }
+.rail-btn.hx-mo-nav.hx-mo-on, .sidebar-nav .nav-tab.hx-mo-nav.hx-mo-on { background: var(--hx-fill-2) !important; color: var(--hx-text) !important; }
+.hx-mo-nav svg { flex: none; }
+
+/* ── Zoetie stands in for Tabbie in motion sessions ── */
+html.hx-mo .role-icon.assistant { background-image: url("brand/zoetie-256.png?v=1") !important; }
+html.hx-mo .hx-ls-buddy, html.hx-mo #hxFlyer .hx-fl-still { background-image: url("brand/zoetie-256.png?v=1"); }
+
+/* ── motion sessions are studio-only: never a chat row, never a raw transcript ── */
+.session-item.hx-mo-row { display: none !important; }
+html.hx-mo-raw #messages, html.hx-mo-raw #msgInner { visibility: hidden !important; }
+/* upstream mirrors id'd rail buttons into the drawer's nav; ours already has its own entry under Chat */
+#hxMotionRailMobile { display: none !important; }
+/* /motion URLs: motion-boot.js sets this before the page paints; the studio clears it once it renders */
+html.hx-mo-boot .layout > .main, html.hx-mo-boot .layout > .rightpanel { visibility: hidden !important; }
+@media (min-width: 641px) { html.hx-mo-boot .layout > .sidebar { visibility: hidden !important; } }

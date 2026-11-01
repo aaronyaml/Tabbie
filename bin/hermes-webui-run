@@ -1,0 +1,6 @@
+#!/bin/bash
+# launchd entrypoint for Hermes WebUI: same bootstrap ctl.sh uses, in the foreground.
+cd "$HOME/hermes/hermes-webui" || exit 1
+set -a; [ -f .env ] && . ./.env; set +a
+export PATH="$HOME/.local/bin:/opt/homebrew/bin:/usr/local/bin:/usr/bin:/bin:/usr/sbin:/sbin"
+exec /usr/bin/env python3 bootstrap.py --no-browser --foreground --host "${HERMES_WEBUI_HOST:-127.0.0.1}" "${HERMES_WEBUI_PORT:-8787}"

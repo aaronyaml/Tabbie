@@ -1,0 +1,6 @@
+name: workboard
+version: "1.0.0"
+description: >-
+  Kanban cards and todos shared by Hermes and the WebUI (one store: Hermes' kanban DB).
+  Full CRUD + actions as tools, /board and /todos commands, and [[kanban:id]] / [[todo:id]]
+  embed tokens the WebUI extension renders as live cards.

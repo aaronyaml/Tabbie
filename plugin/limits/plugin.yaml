@@ -1,0 +1,6 @@
+name: limits
+version: "1.0.0"
+description: >-
+  /limit — usage limits for every subscription the command centre uses (Claude Max, ChatGPT via
+  Codex/Astra + Hermes hub, Higgsfield credits, ElevenLabs), as % used and reset times.
+  Also exposes the usage_limits tool.

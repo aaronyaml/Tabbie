@@ -1,0 +1,24 @@
+#!/bin/bash
+# Publishes hermes.local -> this Mac's current LAN IPv4 via Bonjour (mDNS proxy record).
+# The Mac's own hostname is untouched. Re-registers when the IP changes. Run by launchd.
+NAME="${HERMES_MDNS_NAME:-hermes.local}"
+pid=""; ip=""
+cleanup() { [ -n "$pid" ] && kill "$pid" 2>/dev/null; exit 0; }
+trap cleanup TERM INT
+current_ip() {
+  local ifc; ifc=$(route -n get default 2>/dev/null | awk '/interface:/{print $2}')
+  [ -n "$ifc" ] && ipconfig getifaddr "$ifc" 2>/dev/null
+}
+while true; do
+  new=$(current_ip)
+  if [ "$new" != "$ip" ] || { [ -n "$pid" ] && ! kill -0 "$pid" 2>/dev/null; }; then
+    [ -n "$pid" ] && kill "$pid" 2>/dev/null && wait "$pid" 2>/dev/null
+    pid=""; ip="$new"
+    if [ -n "$ip" ]; then
+      /usr/bin/dns-sd -P "Hermes" _https._tcp local 443 "$NAME" "$ip" path=/ >/dev/null 2>&1 &
+      pid=$!
+      echo "$(date '+%F %T') published $NAME -> $ip (pid $pid)"
+    fi
+  fi
+  sleep 30
+done

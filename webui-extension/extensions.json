@@ -1,0 +1,239 @@
+{
+  "extensions": [
+    {
+      "id": "local",
+      "name": "Local settings (local.js, written by bin/setup)",
+      "scripts": [
+        "local.js?v=1"
+      ],
+      "stylesheets": []
+    },
+    {
+      "id": "spaces-projects",
+      "name": "Spaces & Projects",
+      "scripts": [
+        "spaces-projects.js?v=4"
+      ],
+      "stylesheets": [
+        "spaces-projects.css?v=4"
+      ]
+    },
+    {
+      "id": "apple-skin",
+      "name": "Apple skin",
+      "scripts": [
+        "apple-skin.js?v=9"
+      ],
+      "stylesheets": [
+        "apple-skin.css?v=13"
+      ]
+    },
+    {
+      "id": "brand",
+      "name": "Tabbie name",
+      "scripts": [
+        "brand.js?v=1"
+      ],
+      "stylesheets": []
+    },
+    {
+      "id": "hugeicons",
+      "name": "Hugeicons",
+      "scripts": [
+        "hugeicons.js?v=6"
+      ],
+      "stylesheets": [
+        "hugeicons.css?v=6"
+      ]
+    },
+    {
+      "id": "status-words",
+      "name": "Status words",
+      "scripts": [
+        "status-words.js?v=26"
+      ],
+      "stylesheets": []
+    },
+    {
+      "id": "files",
+      "name": "File cards & viewer",
+      "scripts": [
+        "files.js?v=2"
+      ],
+      "stylesheets": [
+        "files.css?v=4"
+      ]
+    },
+    {
+      "id": "sidebar-toggle",
+      "name": "Sidebar toggle",
+      "scripts": [
+        "sidebar-toggle.js?v=3"
+      ],
+      "stylesheets": []
+    },
+    {
+      "id": "attach-fix",
+      "name": "Attach fixes",
+      "scripts": [
+        "attach-fix.js?v=1"
+      ],
+      "stylesheets": []
+    },
+    {
+      "id": "empty-session-fix",
+      "name": "Empty session reload fix",
+      "scripts": [
+        "empty-session-fix.js?v=2"
+      ],
+      "stylesheets": []
+    },
+    {
+      "id": "workboard",
+      "name": "Workboard embeds",
+      "scripts": [
+        "workboard.js?v=4"
+      ],
+      "stylesheets": [
+        "workboard.css?v=4"
+      ]
+    },
+    {
+      "id": "idle-buddy",
+      "name": "Idle buddy animation",
+      "scripts": [
+        "idle-buddy.js?v=7"
+      ],
+      "stylesheets": []
+    },
+    {
+      "id": "cc-agents",
+      "name": "Agents & questions",
+      "scripts": [
+        "cc-agents.js?v=9"
+      ],
+      "stylesheets": [
+        "cc-agents.css?v=5"
+      ],
+      "sidecar": {
+        "type": "loopback",
+        "origin": "http://127.0.0.1:8794",
+        "health_path": "/health",
+        "proxy_auth": "token-v1"
+      }
+    },
+    {
+      "id": "pwa-polish",
+      "name": "Phone app polish",
+      "scripts": [
+        "pwa-polish.js?v=5"
+      ],
+      "stylesheets": [
+        "pwa-polish.css?v=3"
+      ]
+    },
+    {
+      "id": "follow-scroll",
+      "name": "Follow streaming reply",
+      "scripts": [
+        "follow-scroll.js?v=2"
+      ],
+      "stylesheets": []
+    },
+    {
+      "id": "home",
+      "name": "New-chat home",
+      "scripts": [
+        "home.js?v=4"
+      ],
+      "stylesheets": [
+        "home.css?v=3"
+      ]
+    },
+    {
+      "id": "auto-title",
+      "name": "Auto title",
+      "scripts": [
+        "auto-title.js?v=2"
+      ],
+      "stylesheets": []
+    },
+    {
+      "id": "instant-delete",
+      "name": "Instant session delete",
+      "scripts": [
+        "instant-delete.js?v=2"
+      ],
+      "stylesheets": []
+    },
+    {
+      "id": "lazy-new-chat",
+      "name": "Lazy new chat",
+      "scripts": [
+        "lazy-new-chat.js?v=1"
+      ],
+      "stylesheets": []
+    },
+    {
+      "id": "motion",
+      "name": "Motion studio (Zoetie)",
+      "scripts": [
+        "motion.js?v=6",
+        "motion-scrub.js?v=6",
+        "motion-studio.js?v=19"
+      ],
+      "stylesheets": [
+        "motion.css?v=6",
+        "motion-studio.css?v=12"
+      ]
+    },
+    {
+      "id": "projects",
+      "name": "Projects (multi-folder, memory, Dreamer)",
+      "scripts": [
+        "projects.js?v=4"
+      ],
+      "stylesheets": [
+        "projects.css?v=4"
+      ]
+    },
+    {
+      "id": "model-picker",
+      "name": "Model picker",
+      "scripts": [
+        "model-picker.js?v=2"
+      ],
+      "stylesheets": [
+        "model-picker.css?v=2"
+      ]
+    },
+    {
+      "id": "fast-switch",
+      "name": "Fast session switch",
+      "scripts": [
+        "fast-switch.js?v=2"
+      ],
+      "stylesheets": []
+    },
+    {
+      "id": "message-queue",
+      "name": "Message queue & send now",
+      "scripts": [
+        "message-queue.js?v=1"
+      ],
+      "stylesheets": [
+        "message-queue.css?v=2"
+      ]
+    },
+    {
+      "id": "limits-view",
+      "name": "Usage limit cards",
+      "scripts": [
+        "limits-view.js?v=3"
+      ],
+      "stylesheets": [
+        "limits-view.css?v=1"
+      ]
+    }
+  ]
+}

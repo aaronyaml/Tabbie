@@ -1,0 +1,90 @@
+#!/usr/bin/env python3
+"""Import Claude Code project folders into the Command Centre and the WebUI workspace picker.
+
+A "Claude folder" is a directory under ~ (or ~/Developer) that has a .claude/ dir or CLAUDE.md,
+or that Claude Code has a session history for (~/.claude/projects). Safe to re-run: existing
+entries are kept, new ones appended. The "General" workspace (generic chat, no project) is
+always first.
+
+Usage: cc-import-projects [--dry-run]
+"""
+
+import json
+import re
+import sys
+from pathlib import Path
+
+HOME = Path.home()
+ROOT = HOME / "hermes"
+GENERAL = ROOT / "general"
+PROJECTS_YAML = ROOT / "config" / "projects.yaml"
+WORKSPACES = HOME / ".hermes" / "webui" / "workspaces.json"
+SKIP = {"Library", "Applications", "Desktop", "Documents", "Downloads", "Movies", "Music",
+        "Pictures", "Public", "hermes-onboarding-test"}
+
+
+def candidates() -> list[Path]:
+    found: set[Path] = set()
+    for base in (HOME, HOME / "Developer"):
+        if not base.is_dir():
+            continue
+        for d in base.iterdir():
+            if d.is_dir() and not d.name.startswith(".") and d.name not in SKIP:
+                if (d / ".claude").is_dir() or (d / "CLAUDE.md").is_file():
+                    found.add(d.resolve())
+    # Folders Claude Code has sessions for: ~/.claude/projects/-Users-me-<name>
+    prefix = "-" + str(HOME).strip("/").replace("/", "-") + "-"
+    for enc in (HOME / ".claude" / "projects").glob(prefix + "*"):
+        d = HOME / enc.name[len(prefix):]
+        if d.is_dir() and d.parent == HOME and d.name not in SKIP and not d.name.startswith("."):
+            found.add(d.resolve())
+    found.discard(GENERAL.resolve())
+    return sorted(found, key=lambda p: p.name.lower())
+
+
+def short_name(p: Path) -> str:
+    return re.sub(r"[^a-z0-9._-]+", "-", p.name.lower()).strip("-")
+
+
+def main() -> None:
+    dry = "--dry-run" in sys.argv
+    found = candidates()
+    GENERAL.mkdir(parents=True, exist_ok=True)
+
+    from ruamel.yaml import YAML  # available in the Hermes runtime and via `uv run --with`
+    yaml = YAML()
+    data = yaml.load(PROJECTS_YAML.read_text()) if PROJECTS_YAML.exists() else {}
+    data = data or {}
+    projects = data.setdefault("projects", {})
+    known_paths = {str(Path(str(v)).expanduser().resolve()) for v in projects.values()}
+    added_projects = []
+    for p in found:
+        if str(p) not in known_paths:
+            name = short_name(p)
+            while name in projects:
+                name += "-2"
+            projects[name] = str(p).replace(str(HOME), "~", 1)
+            added_projects.append(name)
+
+    ws = json.loads(WORKSPACES.read_text()) if WORKSPACES.exists() else []
+    ws_paths = {str(Path(w["path"]).expanduser().resolve()) for w in ws if w.get("path")}
+    new_ws = [] if str(GENERAL.resolve()) in ws_paths else [{"path": str(GENERAL), "name": "General (chat)"}]
+    for p in found:
+        if str(p) not in ws_paths:
+            new_ws.append({"path": str(p), "name": p.name})
+    general = [w for w in ws + new_ws if Path(w["path"]).expanduser().resolve() == GENERAL.resolve()]
+    rest = sorted((w for w in ws + new_ws if w not in general), key=lambda w: w["name"].lower())
+
+    print(f"found {len(found)} Claude folders; +{len(added_projects)} projects, +{len(new_ws)} workspaces")
+    if dry:
+        for p in found:
+            print("  ", p)
+        return
+    with PROJECTS_YAML.open("w") as fh:
+        yaml.dump(data, fh)
+    WORKSPACES.parent.mkdir(parents=True, exist_ok=True)
+    WORKSPACES.write_text(json.dumps(general + rest, indent=2))
+
+
+if __name__ == "__main__":
+    main()

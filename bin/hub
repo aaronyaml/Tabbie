@@ -1,0 +1,52 @@
+#!/bin/bash
+# hub — one command for the Hermes command centre.
+#   hub              open Hermes WebUI (https://hermes.local)
+#   hub cli          Hermes in the terminal (same config, routing, sessions)
+#   hub health       lightweight health check of every component
+#   hub restart      restart gateway + WebUI + proxy + mDNS
+#   hub logs [name]  tail logs: webui | gateway | caddy | mdns | decisions
+#   hub import       import Claude project folders into Hermes + WebUI spaces
+#   hub limits       usage limits: Claude Max, ChatGPT (Astra + hub), Higgsfield, ElevenLabs
+export PATH="$HOME/.local/bin:/opt/homebrew/bin:$PATH"
+UID_=$(id -u)
+ok()   { printf '  \033[32m✓\033[0m %s\n' "$1"; }
+bad()  { printf '  \033[31m✗\033[0m %s\n' "$1"; }
+check() { if eval "$2" >/dev/null 2>&1; then ok "$1"; else bad "$1${3:+ — $3}"; fi; }
+
+case "${1:-open}" in
+  open) open "https://hermes.local" ;;
+  cli) shift; exec hermes "$@" ;;
+  health)
+    echo "Hermes command centre"
+    check "Hermes gateway (launchd)"  "hermes gateway status | grep -q -E 'running|supervised'" "hermes gateway install"
+    check "Hermes WebUI"              "curl -sf -m 5 http://127.0.0.1:8787/health" "hub logs webui"
+    check "HTTPS proxy (Caddy)"       "launchctl list ai.hermes.caddy | grep -q '\"PID\"'" "hub logs caddy"
+    check "hermes.local (mDNS)"       "dscacheutil -q host -a name hermes.local | grep -q ip_address" "hub logs mdns"
+    check "WebUI via hermes.local"    "curl -sk -m 5 -o /dev/null -w '%{http_code}' https://hermes.local/login | grep -q 200"
+    check "Router plugin loaded"      "hermes plugins list | grep command-centre | grep -q enabled"
+    check "Limits plugin loaded"      "hermes plugins list | grep limits | grep -q enabled"
+    check "Fragment memory loaded"    "hermes plugins list | grep fragment-memory | grep -q enabled"
+    check "Claude (Max OAuth)"        "claude auth status | grep -q '\"authMethod\": \"claude.ai\"'" "claude auth login"
+    check "OpenAI/Astra (ChatGPT)"    "codex login status 2>&1 | grep -q ChatGPT" "codex login"
+    check "Hermes hub on ChatGPT"     "hermes auth list | grep -A2 openai-codex | grep -q oauth" "hermes auth add openai-codex --type oauth"
+    check "Astra model exposed"       "grep -q '\"gpt-6-astra\"' ~/.codex/models_cache.json"
+    check "Higgsfield"                "higgsfield account status" "higgsfield auth login"
+    check "ElevenLabs MCP (OAuth)"    "test -s ~/.hermes/mcp-tokens/elevenlabs.json" "hermes mcp login elevenlabs"
+    check "Attachments store"         "test -w ~/hermes/state"
+    ;;
+  restart)
+    hermes gateway restart >/dev/null 2>&1
+    for s in webui caddy mdns; do launchctl kickstart -k "gui/$UID_/ai.hermes.$s"; done
+    echo "restarted" ;;
+  logs)
+    case "${2:-webui}" in
+      webui) tail -n 60 ~/.hermes/webui.log ;;
+      gateway) tail -n 60 ~/.hermes/logs/gateway.log ;;
+      caddy) tail -n 40 ~/hermes/state/logs/caddy.log ;;
+      mdns) tail -n 20 ~/hermes/state/logs/mdns.log ;;
+      decisions) tail -n 30 ~/hermes/state/decisions.jsonl ;;
+    esac ;;
+  import) uv run --no-project -q --with ruamel.yaml python ~/hermes/bin/cc-import-projects "${@:2}" ;;
+  limits) python3 ~/hermes/plugin/limits/__init__.py "${@:2}" ;;
+  *) sed -n 2,9p "$0" ;;
+esac

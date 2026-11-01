@@ -1,0 +1,61 @@
+# ── Private runtime state: requests, attachments, sessions, logs, memory ─────────────────────────
+/state/
+/memory/
+/backups/
+/workspaces/
+/sandbox/
+/general/*
+!/general/README.md
+tests/fixtures/out/
+*.log
+
+# ── Credentials: never in this repo (every provider uses its own OAuth login) ──────────────────
+.env
+.env.*
+*.env
+!*.env.example
+*token*
+*credential*
+*secret*
+auth.json
+mcp-tokens/
+*.pem
+*.key
+*.p12
+*.mobileprovision
+id_rsa*
+id_ed25519*
+
+# ── Per-machine config (bin/setup writes these from the *.example files) ────────────────────────
+config/projects.yaml
+webui-extension/local.js
+services/*.plist
+/hermes-webui/
+
+# ── Brand working files (sources, renders, research, generation logs) ───────────────────────────
+brand/screens/
+brand/research/
+brand/research.md
+brand/avatar/*
+!brand/avatar/current.png
+!brand/avatar/buddy-icon-square.png
+!brand/avatar/buddy-character.png
+!brand/avatar/idle/
+brand/avatar/idle/*
+!brand/avatar/idle/web/
+!brand/avatar/motion/
+brand/avatar/motion/*
+!brand/avatar/motion/web/
+brand/**/*.json
+!brand/web/manifest.json
+
+# ── Tooling ─────────────────────────────────────────────────────────────────────────────────────
+__pycache__/
+*.pyc
+.pytest_cache/
+.venv/
+node_modules/
+webui-extension/.build/
+.DS_Store
+.claude/
+CLAUDE.local.md

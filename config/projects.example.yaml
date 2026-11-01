@@ -1,0 +1,6 @@
+# Named folders the router can target ("@project:<name>" or by mentioning the name), plus
+# multi-folder workspaces. `bin/setup` copies this to projects.yaml (git-ignored: it lists your repos).
+# For grouped repos with memory and a Dreamer, prefer Projects in the WebUI (rail → Projects).
+projects:
+  hermes: ~/hermes
+  # my-app: ~/code/my-app

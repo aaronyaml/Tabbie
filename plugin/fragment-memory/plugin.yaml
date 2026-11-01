@@ -1,0 +1,5 @@
+name: fragment-memory
+version: "1.0.0"
+description: >-
+  Unbounded long-term memory as many small markdown fragments (one fact per file) under
+  ~/hermes/memory, with keyword search and per-turn recall of only the most relevant few.

@@ -1,0 +1,118 @@
+/* Hermes — message queue card + "Send now" (pairs with message-queue.js). Restyles upstream's
+ * #queueCard / #queuePill to the Apple skin: one floating raised card, quiet header, roomy rows. */
+
+/* card: floats above the composer like the composer itself */
+:root:root #queueCard { padding: 0 16px; }
+:root:root #queueCard .queue-card-inner {
+  background: var(--hx-raised, var(--surface));
+  border: 1px solid var(--hx-hair, var(--border));
+  border-radius: 16px;
+  box-shadow: var(--hx-shadow, 0 8px 24px rgba(0,0,0,.08));
+  margin-bottom: 10px;
+  padding: 4px 0;
+  max-height: 260px;
+  transform: translateY(12px);
+  transition: transform .25s var(--hx-ease, ease-out), opacity .2s ease;
+}
+:root:root #queueCard.visible .queue-card-inner { transform: translateY(0); }
+
+/* header: "2 queued · sends after this reply" ……… Combine  ×  ⌄ */
+:root:root #queueCard .queue-card-header {
+  border-bottom: 0;
+  padding: 8px 10px 4px 16px;
+  text-transform: none;
+  letter-spacing: 0;
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--hx-text, var(--text));
+  gap: 6px;
+}
+:root:root #queueCard .hxq-hint { font-weight: 400; color: var(--hx-text-2, var(--muted)); }
+:root:root #queueCard .hxq-hint::before { content: "·"; margin-right: 6px; }
+:root:root #queueCard .queue-card-btn {
+  border: 0;
+  border-radius: 999px;
+  padding: 4px 10px;
+  font-size: 12px;
+  color: var(--hx-text-2, var(--muted));
+}
+:root:root #queueCard .queue-card-btn:hover { background: var(--hover-bg); color: var(--hx-text, var(--text)); }
+:root:root #queueCard .queue-card-icon-btn {
+  opacity: 1;
+  color: var(--hx-text-2, var(--muted));
+  width: 26px; height: 26px;
+  justify-content: center;
+  border-radius: 999px;
+}
+:root:root #queueCard .queue-card-icon-btn:hover { background: var(--hover-bg); color: var(--hx-text, var(--text)); }
+
+/* rows */
+:root:root #queueCard .queue-card-row {
+  border-bottom: 0;
+  margin: 0 6px;
+  padding: 6px 6px 6px 10px;
+  border-radius: 10px;
+  gap: 6px;
+}
+:root:root #queueCard .queue-card-row:hover { background: var(--hover-bg); }
+:root:root #queueCard .queue-card-drag { display: none; }
+:root:root #queueCard .queue-card-text {
+  font-size: 14px;
+  line-height: 1.4;
+  padding: 3px 6px;
+  margin-left: -6px;
+  border-radius: 6px;
+}
+:root:root #queueCard .queue-card-text:focus { background: var(--hx-fill, var(--surface)); box-shadow: 0 0 0 2px var(--focus-ring); }
+:root:root #queueCard .queue-card-badges { opacity: 1; color: var(--hx-text-2, var(--muted)); font-size: 11px; }
+
+/* "Send now" — the one accented action in the card */
+.hxq-now, .hxq-composer-now {
+  display: inline-flex; align-items: center; gap: 4px;
+  flex-shrink: 0;
+  border: 0; cursor: pointer;
+  border-radius: 999px;
+  background: var(--hx-tint, rgba(48,84,253,.1));
+  color: var(--hx-ink, var(--accent));
+  font: 500 12px/1 var(--font-ui, system-ui);
+  white-space: nowrap;
+  transition: background .15s ease, opacity .15s ease, transform .1s ease;
+}
+.hxq-now { padding: 6px 10px 6px 8px; }
+.hxq-now:hover, .hxq-composer-now:hover { background: var(--hx-tint-strong, rgba(48,84,253,.16)); }
+.hxq-now:active, .hxq-composer-now:active { transform: scale(.96); }
+.hxq-now:disabled { opacity: .5; cursor: progress; }
+.hxq-now:focus-visible, .hxq-composer-now:focus-visible { outline: 2px solid var(--focus-ring-strong, var(--accent)); outline-offset: 2px; }
+
+/* composer: small pill left of the send button, only while a reply runs and there is a draft */
+.hxq-composer-now { display: none; height: 32px; padding: 0 12px 0 10px; margin-right: 6px; }
+.hxq-composer-now.show { display: inline-flex; animation: hxqIn .16s var(--hx-ease, ease-out); }
+@keyframes hxqIn { from { opacity: 0; transform: translateX(4px); } to { opacity: 1; transform: none; } }
+
+/* collapsed state pill: same floating card language */
+:root:root .queue-pill-outer { padding: 0 16px; }
+:root:root .queue-pill {
+  width: auto; margin: 0 auto 10px; display: flex; max-width: max-content;
+  border: 1px solid var(--hx-hair, var(--border));
+  border-radius: 999px;
+  background: var(--hx-raised, var(--surface));
+  box-shadow: var(--hx-shadow, none);
+  padding: 7px 12px;
+  text-transform: none; letter-spacing: 0;
+  font-size: 12px; font-weight: 500;
+  color: var(--hx-text-2, var(--muted));
+}
+:root:root .queue-pill-chevron { margin-left: 2px; }
+
+@media (max-width: 640px) {
+  :root:root #queueCard { padding: 0 10px; }
+  .hxq-now span { display: none; }
+  .hxq-now { padding: 6px; }
+  .hxq-composer-now span { display: none; }
+  .hxq-composer-now { width: 32px; padding: 0; justify-content: center; }
+}
+@media (prefers-reduced-motion: reduce) {
+  :root:root #queueCard .queue-card-inner, .hxq-composer-now.show { transition: none; animation: none; }
+}
+/* the per-row model label is noise here; keep the attachment count */
+:root:root #queueCard .queue-card-badges > span:not(.queue-card-file-badge) { display: none; }

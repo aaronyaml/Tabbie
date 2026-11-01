@@ -1,0 +1,62 @@
+# Command Centre routing configuration.
+# Read on every request by the command-centre Hermes plugin — edits apply immediately, no restart.
+
+# ---------------------------------------------------------------------------
+# Planner (Route B). Swap provider/model here; nothing else needs to change.
+#   provider: codex-cli   -> `codex exec` on your ChatGPT subscription (OAuth in ~/.codex)
+#   provider: claude-cli  -> `claude -p` on your Claude Max subscription
+# The model must actually be exposed to that CLI. If it is not, planning fails
+# loudly — it is never silently replaced by another model.
+# ---------------------------------------------------------------------------
+planner:
+  provider: codex-cli
+  model: gpt-6-astra
+  label: "GPT-6 Astra"
+  reasoning_effort: high        # codex model_reasoning_effort
+  timeout_seconds: 900
+
+# ---------------------------------------------------------------------------
+# Executor (Routes A and B after approval). Claude Code on Claude Max OAuth.
+# ---------------------------------------------------------------------------
+executor:
+  provider: claude-cli
+  model: null                   # null = Claude Code's own default model
+  permission_mode: auto         # auto | acceptEdits | bypassPermissions | dontAsk
+  timeout_seconds: 10800         # 3h: long renders (motion) outlast 1h
+  max_parallel: 10              # Claude jobs across ALL conversations; each conversation queues its own
+                                # (8 GB M1: each job ~300-600 MB; macOS swaps beyond ~5-6 heavy jobs)
+  queue_wait_seconds: 1800      # how long a request waits for a free worker slot
+  resume_project_session: true  # follow-ups in the same project continue the last Claude session
+  resume_max_age_minutes: 120
+  max_subagents: 2              # guidance passed to Claude about parallel subagents
+
+# ---------------------------------------------------------------------------
+# Router heuristics. Score >= plan_threshold goes to the planner.
+# When unsure the router defaults to Claude.
+# ---------------------------------------------------------------------------
+router:
+  plan_threshold: 3
+  llm_tiebreak: true            # ask the hub model only when the score lands exactly on threshold-1
+  hub_answers_chat: false       # false = Claude executes every request, chat included; the hub only routes
+  overrides:
+    claude: ["@claude", "claude:"]
+    hermes: ["@hermes", "hermes:", "@tabbie", "tabbie:"]   # the hub (Tabbie) answers this one itself (no Claude)
+    astra: ["@astra", "astra:", "@plan", "plan:"]
+
+attachments:
+  max_file_mb: 500
+  zip_max_total_mb: 1000
+  zip_max_files: 5000
+
+# ---------------------------------------------------------------------------
+# Institutional memory + Dreamer (hmem). See docs/memory/ARCHITECTURE.md.
+# Read on every dream cycle; no restart needed.
+# ---------------------------------------------------------------------------
+memory:
+  dream_after_sessions: 20        # background dream once this many new traces exist since the last cycle
+  min_support: 3                  # a pattern must recur in this many distinct conversations…
+  min_days: 2                     # …on at least this many different days, before it is proposed
+  max_proposals_per_cycle: 5      # keeps review short; the rest stay in the dream report
+  dream_window_days: 60           # how far back each cycle looks
+  dream_llm: false                # true = claude -p (subscription, no tools) rephrases proposals; verified against evidence
+  dream_skills: false             # skill candidates are reported; proposing them stays manual (`hmem propose skill`)

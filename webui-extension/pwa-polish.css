@@ -1,0 +1,56 @@
+/* Hermes — phone / home-screen app polish (max-width 640px). Pairs with pwa-polish.js.
+ * - Title bar: same colour as the page, no hairline until the chat scrolls under it, so the
+ *   status bar, bar and page read as one surface (iOS large-title style).
+ * - Bigger tap targets, quieter controls; no Reload button in the installed app (pull to refresh).
+ * - Composer sits on the home-indicator inset only; the keyboard inset applies only while typing.
+ */
+@media (max-width: 640px) {
+  .app-titlebar {
+    background: var(--hx-bg) !important;
+    -webkit-backdrop-filter: none !important; backdrop-filter: none !important;
+    border-bottom: 0.5px solid transparent !important;
+    height: 46px !important;
+    transition: border-color .2s, background-color .2s;
+  }
+  html.hx-scrolled .app-titlebar {
+    background: var(--hx-glass) !important;
+    -webkit-backdrop-filter: saturate(180%) blur(20px) !important; backdrop-filter: saturate(180%) blur(20px) !important;
+    border-bottom-color: var(--hx-hair) !important;
+  }
+  .app-titlebar-icon { display: none !important; }
+  .app-titlebar-title { font-size: 16px !important; font-weight: 600 !important; letter-spacing: -0.02em; }
+  .app-titlebar .session-count-badge, .app-titlebar-sub { display: none !important; }
+  .app-titlebar-hamburger, .app-titlebar-new-chat, .app-titlebar-reload {
+    width: 40px !important; height: 40px !important; border-radius: 12px !important;
+    color: var(--hx-text) !important; opacity: .86;
+  }
+  .app-titlebar-hamburger svg, .app-titlebar-new-chat svg, .app-titlebar-reload svg { width: 22px !important; height: 22px !important; }
+  .app-titlebar-hamburger:active, .app-titlebar-new-chat:active { background: var(--hx-fill) !important; opacity: 1; }
+  .pwa-standalone .app-titlebar-reload { display: none !important; }
+
+  /* suggestion strip: soft fade at the edges instead of a hard cut */
+  .suggestion-grid { -webkit-mask-image: linear-gradient(90deg, transparent 0, #000 16px, #000 calc(100% - 28px), transparent 100%);
+    mask-image: linear-gradient(90deg, transparent 0, #000 16px, #000 calc(100% - 28px), transparent 100%); }
+
+  .composer-wrap { padding-bottom: calc(6px + env(safe-area-inset-bottom, 0px)) !important; }
+  html.hx-kb .composer-wrap { padding-bottom: calc(8px + var(--keyboard-bottom-inset, 0px)) !important; }
+}
+
+/* iOS app download sheet (pwa-polish.js): fetch, then Save -> share sheet */
+.hx-dl-sheet { position: fixed; inset: 0; z-index: 10000; display: flex; align-items: flex-end; justify-content: center;
+  background: rgba(0,0,0,.32); animation: hx-dl-fade .18s ease-out; }
+.hx-dl-card { width: min(100%, 480px); margin: 0 8px calc(8px + env(safe-area-inset-bottom)); padding: 16px 16px 12px;
+  border-radius: 20px; background: var(--hx-raised, #1c1c1e); border: 0.5px solid var(--hx-hair, rgba(255,255,255,.1));
+  color: var(--hx-text, #fff); animation: hx-dl-up .24s cubic-bezier(.2,.9,.3,1); }
+.hx-dl-name { font-weight: 600; font-size: 15px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.hx-dl-state { margin-top: 2px; font-size: 13px; color: var(--hx-text-2, #8e8e93); }
+.hx-dl-state video, .hx-dl-state img { display: block; width: 100%; max-height: 50vh; margin-top: 10px; border-radius: 12px; object-fit: contain; background: #000; }
+.hx-dl-bar { height: 4px; margin: 12px 0 14px; border-radius: 2px; background: var(--hx-hair, rgba(127,127,127,.2)); overflow: hidden; }
+.hx-dl-bar i { display: block; height: 100%; width: 4%; border-radius: inherit; background: var(--hx-accent, #4f6bff); transition: width .2s; }
+.hx-dl-row { display: flex; gap: 8px; }
+.hx-dl-row button { flex: 1; height: 44px; border: 0; border-radius: 12px; font: 600 15px/1 inherit; font-family: inherit; }
+.hx-dl-cancel { background: var(--hx-fill, rgba(127,127,127,.16)); color: var(--hx-text, #fff); }
+.hx-dl-save { background: var(--hx-accent, #4f6bff); color: #fff; }
+.hx-dl-save:disabled { opacity: .4; }
+@keyframes hx-dl-fade { from { opacity: 0; } }
+@keyframes hx-dl-up { from { transform: translateY(24px); opacity: 0; } }

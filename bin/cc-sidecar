@@ -1,0 +1,4 @@
+#!/bin/bash
+# launchd entrypoint: Command Centre WebUI sidecar (agents panel, projects API), 127.0.0.1:8794.
+export PATH="$HOME/.local/bin:/opt/homebrew/bin:/usr/local/bin:/usr/bin:/bin"
+exec python3 -I "$HOME/hermes/plugin/command-centre/sidecar.py"

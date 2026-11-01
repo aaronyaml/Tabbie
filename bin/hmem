@@ -1,0 +1,3 @@
+#!/bin/sh
+# Hermes memory CLI (see ~/hermes/memory/README.md). Stdlib-only Python.
+PYTHONPATH="$HOME/hermes${PYTHONPATH:+:$PYTHONPATH}" exec python3 -m hmem.cli "$@"

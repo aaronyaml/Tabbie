@@ -1,0 +1,604 @@
+/* Hermes — Apple skin. Plain CSS layered over the upstream WebUI (no source edits).
+ * Design language:
+ * neutral surfaces, ONE accent used as a fill, two border tokens
+ * (decorative hairline vs functional >=3:1), frosted chrome only on floating
+ * bars, calm 150-250ms ease-out motion, AA contrast in both themes.
+ *
+ * Specificity: `:root:root` (0,2,0) and `:root:root.dark` (0,3,0) beat the
+ * upstream skins, so this look holds whichever skin is picked in Settings.
+ */
+
+/* ════════════════════════════════════════════════════════════════════════
+ * THE ACCENT — the only place the brand colour is set.
+ *   --hx-accent     brand blue (the buddy's body). #3054FD = 5.5:1 on white, so in
+ *                   LIGHT mode it is both fill and ink; white text on it is 5.5:1.
+ *                   In DARK mode it is a FILL only (3.5:1 on the bg): the ink is a
+ *                   lightened mix (--hx-ink, 6.3:1). Same rule as the yellow accent, mirrored.
+ *   --hx-on-accent  content placed ON an accent fill.
+ * Everything else (ink, tints, focus ring, text-bearing button fill) is derived.
+ * If the accent changes, re-check: ink >= 4.5:1 on --hx-bg and --hx-bg-2 in both
+ * themes, and --hx-on-accent >= 4.5:1 on --hx-fill-text.
+ * ════════════════════════════════════════════════════════════════════════ */
+:root {
+  --hx-accent: #3054FD;
+  --hx-on-accent: #FFFFFF;
+  /* Hero-only flourish (the buddy's wing). Used on the composer focus ring and
+     the login mark — nowhere else. */
+  --hx-wing: linear-gradient(100deg, #FFBA82 0%, #E06BFF 45%, #3054FD 100%);
+}
+
+/* ── Light ─────────────────────────────────────────────────────────────── */
+:root:root {
+  color-scheme: light;
+  /* derived accent family */
+  --hx-ink: var(--hx-accent);           /* 5.5:1 on white, 5.1:1 on bg-2 */
+  --hx-fill-text: var(--hx-accent);     /* fill behind text (white 5.5:1) */
+  --hx-tint: color-mix(in srgb, var(--hx-accent) 10%, transparent);
+  --hx-tint-strong: color-mix(in srgb, var(--hx-accent) 16%, transparent);
+  --hx-user: color-mix(in srgb, var(--hx-accent) 8%, #F4F4F2);   /* user bubble */
+
+  /* neutrals */
+  --hx-bg: #FFFFFF;
+  --hx-bg-2: #F6F6F4;          /* grouped background: sidebar, rail */
+  --hx-fill: #F1F1EF;          /* quiet control fill */
+  --hx-fill-2: #E9E9E6;
+  --hx-raised: #FFFFFF;
+  --hx-hair: #E6E5E1;          /* DECORATIVE hairline */
+  --hx-line: #8E8E93;          /* FUNCTIONAL boundary, 3.3:1 on white */
+  --hx-text: #141413;
+  --hx-text-2: #6B6B70;        /* 5.3:1 on white, 4.9:1 on bg-2 */
+  --hx-glass: rgba(255,255,255,.78);
+  --hx-shadow: 0 1px 2px rgba(0,0,0,.04), 0 8px 24px rgba(0,0,0,.08);
+  --hx-scrim: rgba(0,0,0,.32);
+  --hx-red: #C4161C;
+  --hx-green: #1E7D3A;
+  --hx-orange: #B54708;
+
+  /* upstream token contract (static/style.css :root) */
+  --bg: var(--hx-bg); --sidebar: var(--hx-bg-2); --surface: var(--hx-fill);
+  --border: var(--hx-hair); --border2: var(--hx-line);
+  --border-subtle: var(--hx-hair); --border-muted: var(--hx-hair);
+  --surface-subtle: rgba(0,0,0,.025); --surface-subtle-hover: rgba(0,0,0,.045);
+  --text: var(--hx-text); --muted: var(--hx-text-2); --strong: var(--hx-text); --em: var(--hx-text);
+  --accent: var(--hx-ink); --accent-hover: color-mix(in oklab, var(--hx-accent) 70%, #000);
+  --accent-text: var(--hx-ink); --accent-bg: var(--hx-tint); --accent-bg-strong: var(--hx-tint-strong);
+  --gold: var(--hx-ink); --blue: var(--hx-ink); --info: var(--hx-ink);
+  --error: var(--hx-red); --success: var(--hx-green); --warning: var(--hx-orange);
+  --topbar-bg: var(--hx-glass); --main-bg: var(--hx-bg);
+  --focus-ring: color-mix(in srgb, var(--hx-ink) 55%, transparent); --focus-glow: transparent; --focus-ring-strong: var(--hx-ink);
+  --input-bg: var(--hx-fill); --hover-bg: rgba(0,0,0,.045);
+  --code-bg: #F6F6F4; --pre-text: #1F1F1E; --code-text: #A3341A; --code-inline-bg: rgba(0,0,0,.055);
+  --radius-sm: 8px; --radius-md: 10px; --radius-card: 14px; --radius-lg: 14px; --radius-pill: 999px;
+  --font-ui: -apple-system, BlinkMacSystemFont, "SF Pro Text", "SF Pro", "Helvetica Neue", system-ui, sans-serif;
+  --font-conversation: var(--font-ui);
+  --font-mono: ui-monospace, "SF Mono", SFMono-Regular, Menlo, monospace;
+  --hx-ease: cubic-bezier(.2,.7,.3,1);
+}
+
+/* ── Dark ──────────────────────────────────────────────────────────────── */
+:root:root.dark {
+  color-scheme: dark;
+  --hx-ink: color-mix(in oklab, var(--hx-accent) 70%, #fff);   /* #678FFF: 6.3:1 on bg, 5.5:1 on fill */
+  --hx-fill-text: var(--hx-accent);                              /* white text 5.5:1 */
+  --hx-tint: color-mix(in srgb, var(--hx-accent) 22%, transparent);
+  --hx-tint-strong: color-mix(in srgb, var(--hx-accent) 32%, transparent);
+  --hx-user: color-mix(in srgb, var(--hx-accent) 18%, #1D1F25);
+
+  --hx-bg: #0E0F13;            /* near-black, a breath of navy */
+  --hx-bg-2: #14161B;
+  --hx-fill: #1D1F25;
+  --hx-fill-2: #262830;
+  --hx-raised: #1A1C22;
+  --hx-hair: #26282F;
+  --hx-line: #62646E;          /* 3.25:1 on bg */
+  --hx-text: #F5F5F7;
+  --hx-text-2: #9A9BA3;        /* 6.6:1 on bg */
+  --hx-glass: rgba(20,22,27,.78);
+  --hx-shadow: 0 1px 2px rgba(0,0,0,.3), 0 12px 32px rgba(0,0,0,.45);
+  --hx-scrim: rgba(0,0,0,.55);
+  --hx-red: #FF6961;
+  --hx-green: #4CD27A;
+  --hx-orange: #FFA94D;
+
+  --bg: var(--hx-bg); --sidebar: var(--hx-bg-2); --surface: var(--hx-fill);
+  --border: var(--hx-hair); --border2: var(--hx-line);
+  --border-subtle: var(--hx-hair); --border-muted: var(--hx-hair);
+  --surface-subtle: rgba(255,255,255,.03); --surface-subtle-hover: rgba(255,255,255,.055);
+  --text: var(--hx-text); --muted: var(--hx-text-2); --strong: #fff; --em: var(--hx-text);
+  --accent: var(--hx-ink); --accent-hover: color-mix(in oklab, var(--hx-accent) 70%, #fff);
+  --accent-text: var(--hx-ink); --accent-bg: var(--hx-tint); --accent-bg-strong: var(--hx-tint-strong);
+  --gold: var(--hx-ink); --blue: var(--hx-ink); --info: var(--hx-ink);
+  --error: var(--hx-red); --success: var(--hx-green); --warning: var(--hx-orange);
+  --topbar-bg: var(--hx-glass); --main-bg: var(--hx-bg);
+  --focus-ring: color-mix(in srgb, var(--hx-ink) 60%, transparent); --focus-glow: transparent; --focus-ring-strong: var(--hx-ink);
+  --input-bg: var(--hx-fill); --hover-bg: rgba(255,255,255,.06);
+  --code-bg: #15171C; --pre-text: #E6E6EA; --code-text: #FF9F80; --code-inline-bg: rgba(255,255,255,.08);
+}
+
+/* ════════════════════════════ base ════════════════════════════ */
+html, body { background: var(--hx-bg); }
+body { -webkit-font-smoothing: antialiased; text-rendering: optimizeLegibility; letter-spacing: -0.003em; }
+::selection { background: var(--hx-tint-strong); }
+:focus-visible { outline-color: var(--hx-ink); }
+
+/* Single-stroke icon language: 1.5 strokes everywhere upstream used 2-2.5. */
+.sidebar svg[stroke-width], .rail svg[stroke-width], .app-titlebar svg[stroke-width],
+.composer-box svg[stroke-width], .panel-head svg[stroke-width], .msg-actions svg[stroke-width],
+.suggestion svg[stroke-width], .rightpanel svg[stroke-width] { stroke-width: 1.6; }
+
+/* No glow, gradients or heavy shadows. */
+.empty-state::before, .empty-state::after, .empty-logo::before, .empty-logo::after { display: none !important; }
+
+/* ════════════════════════════ logo: the bare mascot (brand/mascot-*.png) ═══
+ * Built by ~/hermes/brand/build-icons.sh; bump ?v= after rerunning it. */
+.app-titlebar-icon, .empty-logo { position: relative; }
+.app-titlebar-icon > svg, .empty-logo > svg { display: none !important; }
+.app-titlebar-icon {
+  width: 22px !important; height: 22px !important; flex: 0 0 22px; min-width: 22px;
+  background: url("brand/mascot-256.png?v=4") center / contain no-repeat !important; box-shadow: none !important;
+}
+.empty-logo {
+  width: 88px !important; height: 88px !important; margin: 0 auto 14px !important;
+  background: url("brand/mascot-512.png?v=4") center / contain no-repeat !important; overflow: visible !important;
+  box-shadow: none !important; filter: none !important; animation: none !important; border-radius: 0 !important;
+}
+/* idle-buddy.js plays the animated clips over the poster; hide the poster once a clip is live */
+.empty-logo.hx-idle-live { background-image: none !important; }
+.role-icon.assistant { background: url("brand/mascot-256.png?v=4") center / contain no-repeat !important; color: transparent !important; border: 0 !important; box-shadow: none !important; }
+.role-icon.assistant > * { visibility: hidden; }
+
+/* user turn — subtle accent-tinted bubble; assistant has no bubble */
+:root:root, :root:root.dark {
+  --user-bubble-bg: var(--hx-user); --user-bubble-border: transparent; --user-bubble-text: var(--hx-text);
+  --user-bubble-placeholder: var(--hx-text-2);
+  --user-selection-bg: var(--hx-tint-strong); --user-selection-text: var(--hx-text);
+  --logo-glow: none;
+}
+
+/* ════════════════════════════ chrome: titlebar (frosted, floating bar) ════ */
+.app-titlebar {
+  background: var(--hx-glass) !important;
+  -webkit-backdrop-filter: saturate(180%) blur(20px); backdrop-filter: saturate(180%) blur(20px);
+  border-bottom: 0.5px solid var(--hx-hair) !important; box-shadow: none !important;
+}
+.app-titlebar-title { font-weight: 600; letter-spacing: -0.01em; color: var(--hx-text); }
+.app-titlebar-sub, .app-titlebar .session-count-badge { opacity: .7; }
+
+/* ════════════════════════════ rail + sidebar ════════════════════════════ */
+.rail { background: var(--hx-bg-2) !important; border-right: 0.5px solid var(--hx-hair) !important; gap: 6px; }
+.rail-btn { width: 36px; height: 36px; border-radius: 10px; color: var(--hx-text-2); transition: background-color .18s var(--hx-ease), color .18s var(--hx-ease); }
+.rail-btn:hover { background: var(--hover-bg); color: var(--hx-text); }
+.rail-btn.active { background: var(--hx-fill-2) !important; color: var(--hx-text) !important; }
+.rail-btn.active::before { display: none !important; }
+.sidebar { background: var(--hx-bg-2) !important; border-right: 0.5px solid var(--hx-hair) !important; }
+
+/* iOS large title instead of the uppercase eyebrow */
+.panel-head {
+  border-bottom: 0 !important; min-height: 52px; padding: 12px 12px 4px 16px;
+  text-transform: none !important; letter-spacing: -0.02em !important;
+  font-size: 22px !important; font-weight: 700 !important; color: var(--hx-text) !important;
+}
+.panel-head-btn { width: 32px; height: 32px; border-radius: 10px; color: var(--hx-text-2); }
+.panel-head-btn:hover { background: var(--hover-bg); color: var(--hx-text); }
+
+/* search field: iOS filled field, no border */
+.sidebar-search { padding: 4px 12px 8px; }
+.sidebar-search input, .session-search-field input {
+  background: var(--hx-fill-2) !important; border: 0 !important; border-radius: 10px !important;
+  min-height: 34px; color: var(--hx-text) !important; box-shadow: none !important;
+}
+.sidebar-search input::placeholder { color: var(--hx-text-2); }
+.sidebar-search input:focus-visible { outline: 2px solid var(--focus-ring); outline-offset: 0; }
+
+/* WebUI / CLI sessions -> segmented control */
+.session-source-tabs { gap: 0; margin: 0 12px 8px; padding: 2px; background: var(--hx-fill-2); border-radius: 9px; }
+.session-source-tab {
+  border: 0 !important; background: transparent !important; border-radius: 7px !important;
+  color: var(--hx-text) !important; font-size: 12px !important; font-weight: 500 !important;
+  padding: 5px 6px !important; min-height: 28px; transition: background-color .18s var(--hx-ease);
+}
+.session-source-tab.active { background: var(--hx-raised) !important; font-weight: 600 !important; box-shadow: 0 1px 2px rgba(0,0,0,.08), 0 0 0 0.5px rgba(0,0,0,.04); }
+:root.dark .session-source-tab.active { background: #3A3B42 !important; box-shadow: none; }
+
+/* project filter: quiet text chips */
+.project-bar { padding-left: 12px !important; padding-right: 12px !important; gap: 4px !important; }
+.project-chip { border: 0 !important; background: transparent !important; color: var(--hx-text-2) !important; font-size: 12px !important; font-weight: 500 !important; padding: 4px 9px !important; border-radius: 999px !important; }
+.project-chip.active { background: var(--hx-fill-2) !important; color: var(--hx-text) !important; }
+.project-create-btn { border: 0 !important; background: transparent !important; color: var(--hx-text-2) !important; }
+
+.session-date-header { color: var(--hx-text-2) !important; font-size: 12px !important; font-weight: 600 !important; letter-spacing: 0 !important; text-transform: none !important; padding-left: 10px !important; }
+.session-date-caret { display: none !important; }
+.session-item { border-radius: 10px; color: var(--hx-text); padding: 9px 10px; transition: background-color .15s var(--hx-ease); }
+.session-item .session-title { color: var(--hx-text); font-weight: 400; }
+.session-item .session-time { color: var(--hx-text-2); }
+.session-item:hover { background: var(--hover-bg); }
+.session-item.active { background: var(--hx-fill-2) !important; color: var(--hx-text) !important; }
+.session-item.active .session-title { color: var(--hx-text) !important; font-weight: 500; }
+.session-select-toggle { color: var(--hx-text-2) !important; }
+
+/* ════════════════════════════ main / empty state ════════════════════════ */
+.main, .messages { background: var(--hx-bg) !important; }
+.empty-state { background: none !important; gap: 6px; padding: 32px 20px; }
+.empty-state h2 { font-size: 22px !important; font-weight: 600 !important; letter-spacing: -0.02em; color: var(--hx-text); }
+.empty-state p { display: none; }  /* quiet: avatar + one line */
+.suggestion-grid { max-width: 360px !important; gap: 0 !important; margin-top: 22px !important; }
+.suggestion {
+  display: flex; align-items: center; gap: 10px; background: transparent !important; border: 0 !important;
+  border-radius: 10px !important; padding: 11px 12px !important; min-height: 44px;
+  font-size: 15px !important; color: var(--hx-text) !important; transition: background-color .15s var(--hx-ease) !important;
+}
+.suggestion svg { width: 18px; height: 18px; color: var(--hx-ink); flex-shrink: 0; }
+.suggestion:hover { background: var(--hx-fill) !important; }
+
+/* update banner: one quiet line */
+.update-banner { background: var(--hx-fill) !important; border: 0 !important; color: var(--hx-text) !important; border-radius: 14px !important; box-shadow: none !important; }
+.update-banner a, .update-banner .linklike { color: var(--hx-ink) !important; }
+.update-btn { background: transparent !important; border: 0 !important; color: var(--hx-ink) !important; font-weight: 600; border-radius: 8px !important; }
+.update-btn.update-primary { background: var(--hx-fill-text) !important; color: #fff !important; }
+
+/* right-panel edge toggle: small, flat */
+.workspace-panel-edge-toggle { box-shadow: none !important; background: var(--hx-raised) !important; border: 0.5px solid var(--hx-hair) !important; width: 28px !important; height: 40px !important; color: var(--hx-text-2) !important; }
+
+/* ════════════════════════════ messages ═════════════════════════════════ */
+.msg-row[data-role="user"] .msg-body { border-radius: 20px !important; padding: 9px 15px !important; border: 0 !important; }
+.msg-role-name { color: var(--hx-text) !important; font-weight: 600 !important; }
+.role-icon.assistant { width: 20px; height: 20px; }
+.msg-actions { opacity: .6; }
+.msg-action-btn, .msg-copy-btn { color: var(--hx-text-2) !important; border-radius: 8px; }
+.msg-body a { color: var(--hx-ink); }
+.msg-body pre, .msg-body .code-block, .msg-body pre code { border-radius: 12px; }
+.msg-body pre { border: 0.5px solid var(--hx-hair) !important; background: var(--code-bg) !important; }
+
+/* activity / tool cards: hairline list, no left bar */
+.tool-call-group-summary, .tool-group-head { color: var(--hx-text-2) !important; border-radius: 10px; }
+.tool-call-group-summary { border-bottom: 0 !important; }
+.agent-activity-group, .tool-worklog-group { border: 0 !important; background: transparent !important; }
+.as-dot { background: var(--hx-text-2) !important; box-shadow: none !important; }
+.tool-card {
+  background: var(--hx-raised) !important; border: 0.5px solid var(--hx-hair) !important;
+  border-left: 0.5px solid var(--hx-hair) !important; border-radius: 12px !important; box-shadow: none !important;
+}
+:root:not(.dark) .tool-card { background: #FBFBFA !important; }
+.tool-card-header { padding: 9px 12px !important; min-height: 40px; }
+.tool-card-name { color: var(--hx-text) !important; font-weight: 500; }
+.tool-card-detail pre, .tool-card-result pre { background: var(--code-bg) !important; border: 0 !important; border-radius: 10px !important; font-family: var(--font-mono); }
+.tool-arg-key { color: var(--hx-text-2) !important; }
+
+/* ════════════════════════════ composer ═════════════════════════════════ */
+.composer-wrap { background: transparent !important; border: 0 !important; box-shadow: none !important; }
+.composer-box {
+  background: var(--hx-raised) !important; border: 0.5px solid var(--hx-line) !important; border-radius: 22px !important;
+  box-shadow: 0 1px 2px rgba(0,0,0,.04), 0 4px 16px rgba(0,0,0,.04) !important;
+  transition: border-color .18s var(--hx-ease), box-shadow .18s var(--hx-ease) !important;
+}
+:root.dark .composer-box { background: var(--hx-fill) !important; box-shadow: none !important; }
+.composer-box:focus-within { border-color: var(--hx-ink) !important; box-shadow: 0 0 0 3px var(--hx-tint) !important; }
+#msg { color: var(--hx-text); }
+#msg::placeholder { color: var(--hx-text-2); }
+/* chips: plain text buttons, no outlines */
+.composer-profile-chip, .composer-workspace-chip, .composer-model-chip, .composer-reasoning-chip,
+.composer-toolsets-chip, .composer-workspace-group, .composer-workspace-files-btn {
+  border: 0 !important; background: transparent !important; box-shadow: none !important; color: var(--hx-text-2) !important; border-radius: 10px !important;
+}
+.composer-profile-chip:hover, .composer-workspace-chip:hover, .composer-model-chip:hover, .composer-reasoning-chip:hover, .composer-toolsets-chip:hover { background: var(--hover-bg) !important; color: var(--hx-text) !important; }
+.composer-divider { opacity: .5; }
+.composer-left .icon-btn, .composer-left > button { color: var(--hx-text-2) !important; }
+/* send: accent-filled circle, white glyph (UI component, 3.3:1) */
+.send-btn, button.send-btn, :root:root button.send-btn:not(:disabled) {
+  background: var(--hx-accent) !important; color: var(--hx-on-accent) !important; border: 0 !important; box-shadow: none !important;
+  transition: background-color .18s var(--hx-ease), transform .18s var(--hx-ease), opacity .18s var(--hx-ease) !important;
+}
+.send-btn:disabled, button.send-btn:disabled { background: var(--hx-fill-2) !important; color: var(--hx-text-2) !important; opacity: 1 !important; }
+.send-btn:not(:disabled):active { transform: scale(.94); }
+
+/* ════════════════════════════ dialogs & sheets ══════════════════════════ */
+.app-dialog-overlay { background: var(--hx-scrim) !important; -webkit-backdrop-filter: none; backdrop-filter: none; }
+.app-dialog, :root:not(.dark) .app-dialog {
+  background: var(--hx-raised) !important; border: 0.5px solid var(--hx-hair) !important; border-radius: 20px !important;
+  box-shadow: var(--hx-shadow) !important; color: var(--hx-text) !important;
+}
+:root.dark .app-dialog { background: #1C1D23 !important; }
+.app-dialog-input { background: var(--hx-fill) !important; border: 0.5px solid transparent !important; border-radius: 10px !important; color: var(--hx-text) !important; min-height: 40px; }
+.app-dialog-input:focus { border-color: var(--hx-ink) !important; box-shadow: 0 0 0 3px var(--hx-tint) !important; outline: 0; }
+.app-dialog-btn { border: 0 !important; background: var(--hx-fill-2) !important; color: var(--hx-text) !important; border-radius: 12px !important; transform: none !important; min-height: 40px; }
+.app-dialog-btn:hover { background: color-mix(in srgb, var(--hx-fill-2) 80%, var(--hx-text) 8%) !important; }
+.app-dialog-btn.confirm { background: var(--hx-fill-text) !important; color: #fff !important; }
+.app-dialog-btn.danger, .app-dialog-btn.destructive { background: var(--hx-red) !important; color: #fff !important; }
+
+/* ════════════════════════════ motion ═══════════════════════════════════ */
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after { animation-duration: .01ms !important; animation-iteration-count: 1 !important; transition-duration: .01ms !important; scroll-behavior: auto !important; }
+}
+
+/* ════════════════════════════ phone ════════════════════════════════════ */
+@media (max-width: 640px) {
+  .app-titlebar-icon { width: 24px !important; height: 24px !important; flex-basis: 24px; }
+  .empty-logo { width: 96px !important; height: 96px !important; }
+  .empty-state h2 { font-size: 22px !important; }
+  .suggestion-grid { max-width: none !important; }
+  .composer-box { border-radius: 24px !important; }
+  #msg, .sidebar-search input, .app-dialog-input, input, select, textarea { font-size: 16px !important; } /* no iOS zoom */
+  .panel-head { font-size: 28px !important; min-height: 56px; }
+  .session-item { min-height: 44px; }
+  .session-source-tab { min-height: 32px; font-size: 13px !important; }
+}
+
+/* ── fixes round 1 ── */
+.composer-wrap::before { background: linear-gradient(to bottom, transparent, var(--hx-bg)) !important; }
+.mobile-sidebar-close { color: var(--hx-text-2) !important; }
+@media (max-width: 640px) {
+  .rail-btn.active, .sidebar-nav .nav-tab.active { background: var(--hx-fill-2) !important; color: var(--hx-text) !important; }
+}
+.session-jump-btn, .msg-question-jump-btn { border: 0.5px solid var(--hx-hair) !important; box-shadow: none !important; background: var(--hx-raised) !important; color: var(--hx-text-2) !important; }
+
+/* ════════════════════════════ round 2: hero composer, cards, motion ═══════ */
+
+/* reading rhythm: assistant prose without a bubble, generous leading */
+:root:root { --message-body-font-size: 15px; --message-body-line-height: 1.65; }
+.msg-row[data-role="assistant"] .msg-body, .assistant-segment .msg-body { background: transparent !important; border: 0 !important; }
+.msg-body p { margin-bottom: .7em; }
+.msg-row[data-role="user"] .msg-body { border-radius: 20px 20px 6px 20px !important; }
+
+/* Route: lines -> tiny badge (class added by apple-skin.js) */
+.msg-body .hx-route {
+  display: inline-flex; align-items: center; gap: 6px; margin: 0 0 10px; padding: 3px 10px 3px 8px;
+  font-size: 12px; line-height: 18px; font-weight: 500; color: var(--hx-text-2);
+  background: var(--hx-fill); border-radius: 999px;
+}
+.msg-body .hx-route::before { content: ""; width: 6px; height: 6px; border-radius: 50%; background: var(--hx-accent); }
+
+/* streaming / new content: fade + 4px lift, ease-out, no bounce */
+@keyframes hx-in { from { opacity: 0; transform: translateY(4px); } }
+.msg-row:last-child, .assistant-segment:last-child, .tool-card-row:last-child, .empty-state { animation: hx-in .22s var(--hx-ease) both; }
+
+/* ── hero composer: floating frosted glass, soft two-layer shadow ── */
+.composer-box {
+  background: var(--hx-glass) !important;
+  -webkit-backdrop-filter: saturate(180%) blur(24px); backdrop-filter: saturate(180%) blur(24px);
+  border: 1px solid var(--hx-hair) !important; border-radius: 26px !important;
+  box-shadow: inset 0 1px 0 rgba(255,255,255,.6), 0 1px 2px rgba(20,20,40,.05), 0 12px 32px -8px rgba(20,20,60,.14) !important;
+}
+:root.dark .composer-box {
+  background: rgba(29,31,37,.82) !important; border-color: #2C2F37 !important;
+  box-shadow: inset 0 1px 0 rgba(255,255,255,.05), 0 12px 32px -8px rgba(0,0,0,.6) !important;
+}
+/* focus: the wing gradient as a 1px ring (hero moment) */
+.composer-box:focus-within, :root.dark .composer-box:focus-within {
+  border-color: transparent !important;
+  background: linear-gradient(var(--hx-raised), var(--hx-raised)) padding-box, var(--hx-wing) border-box !important;
+}
+:root.dark .composer-box:focus-within { background: linear-gradient(#1D1F25, #1D1F25) padding-box, var(--hx-wing) border-box !important; }
+#msg { font-size: 16px; line-height: 1.5; }
+/* workspace / project + profile live inside the composer as soft pills */
+.composer-workspace-group, .composer-profile-chip {
+  background: var(--hx-fill) !important; border-radius: 999px !important; color: var(--hx-text) !important;
+}
+.composer-workspace-group .composer-workspace-chip, .composer-workspace-group .composer-workspace-files-btn { background: transparent !important; color: var(--hx-text) !important; }
+.composer-profile-chip { padding-inline: 10px !important; }
+.send-btn { width: 36px !important; height: 36px !important; }
+/* attachment chips */
+.attach-tray { gap: 8px !important; padding: 12px 14px 0 !important; }
+.attach-chip {
+  background: var(--hx-fill) !important; border: 0 !important; border-radius: 12px !important;
+  color: var(--hx-text) !important; font-size: 12.5px !important; padding: 6px 10px !important;
+}
+
+/* ── empty state: buddy, greeting, suggestion cards ── */
+.empty-state h2 { font-size: 28px !important; font-weight: 700 !important; letter-spacing: -0.025em !important; }
+.suggestion-grid { display: grid !important; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 10px !important; max-width: 680px !important; margin-top: 26px !important; }
+.suggestion {
+  flex-direction: column; align-items: flex-start !important; gap: 10px !important; min-height: 92px;
+  background: var(--hx-raised) !important; border: 1px solid var(--hx-hair) !important; border-radius: 16px !important;
+  padding: 14px !important; font-size: 14px !important; line-height: 1.35; text-align: left;
+  box-shadow: 0 1px 2px rgba(0,0,0,.03) !important;
+  transition: background-color .18s var(--hx-ease), border-color .18s var(--hx-ease), transform .18s var(--hx-ease) !important;
+}
+:root.dark .suggestion { background: var(--hx-fill) !important; border-color: transparent !important; }
+.suggestion:hover { border-color: var(--hx-line) !important; background: var(--hx-raised) !important; }
+:root.dark .suggestion:hover { background: var(--hx-fill-2) !important; }
+.suggestion:active { transform: scale(.98); }
+.suggestion svg { width: 20px !important; height: 20px !important; }
+
+/* desktop: with an empty chat the composer rises to the centre (ChatGPT/Grok) */
+@media (min-width: 901px) {
+  #mainChat:has(#emptyState:not([style*="none"])) { justify-content: center; padding-bottom: 8vh; }
+  #mainChat:has(#emptyState:not([style*="none"])) .messages-shell,
+  #mainChat:has(#emptyState:not([style*="none"])) #messages { flex: 0 0 auto !important; overflow: visible !important; }
+  #mainChat:has(#emptyState:not([style*="none"])) .empty-state { flex: 0 0 auto; padding-bottom: 8px; }
+  #mainChat:has(#emptyState:not([style*="none"])) .composer-box { max-width: 720px !important; }
+  #mainChat:has(#emptyState:not([style*="none"])) .composer-wrap::before { display: none !important; }
+}
+
+/* ── settings: grouped iOS cells; skin picker hidden (this skin owns colour) ── */
+.settings-field:has(.skin-pick-btn) { display: none !important; }
+.settings-field { border: 0 !important; background: var(--hx-bg-2) !important; border-radius: 14px !important; box-shadow: none !important; }
+.settings-section-head { border-bottom: 0 !important; }
+.settings-section-title { font-size: 28px !important; font-weight: 700 !important; letter-spacing: -0.02em; }
+.settings-action-btn { border: 0 !important; background: var(--hx-fill) !important; color: var(--hx-text) !important; border-radius: 12px !important; min-height: 44px; font-weight: 500; }
+.settings-action-btn:hover:not(:disabled) { background: var(--hx-fill-2) !important; }
+.settings-action-btn:disabled { color: var(--hx-text-2) !important; opacity: .6; }
+.theme-pick-btn, .font-size-pick-btn { border: 1px solid var(--hx-hair) !important; border-radius: 14px !important; background: var(--hx-raised) !important; box-shadow: none !important; }
+.theme-pick-btn.active, .font-size-pick-btn.active, .theme-pick-btn[aria-pressed="true"], .font-size-pick-btn[aria-pressed="true"] { border: 2px solid var(--hx-ink) !important; background: var(--hx-raised) !important; }
+.side-menu-item { border-radius: 10px !important; color: var(--hx-text) !important; }
+.side-menu-item.active { background: var(--hx-fill-2) !important; color: var(--hx-text) !important; }
+.side-menu-item.active svg { color: var(--hx-ink) !important; }
+.settings-search input { background: var(--hx-fill-2) !important; border: 0 !important; border-radius: 10px !important; }
+input[type="checkbox"], input[type="radio"] { accent-color: var(--hx-accent); }
+
+/* ── projects sheet (spaces-projects extension) ── */
+.hxsp-label { text-transform: none !important; letter-spacing: 0 !important; font-size: 13px !important; font-weight: 500 !important; color: var(--hx-text-2) !important; }
+.hxsp-space-list { border: 0 !important; background: var(--hx-bg-2); border-radius: 14px !important; }
+:root.dark .hxsp-space-list { background: var(--hx-fill); }
+.hxsp-space { border-top: 0.5px solid var(--hx-hair) !important; }
+.hxsp-space:first-child { border-top: 0 !important; }
+.hxsp-space-path { opacity: 1 !important; color: var(--hx-text-2) !important; }
+.hxsp-def { border: 0 !important; background: var(--hx-fill-2) !important; color: var(--hx-text) !important; }
+.hxsp-def:disabled { opacity: .45 !important; }
+.hxsp-def.on { background: var(--hx-fill-text) !important; color: #fff !important; }
+.hxsp-switch { border: 0 !important; background: var(--hx-fill) !important; }
+.hxsp-folder-list li { border: 0 !important; background: var(--hx-fill) !important; }
+.hxsp-icon-btn { border-radius: 10px !important; }
+
+/* ── offline / reconnect banners: quiet ── */
+.offline-banner, .reconnect-banner, .agent-health-banner { background: var(--hx-bg-2) !important; border: 0 !important; border-bottom: 0.5px solid var(--hx-hair) !important; box-shadow: none !important; color: var(--hx-text) !important; }
+.offline-banner strong { color: var(--hx-text) !important; letter-spacing: 0 !important; text-transform: none !important; }
+
+/* ── phone ── */
+@media (max-width: 640px) {
+  .empty-state { padding: 24px 16px 8px; justify-content: flex-end; }
+  .empty-state h2 { font-size: 26px !important; }
+  /* suggestions: a horizontal card strip right above the composer */
+  .suggestion-grid { display: flex !important; flex-direction: row !important; overflow-x: auto; scroll-snap-type: x mandatory; gap: 10px !important;
+    margin: 22px -16px 0 !important; padding: 2px 16px 6px; width: calc(100% + 32px); max-width: none !important; scrollbar-width: none; }
+  .suggestion-grid::-webkit-scrollbar { display: none; }
+  .suggestion { flex: 0 0 64%; scroll-snap-align: start; min-height: 88px; font-size: 15px !important; }
+  .composer-box { border-radius: 26px !important; }
+  .composer-wrap { padding-bottom: calc(10px + max(env(safe-area-inset-bottom, 0px), var(--keyboard-bottom-inset, 0px))) !important; }
+  /* sidebar as a sheet over a dimmed scrim */
+  .sidebar { width: min(86vw, 360px) !important; border-radius: 0 22px 22px 0; border-right: 0 !important;
+    box-shadow: 0 0 0 0.5px var(--hx-hair), 24px 0 60px -20px rgba(0,0,0,.35);
+    padding-top: env(safe-area-inset-top, 0px); padding-bottom: env(safe-area-inset-bottom, 0px);
+    transition: transform .28s cubic-bezier(.32,.72,0,1), visibility 0s linear .28s !important; }
+  /* the drawer's icon strip is absolute at top:0, so the sheet's safe-area padding misses it (first tab under the status bar) */
+  .sidebar-nav { padding-top: calc(8px + env(safe-area-inset-top, 0px)) !important; padding-bottom: calc(8px + env(safe-area-inset-bottom, 0px)) !important; }
+  .sidebar.mobile-open { transition: transform .28s cubic-bezier(.32,.72,0,1), visibility 0s !important; }
+  .mobile-overlay { background: var(--hx-scrim) !important; -webkit-backdrop-filter: none !important; backdrop-filter: none !important; }
+  .settings-section-title { font-size: 26px !important; }
+}
+
+/* ── fixes round 3 ── */
+.composer-box:focus-within { box-shadow: inset 0 1px 0 rgba(255,255,255,.6), 0 1px 2px rgba(20,20,40,.05), 0 12px 32px -8px rgba(20,20,60,.16) !important; }
+:root.dark .composer-box:focus-within { box-shadow: 0 12px 32px -8px rgba(0,0,0,.6) !important; }
+.tool-card.open .tool-card-detail { padding: 0 12px 12px !important; }
+.tool-card-args { padding: 2px 0 8px !important; }
+.app-titlebar-sub { background: var(--hx-fill) !important; color: var(--hx-text-2) !important; border: 0 !important; font-family: var(--font-ui) !important; border-radius: 6px !important; }
+@media (max-width: 640px) {
+  .suggestion-grid { width: 100vw !important; margin: 22px 0 0 calc(50% - 50vw) !important; padding: 2px 16px 6px !important; scroll-padding-inline: 16px; }
+  .composer-workspace-group, .composer-profile-chip { background: transparent !important; }
+  .session-source-tab { font-size: 12.5px !important; padding: 5px 4px !important; }
+}
+.settings-action-btn.danger { color: var(--hx-red) !important; }
+.settings-action-btn.danger:disabled { color: var(--hx-text-2) !important; }
+
+/* ════════════════════════════ polish pass 2 ═══════════════════════════════ */
+/* one reading column: messages and composer share --msg-max */
+:root:root { --msg-max: 720px; }
+.composer-box { max-width: var(--msg-max) !important; }
+
+/* empty-state title: wing gradient on one word (span added by apple-skin.js) */
+.empty-state h2 .hx-wing-word {
+  background: var(--hx-wing); -webkit-background-clip: text; background-clip: text;
+  color: transparent; -webkit-text-fill-color: transparent; padding-right: .04em;
+}
+
+/* tool activity: one quiet line ("Used 2 tools ›"), list on expand, JSON per tool */
+.tool-call-group-summary { font-size: 13px !important; color: var(--hx-text-2) !important; padding: 4px 0 !important; min-height: 28px; gap: 6px !important; }
+.tool-call-group-summary .as-dot { display: none !important; }
+.tool-call-group-summary .tool-call-group-chevron { order: 2; opacity: .8; }
+.tool-call-group-summary:hover { color: var(--hx-text) !important; background: transparent !important; }
+.tool-call-group-label { font-weight: 500 !important; }
+.agent-activity-group, .activity { margin: 2px 0 10px !important; }
+.tool-call-group-body { border-left: 0 !important; padding-left: 0 !important; margin-top: 4px; }
+/* the inner "Ran N tools" disclosure is redundant once the outer line says it */
+.tool-worklog-tools .tool-group-head { display: none !important; }
+.tool-worklog-tools .tool-group-body, .tool-worklog-tool-group-collapsed .tool-group-body { max-height: none !important; overflow: visible !important; }
+.tool-card-row + .tool-card-row { margin-top: 6px; }
+.tool-card-header { min-height: 36px !important; padding: 7px 12px !important; font-size: 13px !important; }
+.tool-card-name { font-weight: 500 !important; font-size: 13px !important; }
+.tool-arg-pair { display: flex !important; gap: 8px; align-items: baseline; font-size: 12px !important; line-height: 1.5; }
+.tool-arg-key { flex-shrink: 0; }
+.tool-arg-val { font-family: var(--font-mono); font-size: 11.5px !important; color: var(--hx-text) !important; overflow-wrap: anywhere; }
+.tool-card-result pre, .tool-card-detail pre {
+  font-size: 11.5px !important; line-height: 1.5 !important; padding: 10px 12px !important;
+  max-height: 220px; overflow: auto !important; white-space: pre-wrap; overflow-wrap: anywhere; margin: 0 !important;
+}
+
+/* phone composer: [+] [workspace pill] ........ [send] */
+.hx-ws-label { display: none; }
+@media (max-width: 640px) {
+  .composer-footer #btnMic, .composer-footer #btnSavedPrompts, .composer-footer .composer-profile-wrap,
+  .composer-footer .ctx-indicator-wrap, .composer-footer .composer-divider { display: none !important; }
+  /* attach becomes the "+" (it already opens the attach / camera chooser) */
+  #btnAttach svg { display: none; }
+  #btnAttach { width: 36px !important; height: 36px !important; min-width: 36px; border-radius: 50% !important; background: var(--hx-fill) !important; color: var(--hx-text) !important; position: relative; }
+  #btnAttach::before, #btnAttach::after { content: ""; position: absolute; left: 50%; top: 50%; width: 15px; height: 1.6px; border-radius: 2px; background: currentColor; transform: translate(-50%, -50%); }
+  #btnAttach::after { transform: translate(-50%, -50%) rotate(90deg); }
+  /* the mobile config button (workspace / model / reasoning / context sheet) shows the workspace name */
+  .icon-btn.composer-mobile-config-btn {
+    width: auto !important; max-width: 62vw; height: 36px !important; min-height: 36px !important; padding: 0 12px 0 10px !important; gap: 6px;
+    border-radius: 999px !important; background: var(--hx-fill) !important; border: 0 !important; color: var(--hx-text) !important;
+  }
+  .composer-mobile-config-btn .hx-ws-label { display: inline; font-size: 14px; font-weight: 500; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .composer-mobile-config-btn .hx-ws-label::after { content: " ⌄"; color: var(--hx-text-2); font-size: 12px; }
+  .composer-left { gap: 8px !important; }
+  .composer-mobile-config-panel { border-radius: 18px !important; border: 0.5px solid var(--hx-hair) !important; background: var(--hx-raised) !important; box-shadow: var(--hx-shadow) !important; }
+  :root.dark .composer-mobile-config-panel { background: #1C1D23 !important; }
+  /* empty state: centred between header and composer, smaller buddy */
+  .empty-state { justify-content: center !important; padding: 16px 16px 8px !important; }
+  .empty-logo { width: 64px !important; height: 64px !important; margin-bottom: 10px !important; }
+  .empty-state h2 { font-size: 24px !important; }
+  .suggestion-grid { margin-top: 18px !important; }
+  /* keep the last message clear of the composer + home indicator */
+  .messages-inner { padding-bottom: calc(16px + env(safe-area-inset-bottom, 0px)); }
+}
+
+/* polish pass 2b: phone composer details */
+@media (max-width: 640px) {
+  #btnAttach::after { content: none !important; display: none !important; }
+  #btnAttach::before { width: 16px !important; height: 16px !important; transform: translate(-50%, -50%) !important; border-radius: 0 !important;
+    background: linear-gradient(currentColor, currentColor) center / 15px 1.6px no-repeat, linear-gradient(currentColor, currentColor) center / 1.6px 15px no-repeat !important; }
+  .composer-footer .composer-ws-wrap { display: none !important; }        /* workspace lives in the pill */
+  .icon-btn.composer-mobile-config-btn > svg { display: none !important; } /* context % moves into the sheet */
+  .composer-mobile-config-btn .hx-ws-label::before { content: ""; display: inline-block; width: 14px; height: 14px; margin-right: 6px; vertical-align: -2px;
+    background: currentColor; -webkit-mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='1.7' stroke-linejoin='round'%3E%3Cpath d='M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z'/%3E%3C/svg%3E") center / contain no-repeat;
+    mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='1.7' stroke-linejoin='round'%3E%3Cpath d='M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z'/%3E%3C/svg%3E") center / contain no-repeat; }
+  .composer-mobile-config-action { flex: 1 1 calc(50% - 4px); }
+  .composer-mobile-config-action, .hx-files-action { border-radius: 12px !important; background: var(--hx-fill) !important; border: 0 !important; color: var(--hx-text) !important; }
+  .hx-files-action { display: inline-flex; align-items: center; gap: 10px; min-height: 44px; padding: 8px 10px; font: inherit; font-size: 12px; cursor: pointer; flex: 1 1 calc(50% - 4px); }
+}
+@media (min-width: 641px) { .hx-files-action { display: none !important; } }
+
+/* ── phone: tap outside the open sidebar to close it ──
+   Upstream keeps #mobileOverlay at display:none even when .visible, so taps beside
+   the drawer fell through to the page. Show it as the scrim; its own onclick
+   (dismissMobileSidebar) closes the drawer and swallows the tap. */
+@media (max-width: 640px) {
+  .mobile-overlay.visible { display: block !important; animation: hx-scrim-in .2s ease-out; }
+}
+@keyframes hx-scrim-in { from { opacity: 0; } to { opacity: 1; } }
+
+/* Thinking: same card language as the tool rows ("Ran a tool") instead of a faded big-text line */
+.agent-activity-thinking { margin: 6px 0 0 !important; }
+.agent-activity-thinking .thinking-card,
+:root[data-skin] .agent-activity-thinking .thinking-card,
+.tool-worklog-list > .agent-activity-thinking .thinking-card,
+:root[data-skin] .tool-worklog-list > .agent-activity-thinking .thinking-card,
+:root[data-skin] .tool-worklog-list > .agent-activity-thinking .thinking-card:hover {
+  margin: 0 !important; max-width: none !important; background: var(--hx-raised) !important;
+  border: 0.5px solid var(--hx-hair) !important; border-radius: 12px !important; box-shadow: none !important; overflow: hidden; }
+:root:not(.dark) .agent-activity-thinking .thinking-card { background: #FBFBFA !important; }
+.agent-activity-thinking .thinking-card-header,
+.tool-worklog-list > .agent-activity-thinking .thinking-card-header {
+  min-height: 36px; margin: 0 !important; padding: 7px 12px !important; gap: 8px !important; border-radius: 0 !important;
+  font-size: 13px !important; line-height: 20px !important; font-weight: 500 !important; color: var(--hx-text-2) !important; opacity: 1 !important; }
+.agent-activity-thinking .thinking-card-header:hover { background: transparent !important; color: var(--hx-text) !important; }
+.agent-activity-thinking .thinking-card-label { font-weight: 500 !important; }
+.agent-activity-thinking .thinking-card-icon svg { width: 15px; height: 15px; }
+.agent-activity-thinking .thinking-card-icon,
+.agent-activity-thinking .thinking-copy-btn,
+.agent-activity-thinking .thinking-card-toggle { opacity: .6 !important; color: var(--hx-text-2) !important; }
+.agent-activity-thinking .thinking-copy-btn { opacity: 0 !important; transition: opacity .15s; }
+.agent-activity-thinking .thinking-card-header:hover .thinking-copy-btn { opacity: .6 !important; }
+.agent-activity-thinking .thinking-card.open .thinking-card-body,
+.tool-worklog-list > .agent-activity-thinking .thinking-card.open .thinking-card-body {
+  margin: 0 !important; padding: 0 12px 12px !important; background: transparent !important; border: 0 !important; }
+.agent-activity-thinking .thinking-card-body pre { font-family: inherit !important; font-size: 12.5px !important; line-height: 1.55 !important;
+  white-space: pre-wrap; color: var(--hx-text-2) !important; }
+/* live: soft glint on the label so it reads as "in progress" */
+.agent-activity-thinking[data-thinking-active="1"] .thinking-card-label,
+.agent-activity-thinking[data-live-thinking="1"] .thinking-card-label {
+  background: linear-gradient(100deg, var(--hx-text-2) 0 38%, var(--hx-text) 50%, var(--hx-text-2) 62% 100%);
+  background-size: 250% 100%; -webkit-background-clip: text; background-clip: text; -webkit-text-fill-color: transparent;
+  animation: hx-think-glint 2.2s linear infinite; }
+@keyframes hx-think-glint { from { background-position: 100% 0; } to { background-position: -50% 0; } }
+@media (prefers-reduced-motion: reduce) { .agent-activity-thinking .thinking-card-label { animation: none !important; } }

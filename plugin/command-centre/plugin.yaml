@@ -1,0 +1,6 @@
+name: command-centre
+version: "1.0.0"
+description: >-
+  Routes each request to Claude Code directly or through the Astra planner with a
+  real approval boundary; preserves original attachments end to end; tracks the
+  current project. Source of truth lives in ~/hermes.

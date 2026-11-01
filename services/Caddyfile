@@ -1,0 +1,145 @@
+# hermes.local -> Hermes WebUI (127.0.0.1:8787). LAN / Tailscale only; everything else is dropped.
+{
+	admin localhost:2019
+	local_certs
+	skip_install_trust
+}
+
+(lan_only) {
+	@outside not remote_ip 127.0.0.0/8 ::1 10.0.0.0/8 172.16.0.0/12 192.168.0.0/16 100.64.0.0/10 fc00::/7 fe80::/10
+	abort @outside
+}
+
+# Apple skin brand assets (~/hermes/brand, rebuilt by brand/build-icons.sh). These exact
+# paths shadow the WebUI's own icons/manifest/login script; everything else proxies.
+(brand_file) {
+	root * {$HOME}/hermes/brand
+	header Cache-Control "no-cache"
+	file_server
+}
+
+(hermes_site) {
+	encode zstd gzip
+
+	# Motion studio URLs. Upstream only routes /session/<id>, so:
+	#   /motion        -> the app shell for "/"             (studio home)
+	#   /motion/<sid>  -> the app shell for "/session/<sid>" (that film)
+	#   /motion/<rest> -> /<rest>  (anything resolved against /motion/ before the page fixes its base)
+	# webui-extension/motion-boot.js (served below as static/pwa-startup.js) resets <base href> to the
+	# root and keeps the address bar on /motion/…. Auth stays upstream's: logged-out shells go to
+	# /login?next=/motion/… instead of the relative login URL upstream would send.
+	@mo_sw expression `{http.request.orig_uri.path}.startsWith("/motion/sw.js")`
+	handle @mo_sw {
+		respond 404
+	}
+	@mo_home path /motion /motion/
+	@mo_film path_regexp mo_film ^/motion/([0-9a-fA-F]{6,64})/?$
+	@mo_rest path_regexp mo_rest ^/motion(/.+)$
+	rewrite @mo_home /
+	rewrite @mo_film /session/{re.mo_film.1}
+	rewrite @mo_rest {re.mo_rest.1}
+	@mo_shell expression `{http.request.orig_uri.path}.matches("^/motion(/[0-9a-fA-F]{6,64})?/?$")`
+	handle @mo_shell {
+		reverse_proxy 127.0.0.1:8787 {
+			header_up X-Forwarded-Proto https
+			@to_login {
+				status 3xx
+				header Location login*
+			}
+			handle_response @to_login {
+				redir * /login?next={http.request.orig_uri.path} 302
+			}
+		}
+	}
+	# First script of the app shell: motion-boot.js, which then loads the upstream file (?orig=1).
+	@pwa_boot {
+		path /static/pwa-startup.js
+		not query orig=1
+	}
+	handle @pwa_boot {
+		rewrite * /motion-boot.js
+		root * {$HOME}/hermes/webui-extension
+		header Cache-Control "no-cache"
+		file_server
+	}
+
+	handle /favicon.ico {
+		rewrite * /icons/favicon.ico
+		import brand_file
+	}
+	@fav_svg path /static/favicon.svg /static/favicon-512.svg
+	handle @fav_svg {
+		rewrite * /icons/favicon.svg
+		import brand_file
+	}
+	handle /static/favicon-32.png {
+		rewrite * /icons/favicon-32.png
+		import brand_file
+	}
+	handle /static/favicon-192.png {
+		rewrite * /icons/icon-192.png
+		import brand_file
+	}
+	handle /static/favicon-512.png {
+		rewrite * /icons/icon-512.png
+		import brand_file
+	}
+	handle /static/apple-touch-icon.png {
+		rewrite * /icons/apple-touch-icon.png
+		import brand_file
+	}
+	@manifest path /manifest.json /manifest.webmanifest
+	handle @manifest {
+		rewrite * /web/manifest.json
+		header Content-Type application/manifest+json
+		import brand_file
+	}
+	# Login page skin: our loader, which then pulls the untouched upstream script via ?orig=1.
+	@login_skin {
+		path /static/login.js
+		not query orig=1
+	}
+	handle @login_skin {
+		rewrite * /web/login-skin.js
+		import brand_file
+	}
+	handle_path /hx-brand/* {
+		root * {$HOME}/hermes/brand
+		try_files /web/{path} /icons/{path} =404
+		header Cache-Control "no-cache"
+		file_server
+	}
+
+	handle {
+		reverse_proxy 127.0.0.1:8787 {
+			flush_interval -1
+			header_up X-Forwarded-Proto https
+		}
+	}
+}
+
+https://hermes.local {
+	import lan_only
+	tls internal
+	import hermes_site
+}
+
+# Tailscale Serve upstream (tailnet-only; Serve adds HTTPS). Loopback only, never public.
+http://:8788 {
+	bind 127.0.0.1
+	import lan_only
+	import hermes_site
+}
+
+http://hermes.local {
+	import lan_only
+	# One-time iPhone setup: download + trust this local CA so HTTPS has no warnings.
+	handle /hermes-ca.crt {
+		root * {$HOME}/hermes/state/ca
+		header Content-Type application/x-x509-ca-cert
+		file_server
+	}
+	handle {
+		redir https://hermes.local{uri} 308
+	}
+}
