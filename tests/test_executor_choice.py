@@ -108,7 +108,7 @@ def test_execute_dispatches_by_choice():
 
     out = cc._execute(req("one"))  # default: Claude Code with Opus 5.5
     assert out["ok"] and claude_calls[-1]["model"] == "claude-opus-5-5" and claude_calls[-1]["effort"] is None
-    assert out["route"].startswith("Route: Claude —")
+    assert out["route"].startswith("Route: Claude Opus 5.5 —")
 
     ec.set_choice("s9", "openai", "gpt-6.1-sol", "low")
     r = req("two")

@@ -83,10 +83,34 @@ flowchart LR
 - **At least one coding agent** (you pick at setup):
   - **[Claude Code](https://docs.anthropic.com/en/docs/claude-code)** with a Claude subscription: provides `claude`;
   - **[Codex CLI](https://github.com/openai/codex)** with a ChatGPT subscription: provides `codex`.
-- **[Caddy](https://caddyserver.com)** for `https://hermes.local`, page addresses and phone access (recommended)
+- **[Caddy](https://caddyserver.com)**: **required.** Tabbie is always opened through Caddy at
+  `https://hermes.local`. Caddy serves Tabbie's icons, page addresses (`/kanban`, `/projects` …),
+  the Motion studio and phone access. Without it you get the plain Hermes WebUI on port 8787, with
+  the wrong icons and missing pages. Setup installs it (`bin/install-tool caddy`); no Homebrew.
 - [uv](https://docs.astral.sh/uv/) only to run the tests
+- [Node.js](https://nodejs.org) only for the Motion studio (Remotion renders with it; `bin/install-tool node`)
 
 Setup installs all of these for you.
+
+### Installing with a coding agent (Codex, Claude Code …)
+
+If you ask an AI agent to install Tabbie for you, give it these rules. Agents: follow them exactly.
+
+1. Clone to **`~/hermes`** (no other path works yet). Then have the **user** run `bin/setup` in
+   the Terminal app: it opens the setup page, which needs them for the password and account
+   logins. An agent without an interactive terminal can run `bin/setup --yes` first for the
+   unattended parts, but the user must still finish with `bin/setup`. Don't hand-install pieces,
+   and don't stop at "the WebUI loads on port 8787": that is the bare upstream WebUI, not Tabbie.
+2. **Caddy is required.** If `command -v caddy` fails, run `bin/install-tool caddy`, then
+   `bin/setup --terminal --only services,cert --services` so the `ai.hermes.caddy` service starts
+   (the WebUI password must already be set).
+3. **The four Tabbie plugins must be enabled**, not just linked: `command-centre`,
+   `fragment-memory`, `limits`, `workboard` (`hermes plugins enable <name>`). Without them the hub
+   answers everything itself and never uses Claude Code / Codex, kanban or todos.
+4. **Sign-ins are the user's own account logins** (ChatGPT, Claude). Never create or paste API
+   keys. The browser login steps need the user at the Mac.
+5. Finish with **`bin/hub health`**. Every line must be ✓ except ones marked *optional*. Then open
+   **`https://hermes.local`** (or run `bin/hub`), never `http://127.0.0.1:8787`.
 
 ---
 
@@ -115,8 +139,9 @@ developer tools (git and Python). Leave the Terminal window open until the page 
 | 6. WebUI password | Asks for a password (hidden as you type) and saves it where only you can read it |
 | 7. Background services | Installs and starts the services so Tabbie runs whenever your Mac is on |
 | 8. Secure address | Sets up `https://hermes.local` and offers to trust its certificate on this Mac |
-| 9. Your phone | Home Wi-Fi instructions, and optionally Tailscale for anywhere ([details](#use-tabbie-on-your-phone-anywhere-tailscale)) |
-| 10. Check | Runs `bin/hub health` and shows the address to open |
+| 9. Motion studio | Optional. Installs Node.js (official build, Apple silicon or Intel) and creates the Motion studio from Tabbie's template, with its packages ([details](#motion-studio)) |
+| 10. Your phone | Home Wi-Fi instructions, and optionally Tailscale for anywhere ([details](#use-tabbie-on-your-phone-anywhere-tailscale)) |
+| 11. Check | Runs `bin/hub health` and shows the address to open |
 
 It's safe to run again any time: finished steps are ticked and skipped, and anything marked `!`
 tells you exactly what to do. When services are already running it asks before restarting them.
@@ -130,10 +155,10 @@ at the new login.
 Prefer the Terminal? `bin/setup --terminal` runs the same steps there. For scripted installs,
 `bin/setup --yes` uses defaults and leaves sign-ins, the password and phone setup for later. Answer
 some ahead of time with `--agents claude|codex|claude,codex`, `--name Sam`, `--hub openai-codex|anthropic`
-and `--services`. A single tool can be installed with `bin/install-tool hermes|claude|codex|caddy|uv`.
+and `--services`. A single tool can be installed with `bin/install-tool hermes|claude|codex|caddy|uv|node`.
 
 Everything it writes on your Mac is git-ignored: `config/agents.yaml`, `config/projects.yaml`,
-`webui-extension/local.js`, `hermes-webui/` and its `.env`, `state/`, `general/`, `workspaces/`, and
+`webui-extension/local.js`, `hermes-webui/` and its `.env`, `state/`, `general/`, `workspaces/`, `motion/`, and
 `memory/` (its own private git repo). It also appends the hub rules to `~/.hermes/SOUL.md` and
 symlinks the four plugins into `~/.hermes/plugins/`.
 
@@ -147,7 +172,7 @@ The sections below explain each part in more detail, if you'd rather do things b
 | Claude Code (if enabled) | executing work | `claude auth login` (must show `claude.ai` in `claude auth status`) |
 | Codex (if enabled) | planner, takeover, or executing work in a Codex-only setup | `codex login` |
 | Higgsfield (optional) | image/video generation | `higgsfield auth login` |
-| ElevenLabs (optional) | voice/audio | add the hosted MCP below, then `hermes mcp login elevenlabs` |
+| ElevenLabs (optional) | voice/audio | add the hosted MCP below, then `hermes mcp login elevenlabs`. Motion's music generation uses an API key instead ([Motion studio](#motion-studio)) |
 
 ### Hermes config (`~/.hermes/config.yaml`)
 
@@ -189,8 +214,8 @@ bin/hub health            # one line per component, with the fix command
 | `ai.hermes.cc-sidecar` | Data sidecar for the WebUI extension on `127.0.0.1:8794` (token-protected) |
 | `ai.hermes.dreamer` | Nightly Dreamer run (03:30, low priority) |
 
-The templates live in `services/*.plist.template`. Nothing is exposed to the internet. Without
-Caddy, open `http://127.0.0.1:8787` on the Mac itself.
+The templates live in `services/*.plist.template`. Nothing is exposed to the internet. Always open Tabbie through
+Caddy (`https://hermes.local`, or `bin/hub`): the bare WebUI on `127.0.0.1:8787` lacks Tabbie's icons and page addresses.
 
 **Trust the local HTTPS certificate** (once per device). It enables passkeys and the installable app:
 
@@ -247,7 +272,6 @@ line and press Return:
 /Applications/Tailscale.app/Contents/MacOS/Tailscale serve --bg 8788
 ```
 
-> Didn't install Caddy (no `https://hermes.local`)? Use `8787` instead of `8788` at the end.
 > Installed Tailscale with Homebrew instead of the app? The command is just `tailscale serve --bg 8788`.
 
 It prints your Tabbie address, ending in `.ts.net`. **Write it down** (or copy it into a note on
@@ -321,7 +345,9 @@ asks for your password. Nothing is opened on your router, and port 8787 is never
 ### Updates
 
 Tabbie checks GitHub ([aaronyaml/Tabbie](https://github.com/aaronyaml/Tabbie)) for a newer version
-about once an hour. Checking is read-only: nothing is downloaded until you say so.
+when you open the WebUI, when you come back to its tab, and every 30 minutes while it's open.
+Checking is read-only: nothing is downloaded until you say so. Installs from before the update
+checker existed need one manual update first: `cd ~/hermes && git pull`, then `bin/setup`.
 
 - **In the WebUI**, a card appears bottom-right: *Tabbie update available*, with the list of changes.
   **Update** downloads it. **Later** hides it until something newer comes out.
@@ -348,14 +374,14 @@ Every page has its own address, so a refresh (or a bookmark) lands you back on i
 | `/motion`, `/motion/<id>` | Motion studio |
 | `/tasks`, `/kanban`, `/todos`, `/skills`, `/memory`, `/workspaces`, `/profiles`, `/insights`, `/logs`, `/settings` | That page |
 
-These go through Caddy (`https://hermes.local` or your Tailscale address). On the bare
-`http://127.0.0.1:8787` only the chat addresses work.
+These go through Caddy (`https://hermes.local` or your Tailscale address).
 
 ### Routing
 
 | Route | When | Flow |
 |---|---|---|
 | **Hub** | General chat with no project selected | The hub answers directly |
+| **Hub tools** | Your own kanban board, todos and scheduled tasks: "add 'call the bank' to my todos", "move the login card to done", "remind me every Monday at 9 to send the report" | The hub does it with its own tools; it shows up in the Kanban, Todo and Tasks panels |
 | **Claude** (default) | Clear, scoped work: "fix this error", "run the tests", "make the button black" | Claude Code runs in the project; follow-ups resume the same Claude session (≤ 2 h) |
 | **Planner → approval → Claude** | Broad or ambiguous work: features, migrations, architecture, several deliverables | The planner asks material questions or proposes a plan. You approve, it writes a brief, and Claude executes with the brief, your original prompt and the original attachments |
 
@@ -370,6 +396,7 @@ These go through Caddy (`https://hermes.local` or your Tailscale address). On th
   - `cancel` drops the request.
 - Execution of a planned request is refused in code unless it was approved.
 - Every reply starts with `Route: …`. The full decision log is at `bin/hub logs decisions`.
+- The model under each reply is the one that did the work (e.g. `Opus 5.5 (low)` from the composer's picker). Hover it to see the hub model that routed and relayed it.
 
 ### Projects
 
@@ -451,10 +478,23 @@ With one agent off, its models disappear from the picker, the planner switches t
 have, `/limit` and `bin/hub health` skip it, and chat titles and Dreamer phrasing (which use Claude
 Haiku) fall back to plain text when Claude Code is off. No file means both (older installs).
 
-### Optional: motion studio
+### Motion studio
 
-`/motion <brief>` runs Claude in `~/motion` (a Remotion project of your own) with a `motion` skill.
-The motion panel in the WebUI expects that folder. Ignore this if you don't use it.
+**Motion** (in the rail, under Chat) makes product films cut to music: pick or generate a track, mark
+the moments, approve a storyboard, and Claude Code builds and renders the film with
+[Remotion](https://www.remotion.dev). `/motion <brief>` in any chat does the same from a prompt.
+
+- **The studio folder** is `motion/` inside Tabbie (git-ignored). The first time Motion opens (or setup
+  step 9 runs) Tabbie creates it from `templates/motion-studio/` and runs `npm install` there, so nothing
+  has to exist beforehand. To use a studio of your own instead, copy `config/motion.example.yaml` to
+  `config/motion.yaml` and set `studio:`; a folder that already has files in it is used as it is, never changed.
+- **Node.js** renders the films: setup installs it (`bin/install-tool node`, nodejs.org's official build).
+- **Generate audio** uses ElevenLabs Music, which needs your ElevenLabs API key in the studio's `.env`
+  (`ELEVENLABS_API_KEY=…`; it uses your ElevenLabs credits). The hosted ElevenLabs MCP has no music tool.
+  **Asset generation** needs Higgsfield (`higgsfield auth login`). Until they're linked, Motion greys those
+  buttons out and the tooltip says how to link them; `bin/hub health` lists both.
+- Remotion is free for individuals and companies of up to three people; larger companies need a
+  [Remotion company licence](https://www.remotion.dev/license). npm installs it; Tabbie doesn't ship it.
 
 ---
 
@@ -467,6 +507,7 @@ The motion panel in the WebUI expects that folder. Ignore this if you don't use 
 | `config/projects.yaml` | Named folders and workspaces for routing | no (from `.example`) |
 | `hermes-webui/.env` | WebUI host, port and password | no (from `config/webui.env.example`) |
 | `webui-extension/local.js` | Your home path and name for the extension | no (from `local.example.js`) |
+| `config/motion.yaml` | Optional: a Motion studio folder of your own (default `motion/` in Tabbie) | no (from `.example`) |
 | `~/.hermes/config.yaml`, `~/.hermes/SOUL.md` | Hermes Agent's own config and hub rules | outside the repo |
 
 To change the planner, edit `config/router.yaml`; it applies on the next request.
@@ -516,6 +557,7 @@ Use Claude Code's own permission settings for hard limits.
 | `webui-extension/` | WebUI extension: Apple-style skin, Projects, agents, questions, limits, workboard, motion studio |
 | `brand/` | Icons, mascot animation frames, login skin |
 | `services/` | LaunchAgent templates and the Caddyfile |
+| `templates/motion-studio/` | The Motion studio's starting point (Remotion project, audio analysis, music and edit-map scripts) |
 | `bin/` | `setup`, `hub` (open, cli, health, restart, logs, import, limits), service entrypoints |
 | `config/` | Router defaults and the `*.example` files |
 | `docs/` | Architecture notes |

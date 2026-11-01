@@ -1,0 +1,4 @@
+# Optional, per machine: copy to config/motion.yaml (git-ignored) to use a Motion studio folder of your own.
+# Without it, Motion uses <tabbie>/motion/ (git-ignored), created from templates/motion-studio/ on first use.
+# A folder that already has files in it is used as it is, never changed.
+studio: ~/my-motion-studio

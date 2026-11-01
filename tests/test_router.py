@@ -174,3 +174,18 @@ def test_webui_project_spaces():
     assert projects.expand_with_project("s9", str(b), []) == (str(b), [str(a)])
     assert projects.expand_with_project("s9", None, []) == (str(a), [str(b)])
     assert projects.expand_with_project("nope", "/x", []) == ("/x", [])
+
+
+def test_hub_tool_requests():
+    board = ["add buy milk to my todos", "move the login card to done", "put fix invoices on the kanban",
+             "what is on my todo list", "show my board", "add todo: call mum"]
+    schedule = ["remind me every monday at 9 to send the report", "schedule a daily check of my inbox"]
+    work = ["fix the navbar on the board game app", "add a todo list feature to my app", "run the tests",
+            "make the cards on the landing page rounder", "every time I click save it crashes, fix it",
+            "add a kanban board page to the dashboard app"]
+    for t in board:
+        assert router.hub_tool_request(t) == "board", t
+    for t in schedule:
+        assert router.hub_tool_request(t) == "schedule", t
+    for t in work:
+        assert router.hub_tool_request(t) is None, t

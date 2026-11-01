@@ -1,7 +1,7 @@
 #!/bin/bash
 # install-tool — install one of Tabbie's tools from its official source, on Apple silicon or Intel.
 # No Homebrew and no Mac password: everything lands in ~/.local/bin (or the tool's own folder).
-#   bin/install-tool hermes|claude|codex|uv|caddy
+#   bin/install-tool hermes|claude|codex|uv|caddy|node
 set -euo pipefail
 BIN="$HOME/.local/bin"; mkdir -p "$BIN"
 export PATH="$HOME/.hermes/bin:$BIN:/opt/homebrew/bin:/usr/local/bin:$PATH"
@@ -9,7 +9,7 @@ export PATH="$HOME/.hermes/bin:$BIN:/opt/homebrew/bin:/usr/local/bin:$PATH"
 # Intel or Apple silicon (a Terminal running under Rosetta still gets the native Apple silicon build)
 ARCH="${TOOL_ARCH:-$(uname -m)}"  # TOOL_ARCH: test the other build
 [ -z "${TOOL_ARCH:-}" ] && [ "$(sysctl -in sysctl.proc_translated 2>/dev/null)" = 1 ] && ARCH=arm64
-case "$ARCH" in arm64|aarch64) RUST=aarch64; GO=arm64 ;; x86_64) RUST=x86_64; GO=amd64 ;;
+case "$ARCH" in arm64|aarch64) RUST=aarch64; GO=arm64; NODE=arm64 ;; x86_64) RUST=x86_64; GO=amd64; NODE=x64 ;;
   *) echo "Unsupported processor: $ARCH"; exit 1 ;; esac
 TMP="$(mktemp -d)"; trap 'rm -rf "$TMP"' EXIT
 
@@ -36,6 +36,19 @@ case "${1:-}" in
     curl -fsSL -o "$TMP/caddy.tgz" "https://github.com/caddyserver/caddy/releases/download/$TAG/caddy_${V}_mac_${GO}.tar.gz"
     tar -xzf "$TMP/caddy.tgz" -C "$TMP" caddy
     install -m 755 "$TMP/caddy" "$BIN/caddy" ;;
+  node)    # Node.js LTS, nodejs.org's official build for this processor, checked against its SHASUMS256.txt.
+           # Lands in ~/.local/node with node, npm and npx linked into ~/.local/bin (Motion studio renders with it).
+    V="$(curl -fsSL https://nodejs.org/dist/index.json | /usr/bin/python3 -c 'import json,sys; print(next(r["version"] for r in json.load(sys.stdin) if r.get("lts")))')"
+    [ -n "$V" ] || { echo "Couldn't find Node's latest LTS version"; exit 1; }
+    F="node-$V-darwin-$NODE.tar.gz"
+    echo "Downloading Node.js $V for darwin-${NODE}…"
+    curl -fsSL -o "$TMP/$F" "https://nodejs.org/dist/$V/$F"
+    curl -fsSL -o "$TMP/SHASUMS256.txt" "https://nodejs.org/dist/$V/SHASUMS256.txt"
+    (cd "$TMP" && grep " $F\$" SHASUMS256.txt | shasum -a 256 -c - >/dev/null) || { echo "Node download didn't match its checksum"; exit 1; }
+    tar -xzf "$TMP/$F" -C "$TMP"
+    rm -rf "$HOME/.local/node.new" && mv "$TMP/node-$V-darwin-$NODE" "$HOME/.local/node.new"
+    rm -rf "$HOME/.local/node" && mv "$HOME/.local/node.new" "$HOME/.local/node"
+    for b in node npm npx; do ln -sfn "$HOME/.local/node/bin/$b" "$BIN/$b"; done ;;
   *) sed -n '2,4p' "$0"; exit 2 ;;
 esac
 hash -r

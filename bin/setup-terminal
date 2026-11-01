@@ -18,7 +18,7 @@ warn() { printf '  %s!%s %s\n' "$Y" "$N" "$1"; }
 fail() { printf '  %s✗%s %s\n' "$R" "$N" "$1"; }
 say()  { printf '  %s\n' "$1"; }
 dim()  { printf '  %s%s%s\n' "$D" "$1" "$N"; }
-TOTAL=10; STEP=0
+TOTAL=11; STEP=0
 step() { STEP=$((STEP + 1)); printf '\n%s━━ Step %d of %d · %s %s%s\n' "$C$B" "$STEP" "$TOTAL" "$1" "$(printf '━%.0s' $(seq 1 $((60 - ${#1}))))" "$N"; [ -n "${2:-}" ] && dim "$2"; echo; }
 
 # ── answers ───────────────────────────────────────────────────────────────────────────────────────
@@ -71,9 +71,9 @@ cat <<EOF
   ${D}Your coding agents, one inbox — on your Mac and your phone.${N}
 
   This screen walks you through everything, one step at a time:
-    1 About you          4 Sign in              7 Background services   10 Check it all works
-    2 Coding agents      5 Local files          8 Secure address
-    3 Tools              6 WebUI password       9 Your phone
+    1 About you          4 Sign in              7 Background services   10 Your phone
+    2 Coding agents      5 Local files          8 Secure address        11 Check it all works
+    3 Tools              6 WebUI password       9 Motion studio
 
   It asks before installing or changing anything. Takes about 10–15 minutes the first time.
   Safe to run again later: finished steps are ticked and skipped.
@@ -94,14 +94,15 @@ if [ "$NAME_SET" = 0 ]; then
     NAME="$GUESS"
   fi
 fi
-python3 - "$HOME" "$HERMES" "$NAME" > webui-extension/local.js <<'PY'
+PYTHONPATH="$HERMES" python3 - "$HOME" "$HERMES" "$NAME" > webui-extension/local.js <<'PY'
 import json, sys
+from hmem import motion
 home, hermes, name = sys.argv[1], sys.argv[2], " ".join(sys.argv[3].split())[:40]
 print("// Per-machine settings (git-ignored). Regenerate with bin/setup (--name to change the greeting).")
 print("window.HX_LOCAL = {")
 print(f"  home: {json.dumps(home)},")
 print(f"  hermes: {json.dumps(hermes)},")
-print(f"  motion: {json.dumps(home + '/motion')},")
+print(f"  motion: {json.dumps(str(motion.studio_dir()))},")
 print(f"  name: {json.dumps(name, ensure_ascii=False)},")
 print("};")
 PY
@@ -164,7 +165,7 @@ tool hermes  "Hermes Agent, the hub Tabbie is built on" "$IT hermes" 1 || MISSIN
 export PATH="$HOME/.hermes/bin:$HOME/.local/bin:$PATH"; hash -r
 [ "$USE_CLAUDE" = 1 ] && { tool claude "Claude Code" "$IT claude" 1 || MISSING=1; }
 [ "$USE_CODEX" = 1 ]  && { tool codex  "Codex"       "$IT codex"  1 || MISSING=1; }
-tool caddy "https://hermes.local, page addresses and phone access" "$IT caddy" 1 || true
+tool caddy "serves Tabbie at https://hermes.local with its icons, page addresses and phone access" "$IT caddy" 1 || MISSING=1
 tool uv    "runs the tests (for contributors)" "$IT uv" 0
 if [ "$MISSING" = 1 ]; then
   echo; fail "Some required tools are missing (above). Install them, then run ${B}bin/setup${N} again."
@@ -242,6 +243,16 @@ ok "Hub rules (~/.hermes/SOUL.md)"
 mkdir -p "$HOME/.hermes/plugins"
 for p in command-centre fragment-memory limits workboard; do ln -sfn "$HERMES/plugin/$p" "$HOME/.hermes/plugins/$p"; done
 ok "Plugins linked into ~/.hermes/plugins/"
+# Hermes loads a user plugin only once it's enabled. Without these the hub has no router, no
+# Claude/Codex workers and no kanban/todo tools: it would answer everything itself.
+ON="$(hermes config get plugins.enabled 2>/dev/null || true)"
+for p in command-centre fragment-memory limits workboard; do
+  printf '%s\n' "$ON" | grep -qE "^[[:space:]]*-[[:space:]]*$p[[:space:]]*$" && continue
+  backup_hermes_config
+  hermes plugins enable "$p" --no-allow-tool-override </dev/null >/dev/null 2>&1 \
+    || warn "Couldn't enable the $p plugin. Run: hermes plugins enable $p"
+done
+ok "Plugins enabled (router, memory, limits, kanban/todos)"
 # Workers can run for an hour: the hub must wait for them (backup first, like every config change).
 T="$(hermes config get timeouts.tools.sequential_call 2>/dev/null | tr -dc '0-9')"
 if [ "${T:-0}" -lt 3900 ]; then
@@ -310,7 +321,6 @@ if { [ "$ASK" = 0 ] && [ -n "$SERVICES" ]; } || { [ "$ASK" = 1 ] && yn "$Q" "$DE
     CADDY="$(command -v caddy || echo "$HOME/.local/bin/caddy")"
     for t in services/*.plist.template; do
       label="$(basename "$t" .plist.template)"
-      if [ "$label" = ai.hermes.caddy ] && ! have caddy; then warn "skipped $label (no caddy)"; continue; fi
       dest="$HOME/Library/LaunchAgents/$label.plist"
       sed -e "s|__HOME__|$HOME|g" -e "s|__CADDY__|$CADDY|g" "$t" > "$dest"
       launchctl bootout "gui/$(id -u)/$label" 2>/dev/null || true
@@ -325,10 +335,10 @@ fi
 
 # ── 8. secure address ─────────────────────────────────────────────────────────────────────────────
 if want cert; then
-step "Secure address" "https://hermes.local on your home network, with a padlock. Needs Caddy."
+step "Secure address" "https://hermes.local on your home network, with a padlock."
 CA="$HOME/Library/Application Support/Caddy/pki/authorities/local/root.crt"
 if ! have caddy; then
-  warn "No Caddy, so no https://hermes.local. Use http://127.0.0.1:8787 on this Mac (brew install caddy, then re-run)."
+  fail "Caddy is missing. Install it with bin/install-tool caddy, then run bin/setup again."
 else
   for _ in 1 2 3 4 5 6 7 8 9 10; do [ -f "$CA" ] && break; sleep 1; done
   if [ ! -f "$CA" ]; then
@@ -345,10 +355,35 @@ else
 fi
 fi
 
-# ── 9. phone ──────────────────────────────────────────────────────────────────────────────────────
+# ── 9. motion studio ──────────────────────────────────────────────────────────────────────────────
+if want motion; then
+step "Motion studio" "Optional. Motion (in the WebUI) makes product films with Remotion, which needs Node.js."
+MSTUDIO="$(PYTHONPATH="$HERMES" python3 -c 'from hmem import motion; print(motion.studio_dir())')"
+if [ "$ASK" = 1 ] && [ -z "$ONLY" ] && ! have node && ! yn "Set up Motion now? (installs Node.js, about 300 MB with the studio's packages)" y; then
+  dim "Skipped. Later: bin/setup --only motion (Motion also sets up its folder the first time it opens)"
+else
+  have node && ok "Node.js $(node -v)" || { run "$HERMES/bin/install-tool" node && hash -r; }
+  if have node; then
+    PYTHONPATH="$HERMES" python3 -c 'from hmem import motion; r = motion.ensure(); print("created" if r["created"] else "kept")' \
+      | grep -q created && ok "Studio created: $MSTUDIO" || ok "Studio: $MSTUDIO"
+    if PYTHONPATH="$HERMES" python3 -c 'import sys; from hmem import motion; sys.exit(0 if motion.deps_ready(motion.studio_dir()) else 1)'; then
+      ok "Studio packages installed"
+    else
+      say "Installing the studio's packages (Remotion, about a minute)…"
+      PYTHONPATH="$HERMES" python3 -c 'import sys; from hmem import motion; sys.exit(0 if motion.npm_install(wait=True)["state"] == "ready" else 1)' \
+        && ok "Studio packages installed" || warn "npm install didn't finish (state/logs/motion-npm.log). Motion retries when it opens."
+    fi
+  else
+    warn "Node.js didn't install. Later: bin/install-tool node"
+  fi
+  dim "Optional: \"Generate audio\" needs ELEVENLABS_API_KEY in $MSTUDIO/.env; asset generation needs higgsfield auth login."
+fi
+fi
+
+# ── 10. phone ──────────────────────────────────────────────────────────────────────────────────────
 if want phone; then
 step "Your phone" "Optional. Use Tabbie from your phone, at home or anywhere."
-PORT=8788; have caddy || PORT=8787
+PORT=8788
 say "${B}At home (same Wi-Fi):${N} open ${B}http://hermes.local/hermes-ca.crt${N} on the phone and install it."
 say "  iPhone: then Settings › General › About › Certificate Trust Settings → turn it on."
 say "  Then open ${B}https://hermes.local${N}."
@@ -396,7 +431,7 @@ else
 fi
 fi
 
-# ── 10. check ─────────────────────────────────────────────────────────────────────────────────────
+# ── 11. check ─────────────────────────────────────────────────────────────────────────────────────
 if want check; then
 step "Check it all works" "One line per part, with the fix command if something's off."
 bin/hub health
@@ -406,10 +441,10 @@ fi
 [ -n "$ONLY" ] && exit 0
 echo
 printf '%s━━ Done %s%s\n' "$G$B" "$(printf '━%.0s' $(seq 1 75))" "$N"
-if have caddy; then say "Open Tabbie:   ${B}https://hermes.local${N}   (or run bin/hub)"; else say "Open Tabbie:   ${B}http://127.0.0.1:8787${N}"; fi
+say "Open Tabbie:   ${B}https://hermes.local${N}   (or run bin/hub)"
 [ -n "${TS_URL:-}" ] && say "From anywhere: ${B}$TS_URL${N}   (Tailscale on)"
 say "Log in with your WebUI password. Anything marked ! above can be fixed by running bin/setup again."
 echo
 dim "Optional extras: Higgsfield (higgsfield auth login), ElevenLabs (README → Hermes config),"
-dim "Projects for your repos (WebUI → Projects), the motion studio (README → Optional: motion studio)."
+dim "Projects for your repos (WebUI → Projects), Motion's audio and asset generation (README → Motion studio)."
 echo

@@ -39,11 +39,12 @@ os.environ["PATH"] = os.pathsep.join([str(HOME / ".hermes/bin"), str(HOME / ".lo
                                       "/usr/local/bin", os.environ.get("PATH", "")])
 sys.path.insert(0, str(ROOT))
 from hmem import agents as agent_set  # noqa: E402
+from hmem import motion as motion_studio  # noqa: E402
 
 # Tools install with bin/install-tool: official sources, the right build for Apple silicon or Intel,
 # into ~/.local/bin. No Homebrew and no Mac password. Only Apple's developer tools (git, python3)
 # come from Apple's own installer window.
-TOOLS = ("hermes", "claude", "codex", "caddy", "uv")
+TOOLS = ("hermes", "claude", "codex", "caddy", "uv", "node")
 HUB_MODEL = {"openai-codex": "gpt-6.1-sol", "anthropic": "claude-sonnet-5-5"}
 
 
@@ -89,6 +90,9 @@ def state() -> dict:
         "services": lambda: sh(["launchctl", "list", "ai.hermes.webui"])[0] == 0,
         "trusted": lambda: CADDY_CA.exists() and sh(["security", "verify-cert", "-c", str(CADDY_CA)])[0] == 0,
         "git": lambda: sh(["xcode-select", "-p"])[0] == 0 and have("git"),
+        # Linked isn't enough: Hermes loads a user plugin only once it's enabled.
+        "plugins": lambda: have("hermes") and all(f"- {p}" in sh(["hermes", "config", "get", "plugins.enabled"])[1]
+                                                  for p in ("command-centre", "fragment-memory", "limits", "workboard")),
     }
     ts = tailscale()
     if ts:
@@ -105,7 +109,7 @@ def state() -> dict:
             pass
     env = ENV_FILE.read_text() if ENV_FILE.exists() else ""
     files = all([(ROOT / "webui-extension/local.js").exists(), (ROOT / "config/projects.yaml").exists(), ENV_FILE.exists(),
-                 (HOME / ".hermes/plugins/command-centre").exists(), (ROOT / "memory").exists()])
+                 (HOME / ".hermes/plugins/command-centre").exists(), (ROOT / "memory").exists(), got["plugins"]])
     tools = {"git": got["git"], "hermes": have("hermes"), "claude": have("claude"), "codex": have("codex"),
              "caddy": have("caddy"), "uv": have("uv")}
     return {
@@ -118,8 +122,17 @@ def state() -> dict:
         "cert": {"caddy": have("caddy"), "exists": CADDY_CA.exists(), "trusted": got["trusted"]},
         "tailscale": {"installed": bool(ts), "connected": got.get("ts_on", False), "served": got.get("ts_served", False),
                       "url": ts_url},
-        "open_url": "https://hermes.local" if have("caddy") else "http://127.0.0.1:8787",
+        "open_url": "https://hermes.local",
+        "motion": _motion(),
     }
+
+
+def _motion() -> dict:
+    """The Motion studio (optional step): Node, the studio folder and its packages. No keys, only booleans."""
+    p = motion_studio.studio_dir()
+    node = have("node")
+    return {"path": str(p), "node": node, "exists": p.is_dir(), "deps": motion_studio.deps_ready(p),
+            "ready": node and p.is_dir() and motion_studio.deps_ready(p)}
 
 
 # ── jobs ─────────────────────────────────────────────────────────────────────────────────────────
@@ -163,7 +176,7 @@ def write_name(name: str) -> None:
     name = " ".join(str(name or "").split())[:40]
     js = ("// Per-machine settings (git-ignored). Regenerate with bin/setup.\nwindow.HX_LOCAL = {\n"
           f"  home: {json.dumps(str(HOME))},\n  hermes: {json.dumps(str(ROOT))},\n"
-          f"  motion: {json.dumps(str(HOME / 'motion'))},\n  name: {json.dumps(name, ensure_ascii=False)},\n}};\n")
+          f"  motion: {json.dumps(str(motion_studio.studio_dir()))},\n  name: {json.dumps(name, ensure_ascii=False)},\n}};\n")
     (ROOT / "webui-extension" / "local.js").write_text(js)
 
 
@@ -229,7 +242,7 @@ def do(body: dict) -> dict:
         if term:
             return in_terminal(" ".join(shlex.quote(c) for c in cmds[who]))
         return {"ok": True, "job": job(cmds[who], f"Signing in ({who})")}
-    if a in ("files", "services", "cert"):
+    if a in ("files", "services", "cert", "motion"):
         cmd = ["bin/setup-terminal", "--yes", "--only", a, "--agents", agents_arg()]
         if a == "services":
             cmd.append("--services")
@@ -250,7 +263,7 @@ def do(body: dict) -> dict:
         ts = tailscale()
         if not ts:
             return {"ok": False, "error": "Tailscale isn't installed yet."}
-        return {"ok": True, "job": job(ts + ["serve", "--bg", "8788" if have("caddy") else "8787"], "Sharing on Tailscale")}
+        return {"ok": True, "job": job(ts + ["serve", "--bg", "8788"], "Sharing on Tailscale")}
     if a == "check":
         return {"ok": True, "job": job(["bin/hub", "health"], "Health check")}
     if a == "open":

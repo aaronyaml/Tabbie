@@ -120,13 +120,13 @@
     const anchorRail = document.getElementById('hxMotionRail') || document.querySelector('.rail .rail-btn.nav-tab[data-panel="chat"]');
     if (anchorRail && !document.getElementById('hxProjRail')) {
       const b = h('button', { id: 'hxProjRail', type: 'button', class: 'rail-btn nav-tab has-tooltip hxp-nav', 'data-tooltip': 'Projects', 'aria-label': 'Projects' });
-      b.innerHTML = icon('Folder01Icon', 20);
+      b.innerHTML = icon('Briefcase01Icon', 20);
       anchorRail.after(b);
     }
     const anchorSide = document.getElementById('hxMotionTab') || document.querySelector('.sidebar-nav .nav-tab[data-panel="chat"]');
     if (anchorSide && !document.getElementById('hxProjTab')) {
       const b = h('button', { id: 'hxProjTab', type: 'button', class: 'nav-tab has-tooltip has-tooltip--bottom hxp-nav', 'data-label': 'Projects', 'data-tooltip': 'Projects', 'aria-label': 'Projects' });
-      b.innerHTML = icon('Folder01Icon', 18);
+      b.innerHTML = icon('Briefcase01Icon', 18);
       anchorSide.after(b);
     }
   }
@@ -288,7 +288,7 @@
     if (!S.list && !S.err) main.append(h('p', { class: 'hxp-muted', text: 'Loading…' }));
     if (S.list && !S.list.length) {
       main.append(h('div', { class: 'hxp-empty' },
-        h('div', { class: 'hxp-empty-i', icon: 'Folder01Icon', size: 28 }),
+        h('div', { class: 'hxp-empty-i', icon: 'Briefcase01Icon', size: 28 }),
         h('h2', { text: 'One project, all its folders' }),
         h('p', { text: 'Group the repos that make up one product (site, app, API…). Hermes then works across them as one system, and learns from every session in that project.' }),
         btn('hxp-primary', 'Create your first project', () => { S.sheet = { kind: 'new', name: '', description: '', folders: [], primary: null }; render(); }, 'Add01Icon')));

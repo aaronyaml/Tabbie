@@ -25,9 +25,10 @@ case "${1:-open}" in
     check "HTTPS proxy (Caddy)"       "launchctl list ai.hermes.caddy | grep -q '\"PID\"'" "hub logs caddy"
     check "hermes.local (mDNS)"       "dscacheutil -q host -a name hermes.local | grep -q ip_address" "hub logs mdns"
     check "WebUI via hermes.local"    "curl -sk -m 5 -o /dev/null -w '%{http_code}' https://hermes.local/login | grep -q 200"
-    check "Router plugin loaded"      "hermes plugins list | grep command-centre | grep -q enabled"
-    check "Limits plugin loaded"      "hermes plugins list | grep limits | grep -q enabled"
-    check "Fragment memory loaded"    "hermes plugins list | grep fragment-memory | grep -q enabled"
+    PL="$(hermes plugins list 2>/dev/null)"
+    for p in command-centre fragment-memory limits workboard; do
+      check "Plugin $p enabled"       "printf '%s' \"\$PL\" | grep -E '^. $p ' | grep -q enabled" "hermes plugins enable $p, then bin/hub restart"
+    done
     AGENTS_ON="$(sed -n 's/^enabled:[[:space:]]*\[\(.*\)\]/\1/p' "$HOME/hermes/config/agents.yaml" 2>/dev/null)"
     [ -n "$AGENTS_ON" ] || AGENTS_ON="claude, codex"  # no file = both (older installs)
     case "$AGENTS_ON" in *claude*)
@@ -39,6 +40,11 @@ case "${1:-open}" in
     check "Astra model exposed"       "grep -q '\"gpt-6-astra\"' ~/.codex/models_cache.json" ;; esac
     opt   "Higgsfield"                "higgsfield account status" "higgsfield auth login"
     opt   "ElevenLabs MCP (OAuth)"    "test -s ~/.hermes/mcp-tokens/elevenlabs.json" "hermes mcp login elevenlabs"
+    # Motion: the studio folder is created from templates/motion-studio the first time Motion opens.
+    MS="$(PYTHONPATH="$HOME/hermes" python3 -c 'from hmem import motion; print(motion.studio_dir())' 2>/dev/null)"
+    opt   "Motion: Node.js"           "command -v node" "bin/install-tool node"
+    opt   "Motion: studio ready"      "test -d \"$MS/node_modules/remotion\"" "bin/setup --only motion, or open Motion in the WebUI"
+    opt   "Motion: music (ElevenLabs key)" "grep -qE '^[[:space:]]*ELEVENLABS_API_KEY=[^[:space:]]+' \"$MS/.env\"" "add ELEVENLABS_API_KEY=… to $MS/.env"
     check "Attachments store"         "test -w ~/hermes/state"
     ;;
   restart)

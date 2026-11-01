@@ -71,3 +71,16 @@
 .hx-lim-off-t { color: var(--hx-text, #141413); }
 .hx-lim-off-fix code { font-size: 12px; padding: 1px 5px; border-radius: 5px; background: var(--code-inline-bg, rgba(0,0,0,.055));
   color: var(--hx-text, #141413); word-break: break-all; }
+
+/* /limit skeleton while the reply loads (limits-view.js) */
+.hx-lim-skel { padding: 6px 0 12px; }
+.hx-lim-skel .hx-lim-card { gap: 9px; padding-bottom: 14px; }
+.hx-sk { display: block; height: 10px; width: 60%; border-radius: 5px; background: var(--hx-fill, #F1F1EF);
+  background-image: linear-gradient(90deg, transparent, rgba(255,255,255,.55), transparent); background-size: 200% 100%;
+  background-repeat: no-repeat; animation: hx-sk 1.2s ease-in-out infinite; }
+:root.dark .hx-sk { background-color: rgba(255,255,255,.08); background-image: linear-gradient(90deg, transparent, rgba(255,255,255,.08), transparent); }
+.hx-sk-t { width: 45%; height: 12px; }
+.hx-sk-bar { width: 100%; height: 6px; border-radius: 3px; }
+.hx-sk-s { width: 35%; }
+@keyframes hx-sk { from { background-position: 150% 0; } to { background-position: -50% 0; } }
+@media (prefers-reduced-motion: reduce) { .hx-sk { animation: none; } }

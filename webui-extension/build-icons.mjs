@@ -140,7 +140,7 @@ const GLYPH = {
   '💡': 'BulbIcon', '🚀': 'Rocket01Icon', '✨': 'SparklesIcon', '✦': 'SparklesIcon', '🛑': 'StopIcon',
 };
 // Extras the runtime / CSS reference directly.
-const EXTRA = ['PanelLeftIcon', 'PanelLeftCloseIcon', 'FileImageIcon', 'FileVideoIcon', 'FileAudioIcon', 'Pdf02Icon', 'FileZipIcon', 'FileCodeIcon', 'FileTextIcon', 'FileSpreadsheetIcon', 'ArrowUpDownIcon', 'InformationCircleIcon', 'CheckmarkCircle02Icon', 'CircleIcon', 'Flag02Icon', 'KanbanIcon', 'CheckListIcon', 'Calendar03Icon', 'UserMultiple02Icon', 'BubbleChatQuestionIcon', 'AiBrain01Icon', 'AiMagicIcon'];
+const EXTRA = ['PanelLeftIcon', 'PanelLeftCloseIcon', 'FileImageIcon', 'FileVideoIcon', 'FileAudioIcon', 'Pdf02Icon', 'FileZipIcon', 'FileCodeIcon', 'FileTextIcon', 'FileSpreadsheetIcon', 'ArrowUpDownIcon', 'InformationCircleIcon', 'CheckmarkCircle02Icon', 'CircleIcon', 'Flag02Icon', 'KanbanIcon', 'CheckListIcon', 'Calendar03Icon', 'UserMultiple02Icon', 'BubbleChatQuestionIcon', 'AiBrain01Icon', 'AiMagicIcon', 'Briefcase01Icon'];
 
 // ── fingerprint: element tags + geometry, document order (mirrored in runtime) ─
 const GEO = ['d', 'points', 'x1', 'y1', 'x2', 'y2', 'cx', 'cy', 'r', 'x', 'y', 'width', 'height', 'rx', 'ry'];

@@ -1,7 +1,7 @@
 """Tabbie updates: check GitHub for a newer version, and download it only when the user says so.
 
 check()    compares this install's commit with the repo's branch on GitHub (git ls-remote, plus the
-           public compare API for the list of changes). Read-only; cached for an hour.
+           public compare API for the list of changes). Read-only; cached for 10 minutes.
 apply()    fast-forwards this checkout to that commit (git fetch + merge --ff-only). Your own edits
            (e.g. config/router.yaml) stay; git refuses if the update would overwrite one, or if the
            history has diverged, so nothing is ever lost.
@@ -23,7 +23,7 @@ from pathlib import Path
 from .common import ROOT, STATE_DIR
 
 DEFAULTS = {"repo": "aaronyaml/Tabbie", "branch": "main", "check": True}
-CACHE_TTL = 3600
+CACHE_TTL = 600
 STATE = STATE_DIR / "updates.json"
 _SHA = re.compile(r"^[0-9a-f]{40}$")
 _REPO = re.compile(r"^[A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+$")

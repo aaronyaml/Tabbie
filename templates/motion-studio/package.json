@@ -1,0 +1,32 @@
+{
+  "name": "tabbie-motion-studio",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "description": "Tabbie's Motion studio: a Remotion project the Motion panel and /motion jobs build films in",
+  "scripts": {
+    "studio": "remotion studio src/index.ts",
+    "render": "remotion render src/index.ts",
+    "still": "remotion still src/index.ts",
+    "audio": "node scripts/analyze.mjs",
+    "music": "node scripts/music.mjs",
+    "editmap": "node scripts/edit-map.mjs",
+    "ffmpeg": "remotion ffmpeg",
+    "ffprobe": "remotion ffprobe",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@remotion/bundler": "4.0.539",
+    "@remotion/cli": "4.0.539",
+    "@remotion/renderer": "4.0.539",
+    "@remotion/transitions": "4.0.539",
+    "remotion": "4.0.539",
+    "react": "19.3.1",
+    "react-dom": "19.3.1"
+  },
+  "devDependencies": {
+    "@types/react": "^19.3.0",
+    "@types/react-dom": "^19.3.0",
+    "typescript": "^5.9.3"
+  }
+}

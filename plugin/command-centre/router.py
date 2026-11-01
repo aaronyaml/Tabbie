@@ -126,6 +126,32 @@ def looks_like_chat(text: str) -> bool:
     return bool(_QUESTION.match(t) or t.endswith("?") or len(t.split()) <= 3)
 
 
+# Things the hub does itself with its own tools: the kanban board and todos (workboard plugin) and
+# scheduled tasks (Hermes' cronjob_manage tool). "add 'buy milk' to my todos", "move the login card to done",
+# "remind me every Monday at 9 to send the report". A worker in a project folder can't reach these.
+_LIST = r"(?:kanban(?: board)?|board|todo'?s?|to-?dos?(?: list)?|to do list|task ?list|checklist|tasks)"
+_BOARD = re.compile(
+    rf"\b(?:to|on|onto|from|off|in)\s+(?:my|the)\s+{_LIST}\b"            # "add X to my todos", "on the kanban"
+    rf"|\bmy\s+{_LIST}\b|\b(?:the\s+)?kanban\b"                          # "show my board", "the kanban"
+    r"|\bcard\b.*\bto\s+(?:done|doing|todo|in progress|review|blocked|ready)\b"  # "move the login card to done"
+    r"|^\s*(?:add|new)\s+(?:a\s+)?(?:todo|to-?do)\b", re.I)                # "add todo: call mum"
+# Building one of these in an app is project work, not the user's own board.
+_DEV = re.compile(r"\b(feature|component|app|page|screen|ui|endpoint|api|function|module|repo|website|site|css)\b", re.I)
+_SCHEDULE = re.compile(r"\b(remind me|schedule|every (?:day|morning|evening|night|week|weekday|monday|tuesday|wednesday|"
+                       r"thursday|friday|saturday|sunday|hour|\d+ (?:minutes?|hours?|days?))|daily|weekly|hourly|cron)\b", re.I)
+
+
+def hub_tool_request(text: str) -> str | None:
+    """"board" or "schedule" when the message is about the user's kanban/todos or a scheduled task."""
+    t = text.strip()
+    if _BOARD.search(t) and not _DEV.search(t):
+        return "board"
+    if _SCHEDULE.search(t) and re.search(r"\b(remind me|schedule|every|daily|weekly|hourly)\b", t, re.I) \
+            and not re.search(r"\bevery ?time\b", t, re.I):
+        return "schedule"
+    return None
+
+
 # --- approval-state reply interpretation ------------------------------------------------------
 
 _APPROVE = re.compile(

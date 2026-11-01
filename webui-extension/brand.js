@@ -61,6 +61,18 @@
       attributeFilter: ['aria-label', 'placeholder', 'content'] });
     new MutationObserver(later).observe(document.head, { childList: true, subtree: true, characterData: true });
   }
+  // The bare WebUI (port 8787) skips Caddy, so it has upstream's icons and no page addresses: point to the real door.
+  function nudge() {
+    if (location.port !== '8787' || document.getElementById('hxBareNudge')) return;
+    const n = document.createElement('a');
+    n.id = 'hxBareNudge';
+    n.href = 'https://hermes.local' + location.pathname;
+    n.textContent = 'Open Tabbie at https://hermes.local for the full app';
+    n.style.cssText = 'position:fixed;left:50%;top:10px;transform:translateX(-50%);z-index:2000;padding:8px 14px;border-radius:10px;'
+      + 'background:var(--hx-accent,#3054FD);color:#fff;font:500 13px/1.2 var(--font-ui,system-ui);text-decoration:none;box-shadow:0 6px 18px rgba(0,0,0,.2)';
+    document.body.appendChild(n);
+  }
   apply();
-  if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', start); else start();
+  if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', () => { start(); nudge(); });
+  else { start(); nudge(); }
 })();

@@ -245,4 +245,45 @@
     setInterval(() => { if (!document.hidden) scan(); }, 30000); // keep "resets in" honest
   }
   if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', start); else start();
+
+  // ── /limit feedback ─────────────────────────────────────────────────────
+  // Upstream runs plugin commands (POST /api/commands/exec) before it renders anything, so /limit
+  // looked frozen for a second or two. Show the user's message and a skeleton card right away; the
+  // real reply replaces both when upstream re-renders.
+  function skeleton() {
+    const inner = document.getElementById('msgInner') || document.getElementById('messages');
+    if (!inner) return null;
+    const el = document.createElement('div');
+    el.className = 'hx-lim-skel';
+    el.setAttribute('role', 'status');
+    el.setAttribute('aria-label', 'Checking usage limits');
+    const card = '<div class="hx-lim-card"><div class="hx-lim-svc"><span class="hx-lim-ic"></span><span class="hx-sk hx-sk-t"></span></div>'
+      + '<span class="hx-sk"></span><span class="hx-sk hx-sk-bar"></span><span class="hx-sk hx-sk-s"></span></div>';
+    el.innerHTML = `<div class="hx-lim"><div class="hx-lim-head"><span class="hx-lim-title">Usage limits</span>`
+      + `<span class="hx-lim-meta">Checking your accounts…</span></div><div class="hx-lim-grid">${card}${card}</div></div>`;
+    inner.appendChild(el);
+    if (typeof window.scrollToBottom === 'function') window.scrollToBottom();
+    return el;
+  }
+  function wrapExec() {
+    const orig = window.executeAgentPluginCommand;
+    if (typeof orig !== 'function' || orig.__hxLim) return;
+    const wrapped = async function (text, meta) {
+      if (!/^\/limits?\b/i.test(String(text || '').trim())) return orig.apply(this, arguments);
+      let sk = null;
+      try {
+        if (typeof window.renderMessages === 'function') window.renderMessages();  // the user's /limit bubble
+        const box = document.getElementById('msg');
+        if (box) { box.value = ''; if (typeof window.autoResize === 'function') window.autoResize(); }
+        sk = skeleton();
+      } catch (_) { /* feedback only */ }
+      try { return await orig.apply(this, arguments); } finally { if (sk) sk.remove(); }
+    };
+    wrapped.__hxLim = true;
+    window.executeAgentPluginCommand = wrapped;
+  }
+  // upstream's commands.js is deferred: wrap once it has run
+  wrapExec();
+  if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', wrapExec);
+  window.addEventListener('load', wrapExec);
 })();

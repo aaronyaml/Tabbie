@@ -14,6 +14,9 @@ GET /agents, POST /agents {enabled}  -> which coding agents this install uses (C
 GET /update[?force=1], POST /update, POST /update/restart -> Tabbie updates from GitHub (asked first)
 POST /hub {provider}, POST /hub/claude-login -> finish the hub's sign-in from the WebUI (hub_setup.py)
 GET|POST /projects/*, GET /fs/*      -> Projects UI (hmem/api.py): registry, memory, Dreamer, proposals
+GET /motion/status, POST /motion/ensure -> the Motion studio folder (created from the template when missing,
+                                       npm install in the background) and whether ElevenLabs / Higgsfield are
+                                       linked (booleans + how-to hints only; hmem/motion.py)
 """
 
 from __future__ import annotations
@@ -49,6 +52,7 @@ if _HERMES_HOME not in sys.path:
     sys.path.insert(0, _HERMES_HOME)
 from hmem import api as projects_api  # noqa: E402  (Projects UI backend: /projects/*, /fs/*)
 from hmem import agents as agent_set  # noqa: E402  (config/agents.yaml: Claude Code, Codex or both)
+from hmem import motion as motion_studio  # noqa: E402  (Motion studio folder + linked providers)
 
 EXT_ID = "cc-agents"
 HOST, PORT = "127.0.0.1", int(os.environ.get("CC_SIDECAR_PORT", "8794"))
@@ -262,6 +266,8 @@ class Handler(BaseHTTPRequestHandler):
                 return self._send(200, executor_payload(sid))
             if u.path == "/agents":
                 return self._send(200, agents_payload())
+            if u.path == "/motion/status":
+                return self._send(200, motion_studio.status())
             if u.path == "/update":
                 return self._send(200, update_payload(q.get("force") == "1"))
             if u.path == "/title":
@@ -293,6 +299,8 @@ class Handler(BaseHTTPRequestHandler):
                 return self._send(*set_executor(body))
             if u.path == "/agents" and isinstance(body, dict):
                 return self._send(*set_agents(body))
+            if u.path == "/motion/ensure":
+                return self._send(200, motion_studio.status(create=True))
             if u.path == "/update":
                 res = updates.apply()
                 return self._send(200 if res["ok"] else 409, res)

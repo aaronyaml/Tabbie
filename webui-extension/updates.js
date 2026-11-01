@@ -12,7 +12,8 @@
 
   const API = 'api/extensions/cc-agents/sidecar/update';
   const KEY = 'hx-update-dismissed';
-  const EVERY = 6 * 3600 * 1000;
+  const EVERY = 30 * 60 * 1000;
+  const SOON = 10 * 60 * 1000;
   const esc = (s) => String(s == null ? '' : s).replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
   const get = (k) => { try { return localStorage.getItem(k); } catch (_) { return null; } };
   const set = (k, v) => { try { localStorage.setItem(k, v); } catch (_) {} };
@@ -92,15 +93,33 @@
     }
   }
 
+  let last = 0;
   async function check(force) {
+    if (card) return;  // already showing something
+    last = Date.now();
     let j;
-    try { j = await call(force ? '?force=1' : '', 'GET'); } catch (_) { return; }  // no consent / sidecar down: stay quiet
+    try { j = await call(force ? '?force=1' : '', 'GET'); }
+    catch (err) { console.warn('[Tabbie updates] check failed:', err && err.message); return; }  // sidecar down / not allowed yet
+    if (j.note) console.info('[Tabbie updates]', j.note);
     if (j.pending_restart && j.pending_restart.length) { finished({ needs: j.pending_restart }); return; }
-    if (!j.available || get(KEY) === j.remote) return;
+    if (!j.available) {
+      // A copy that can't fast-forward says so once per GitHub version, so it isn't silently stuck.
+      if (j.note && j.remote && /can't update automatically/.test(j.note) && get(KEY) !== j.remote) {
+        info = j;
+        show(`<div class="hx-up-head"><b>Tabbie update available</b></div><p class="hx-up-note">${esc(j.note)} Run <code>bin/hub update</code> on the Mac for details.</p>`
+          + `<div class="hx-up-btns"><button type="button" data-later>OK</button></div>`);
+      }
+      return;
+    }
+    if (get(KEY) === j.remote) return;
     offer(j);
   }
 
   window.hxUpdates = { check: () => check(true) };
   setTimeout(() => check(false), 4000);  // after the app has settled
   setInterval(() => check(false), EVERY);
+  // Coming back to the tab (a phone unlocking, a laptop waking) checks again after a while.
+  document.addEventListener('visibilitychange', () => {
+    if (document.visibilityState === 'visible' && Date.now() - last > SOON) check(false);
+  });
 })();

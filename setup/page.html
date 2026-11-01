@@ -129,7 +129,8 @@ const STEPS = [
   { id: 'files', title: 'Local files', done: () => S.files },
   { id: 'password', title: 'Password', done: () => S.password },
   { id: 'services', title: 'Start Tabbie', done: () => S.services },
-  { id: 'cert', title: 'Secure address', done: () => !S.cert.caddy || S.cert.trusted, optional: true },
+  { id: 'cert', title: 'Secure address', done: () => S.cert.caddy && S.cert.trusted },
+  { id: 'motion', title: 'Motion studio', done: () => (S.motion && S.motion.ready) || skipped.motion, optional: true },
   { id: 'phone', title: 'Your phone', done: () => S.tailscale.served || skipped.phone, optional: true },
   { id: 'check', title: 'All done', done: () => !!skipped.checked },
 ];
@@ -214,7 +215,7 @@ const VIEWS = {
       hermes: ['Hermes Agent', 'The engine Tabbie runs on. Installed from Nous Research.'],
       claude: ['Claude Code', "Anthropic's coding agent."],
       codex: ['Codex', "OpenAI's coding agent."],
-      caddy: ['Caddy', 'Gives Tabbie a secure address for your phone and browser.'],
+      caddy: ['Caddy', 'Serves Tabbie at https://hermes.local, with its icons and page addresses. Required.'],
     };
     const need = toolsNeeded();
     const missing = need.filter((t) => !S.tools[t]);
@@ -262,11 +263,25 @@ const VIEWS = {
 
   cert: () => `<h2>Secure address</h2>
     <p class="lead">Lets your browser open <code>https://hermes.local</code> with a padlock and no warnings.</p>
-    ${!S.cert.caddy ? '<p class="banner">Install Caddy in step 3 to get a secure address.</p>'
+    ${!S.cert.caddy ? '<p class="banner bad">Install Caddy in step 3 first. Tabbie needs it.</p>'
       : S.cert.trusted ? '<p class="ok">✓ This Mac trusts Tabbie\'s certificate</p>'
       : !S.cert.exists ? '<p class="banner">Start Tabbie first (step 7), then come back.</p>'
       : `${btn('cert', 'Trust on this Mac', 'data-act="cert"', true)}<p class="note">macOS will ask for your Mac password to confirm.</p>`}
     ${log('cert')}`,
+
+  motion: () => {
+    const m = S.motion || {};
+    const row = (done, text, sub) => `<div class="row"><div class="what"><b>${text}</b>${sub ? `<span>${sub}</span>` : ''}</div>${done ? '<span class="ok">✓ Done</span>' : ''}</div>`;
+    return `<h2>Motion studio</h2>
+      <p class="lead">Optional. <b>Motion</b> in Tabbie makes product films cut to music, with Remotion. It needs Node.js and a studio
+      folder with its packages (about 300 MB). Motion also sets up its folder the first time it opens.</p>
+      ${row(m.node, 'Node.js', "From nodejs.org's official download, the right build for this Mac.")}
+      ${row(m.exists && m.deps, 'Studio folder and packages', `<code>${esc(m.path || '')}</code>`)}
+      ${m.ready ? '' : btn('motion', 'Set up Motion', 'data-act="motion"', true)}${log('motion')}
+      <p class="note">Optional extras: <b>Generate audio</b> needs your ElevenLabs API key in the studio's <code>.env</code>
+      (<code>ELEVENLABS_API_KEY=…</code>), and asset generation needs Higgsfield (<code>higgsfield auth login</code>).
+      Motion greys those buttons out until they're linked.</p>`;
+  },
 
   phone: () => {
     const t = S.tailscale;

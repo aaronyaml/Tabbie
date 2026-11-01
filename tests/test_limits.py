@@ -98,3 +98,12 @@ def test_command_surfaces(monkeypatch):
     assert L._cmd_limit("", platform="cli").startswith("Service")
     assert L._cmd_limit("", platform="telegram").startswith("```")
     assert json.loads(L._tool_usage_limits({}))["limits"][0]["service"] == "Higgsfield Pro"
+
+
+def test_limit_shows_connected_accounts_only():
+    keep = [{"note": ""}, {"note": "binding"}, {"note": "12 credits left"}, {"note": L.SLOW},
+            {"note": "Claude Code token expired — run `claude` once to refresh"}]
+    drop = [{"note": "not connected — fix: `elevenlabs auth login`"}, {"note": "CLI not installed"},
+            {"note": "no data — fix: `codex login`"}, {"note": "unavailable (not logged in) — fix: `higgsfield auth login`"}]
+    assert all(L.connected(r) for r in keep)
+    assert not any(L.connected(r) for r in drop)

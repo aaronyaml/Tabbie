@@ -393,6 +393,15 @@ def _enabled_agents() -> list[str]:
         return ["claude", "codex"]
 
 
+# Rows for accounts this install isn't signed in to (or tools it doesn't have). /limit shows only
+# the user's connected accounts; `bin/hub health` is where missing sign-ins are reported.
+_UNCONNECTED = re.compile(r"^(not connected|CLI not installed|no data — fix|unavailable \(.*\) — fix)", re.I)
+
+
+def connected(r: dict) -> bool:
+    return not _UNCONNECTED.match(str(r.get("note") or ""))
+
+
 def collect(refresh: bool = False) -> list[dict]:
     if not refresh and _cache["rows"] is not None and _now() - _cache["at"] < CACHE_TTL:
         return _cache["rows"]
@@ -408,6 +417,7 @@ def collect(refresh: bool = False) -> list[dict]:
                 rows.append(_row(fn.__name__.replace("_rows", "").capitalize(), "—", note=f"error ({_err(e)})"))
     if "codex" not in on:  # the hub's own ChatGPT login stays; only Codex-as-worker (Astra) goes
         rows = [r for r in rows if not str(r.get("service", "")).startswith("Astra")]
+    rows = [r for r in rows if connected(r)]
     _cache.update(at=_now(), rows=rows)
     return rows
 
@@ -535,6 +545,8 @@ _MESSAGING = {"telegram", "discord", "slack", "whatsapp", "signal", "matrix", "s
 def _cmd_limit(raw_args: str = "", platform: str | None = None, **kwargs):
     refresh = "refresh" in (raw_args or "").lower()
     rows = collect(refresh=refresh)
+    if not rows:
+        return "No connected accounts to show. Sign in with `bin/setup` on the Mac; `bin/hub health` lists what's missing."
     if not platform or platform in ("webui", "web"):
         return format_webui(rows)  # WebUI (no platform passed): cards via limits-view.js
     if platform == "api_server":

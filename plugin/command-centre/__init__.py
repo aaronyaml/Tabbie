@@ -23,7 +23,7 @@ from .common import REQUESTS_DIR, STATE_DIR, load_config, log_decision, read_jso
 from .providers import (WORKER_RULES, claude_transcript_tail, codex_models, git_state, run_astra_executor, run_claude,
                         run_planner, usage_limit_info)
 from .common import LOCKS_DIR, agents
-from .router import ASTRA, CLAUDE, classify, interpret_reply, looks_like_chat
+from .router import ASTRA, CLAUDE, classify, hub_tool_request, interpret_reply, looks_like_chat
 from .state import Request, active_planning_request, session_state, save_session_state, set_active
 
 _CTX = None
@@ -91,11 +91,11 @@ def _session_cwd() -> str | None:
 
 
 def _worker_label(session_id: str) -> str:
-    """The conversation's executor as the route line names it: "Claude" by default, else the pick."""
+    """The conversation's executor as the route line names it, e.g. "Claude Opus 5.5 (low)". The WebUI
+    shows this model on the reply (worker-label.js) instead of the hub model that relayed it."""
     ch = executor_choice.get_choice(session_id)
-    if ch["default"]:
-        return "Claude"
-    return f"{'Claude' if ch['provider'] == 'anthropic' else 'Codex'} {ch['name']}"
+    who = f"{'Claude' if ch['provider'] == 'anthropic' else 'Codex'} {ch['name']}"
+    return f"{who} ({ch['effort']})" if ch["effort"] else who
 
 
 def _route_line(r: Request) -> str:
@@ -151,7 +151,7 @@ def _directive_execute_approved(r: Request) -> str:
         f"{TAG} User approved request {r.id}"
         + (f" with modifications: {r['modifications'][-1]!r}" if r["modifications"] else "")
         + f".\nACTION: call cc_execute_approved(request_id=\"{r.id}\") now." + _DIRECT + f" Reply starting with "
-        f"`Route: Astra → approval → Claude — executing approved brief`, show any changed points the "
+        f"`Route: Astra → approval → {_worker_label(r['session_id'])} — executing approved brief`, show any changed points the "
         f"tool reports (one bullet each), then relay Claude's result as short Done / Verified / "
         f"Note bullets."
     )
@@ -286,7 +286,17 @@ def _route_turn(session_id: str, user_message, history=None):
         active.save()
         return _directive_plan(active, cfg)
 
-    # 3) a new request
+    # 3) the user's own board, todos or scheduled tasks: the hub's tools, not a worker's
+    kind = None if overridden else hub_tool_request(text)
+    if kind:
+        log_decision(event="routed", route="hermes", reason=f"hub tools ({kind})")
+        tools = ("the workboard_* tools (kanban cards and todos, shown in the Kanban and Todo panels)" if kind == "board"
+                 else "the cronjob_manage tool (scheduled tasks, shown in the Tasks panel)")
+        return (f"{TAG} Route: Tabbie — your {'board and todos' if kind == 'board' else 'scheduled tasks'}. Do this "
+                f"YOURSELF with {tools}; do not call cc_* tools. Start the reply with that route line, then "
+                f"confirm what changed in one or two short lines.")
+
+    # 4) a new request
     decision = classify(text, cfg)
     if (not decision.forced and decision.route == CLAUDE and cfg.get("router", {}).get("llm_tiebreak")
             and decision.score == int(cfg.get("router", {}).get("plan_threshold", 3)) - 1
@@ -403,23 +413,28 @@ def _agent_events(run: AgentRun, kind: str):
     return on_event
 
 
-MOTION_STUDIO = Path.home() / "motion"
-
-
 def _route_motion(session_id: str, user_message, text: str):
-    """/motion <brief>: Claude Code in ~/motion, current workspace = product source (read-only)."""
+    """/motion <brief>: Claude Code in the Motion studio, current workspace = product source (read-only).
+    The studio folder (hmem/motion.py) is created from Tabbie's template if it's missing."""
+    _hmem()  # puts hmem on sys.path
+    from hmem import motion as motion_studio
     cfg = load_config()
+    studio = motion_studio.studio_dir()
+    motion_studio.ensure(studio)
     brief = text[len("/motion"):].strip()
     project, source = projects.resolve(brief, _session_cwd())
     primary, extras = projects.folders_for(project)
     primary, extras = projects.expand_with_project(session_id, primary, extras)
-    product = [f for f in [primary, *extras] if f and Path(f).resolve() != MOTION_STUDIO.resolve()]
-    prompt = ("Use the `motion` skill (~/.claude/skills/motion/SKILL.md). Style: ~/motion/MOTION_RULES.md. "
+    product = [f for f in [primary, *extras] if f and Path(f).resolve() != studio.resolve()]
+    skill = Path.home() / ".claude" / "skills" / "motion" / "SKILL.md"
+    how = (f"Use the `motion` skill ({skill}). " if skill.exists() else
+           f"Follow the studio's CLAUDE.md ({studio / 'CLAUDE.md'}). ")
+    prompt = (f"Motion studio: {studio} (your working folder). {how}Style: {studio / 'MOTION_RULES.md'}. "
               "Do not use Higgsfield.\n"
               f"BRIEF: {brief or '(none given - ask once what the film should do)'}\n"
               f"PRODUCT SOURCE (read-only): {', '.join(product) if product else '(none selected - ask which app)'}")
     r = Request.create(session_id=session_id, route=CLAUDE, reason="motion studio (/motion)", forced=True,
-                       prompt=prompt, raw_message=text, project=str(MOTION_STUDIO), project_source="/motion")
+                       prompt=prompt, raw_message=text, project=str(studio), project_source="/motion")
     r["extra_dirs"] = product
     r.save()
     Manifest(r.dir).ingest(user_message, cfg.get("attachments", {}) or {})
@@ -655,7 +670,7 @@ def _astra_takeover(r: Request, reason: str, choice: dict | None = None) -> dict
         r.write_text("takeover_prompt.md", prompt)
     r["status"] = "executing"
     r.save()
-    who = f"Codex {choice['name']}" if choice else "Astra"
+    who = (f"Codex {choice['name']}" + (f" ({choice['effort']})" if choice.get("effort") else "")) if choice else "Astra"
     _notify(f"Using {who}{'' if choice else ' (takeover)'}: {cwd}")
     manifest = Manifest(r.dir)
     add_dirs = ([str(manifest.dir)] if manifest.items else []) + list(r.data.get("extra_dirs") or [])

@@ -32,7 +32,7 @@
       "id": "brand",
       "name": "Tabbie name",
       "scripts": [
-        "brand.js?v=1"
+        "brand.js?v=2"
       ],
       "stylesheets": []
     },
@@ -40,7 +40,7 @@
       "id": "hugeicons",
       "name": "Hugeicons",
       "scripts": [
-        "hugeicons.js?v=6"
+        "hugeicons.js?v=7"
       ],
       "stylesheets": [
         "hugeicons.css?v=6"
@@ -178,20 +178,20 @@
       "id": "motion",
       "name": "Motion studio (Zoetie)",
       "scripts": [
-        "motion.js?v=8",
+        "motion.js?v=9",
         "motion-scrub.js?v=6",
-        "motion-studio.js?v=19"
+        "motion-studio.js?v=20"
       ],
       "stylesheets": [
         "motion.css?v=6",
-        "motion-studio.css?v=12"
+        "motion-studio.css?v=13"
       ]
     },
     {
       "id": "projects",
       "name": "Projects (multi-folder, memory, Dreamer)",
       "scripts": [
-        "projects.js?v=6"
+        "projects.js?v=7"
       ],
       "stylesheets": [
         "projects.css?v=5"
@@ -209,7 +209,7 @@
       "id": "updates",
       "name": "Tabbie updates (asks before downloading)",
       "scripts": [
-        "updates.js?v=1"
+        "updates.js?v=2"
       ],
       "stylesheets": [
         "updates.css?v=1"
@@ -247,10 +247,10 @@
       "id": "limits-view",
       "name": "Usage limit cards",
       "scripts": [
-        "limits-view.js?v=3"
+        "limits-view.js?v=4"
       ],
       "stylesheets": [
-        "limits-view.css?v=1"
+        "limits-view.css?v=2"
       ]
     },
     {
@@ -262,6 +262,14 @@
       "stylesheets": [
         "hub-signin.css?v=1"
       ]
+    },
+    {
+      "id": "worker-label",
+      "name": "Reply model label",
+      "scripts": [
+        "worker-label.js?v=1"
+      ],
+      "stylesheets": []
     }
   ]
 }

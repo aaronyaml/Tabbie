@@ -5,7 +5,7 @@
  *
  * This file owns what is shared with the chat:
  *  - the Motion entries in the rail (desktop) and the drawer list (phones), right under Chat;
- *  - motion sessions: each studio film has its own chat session (workspace ~/motion, title
+ *  - motion sessions: each studio film has its own chat session (workspace = the studio folder, title
  *    "Motion · <film>"). They are studio-only: never listed in the chat sidebar or its search
  *    (rows are filtered before upstream paints them, and any row that slips through is hidden),
  *    and landing on one by URL opens the studio instead of the raw transcript.
@@ -16,14 +16,15 @@
   window.__hxMotion = true;
 
   const NAME = 'Zoetie';
-  const HOME = (window.HX_LOCAL || {}).motion || `${(window.HX_LOCAL || {}).home || ''}/motion`;
+  const LOC = window.HX_LOCAL || {};
+  let HOME = LOC.motion || `${LOC.hermes || `${LOC.home || ''}/hermes`}/motion`; // motion-studio.js sets the sidecar's answer
   const MARK = 'Motion · ';
   const STORE = 'hx-motion-sessions';
   const icon = (n, s) => (typeof window.hxIcon === 'function' ? window.hxIcon(n, s) : '');
   const sess = () => { try { return S.session || null; } catch (_) { return null; } };
   const sidNow = () => { const s = sess(); return (s && s.session_id) || null; };
 
-  // ── motion sessions: remembered here, plus anything in ~/motion titled "Motion · …" ──
+  // ── motion sessions: remembered here, plus anything in the studio folder titled "Motion · …" ──
   let mine;
   try { mine = new Set(JSON.parse(localStorage.getItem(STORE) || '[]')); } catch (_) { mine = new Set(); }
   function remember(sid) {
@@ -49,7 +50,7 @@
     if (/^COMMAND CENTRE REQUEST\b/.test(t) && /motion studio/i.test(t)) { plumbing.add(String(s.session_id)); return true; }
     return plumbing.has(String(s.session_id));
   }
-  window.hxMotion = { isMotion, remember, hides, NAME, MARK };
+  window.hxMotion = { isMotion, remember, hides, NAME, MARK, setHome: (p) => { HOME = p; } };
 
   // ── keep them out of the chat sidebar (desktop list, phone drawer, search) ──
   function wrapRows() {
