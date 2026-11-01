@@ -1,4 +1,19 @@
-# Tabbie
+<p align="center">
+  <img src="docs/images/tabbie.png" alt="Tabbie, a blue mascot with a pink-to-orange swoosh" width="160">
+</p>
+
+<h1 align="center">Tabbie</h1>
+
+<p align="center">
+  <b>Your coding agents, one inbox.</b> Type a request on your Mac or phone; Tabbie sends it to the
+  right agent, in the right repos, and remembers what worked.
+</p>
+
+<p align="center">
+  <img src="docs/images/project-home.png" alt="A project's home: linked folders, sessions, items to review, and New task / Run Dreamer buttons" width="900">
+</p>
+
+---
 
 A personal command centre for coding agents on your Mac. You type a request in a web app (desktop
 or phone) and Tabbie routes it:
@@ -31,12 +46,20 @@ pay-per-token billing.
 
 ## How it works
 
-```
- WebUI (Mac / phone) ─┐                                   ┌─ Claude Code   (claude -p, your Claude login)
- hermes CLI ──────────┼─> Hermes agent (hub model)  ──────┼─ Planner       (codex exec, your ChatGPT login; optional)
-                      │     └─ command-centre plugin       └─ Optional tools Claude can use (Higgsfield, ElevenLabs…)
-                      │          router · attachments · approvals · projects · takeover
-                      └─ fragment-memory plugin → hmem (scoped, versioned memory + Dreamer)
+```mermaid
+flowchart LR
+    you(["You<br/>WebUI · phone · CLI"]) --> hub["Hermes hub<br/><i>command-centre plugin</i>"]
+    hub -->|"chat"| reply(["Hub answers"])
+    hub -->|"clear, scoped job"| claude["Claude Code<br/>in the project's folders"]
+    hub -->|"big or ambiguous"| plan["Planner (Codex)"]
+    plan -->|"questions / plan"| ok{"You approve?"}
+    ok -->|"yes"| claude
+    ok -->|"revise"| plan
+    claude --> trace[("Sanitised trace")]
+    trace --> dream["Dreamer"]
+    dream -->|"proposals + evidence"| review{"You review"}
+    review -->|"approve"| mem[("Versioned memory")]
+    mem -.->|"short context"| claude
 ```
 
 1. Every message passes through the `command-centre` plugin. It scores the request
@@ -181,6 +204,10 @@ The project home has tabs for:
 - the Dreamer (findings with evidence; approve or reject proposals with a diff);
 - skills, instructions, architecture and settings.
 
+<p align="center">
+  <img src="docs/images/phone.png" alt="On a phone: a project home, the multi-select folder picker, and a Dreamer proposal with its diff" width="900">
+</p>
+
 Folder access is limited to linked folders under your home folder. It never includes hidden folders
 (`~/.ssh`…), personal folders (Documents, Desktop…) or Tabbie's own state.
 
@@ -201,6 +228,10 @@ For lighter routing, `config/projects.yaml` names folders the router can target,
   project it only reads that project's sessions.
 - CLI reference: `hmem search|read|proposals|show|approve|reject|history|rollback|stats|doctor`, and
   `hmem project …`.
+
+<p align="center">
+  <img src="docs/images/dreamer.png" alt="The Dreamer tab: last dream, sessions analysed, pending proposals and findings with evidence" width="900">
+</p>
 
 Design notes: `docs/memory/ARCHITECTURE.md`, `docs/projects/ARCHITECTURE.md`.
 
