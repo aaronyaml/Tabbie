@@ -12,6 +12,7 @@ GET /executor?id=<webui session id> -> the conversation's executor choice + the 
 POST /executor {id, provider, model, effort} -> set it (composer model picker)
 GET /agents, POST /agents {enabled}  -> which coding agents this install uses (Claude Code, Codex, both)
 GET /update[?force=1], POST /update, POST /update/restart -> Tabbie updates from GitHub (asked first)
+POST /hub {provider}, POST /hub/claude-login -> finish the hub's sign-in from the WebUI (hub_setup.py)
 GET|POST /projects/*, GET /fs/*      -> Projects UI (hmem/api.py): registry, memory, Dreamer, proposals
 """
 
@@ -42,6 +43,7 @@ common = importlib.import_module("cc_sidecar_pkg.common")
 executor_choice = importlib.import_module("cc_sidecar_pkg.executor_choice")
 providers = importlib.import_module("cc_sidecar_pkg.providers")
 updates = importlib.import_module("cc_sidecar_pkg.updates")
+hub_setup = importlib.import_module("cc_sidecar_pkg.hub_setup")
 _HERMES_HOME = str(PKG.parents[1])  # ~/hermes: hmem (memory + Projects) lives here
 if _HERMES_HOME not in sys.path:
     sys.path.insert(0, _HERMES_HOME)
@@ -294,6 +296,14 @@ class Handler(BaseHTTPRequestHandler):
             if u.path == "/update":
                 res = updates.apply()
                 return self._send(200 if res["ok"] else 409, res)
+            if u.path == "/hub" and isinstance(body, dict):
+                try:
+                    return self._send(200, hub_setup.use(str(body.get("provider") or "")))
+                except (ValueError, RuntimeError) as exc:
+                    return self._send(400, {"ok": False, "error": str(exc)})
+            if u.path == "/hub/claude-login":
+                res = hub_setup.claude_login()
+                return self._send(200 if res["ok"] else 400, res)
             if u.path == "/update/restart":
                 res = updates.restart(after_reply=_exit_soon)
                 return self._send(200 if res["ok"] else 409, res)

@@ -121,6 +121,12 @@ developer tools (git and Python). Leave the Terminal window open until the page 
 It's safe to run again any time: finished steps are ticked and skipped, and anything marked `!`
 tells you exactly what to do. When services are already running it asks before restarting them.
 
+Skipped the hub sign-in, or it got signed out? Tabbie notices and shows a **Finish setting up
+Tabbie** card in the WebUI (also from your phone): **Sign in with ChatGPT** gives you a link and a
+code to enter on any device; **Use my Claude login** uses Claude Code's login on the Mac, and can
+start that sign-in on the Mac for you. Your Hermes config is backed up before the hub is pointed
+at the new login.
+
 Prefer the Terminal? `bin/setup --terminal` runs the same steps there. For scripted installs,
 `bin/setup --yes` uses defaults and leaves sign-ins, the password and phone setup for later. Answer
 some ahead of time with `--agents claude|codex|claude,codex`, `--name Sam`, `--hub openai-codex|anthropic`

@@ -1,0 +1,44 @@
+/* Tabbie — "Finish setting up Tabbie" card (hub-signin.js). Centred dialog; a bottom sheet on phones. */
+#hxHubSignin { position: fixed; inset: 0; z-index: 1000; display: none; align-items: center; justify-content: center; padding: 16px; }
+#hxHubSignin.is-open { display: flex; }
+.hx-hs-scrim { position: absolute; inset: 0; background: rgba(0,0,0,.32); }
+.hx-hs-card {
+  position: relative; width: 420px; max-width: 100%; max-height: calc(100vh - 32px); overflow: auto;
+  padding: 20px 20px 16px; border-radius: 16px; background: var(--hx-raised, var(--bg, #fff)); color: var(--hx-text, var(--text));
+  box-shadow: 0 20px 48px rgba(0,0,0,.24), 0 0 0 0.5px var(--hx-hair, rgba(127,127,127,.25));
+  font: 14px/1.45 var(--font-ui, -apple-system, system-ui, sans-serif);
+}
+.hx-hs-card h2 { margin: 0 0 6px; font-size: 17px; font-weight: 600; letter-spacing: -.01em; }
+.hx-hs-card p { margin: 6px 0; }
+.hx-hs-card a { color: var(--hx-accent, #3054FD); }
+.hx-hs-card code { font-size: 12px; }
+.hx-hs-dim { color: var(--hx-text-2, var(--muted)); font-size: 13px; }
+.hx-hs-err { color: var(--hx-orange, #c2410c); overflow-wrap: anywhere; }
+.hx-hs-opts { display: grid; gap: 8px; margin: 14px 0 4px; }
+.hx-hs-opt {
+  display: grid; gap: 2px; text-align: left; padding: 12px 14px; border: 0; border-radius: 12px; cursor: pointer;
+  background: var(--hx-fill, rgba(127,127,127,.12)); color: inherit; font: inherit;
+}
+.hx-hs-opt b { font-weight: 600; }
+.hx-hs-opt span { color: var(--hx-text-2, var(--muted)); font-size: 12.5px; }
+.hx-hs-opt.is-primary { background: var(--hx-accent, #3054FD); color: #fff; }
+.hx-hs-opt.is-primary span { color: rgba(255,255,255,.82); }
+.hx-hs-steps { margin: 10px 0 6px; padding-left: 20px; }
+.hx-hs-steps li { margin: 4px 0; overflow-wrap: anywhere; }
+.hx-hs-code { display: flex; align-items: center; justify-content: space-between; gap: 10px; margin: 8px 0 10px; padding: 10px 12px; border-radius: 10px; background: var(--hx-fill, rgba(127,127,127,.12)); }
+.hx-hs-code span { font: 600 20px/1 ui-monospace, SFMono-Regular, Menlo, monospace; letter-spacing: .08em; }
+.hx-hs-foot { display: flex; justify-content: flex-end; gap: 8px; margin-top: 14px; }
+.hx-hs-btn {
+  height: 32px; padding: 0 14px; border: 0; border-radius: 8px; cursor: pointer;
+  background: var(--hx-fill, rgba(127,127,127,.12)); color: var(--hx-text, var(--text)); font: 500 13px/1 var(--font-ui, system-ui);
+}
+.hx-hs-btn.is-primary { background: var(--hx-accent, #3054FD); color: #fff; margin: 6px 0; }
+.hx-hs-btn:disabled { opacity: .6; cursor: default; }
+.hx-hs-btn:focus-visible, .hx-hs-opt:focus-visible { outline: 2px solid var(--focus-ring, var(--hx-accent, #3054FD)); outline-offset: 2px; }
+.hx-hs-spin { display: inline-block; width: 10px; height: 10px; margin-right: 7px; border: 2px solid currentColor; border-right-color: transparent; border-radius: 50%; vertical-align: -1px; animation: hx-hs-spin .8s linear infinite; }
+@keyframes hx-hs-spin { to { transform: rotate(360deg); } }
+@media (max-width: 640px) {
+  #hxHubSignin { align-items: flex-end; padding: 0; }
+  .hx-hs-card { width: 100%; border-radius: 16px 16px 0 0; padding-bottom: calc(16px + env(safe-area-inset-bottom)); }
+}
+@media (prefers-reduced-motion: reduce) { .hx-hs-spin { animation: none; } }

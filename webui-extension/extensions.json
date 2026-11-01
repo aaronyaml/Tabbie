@@ -199,7 +199,7 @@
     },
     {
       "id": "routes",
-      "name": "Page addresses (/kanban, /projects, …)",
+      "name": "Page addresses (/kanban, /projects, \u2026)",
       "scripts": [
         "routes.js?v=1"
       ],
@@ -251,6 +251,16 @@
       ],
       "stylesheets": [
         "limits-view.css?v=1"
+      ]
+    },
+    {
+      "id": "hub-signin",
+      "name": "Hub sign-in card",
+      "scripts": [
+        "hub-signin.js?v=1"
+      ],
+      "stylesheets": [
+        "hub-signin.css?v=1"
       ]
     }
   ]
