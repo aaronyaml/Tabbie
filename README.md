@@ -146,6 +146,10 @@ developer tools (git and Python). Leave the Terminal window open until the page 
 It's safe to run again any time: finished steps are ticked and skipped, and anything marked `!`
 tells you exactly what to do. When services are already running it asks before restarting them.
 
+The first time you open Tabbie, an **Allow Tabbie's helper** card appears bottom-right. Press
+**Allow**: Projects, the model picker, Motion, sign-in and update checks talk to a small helper on
+your Mac, and the WebUI asks once before letting them (also in Settings → Extensions).
+
 Skipped the hub sign-in, or it got signed out? Tabbie notices and shows a **Finish setting up
 Tabbie** card in the WebUI (also from your phone): **Sign in with ChatGPT** gives you a link and a
 code to enter on any device; **Use my Claude login** uses Claude Code's login on the Mac, and can
@@ -481,8 +485,11 @@ Haiku) fall back to plain text when Claude Code is off. No file means both (olde
 ### Motion studio
 
 **Motion** (in the rail, under Chat) makes product films cut to music: pick or generate a track, mark
-the moments, approve a storyboard, and Claude Code builds and renders the film with
+the moments, approve a storyboard, and Claude Code (or Codex) builds and renders the film with
 [Remotion](https://www.remotion.dev). `/motion <brief>` in any chat does the same from a prompt.
+
+- **Model**: the Storyboard step has a model picker (e.g. Opus 5.5, Sonnet 5.5, GPT-6.1 Sol, plus
+  effort). That model draws the storyboard and builds the film; it can be changed until you approve.
 
 - **The studio folder** is `motion/` inside Tabbie (git-ignored). The first time Motion opens (or setup
   step 9 runs) Tabbie creates it from `templates/motion-studio/` and runs `npm install` there, so nothing

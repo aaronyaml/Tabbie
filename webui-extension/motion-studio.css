@@ -579,3 +579,13 @@ html.hx-studio-open #hxStudio { display: block; position: fixed; top: 0; right: 
 .hxs-rangebar > span { flex: 1; min-width: 0; }
 .hxs-rangebar.is-ask { display: grid; gap: 10px; padding: 12px; border-radius: 14px; background: rgba(48,84,253,.07); color: inherit; line-height: 1.4; }
 .hxs-rangebar.is-ask .hxs-jc-askb { display: flex; gap: 8px; justify-content: flex-end; }
+
+/* model for the storyboard + film (Storyboard step) */
+.hxs-model-row { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 8px; }
+.hxs-model select { min-width: 0; height: 40px; padding: 0 28px 0 12px; border-radius: 12px; border: 1px solid var(--hx-hair, rgba(127,127,127,.22));
+  background-color: var(--hx-raised, #fff); color: var(--hx-text, inherit); font: inherit; font-size: 14px; }
+:root.dark .hxs-model select { background-color: var(--hx-fill, #1D1F25); }
+.hxs-model select:focus-visible { outline: 2px solid var(--focus-ring-strong, #3054FD); outline-offset: 2px; }
+.hxs-model .hxs-note { margin-top: 0; }
+.hxs-model-err { color: #d70015; } :root.dark .hxs-model-err { color: #ff6961; }
+@media (max-width: 520px) { .hxs-model-row { grid-template-columns: minmax(0, 1fr); } }

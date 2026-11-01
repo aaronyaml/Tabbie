@@ -1185,9 +1185,53 @@
         ${locked ? `<button type="button" class="hxs-primary" data-go="storyboard">Next ${icon('ArrowRight01Icon', 16)}</button>` : `<span class="hxs-foot-r"><button type="button" class="hxs-ghost" data-act="sk-skip">Skip</button><button type="button" class="hxs-primary" data-act="sk-next"${sk.length ? '' : ' disabled'}>Next ${icon('ArrowRight01Icon', 16)}</button></span>`}</div>`;
   }
 
+  // Model for the storyboard and the film: the Motion chat's worker choice (the same setting as the
+  // composer's model picker), so every /motion job of this film runs on it. Editable until approval.
+  const EXEC = 'api/extensions/cc-agents/sidecar/executor';
+  const MODEL = { sid: null, choice: null, catalog: null, err: '' };
+  async function loadModel() {
+    if (!P || !P.sessionId || MODEL.sid === P.sessionId) return;
+    MODEL.sid = P.sessionId;
+    MODEL.err = '';
+    try {
+      const r = await fetchT(`${EXEC}?id=${encodeURIComponent(P.sessionId)}`, 8000);
+      const d = r.ok ? await r.json() : null;
+      MODEL.choice = d && d.choice; MODEL.catalog = d && d.catalog;
+    } catch (_) { MODEL.catalog = null; }
+    if (view === 'storyboard') render();
+  }
+  const modelLabel = (c) => (c ? `${c.worker} · ${c.name}${c.effort ? ` (${c.effort})` : ''}` : '');
+  function modelCard(locked, busy) {
+    const c = MODEL.catalog, ch = MODEL.choice;
+    if (!c || !ch) return '';
+    if (locked) return `<p class="hxs-note">Built with ${esc(modelLabel(ch))}.</p>`;
+    const dis = busy ? ' disabled' : '';
+    const opts = Object.entries(c.providers || {}).map(([pid, pv]) => `<optgroup label="${esc(pv.worker)}">${(pv.models || []).map((m) =>
+      `<option value="${esc(pid)}|${esc(m.id)}"${ch.provider === pid && ch.model === m.id ? ' selected' : ''}>${esc(m.name)} · ${esc(m.desc)}</option>`).join('')}</optgroup>`).join('');
+    const effs = ['', ...(c.efforts || [])].map((e) => `<option value="${esc(e)}"${(ch.effort || '') === e ? ' selected' : ''}>${e ? `${e[0].toUpperCase()}${e.slice(1)} effort` : 'Auto effort'}</option>`).join('');
+    return `<div class="hxs-card hxs-dir hxs-model"><b>Model <em>draws the storyboard and builds the film</em></b>
+      <div class="hxs-model-row"><select data-model aria-label="Model"${dis}>${opts}</select><select data-effort aria-label="Effort"${dis}>${effs}</select></div>
+      ${MODEL.err ? `<p class="hxs-note hxs-model-err">${esc(MODEL.err)}</p>` : '<p class="hxs-note">You can change it until you approve the storyboard.</p>'}</div>`;
+  }
+  async function saveModel() {
+    const card = root && root.querySelector('.hxs-model');
+    if (!card || !P) return;
+    const [provider, model] = card.querySelector('select[data-model]').value.split('|');
+    const effort = card.querySelector('select[data-effort]').value || null;
+    MODEL.err = '';
+    try {
+      const d = await post(EXEC, { id: P.sessionId, provider, model, effort });
+      MODEL.choice = d.choice; MODEL.catalog = d.catalog;
+      P.model = { provider, model, effort };
+      saveProject();
+    } catch (e) { MODEL.err = `Couldn't switch the model (${e.message}). Still using ${modelLabel(MODEL.choice)}.`; }
+    render();
+  }
+
   function vStoryboard() {
     const sb = F.storyboard, st = (P.storyboard && P.storyboard.status) || 'none';
     const busy = blocked();
+    loadModel();
     const frames = (sb && sb.frames) || [];
     const line = busy ? 'Drawing it up. Each card is a moment on the track.'
       : frames.length ? (st === 'approved' ? 'Approved. The film is being built in the editor.' : 'Here’s the plan. Approve it and I’ll build the film, or tell me what to change.')
@@ -1196,6 +1240,7 @@
       ${frames.length ? `${sb.summary ? `<p class="hxs-sum">${esc(sb.summary)}</p>` : ''}<div class="hxs-board">${frames.map((f, i) => `<article class="hxs-frame">
           <header><i>${i + 1}</i><b>${fmt(f.timeMs)}</b><span>${esc(f.anchor || '')}</span></header>
           <h4>${esc(f.action || '')}</h4><p>${esc(f.description || '')}</p></article>`).join('')}</div>` : ''}
+      ${modelCard(st === 'approved', busy)}
       ${!frames.length || st === 'revise' ? `<label class="hxs-card hxs-dir"><b>Creative direction <em>optional</em></b>
           <textarea data-brief rows="3" maxlength="2000" placeholder="What are you going for? Mood, story, who it’s for, must-haves, things to avoid…"${busy ? ' disabled' : ''}>${esc(P.brief || '')}</textarea></label>` : ''}
       ${!frames.length || st === 'revise' ? `<div class="hxs-foot"><button type="button" class="hxs-ghost" data-go="sketches">Back</button><button type="button" class="hxs-primary" data-act="sb-gen"${busy ? ' disabled' : ''}>${icon('SparklesIcon', 16)}<span>${frames.length ? 'Redo storyboard' : 'Generate storyboard'}</span></button></div>` : ''}
@@ -1450,7 +1495,7 @@
     }
     await saveProject();
   }
-  // Mapping: a range dragged across the waveform can become the cut (re-analyses; voids keypoints + storyboard).
+  // Mapping: a range dragged across the waveform can become the cut (sliced in place when already analysed; voids the storyboard).
   const trimOff = () => (P.audio && P.audio.trim && !P.audio.trim.full ? P.audio.trim.startMs : 0);
   function rangeBar() {
     const r = local.mapRange;
@@ -1459,8 +1504,11 @@
     const what = `${fmtMs(r[0])} – ${fmtMs(r[1])} · ${fmtMs(len)}`;
     if (done) return `<p class="hxs-rangebar">${icon('MusicNote01Icon', 16)}<span>Selected ${what}. The film is already built on ${fmtMs(whole)}; start a new film to use a shorter cut.</span></p>`;
     if (local.rangeAsk) {
-      const loses = [F.keypoints && (F.keypoints.points || []).length ? 'your keypoints' : '', F.storyboard || P.storyboard ? 'the storyboard' : ''].filter(Boolean).join(' and ');
-      return `<div class="hxs-rangebar is-ask"><span>Cut the track to ${what} and listen to just that part?${loses ? ` This clears ${loses} (made for the full ${fmtMs(whole)}).` : ''}</span><span class="hxs-jc-askb"><button type="button" class="hxs-ghost hxs-sm" data-act="range-no">Cancel</button><button type="button" class="hxs-primary hxs-sm" data-act="range-yes"${blocked() ? ' disabled' : ''}>Use only this part</button></span></div>`;
+      const quick = !!(F.analysis && P.audio.path);  // already analysed: a plain cut, the mapping stays
+      const outside = quick ? (F.keypoints && F.keypoints.points || []).filter((k) => k.timeMs < r[0] || k.timeMs >= r[1]).length : 0;
+      const loses = [quick ? (outside ? `${outside} keypoint${outside === 1 ? '' : 's'} outside it` : '') : F.keypoints && (F.keypoints.points || []).length ? 'your keypoints' : '',
+        F.storyboard || P.storyboard ? 'the storyboard' : ''].filter(Boolean).join(' and ');
+      return `<div class="hxs-rangebar is-ask"><span>Cut the track to ${what}?${quick ? ' The analysis and keypoints inside it stay; nothing is re-analysed.' : ' It gets analysed again.'}${loses ? ` This clears ${loses}.` : ''}</span><span class="hxs-jc-askb"><button type="button" class="hxs-ghost hxs-sm" data-act="range-no">Cancel</button><button type="button" class="hxs-primary hxs-sm" data-act="range-yes"${blocked() ? ' disabled' : ''}>Use only this part</button></span></div>`;
     }
     return `<div class="hxs-rangebar">${icon('MusicNote01Icon', 16)}<span>Selected ${what} of ${fmtMs(whole)}</span><button type="button" class="hxs-link" data-act="range-trim"${blocked() ? ' disabled' : ''}>Use only this part…</button></div>`;
   }
@@ -1473,8 +1521,96 @@
     Object.assign(TR, { init: true, metaDur: 0, startMs: Math.round(r[0] + off), endMs: Math.round(r[1] + off), fadeIn: 0, fadeOut: 0, preset: 'custom' });
     local.mapRange = null; local.rangeAsk = false;
     delete P.storyboard; F.storyboard = null;
+    // Already analysed: just cut. Slice the analysed edit.wav and its analysis here (no studio job,
+    // no re-analysis) and keep the keypoints that fall inside the cut. Anything odd: the full job.
+    if (F.analysis && P.audio && P.audio.path) {
+      try { await sliceCut(r[0], r[1]); return; } catch (e) { console.warn('[motion] quick cut failed, re-analysing:', e && e.message); }
+    }
     P.step = 'audio'; view = 'audio';
     await useTrim(true);
+  }
+
+  // ── quick cut: slice what was already analysed ─────────────────────────
+  const TIME_KEYS = ['ms', 'timeMs', 'startMs', 'endMs', 'atMs', 'onsetMs', 'peakMs'];
+  function sliceAnalysis(a, s, e, path) {
+    const fps = Number(a.fps) || FPS, len = e - s;
+    const fr = (ms) => Math.floor((ms * fps) / 1000 + 0.5), r2 = (x) => Math.round(x * 100) / 100, r3 = (x) => Math.round(x * 1000) / 1000;
+    const fix = (o) => {  // an object with times: drop it outside the cut, else shift it; recurse either way
+      const has = TIME_KEYS.filter((k) => typeof o[k] === 'number');
+      if (has.length) {
+        const st = ['startMs', 'ms', 'timeMs', 'atMs', 'onsetMs', 'peakMs'].map((k) => o[k]).find((v) => typeof v === 'number');
+        const en = typeof o.endMs === 'number' ? o.endMs : st;
+        if (en < s || st >= e) return null;
+        for (const k of has) o[k] = r2(Math.min(len, Math.max(0, o[k] - s)));
+        const at = typeof o.ms === 'number' ? o.ms : typeof o.timeMs === 'number' ? o.timeMs : o.startMs;
+        if ('frame' in o && typeof at === 'number') { o.frame = fr(at); if ('subframe' in o) o.subframe = r3((at * fps) / 1000 - o.frame); }
+        if ('startFrame' in o && typeof o.startMs === 'number') o.startFrame = fr(o.startMs);
+        if ('endFrame' in o && typeof o.endMs === 'number') o.endFrame = fr(o.endMs);
+      }
+      for (const [k, v] of Object.entries(o)) {
+        if (Array.isArray(v)) o[k] = v.map((x) => (x && typeof x === 'object' && !Array.isArray(x) ? fix(x) : x)).filter((x) => x !== null);
+        else if (v && typeof v === 'object') fix(v);
+      }
+      return o;
+    };
+    const out = JSON.parse(JSON.stringify(a));
+    const keep = { source: out.source, tempo: out.tempo, tools: out.tools, stems: out.stems, wordsSource: out.wordsSource };
+    for (const k of Object.keys(keep)) delete out[k];
+    fix(out);
+    Object.assign(out, keep, { durationMs: r2(len), durationFrames: fr(len) });
+    const sr = (a.source && a.source.sampleRate) || 48000;
+    out.source = { ...(a.source || {}), path, samples: Math.round((len / 1000) * sr), sha256: null, slicedFrom: { path: a.source && a.source.path, startMs: r2(s), endMs: r2(e) } };
+    return out;
+  }
+  function wav24(buf, s, e) {  // the decoded edit.wav, samples s..e, back to 24-bit PCM WAV
+    const sr = buf.sampleRate, ch = buf.numberOfChannels, a = Math.round((s / 1000) * sr), b = Math.min(buf.length, Math.round((e / 1000) * sr));
+    const n = Math.max(0, b - a), bytes = n * ch * 3, v = new DataView(new ArrayBuffer(44 + bytes));
+    const str = (o, t) => { for (let i = 0; i < t.length; i++) v.setUint8(o + i, t.charCodeAt(i)); };
+    str(0, 'RIFF'); v.setUint32(4, 36 + bytes, true); str(8, 'WAVE'); str(12, 'fmt '); v.setUint32(16, 16, true);
+    v.setUint16(20, 1, true); v.setUint16(22, ch, true); v.setUint32(24, sr, true); v.setUint32(28, sr * ch * 3, true);
+    v.setUint16(32, ch * 3, true); v.setUint16(34, 24, true); str(36, 'data'); v.setUint32(40, bytes, true);
+    const data = [...Array(ch)].map((_, c) => buf.getChannelData(c));
+    let o = 44;
+    for (let i = a; i < b; i++) for (let c = 0; c < ch; c++) {
+      const x = Math.max(-1, Math.min(1, data[c][i])), q = Math.round(x < 0 ? x * 0x800000 : x * 0x7fffff);
+      v.setUint8(o, q & 255); v.setUint8(o + 1, (q >> 8) & 255); v.setUint8(o + 2, (q >> 16) & 255); o += 3;
+    }
+    return new Blob([v.buffer], { type: 'audio/wav' });
+  }
+  async function sliceCut(s, e) {
+    const a = F.analysis, sr = (a.source && a.source.sampleRate) || 48000;
+    const res = await fetch(`${rawUrl(P.sessionId, P.audio.path)}&t=${Date.now()}`, { credentials: 'same-origin' });
+    if (!res.ok) throw new Error(`can't read ${P.audio.path}`);
+    const Ctx = window.OfflineAudioContext || window.webkitOfflineAudioContext;
+    const buf = await new Ctx(2, 1, sr).decodeAudioData(await res.arrayBuffer());
+    if (buf.sampleRate !== sr) throw new Error('sample rate changed while decoding');
+    const name = `edit-${Math.round(s)}-${Math.round(e)}.wav`;
+    const fd = new FormData();
+    fd.append('session_id', P.sessionId);
+    fd.append('path', `public/audio/music/${P.project}`);
+    fd.append('file', wav24(buf, s, e), name);
+    const up = await fetch('api/workspace/upload', { method: 'POST', credentials: 'include', body: fd });
+    let d = {};
+    try { d = await up.json(); } catch (_) {}
+    if (!up.ok || d.error) throw new Error(d.error || 'upload failed');
+    const path = `public/audio/music/${P.project}/${name}`;
+    const sliced = sliceAnalysis(a, s, e, path);
+    const dir = `audio/analysis/${P.project}`;
+    if (!a.source || !a.source.slicedFrom) await writeJSON(P.sessionId, `${dir}/analysis.full.json`, a);  // the uncut analysis, once
+    await writeJSON(P.sessionId, `${dir}/analysis.json`, sliced);
+    F.analysis = sliced;
+    if (F.keypoints && (F.keypoints.points || []).length) {
+      F.keypoints.points = F.keypoints.points.filter((k) => k.timeMs >= s && k.timeMs < e)
+        .map((k) => ({ ...k, timeMs: Math.round((k.timeMs - s) * 100) / 100, frame: msToFrame(k.timeMs - s) }));
+      kpSel = null; saveKeypoints();
+    }
+    const t = P.audio.trim || { startMs: 0, endMs: a.durationMs, fadeInMs: 0, fadeOutMs: 0, full: true };
+    const base = t.full ? 0 : t.startMs;
+    P.audio = { ...P.audio, path, status: 'ready', trim: { ...t, startMs: base + s, endMs: base + e, fadeInMs: 0, fadeOutMs: 0, full: false } };
+    try { await post('api/file/delete', { session_id: P.sessionId, path: `${pdir()}/storyboard.json` }); } catch (_) {}
+    local.peaksFor = ''; local.peaks = null;
+    await saveProject();
+    render();
   }
   async function genStoryboard(note) {
     const len = F.analysis && F.analysis.durationMs, t = P.audio && P.audio.trim;
@@ -1667,6 +1803,7 @@
     root.addEventListener('dragleave', () => { if (--dragDepth <= 0) { dragDepth = 0; dragOn(false); } });
     root.addEventListener('drop', (e) => { e.preventDefault(); dragDepth = 0; dragOn(false); onDrop([...(e.dataTransfer?.files || [])]); });
     root.addEventListener('change', (e) => {
+      if (e.target.matches('select[data-model], select[data-effort]')) { if (!blocked()) guard(() => saveModel()); return; }
       if (e.target.matches('input[name="trimlen"]') && trimming()) {
         const v = parseFloat(e.target.value);
         if (v > 0) { applyLen(v * 1000); TR.preset = presetFor(TR.endMs - TR.startMs, durationMs()); if (TR.preset === 'full') TR.preset = 'custom'; }

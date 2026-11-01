@@ -180,18 +180,18 @@
       "scripts": [
         "motion.js?v=9",
         "motion-scrub.js?v=6",
-        "motion-studio.js?v=20"
+        "motion-studio.js?v=22"
       ],
       "stylesheets": [
         "motion.css?v=6",
-        "motion-studio.css?v=13"
+        "motion-studio.css?v=14"
       ]
     },
     {
       "id": "projects",
       "name": "Projects (multi-folder, memory, Dreamer)",
       "scripts": [
-        "projects.js?v=7"
+        "projects.js?v=8"
       ],
       "stylesheets": [
         "projects.css?v=5"
@@ -270,6 +270,16 @@
         "worker-label.js?v=1"
       ],
       "stylesheets": []
+    },
+    {
+      "id": "helper-consent",
+      "name": "Helper permission card",
+      "scripts": [
+        "helper-consent.js?v=1"
+      ],
+      "stylesheets": [
+        "helper-consent.css?v=1"
+      ]
     }
   ]
 }

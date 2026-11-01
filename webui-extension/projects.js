@@ -55,7 +55,8 @@
     if (body !== undefined) { opts.method = 'POST'; opts.body = JSON.stringify(body); }
     const r = await fetch(`${API}${path}`, opts);
     const j = await r.json().catch(() => ({}));
-    if (r.status === 401 || r.status === 403) throw Object.assign(new Error('Hermes needs permission to reach its helper. Open the Agents panel once and allow it.'), { auth: true });
+    if (r.status === 401 || r.status === 403) { if (window.hxHelperConsent) window.hxHelperConsent.open(); }
+    if (r.status === 401 || r.status === 403) throw Object.assign(new Error('Tabbie needs your OK to reach its helper. Press Allow on the card at the bottom right (or Settings → Extensions).'), { auth: true });
     if (r.status === 409) throw Object.assign(new Error(j.error || 'Changed elsewhere; reloaded.'), { conflict: true });
     if (!r.ok) throw new Error(j.error || `Request failed (${r.status})`);
     return j;

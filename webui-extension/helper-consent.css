@@ -1,0 +1,18 @@
+/* Tabbie — "Allow Tabbie's helper" card (helper-consent.js). Same shape as the update card. */
+#hxHelperConsent {
+  position: fixed; right: 16px; bottom: 16px; z-index: 950; width: 340px; max-width: calc(100vw - 32px);
+  padding: 14px 14px 12px; border-radius: 14px; background: var(--hx-raised, var(--bg, #fff)); color: var(--hx-text, var(--text));
+  box-shadow: 0 12px 32px rgba(0,0,0,.18), 0 0 0 0.5px var(--hx-hair, rgba(127,127,127,.25));
+  font: 13px/1.4 var(--font-ui, -apple-system, system-ui, sans-serif);
+}
+#hxHelperConsent b { font-size: 14px; font-weight: 600; letter-spacing: -.01em; }
+#hxHelperConsent p { margin: 6px 0 0; color: var(--hx-text-2, var(--muted)); }
+#hxHelperConsent .hx-hc-err { color: var(--hx-orange, #c2410c); }
+#hxHelperConsent .hx-hc-err:empty { display: none; }
+.hx-hc-btns { display: flex; justify-content: flex-end; gap: 8px; margin-top: 12px; }
+.hx-hc-btns button { height: 30px; padding: 0 14px; border: 0; border-radius: 8px; cursor: pointer;
+  background: var(--hx-fill, rgba(127,127,127,.12)); color: var(--hx-text, var(--text)); font: 500 13px/1 var(--font-ui, system-ui); }
+.hx-hc-btns .hx-hc-go { background: var(--hx-accent, #3054FD); color: #fff; }
+.hx-hc-btns button:disabled { opacity: .6; cursor: default; }
+.hx-hc-btns button:focus-visible { outline: 2px solid var(--focus-ring, var(--hx-accent, #3054FD)); outline-offset: 2px; }
+@media (max-width: 640px) { #hxHelperConsent { left: 12px; right: 12px; bottom: calc(84px + env(safe-area-inset-bottom)); width: auto; } }
