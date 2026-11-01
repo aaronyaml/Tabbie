@@ -2,6 +2,7 @@
 # setup — first-time install for Tabbie (the Hermes command centre). Safe to re-run.
 #   bin/setup              check prerequisites, write local files, link plugins
 #   bin/setup --services   also install + start the LaunchAgents (WebUI, HTTPS proxy, mDNS, sidecar, Dreamer)
+#   bin/setup --agents claude|codex|claude,codex   pick the coding agents without the prompt
 # Nothing here asks for or stores an API key: every provider signs in with its own OAuth login.
 set -euo pipefail
 HERMES="$HOME/hermes"
@@ -10,6 +11,38 @@ ok()   { printf '  \033[32m✓\033[0m %s\n' "$1"; }
 warn() { printf '  \033[33m!\033[0m %s\n' "$1"; }
 need() { if command -v "$1" >/dev/null 2>&1; then ok "$1"; else warn "$1 missing — $2"; MISSING=1; fi; }
 
+SERVICES=0; AGENTS=""
+while [ $# -gt 0 ]; do
+  case "$1" in
+    --services) SERVICES=1 ;;
+    --agents) AGENTS="${2:-}"; shift ;;
+    --agents=*) AGENTS="${1#--agents=}" ;;
+    *) echo "unknown option: $1"; exit 2 ;;
+  esac
+  shift
+done
+
+# Which coding agents do the work: Claude Code, Codex, or both (config/agents.yaml; change later in
+# the WebUI model picker → Agents). Asked once; a re-run keeps the saved choice unless --agents is given.
+if [ -z "$AGENTS" ] && [ -f config/agents.yaml ]; then
+  AGENTS="$(sed -n 's/^enabled:[[:space:]]*\[\(.*\)\]/\1/p' config/agents.yaml | tr -d ' ')"
+fi
+if [ -z "$AGENTS" ]; then
+  if [ -t 0 ]; then
+    echo "Which coding agents should Tabbie use?"
+    echo "  1) Claude Code only   2) Codex only   3) Both (Claude Code works, Codex plans + covers limits)"
+    while :; do
+      read -r -p "Pick 1, 2 or 3 [3]: " pick
+      case "${pick:-3}" in 1) AGENTS=claude; break ;; 2) AGENTS=codex; break ;; 3) AGENTS=claude,codex; break ;; esac
+    done
+  else
+    AGENTS=claude,codex
+  fi
+fi
+case ",$AGENTS," in *,claude,*) USE_CLAUDE=1 ;; *) USE_CLAUDE=0 ;; esac
+case ",$AGENTS," in *,codex,*) USE_CODEX=1 ;; *) USE_CODEX=0 ;; esac
+[ "$USE_CLAUDE$USE_CODEX" = 00 ] && { echo "--agents must be claude, codex or claude,codex"; exit 2; }
+
 echo "Prerequisites"
 MISSING=0
 [ "$(uname)" = Darwin ] && ok "macOS" || warn "not macOS: services (launchd, Bonjour) won't work; the rest may"
@@ -17,13 +50,16 @@ need python3 "install Python 3.11+ (python.org or brew install python)"
 need git     "xcode-select --install"
 need uv      "curl -LsSf https://astral.sh/uv/install.sh | sh"
 need hermes  "install Hermes Agent: https://github.com/NousResearch/hermes-agent"
-need claude  "install Claude Code: https://docs.anthropic.com/claude-code"
-command -v codex >/dev/null 2>&1 && ok "codex (optional planner)" || warn "codex missing (optional: Astra planner) — npm i -g @openai/codex"
+[ "$USE_CLAUDE" = 1 ] && need claude "install Claude Code: https://docs.anthropic.com/claude-code"
+[ "$USE_CODEX" = 1 ]  && need codex  "install Codex: npm i -g @openai/codex"
 command -v caddy >/dev/null 2>&1 && ok "caddy (optional HTTPS)" || warn "caddy missing (optional: https://hermes.local) — brew install caddy"
 
 echo "Local files"
 mkdir -p state/logs state/requests general workspaces
 chmod 700 state
+LIST="$(PYTHONPATH="$HERMES" COMMAND_CENTRE_HOME="$HERMES" python3 -c \
+  'import sys; from hmem import agents; print(",".join(agents.save(sys.argv[1].split(","))))' "$AGENTS")"
+ok "config/agents.yaml ($LIST)"
 [ -f config/projects.yaml ] || { cp config/projects.example.yaml config/projects.yaml; ok "config/projects.yaml"; }
 if [ ! -f webui-extension/local.js ]; then
   NAME="$(id -F 2>/dev/null | awk '{print $1}')"
@@ -58,7 +94,7 @@ for p in command-centre fragment-memory limits workboard; do
   ln -sfn "$HERMES/plugin/$p" "$HOME/.hermes/plugins/$p" && ok "~/.hermes/plugins/$p"
 done
 
-if [ "${1:-}" = "--services" ]; then
+if [ "$SERVICES" = 1 ]; then
   echo "LaunchAgents"
   CADDY="$(command -v caddy || echo /opt/homebrew/bin/caddy)"
   for t in services/*.plist.template; do

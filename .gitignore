@@ -28,6 +28,7 @@ id_ed25519*
 
 # ── Per-machine config (bin/setup writes these from the *.example files) ────────────────────────
 config/projects.yaml
+config/agents.yaml
 webui-extension/local.js
 services/*.plist
 /hermes-webui/

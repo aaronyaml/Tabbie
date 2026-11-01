@@ -11,6 +11,8 @@ Only models verified to run on the user's subscriptions are listed (tiny `say hi
 
 from __future__ import annotations
 
+from pathlib import Path
+
 from .state import save_session_state, session_state
 
 KEY = "executor_choice"
@@ -40,6 +42,29 @@ CATALOG: dict[str, dict] = {
 }
 
 DEFAULT = {"provider": "anthropic", "model": "claude-opus-5-5", "effort": None}
+AGENT_OF = {"anthropic": "claude", "openai": "codex"}
+
+
+def _agents():
+    import sys
+    home = str(Path(__file__).resolve().parents[2])
+    if home not in sys.path:
+        sys.path.insert(0, home)
+    from hmem import agents
+    return agents
+
+
+def providers_on() -> list[str]:
+    """Providers whose CLI the user enabled (config/agents.yaml): Claude only, Codex only, or both."""
+    on = _agents().enabled()
+    return [p for p in CATALOG if AGENT_OF[p] in on]
+
+
+def default_choice() -> dict:
+    p = providers_on()[0]
+    if p == DEFAULT["provider"]:
+        return dict(DEFAULT)
+    return {"provider": p, "model": CATALOG[p]["models"][0]["id"], "effort": None}
 
 
 def model_info(provider: str, model: str) -> dict | None:
@@ -57,8 +82,9 @@ def get_choice(session_id: str) -> dict:
     """The conversation's choice, or the default. Always a complete, valid dict."""
     raw = session_state(session_id).get(KEY) or {}
     p, m, e = raw.get("provider"), raw.get("model"), raw.get("effort") or None
-    if not (isinstance(p, str) and isinstance(m, str) and valid(p, m, e)):
-        p, m, e = DEFAULT["provider"], DEFAULT["model"], DEFAULT["effort"]
+    if not (isinstance(p, str) and isinstance(m, str) and valid(p, m, e)) or p not in providers_on():
+        d = default_choice()  # also when the picked agent was switched off in settings
+        p, m, e = d["provider"], d["model"], d["effort"]
     info = model_info(p, m)
     return {"provider": p, "model": m, "effort": e, "name": info["name"], "desc": info["desc"],
             "worker": CATALOG[p]["worker"], "default": not raw}
@@ -66,7 +92,7 @@ def get_choice(session_id: str) -> dict:
 
 def set_choice(session_id: str, provider: str, model: str, effort: str | None = None) -> dict:
     effort = (effort or "").strip().lower() or None
-    if not valid(provider, model, effort):
+    if not valid(provider, model, effort) or provider not in providers_on():
         raise ValueError("unknown provider/model/effort")
     st = session_state(session_id)
     st[KEY] = {"provider": provider, "model": model, "effort": effort}
@@ -78,11 +104,14 @@ def public_catalog(available_openai: list[str] | None = None) -> dict:
     """Catalog for the picker. OpenAI models are trimmed to what this Codex login exposes."""
     out = {}
     for pid, p in CATALOG.items():
+        if pid not in providers_on():
+            continue
         models = p["models"]
         if pid == "openai" and available_openai:
             models = [m for m in models if m["id"] in available_openai]
         out[pid] = {"name": p["name"], "worker": p["worker"], "models": models}
-    return {"providers": out, "efforts": list(EFFORTS), "default": DEFAULT}
+    return {"providers": out, "efforts": list(EFFORTS), "default": default_choice(),
+            "agents": _agents().enabled()}
 
 
 def claude_args(model: str | None, effort: str | None) -> list[str]:

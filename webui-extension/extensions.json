@@ -201,7 +201,7 @@
       "id": "model-picker",
       "name": "Model picker",
       "scripts": [
-        "model-picker.js?v=2"
+        "model-picker.js?v=3"
       ],
       "stylesheets": [
         "model-picker.css?v=2"

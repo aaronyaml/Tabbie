@@ -81,3 +81,12 @@ def log_decision(**fields: Any) -> None:
     fields.setdefault("ts", time.strftime("%Y-%m-%dT%H:%M:%S"))
     with LOG_FILE.open("a") as fh:
         fh.write(json.dumps(fields, default=str) + "\n")
+
+
+def agents():
+    """hmem.agents: which coding agents (claude / codex) are enabled on this Mac."""
+    import sys
+    if str(ROOT) not in sys.path:
+        sys.path.insert(0, str(ROOT))
+    from hmem import agents as _a
+    return _a

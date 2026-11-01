@@ -289,9 +289,22 @@ def _json_lines(on_event):
     return on_line
 
 
+def planner_config(cfg: dict) -> dict:
+    """router.yaml's planner, moved to the other CLI when its own agent is switched off: a Claude-only
+    install plans with Claude, a Codex-only one with Codex (planner.claude_model / planner.codex_model)."""
+    from .common import agents
+    pcfg = dict(cfg.get("planner", {}) or {})
+    on = agents().enabled()
+    if pcfg.get("provider", "codex-cli") == "codex-cli" and "codex" not in on:
+        pcfg.update(provider="claude-cli", model=pcfg.get("claude_model") or None)
+    elif pcfg.get("provider") == "claude-cli" and "claude" not in on:
+        pcfg.update(provider="codex-cli", model=pcfg.get("codex_model") or "gpt-6-astra")
+    return pcfg
+
+
 def run_planner(phase: str, request: dict, manifest_text: str, images: list[str], cfg: dict,
                 work_dir: Path, on_event=None) -> PlanResult:
-    pcfg = cfg.get("planner", {}) or {}
+    pcfg = planner_config(cfg)
     provider = pcfg.get("provider", "codex-cli")
     model = pcfg.get("model")
     timeout = int(pcfg.get("timeout_seconds", 900))

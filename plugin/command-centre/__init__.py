@@ -16,13 +16,13 @@ import os
 import time
 from pathlib import Path
 
-from . import executor_choice, projects, questions
+from . import executor_choice, projects, providers, questions
 from .agents import AgentRun
 from .attachments import Manifest
 from .common import REQUESTS_DIR, STATE_DIR, load_config, log_decision, read_json, write_json
 from .providers import (WORKER_RULES, claude_transcript_tail, codex_models, git_state, run_astra_executor, run_claude,
                         run_planner, usage_limit_info)
-from .common import LOCKS_DIR
+from .common import LOCKS_DIR, agents
 from .router import ASTRA, CLAUDE, classify, interpret_reply, looks_like_chat
 from .state import Request, active_planning_request, session_state, save_session_state, set_active
 
@@ -44,7 +44,7 @@ def _text_of(message) -> str:
 
 
 def _planner_label(cfg: dict) -> str:
-    p = cfg.get("planner", {}) or {}
+    p = providers.planner_config(cfg)
     return f"{p.get('label') or p.get('model')} ({p.get('provider')}:{p.get('model')})"
 
 
@@ -507,7 +507,7 @@ def _execute(r: Request) -> dict:
     if answer and q.get("source") == "astra":
         chosen_run = (r.data.get("executor") or {}).get("chosen")
         return _astra_takeover(r, reason="resumed with your answers", choice=picked if chosen_run else None)
-    if session_state(r["session_id"]).get("takeover") and not answer:
+    if session_state(r["session_id"]).get("takeover") and not answer and agents().has("codex"):
         return _astra_takeover(r, reason="takeover mode is on for this session")
     if picked and not answer:  # the user picked an OpenAI model for this conversation: Codex executes
         return _astra_takeover(r, reason=r["route_reason"], choice=picked)
@@ -582,6 +582,10 @@ def _execute(r: Request) -> dict:
         r["status"] = "claude_limited"
         r.save()
         log_decision(event="claude_limit", request=r.id, detail=limit)
+        if not agents().has("codex"):
+            return {"request_id": r.id, "ok": False, "claude_usage_limit": limit,
+                    "note": "Claude is at its usage limit and Codex isn't enabled on this Mac (Settings → Agents), "
+                            "so nothing can take over. Say when the limit resets, in one line."}
         if st.get("takeover_declined"):
             return {"request_id": r.id, "ok": False, "claude_usage_limit": limit,
                     "note": "Claude is at its usage limit. Takeover was declined for this limit; the user can "
@@ -696,6 +700,9 @@ def _tool_takeover(params, **kwargs):
         return json.dumps({"ok": False, "error": "unknown request_id"})
     st = session_state(r["session_id"])
     st["takeover_offer"] = None
+    if params.get("accept") and not agents().has("codex"):
+        save_session_state(r["session_id"], st)
+        return json.dumps({"ok": False, "error": "Codex isn't enabled on this Mac (Settings → Agents)."})
     if not params.get("accept"):
         st["takeover_declined"] = True
         save_session_state(r["session_id"], st)
@@ -739,6 +746,8 @@ def _cmd_takeover(raw_args: str = "", session_id: str = "", session_key: str = "
                 pass
         log_decision(event="takeover_disabled", session=sid)
         return f"Takeover off — Claude executes again.{stopped}"
+    if not agents().has("codex"):
+        return "Takeover needs Codex, and only Claude Code is enabled on this Mac (Settings → Agents)."
     st["takeover"], st["takeover_declined"] = True, False
     save_session_state(sid, st)
     log_decision(event="takeover_enabled", session=sid)
@@ -779,7 +788,7 @@ def _plan_display(r: Request, data: dict, cfg: dict) -> str:
 def _planner_run(r: Request, cfg: dict, phase: str, manifest: Manifest):
     """run_planner with an agent record (Astra · discover / revise / finalize)."""
     run = AgentRun.load(r.id, r.data.get("session_id") or "")
-    pcfg = cfg.get("planner", {}) or {}
+    pcfg = providers.planner_config(cfg)
     kind = "codex" if pcfg.get("provider", "codex-cli") == "codex-cli" else "claude"
     names = {"discover": "planning", "revise": "revising the plan", "finalize": "writing the brief"}
     run.start_main(f"{pcfg.get('label') or 'Astra'} · {names.get(phase, phase)}",
@@ -867,7 +876,7 @@ def _tool_set_project(params, **kwargs):
 
 def _status_text() -> str:
     cfg = load_config()
-    planner = cfg.get("planner", {}) or {}
+    planner = providers.planner_config(cfg)
     exposed = planner.get("model") in codex_models() if planner.get("provider") == "codex-cli" else None
     recent = sorted((STATE_DIR / "requests").glob("*/request.json"))[-5:]
     lines = [f"Project: {projects.current() or '(none)'}",

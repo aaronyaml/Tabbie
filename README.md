@@ -23,6 +23,9 @@ or phone) and Tabbie routes it:
   matter, you approve the plan, and Claude Code carries it out.
 - **Chat** stays with the hub model.
 
+Use **Claude Code only, Codex only, or both**. `bin/setup` asks which, and you can switch any time in
+the WebUI (see [Choosing Claude Code, Codex or both](#choosing-claude-code-codex-or-both)).
+
 On top of that:
 
 - **Projects** group several repos (site + app + API), each with its own instructions, memory and sessions.
@@ -77,9 +80,10 @@ flowchart LR
   use launchd and Bonjour.
 - **Python 3.11+**, **git**, **[uv](https://docs.astral.sh/uv/)**
 - **[Hermes Agent](https://github.com/NousResearch/hermes-agent)**: provides `hermes`
-- **[Claude Code](https://docs.anthropic.com/en/docs/claude-code)** with a Claude subscription: provides `claude`
+- **At least one coding agent** (you pick at setup):
+  - **[Claude Code](https://docs.anthropic.com/en/docs/claude-code)** with a Claude subscription: provides `claude`;
+  - **[Codex CLI](https://github.com/openai/codex)** with a ChatGPT subscription: provides `codex`.
 - **Optional:**
-  - [Codex CLI](https://github.com/openai/codex) (`codex`), for the planner and takeover;
   - [Caddy](https://caddyserver.com) (`brew install caddy`), for `https://hermes.local` on your network.
 
 ---
@@ -89,11 +93,14 @@ flowchart LR
 ```bash
 git clone <this repo> ~/hermes      # the path ~/hermes is required for now
 cd ~/hermes
-bin/setup                           # checks tools, writes local config, links the plugins
+bin/setup                           # asks Claude Code / Codex / both, checks tools, writes local config
 ```
+
+Skip the question with `bin/setup --agents claude`, `--agents codex` or `--agents claude,codex`.
 
 `bin/setup` is safe to re-run. It:
 
+- saves your agent choice to `config/agents.yaml` (git-ignored) and only checks for the CLIs you picked;
 - creates `state/`, `general/` and `workspaces/` (all git-ignored);
 - copies `config/projects.example.yaml` → `config/projects.yaml`;
 - writes `webui-extension/local.js` (your home folder and first name, git-ignored);
@@ -108,8 +115,8 @@ bin/setup                           # checks tools, writes local config, links t
 | Provider | Needed for | Command |
 |---|---|---|
 | Hermes hub model | the dispatcher | `hermes setup` (pick any provider Hermes supports; e.g. `hermes auth add openai-codex --type oauth`) |
-| Claude Code | executing work | `claude auth login` (must show `claude.ai` in `claude auth status`) |
-| Codex (optional) | planner, takeover | `codex login` |
+| Claude Code (if enabled) | executing work | `claude auth login` (must show `claude.ai` in `claude auth status`) |
+| Codex (if enabled) | planner, takeover, or executing work in a Codex-only setup | `codex login` |
 | Higgsfield (optional) | image/video generation | `higgsfield auth login` |
 | ElevenLabs (optional) | voice/audio | add the hosted MCP below, then `hermes mcp login elevenlabs` |
 
@@ -249,6 +256,26 @@ Design notes: `docs/memory/ARCHITECTURE.md`, `docs/projects/ARCHITECTURE.md`.
   it stopped. `/takeover` toggles it.
 - **Limits**: `/limit` or `bin/hub limits` shows % used and reset times for each signed-in subscription.
 
+### Choosing Claude Code, Codex or both
+
+| Setup | Who executes | Who plans big jobs | Usage limit hit |
+|---|---|---|---|
+| **Both** (default) | Claude Code, or Codex if you pick an OpenAI model for the chat | Codex ("Astra") | Codex can take over (`/takeover`) |
+| **Claude Code only** | Claude Code | Claude Code (`claude-cli` planner) | Tabbie tells you; no takeover |
+| **Codex only** | Codex | Codex | no fallback agent |
+
+Change it any time from the composer's **model picker → Agents** (Claude Code / Codex toggles; at
+least one stays on). It applies on the next request with no restart. It's stored in
+`config/agents.yaml`:
+
+```yaml
+enabled: [claude, codex]   # or [claude], or [codex]
+```
+
+With one agent off, its models disappear from the picker, the planner switches to the agent you
+have, `/limit` and `bin/hub health` skip it, and chat titles and Dreamer phrasing (which use Claude
+Haiku) fall back to plain text when Claude Code is off. No file means both (older installs).
+
 ### Optional: motion studio
 
 `/motion <brief>` runs Claude in `~/motion` (a Remotion project of your own) with a `motion` skill.
@@ -261,6 +288,7 @@ The motion panel in the WebUI expects that folder. Ignore this if you don't use 
 | File | What | Tracked? |
 |---|---|---|
 | `config/router.yaml` | Router, planner and executor settings, memory and Dreamer options. Re-read on every request | yes (defaults) |
+| `config/agents.yaml` | Which coding agents to use: Claude Code, Codex or both | no (written by `bin/setup` / the WebUI) |
 | `config/projects.yaml` | Named folders and workspaces for routing | no (from `.example`) |
 | `hermes-webui/.env` | WebUI host, port and password | no (from `config/webui.env.example`) |
 | `webui-extension/local.js` | Your home path and name for the extension | no (from `local.example.js`) |
@@ -270,7 +298,7 @@ To change the planner, edit `config/router.yaml`; it applies on the next request
 
 ```yaml
 planner:
-  provider: codex-cli      # or claude-cli
+  provider: codex-cli      # or claude-cli (used automatically when Codex is off)
   model: <a model your login exposes>   # list them with: /cc planner
 ```
 

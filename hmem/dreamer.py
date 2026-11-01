@@ -604,7 +604,10 @@ FINDING:
 
 def phrase(f: dict, p: dict) -> dict | None:
     """Rephrase with claude -p (subscription OAuth; API-key env vars stripped; no tools, no MCP, empty cwd).
-    Returns None (keep the template) unless the output passes verification."""
+    Returns None (keep the template) unless the output passes verification, or Claude Code is off."""
+    from . import agents
+    if not agents.has("claude"):
+        return None
     data = {"title": p["title"], "body": p["body"], "evidence": [str(e.get("quote", ""))[:300] for e in f["evidence"][:6]]}
     env = {k: v for k, v in os.environ.items() if k not in ("ANTHROPIC_API_KEY", "ANTHROPIC_AUTH_TOKEN",
                                                               "ANTHROPIC_BASE_URL", "CLAUDE_CODE_USE_BEDROCK")}

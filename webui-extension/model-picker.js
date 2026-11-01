@@ -5,6 +5,7 @@
  * Data: cc-agents sidecar via the WebUI's authenticated, consent-gated proxy:
  *   GET  api/extensions/cc-agents/sidecar/executor?id=<session>  -> {choice, catalog}
  *   POST api/extensions/cc-agents/sidecar/executor {id, provider, model, effort}
+ *   POST api/extensions/cc-agents/sidecar/agents {enabled: ['claude', 'codex']}  (Agents row, step 1)
  * A pick made before the chat exists is held and saved as soon as the session id appears.
  */
 (() => {
@@ -13,6 +14,8 @@
   window.__hxModelPicker = true;
 
   const API = 'api/extensions/cc-agents/sidecar/executor';
+  const AGENTS_API = 'api/extensions/cc-agents/sidecar/agents';
+  const AGENTS = [['claude', 'Claude Code'], ['codex', 'Codex']];
   const PROVIDER_ICON = { anthropic: 'AiBrain01Icon', openai: 'AiMagicIcon' };
   const EFFORT_LABEL = { '': 'Auto', low: 'Low', medium: 'Medium', high: 'High' };
   const FALLBACK = {
@@ -66,22 +69,24 @@
     if (open) paint();
   }
 
+  async function post(url, data) {
+    const body = JSON.stringify(data);
+    if (typeof window.api === 'function') {
+      return window.api('/' + url, { method: 'POST', body, headers: { 'Content-Type': 'application/json' }, retries: 0, timeoutToast: false });
+    }
+    const r = await fetch(url, { method: 'POST', credentials: 'same-origin', headers: { 'Content-Type': 'application/json' }, body });
+    if (!r.ok) throw new Error(String(r.status));
+    return r.json();
+  }
+
   async function save(next) {
     const prev = choice;
     choice = next;
     paintChip();
     const s = sid();
     if (!s) { pending = next; return; }
-    const body = JSON.stringify({ id: s, provider: next.provider, model: next.model, effort: next.effort || '' });
     try {
-      let j;
-      if (typeof window.api === 'function') {
-        j = await window.api('/' + API, { method: 'POST', body, headers: { 'Content-Type': 'application/json' }, retries: 0, timeoutToast: false });
-      } else {
-        const r = await fetch(API, { method: 'POST', credentials: 'same-origin', headers: { 'Content-Type': 'application/json' }, body });
-        if (!r.ok) throw new Error(String(r.status));
-        j = await r.json();
-      }
+      const j = await post(API, { id: s, provider: next.provider, model: next.model, effort: next.effort || '' });
       if (j && j.choice && sid() === s) choice = { provider: j.choice.provider, model: j.choice.model, effort: j.choice.effort || null };
       notice = '';
     } catch (e) {
@@ -90,6 +95,24 @@
       if (open) paint();
     }
     paintChip();
+  }
+
+  // Which coding agents this install uses (config/agents.yaml). At least one stays on; the server
+  // drops the other provider from the catalog and moves this chat's pick if it was on that side.
+  async function toggleAgent(a) {
+    const on = (catalog.agents || AGENTS.map((x) => x[0])).slice();
+    const next = on.includes(a) ? on.filter((x) => x !== a) : on.concat(a);
+    if (!next.length) { notice = 'Keep at least one agent on.'; paint(); return; }
+    try {
+      await post(AGENTS_API, { enabled: next });
+      catalog = Object.assign({}, catalog, { agents: next });
+      notice = '';
+      const s = sid();
+      if (s) await load(s); else paint();
+    } catch (e) {
+      notice = /403/.test(String(e && e.message)) ? 'Allow “Agents & questions” in Settings › Extensions to change agents.' : 'Couldn’t save. Try again.';
+      paint();
+    }
   }
 
   function tick() {
@@ -168,8 +191,11 @@
         + `<span class="hx-mp-text"><span class="hx-mp-name">${esc(pv.name)}</span><span class="hx-mp-desc">${esc(sub)}</span></span>`
         + `<span class="hx-mp-go">${icon('ArrowRight01Icon', 16)}</span></button>`;
     }).join('');
+    const on = catalog.agents || AGENTS.map((x) => x[0]);
+    const agents = AGENTS.map(([a, label]) => `<button type="button" class="hx-mp-seg${on.includes(a) ? ' is-on' : ''}" data-agent="${a}" aria-pressed="${on.includes(a)}">${label}</button>`).join('');
     return `<header class="hx-mp-head"><span class="hx-mp-title">Model</span></header>`
       + `<div class="hx-mp-list">${rows}</div>`
+      + `<div class="hx-mp-effort hx-mp-agents"><span class="hx-mp-effort-label">Agents</span><div class="hx-mp-segs" role="group" aria-label="Coding agents on this Mac">${agents}</div></div>`
       + (notice ? `<p class="hx-mp-note" role="status">${esc(notice)}</p>` : `<p class="hx-mp-cap">For this conversation</p>`);
   }
 
@@ -259,6 +285,7 @@
   function onClick(e) {
     const t = e.target.closest('button');
     if (!t) return;
+    if (t.dataset.agent) { toggleAgent(t.dataset.agent); return; }
     if (t.dataset.provider) { browsing = t.dataset.provider; go(2); return; }
     if (t.hasAttribute('data-back')) { go(1, `[data-provider="${browsing}"]`); return; }
     if (t.dataset.model) {

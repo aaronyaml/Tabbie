@@ -380,17 +380,34 @@ def _err(e: Exception) -> str:
     return re.sub(r"(Bearer|sk-|eyJ)[\w.\-]+", "[redacted]", msg)[:80]
 
 
+def _enabled_agents() -> list[str]:
+    """config/agents.yaml (Claude Code, Codex or both); a missing hmem means an older install = both."""
+    try:
+        import sys
+        root = str(Path(os.environ.get("COMMAND_CENTRE_HOME", HOME / "hermes")).expanduser())
+        if root not in sys.path:
+            sys.path.insert(0, root)
+        from hmem import agents
+        return agents.enabled()
+    except Exception:
+        return ["claude", "codex"]
+
+
 def collect(refresh: bool = False) -> list[dict]:
     if not refresh and _cache["rows"] is not None and _now() - _cache["at"] < CACHE_TTL:
         return _cache["rows"]
     rows: list[dict] = []
-    with ThreadPoolExecutor(max_workers=len(SOURCES)) as ex:
-        futs = [ex.submit(fn) for fn in SOURCES]
-        for fn, f in zip(SOURCES, futs):
+    on = _enabled_agents()
+    sources = [fn for fn in SOURCES if not (fn is claude_rows and "claude" not in on)]
+    with ThreadPoolExecutor(max_workers=len(sources)) as ex:
+        futs = [ex.submit(fn) for fn in sources]
+        for fn, f in zip(sources, futs):
             try:
                 rows += f.result(timeout=CLI_TIMEOUT + TIMEOUT)
             except Exception as e:
                 rows.append(_row(fn.__name__.replace("_rows", "").capitalize(), "—", note=f"error ({_err(e)})"))
+    if "codex" not in on:  # the hub's own ChatGPT login stays; only Codex-as-worker (Astra) goes
+        rows = [r for r in rows if not str(r.get("service", "")).startswith("Astra")]
     _cache.update(at=_now(), rows=rows)
     return rows
 

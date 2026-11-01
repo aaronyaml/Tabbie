@@ -26,10 +26,15 @@ case "${1:-open}" in
     check "Router plugin loaded"      "hermes plugins list | grep command-centre | grep -q enabled"
     check "Limits plugin loaded"      "hermes plugins list | grep limits | grep -q enabled"
     check "Fragment memory loaded"    "hermes plugins list | grep fragment-memory | grep -q enabled"
-    check "Claude (Max OAuth)"        "claude auth status | grep -q '\"authMethod\": \"claude.ai\"'" "claude auth login"
-    check "OpenAI/Astra (ChatGPT)"    "codex login status 2>&1 | grep -q ChatGPT" "codex login"
+    AGENTS_ON="$(sed -n 's/^enabled:[[:space:]]*\[\(.*\)\]/\1/p' "$HOME/hermes/config/agents.yaml" 2>/dev/null)"
+    [ -n "$AGENTS_ON" ] || AGENTS_ON="claude, codex"  # no file = both (older installs)
+    case "$AGENTS_ON" in *claude*)
+    check "Claude (Max OAuth)"        "claude auth status | grep -q '\"authMethod\": \"claude.ai\"'" "claude auth login" ;; esac
+    case "$AGENTS_ON" in *codex*)
+    check "OpenAI/Astra (ChatGPT)"    "codex login status 2>&1 | grep -q ChatGPT" "codex login" ;; esac
     check "Hermes hub on ChatGPT"     "hermes auth list | grep -A2 openai-codex | grep -q oauth" "hermes auth add openai-codex --type oauth"
-    check "Astra model exposed"       "grep -q '\"gpt-6-astra\"' ~/.codex/models_cache.json"
+    case "$AGENTS_ON" in *codex*)
+    check "Astra model exposed"       "grep -q '\"gpt-6-astra\"' ~/.codex/models_cache.json" ;; esac
     check "Higgsfield"                "higgsfield account status" "higgsfield auth login"
     check "ElevenLabs MCP (OAuth)"    "test -s ~/.hermes/mcp-tokens/elevenlabs.json" "hermes mcp login elevenlabs"
     check "Attachments store"         "test -w ~/hermes/state"

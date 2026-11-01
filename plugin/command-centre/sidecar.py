@@ -10,6 +10,7 @@ GET /session?id=<webui session id>  -> requests (oldest first) with agents, ques
 GET /request?id=<request id>        -> one request's agents + question rounds
 GET /executor?id=<webui session id> -> the conversation's executor choice + the picker catalog
 POST /executor {id, provider, model, effort} -> set it (composer model picker)
+GET /agents, POST /agents {enabled}  -> which coding agents this install uses (Claude Code, Codex, both)
 GET|POST /projects/*, GET /fs/*      -> Projects UI (hmem/api.py): registry, memory, Dreamer, proposals
 """
 
@@ -43,6 +44,7 @@ _HERMES_HOME = str(PKG.parents[1])  # ~/hermes: hmem (memory + Projects) lives h
 if _HERMES_HOME not in sys.path:
     sys.path.insert(0, _HERMES_HOME)
 from hmem import api as projects_api  # noqa: E402  (Projects UI backend: /projects/*, /fs/*)
+from hmem import agents as agent_set  # noqa: E402  (config/agents.yaml: Claude Code, Codex or both)
 
 EXT_ID = "cc-agents"
 HOST, PORT = "127.0.0.1", int(os.environ.get("CC_SIDECAR_PORT", "8794"))
@@ -126,8 +128,8 @@ def make_title(text: str) -> str:
     subscription login, no API key). No tools, MCP servers or settings: ~3 s. The prompt goes in on
     stdin as quoted data, so a leading "/motion" is never run as a slash command."""
     text = text.strip()[:2000]
-    if not text:
-        return ""
+    if not text or not agent_set.has("claude"):
+        return ""  # Codex-only install: the WebUI keeps its own default title
     claude = shutil.which("claude") or str(Path.home() / ".local/bin/claude")
     with tempfile.TemporaryDirectory() as cwd:
         out = subprocess.run(
@@ -182,6 +184,19 @@ def executor_payload(sid: str) -> dict:
             "catalog": executor_choice.public_catalog(available)}
 
 
+def agents_payload() -> dict:
+    return {"enabled": agent_set.enabled(), "labels": agent_set.LABEL,
+            "installed": {a: bool(shutil.which(a)) for a in agent_set.AGENTS}}
+
+
+def set_agents(body: dict) -> tuple[int, dict]:
+    try:
+        agent_set.save(body.get("enabled") or [])
+    except (TypeError, ValueError) as exc:
+        return 400, {"error": str(exc)}
+    return 200, agents_payload()
+
+
 def set_executor(body: dict) -> tuple[int, dict]:
     sid = str(body.get("id") or "")
     if not _SID.match(sid):
@@ -229,6 +244,8 @@ class Handler(BaseHTTPRequestHandler):
                 if not _SID.match(sid):
                     return self._send(400, {"error": "bad session id"})
                 return self._send(200, executor_payload(sid))
+            if u.path == "/agents":
+                return self._send(200, agents_payload())
             if u.path == "/title":
                 return self._send(200, title_for(q.get("text", "")))
             if u.path == "/request":
@@ -256,6 +273,8 @@ class Handler(BaseHTTPRequestHandler):
                 return self._send(*projects_api.handle("POST", u.path, None, body))
             if u.path == "/executor" and isinstance(body, dict):
                 return self._send(*set_executor(body))
+            if u.path == "/agents" and isinstance(body, dict):
+                return self._send(*set_agents(body))
         except json.JSONDecodeError:
             return self._send(400, {"error": "bad json"})
         except Exception as exc:
