@@ -212,7 +212,7 @@ def restart(after_reply=None) -> dict:
         subprocess.run(["launchctl", "kickstart", "-k", f"gui/{uid}/ai.hermes.gateway"], capture_output=True)
         done.append("gateway")
     if "caddy" in needs:
-        caddy = shutil.which("caddy") or "/opt/homebrew/bin/caddy"
+        caddy = shutil.which("caddy") or str(Path.home() / ".local/bin/caddy")
         subprocess.run([caddy, "reload", "--config", str(ROOT / "services" / "Caddyfile")], capture_output=True)
         done.append("caddy")
     st = _state()

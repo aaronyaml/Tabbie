@@ -1,0 +1,42 @@
+#!/bin/bash
+# install-tool — install one of Tabbie's tools from its official source, on Apple silicon or Intel.
+# No Homebrew and no Mac password: everything lands in ~/.local/bin (or the tool's own folder).
+#   bin/install-tool hermes|claude|codex|uv|caddy
+set -euo pipefail
+BIN="$HOME/.local/bin"; mkdir -p "$BIN"
+export PATH="$HOME/.hermes/bin:$BIN:/opt/homebrew/bin:/usr/local/bin:$PATH"
+
+# Intel or Apple silicon (a Terminal running under Rosetta still gets the native Apple silicon build)
+ARCH="${TOOL_ARCH:-$(uname -m)}"  # TOOL_ARCH: test the other build
+[ -z "${TOOL_ARCH:-}" ] && [ "$(sysctl -in sysctl.proc_translated 2>/dev/null)" = 1 ] && ARCH=arm64
+case "$ARCH" in arm64|aarch64) RUST=aarch64; GO=arm64 ;; x86_64) RUST=x86_64; GO=amd64 ;;
+  *) echo "Unsupported processor: $ARCH"; exit 1 ;; esac
+TMP="$(mktemp -d)"; trap 'rm -rf "$TMP"' EXIT
+
+latest_tag() {  # owner/repo -> its latest release tag, from GitHub's redirect (no API rate limit)
+  curl -fsSLI -o /dev/null -w '%{url_effective}' "https://github.com/$1/releases/latest" | sed 's#.*/tag/##'
+}
+
+case "${1:-}" in
+  hermes)  # Hermes Agent's official installer; --non-interactive skips its own setup (Tabbie does that)
+    curl -fsSL https://hermes-agent.nousresearch.com/install.sh | bash -s -- --non-interactive ;;
+  claude)  # Claude Code's official native installer
+    curl -fsSL https://claude.ai/install.sh | bash ;;
+  uv)
+    curl -LsSf https://astral.sh/uv/install.sh | sh ;;
+  codex)   # OpenAI's release build for this processor (no Node needed)
+    echo "Downloading Codex for ${RUST}-apple-darwin…"
+    curl -fsSL -o "$TMP/codex.tgz" "https://github.com/openai/codex/releases/latest/download/codex-$RUST-apple-darwin.tar.gz"
+    tar -xzf "$TMP/codex.tgz" -C "$TMP"
+    install -m 755 "$TMP/codex-$RUST-apple-darwin" "$BIN/codex" ;;
+  caddy)   # Caddy's release build for this processor
+    TAG="$(latest_tag caddyserver/caddy)"; V="${TAG#v}"
+    [ -n "$V" ] || { echo "Couldn't find Caddy's latest version"; exit 1; }
+    echo "Downloading Caddy $V for mac_${GO}…"
+    curl -fsSL -o "$TMP/caddy.tgz" "https://github.com/caddyserver/caddy/releases/download/$TAG/caddy_${V}_mac_${GO}.tar.gz"
+    tar -xzf "$TMP/caddy.tgz" -C "$TMP" caddy
+    install -m 755 "$TMP/caddy" "$BIN/caddy" ;;
+  *) sed -n '2,4p' "$0"; exit 2 ;;
+esac
+hash -r
+command -v "$1" >/dev/null 2>&1 && echo "✓ $1 installed: $(command -v "$1")" || { echo "✗ $1 didn't install"; exit 1; }

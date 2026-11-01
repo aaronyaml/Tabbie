@@ -1,5 +1,6 @@
 """Projects (multi-folder, first-class) + project-aware Dreamer.
 Every test runs against a throwaway home (HERMES_PROJECT_ROOT), memory store and workspaces dir."""
+from __future__ import annotations
 import json, subprocess, sys, threading
 from pathlib import Path
 

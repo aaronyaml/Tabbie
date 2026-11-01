@@ -8,7 +8,7 @@
 #   hub import       import Claude project folders into Hermes + WebUI spaces
 #   hub limits       usage limits: Claude Max, ChatGPT (Astra + hub), Higgsfield, ElevenLabs
 #   hub update       check GitHub for a newer Tabbie, and download it if you say yes
-export PATH="$HOME/.local/bin:/opt/homebrew/bin:$PATH"
+export PATH="$HOME/.hermes/bin:$HOME/.local/bin:/opt/homebrew/bin:/usr/local/bin:$PATH"
 UID_=$(id -u)
 ok()   { printf '  \033[32m✓\033[0m %s\n' "$1"; }
 bad()  { printf '  \033[31m✗\033[0m %s\n' "$1"; }

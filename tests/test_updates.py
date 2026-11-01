@@ -1,4 +1,5 @@
 """Tabbie updates: settings, the check (no download), what an update needs restarted."""
+from __future__ import annotations
 import importlib.util, sys
 from importlib import import_module
 from pathlib import Path

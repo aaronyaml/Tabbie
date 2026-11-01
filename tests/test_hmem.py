@@ -1,6 +1,7 @@
 """Tests + evaluations for hmem (institutional memory, traces, proposals, Dreamer).
 Run: uv run --no-project --with pytest python -m pytest ~/hermes/tests/test_hmem.py
 Every test uses a throwaway store (HMEM_ROOT) and throwaway skills/transcript dirs."""
+from __future__ import annotations
 import json, os, subprocess, sys, threading, time
 from pathlib import Path
 

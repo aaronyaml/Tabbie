@@ -1,4 +1,5 @@
 """Every test gets a throwaway memory store: nothing a test does may reach ~/hermes/memory."""
+from __future__ import annotations
 import os
 import tempfile
 

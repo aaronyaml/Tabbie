@@ -4,7 +4,7 @@
 <plist version="1.0"><dict>
   <key>Label</key><string>ai.hermes.dreamer</string>
   <key>ProgramArguments</key><array><string>__HOME__/hermes/bin/hmem</string><string>dream</string><string>--trigger</string><string>nightly</string><string>--quiet</string></array>
-  <key>EnvironmentVariables</key><dict><key>HOME</key><string>__HOME__</string><key>PATH</key><string>__HOME__/.local/bin:/opt/homebrew/bin:/usr/local/bin:/usr/bin:/bin:/usr/sbin:/sbin</string></dict>
+  <key>EnvironmentVariables</key><dict><key>HOME</key><string>__HOME__</string><key>PATH</key><string>__HOME__/.hermes/bin:__HOME__/.local/bin:/opt/homebrew/bin:/usr/local/bin:/usr/bin:/bin:/usr/sbin:/sbin</string></dict>
   <key>StartCalendarInterval</key><dict><key>Hour</key><integer>3</integer><key>Minute</key><integer>30</integer></dict>
   <key>Nice</key><integer>15</integer>
   <key>ProcessType</key><string>Background</string>

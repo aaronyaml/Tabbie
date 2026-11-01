@@ -1,4 +1,5 @@
 """Claude Code only, Codex only, or both (config/agents.yaml): setting, catalog, planner, takeover."""
+from __future__ import annotations
 import importlib.util, sys, tempfile
 from importlib import import_module
 from pathlib import Path

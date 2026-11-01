@@ -1,4 +1,5 @@
 """Agent records from worker event streams, and hermes-question block extraction."""
+from __future__ import annotations
 import importlib.util, json, sys
 from pathlib import Path
 

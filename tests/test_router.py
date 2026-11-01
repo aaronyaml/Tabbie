@@ -1,5 +1,6 @@
 """Offline tests for the command-centre router, reply parsing and attachment pipeline.
 Run: ~/.hermes/hermes-agent/venv-python -m pytest ~/hermes/tests  (or any python3 with pyyaml)."""
+from __future__ import annotations
 import importlib.util, sys, tempfile, zipfile, base64
 from pathlib import Path
 

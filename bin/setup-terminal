@@ -1,0 +1,415 @@
+#!/bin/bash
+# setup-terminal — Tabbie setup in the Terminal (bin/setup opens the same steps as a page in your browser). Walks through every step in order, asks before installing
+# or changing anything, and is safe to re-run: finished steps are ticked and skipped.
+#   bin/setup                        the setup screen
+#   bin/setup --yes                  no questions: defaults, and sign-ins / password / phone left for later
+#   bin/setup --agents claude|codex|claude,codex    --name Sam    --services   (answer ahead of time)
+#   bin/setup-terminal --yes --only files,services   run just those steps (the setup page uses this)
+# Nothing here asks for or stores an API key: every provider signs in with its own login.
+set -uo pipefail   # no -e: a step that fails says so and setup carries on
+HERMES="$HOME/hermes"
+cd "$HERMES" 2>/dev/null || { echo "Clone this repo to ~/hermes first (other locations aren't supported yet)."; exit 1; }
+export PATH="$HOME/.local/bin:/opt/homebrew/bin:/usr/local/bin:$PATH"
+
+# ── look ──────────────────────────────────────────────────────────────────────────────────────────
+B=$'\033[1m'; D=$'\033[2m'; G=$'\033[32m'; Y=$'\033[33m'; R=$'\033[31m'; C=$'\033[36m'; N=$'\033[0m'
+ok()   { printf '  %s✓%s %s\n' "$G" "$N" "$1"; }
+warn() { printf '  %s!%s %s\n' "$Y" "$N" "$1"; }
+fail() { printf '  %s✗%s %s\n' "$R" "$N" "$1"; }
+say()  { printf '  %s\n' "$1"; }
+dim()  { printf '  %s%s%s\n' "$D" "$1" "$N"; }
+TOTAL=10; STEP=0
+step() { STEP=$((STEP + 1)); printf '\n%s━━ Step %d of %d · %s %s%s\n' "$C$B" "$STEP" "$TOTAL" "$1" "$(printf '━%.0s' $(seq 1 $((60 - ${#1}))))" "$N"; [ -n "${2:-}" ] && dim "$2"; echo; }
+
+# ── answers ───────────────────────────────────────────────────────────────────────────────────────
+YES=0; ONLY=""; HUB_ARG=""; SERVICES=""; AGENTS=""; NAME=""; NAME_SET=0
+while [ $# -gt 0 ]; do
+  case "$1" in
+    --yes|-y) YES=1 ;;
+    --only) ONLY="${2:-}"; shift ;;
+    --hub) HUB_ARG="${2:-}"; shift ;;
+    --services) SERVICES=1 ;;
+    --agents) AGENTS="${2:-}"; shift ;;
+    --agents=*) AGENTS="${1#--agents=}" ;;
+    --name) NAME="${2:-}"; NAME_SET=1; shift ;;
+    --name=*) NAME="${1#--name=}"; NAME_SET=1 ;;
+    -h|--help) sed -n '2,7p' "$0"; exit 0 ;;
+    *) echo "unknown option: $1 (try --help)"; exit 2 ;;
+  esac
+  shift
+done
+ASK=1; { [ "$YES" = 1 ] || [ ! -t 0 ]; } && ASK=0
+want() { [ -z "$ONLY" ] || case ",$ONLY," in *",$1,"*) true ;; *) false ;; esac; }
+[ -n "$ONLY" ] && TOTAL=$(( $(printf '%s' "$ONLY" | tr -cd ',' | wc -c) + 1 ))
+
+# yes/no question; $2 is the default (y/n). Without a terminal, the default.
+yn() {
+  local d="${2:-y}" a hint="[Y/n]"; [ "$d" = n ] && hint="[y/N]"
+  if [ "$ASK" = 0 ]; then [ "$d" = y ]; return; fi
+  while :; do
+    read -r -p "  $1 $hint " a
+    case "${a:-$d}" in [Yy]*) return 0 ;; [Nn]*) return 1 ;; esac
+  done
+}
+pause() { [ "$ASK" = 1 ] && read -r -p "  ${1:-Press Return to continue} " _; }
+run() { printf '  %s$ %s%s\n' "$D" "$*" "$N"; "$@"; }
+have() { command -v "$1" >/dev/null 2>&1; }
+# Every change to Hermes' own config is backed up first (once per run).
+backup_hermes_config() {
+  [ -n "${HCFG_SAVED:-}" ] && return
+  local cfg; cfg="$(hermes config path 2>/dev/null)"
+  BK="backups/setup-$(date +%Y%m%d-%H%M%S)"
+  [ -f "$cfg" ] && mkdir -p "$BK" && cp "$cfg" "$BK/" && HCFG_SAVED=1 && dim "Hermes config backed up to $BK/"
+}
+
+# ── welcome ───────────────────────────────────────────────────────────────────────────────────────
+if [ -z "$ONLY" ]; then
+[ "$ASK" = 1 ] && clear
+cat <<EOF
+
+  ${B}Tabbie setup${N}
+  ${D}Your coding agents, one inbox — on your Mac and your phone.${N}
+
+  This screen walks you through everything, one step at a time:
+    1 About you          4 Sign in              7 Background services   10 Check it all works
+    2 Coding agents      5 Local files          8 Secure address
+    3 Tools              6 WebUI password       9 Your phone
+
+  It asks before installing or changing anything. Takes about 10–15 minutes the first time.
+  Safe to run again later: finished steps are ticked and skipped.
+EOF
+pause "Press Return to start"
+fi
+
+# ── 1. about you ──────────────────────────────────────────────────────────────────────────────────
+if want name; then
+step "About you" "Your first name, for the greeting on the chat home: \"Morning, Sam\"."
+CUR_NAME="$(sed -n 's/^  name: "\(.*\)",$/\1/p' webui-extension/local.js 2>/dev/null)"
+if [ "$NAME_SET" = 0 ]; then
+  GUESS="${CUR_NAME:-$(id -F 2>/dev/null | awk '{print $1}')}"
+  if [ "$ASK" = 1 ]; then
+    read -r -p "  Your first name [${GUESS:-skip}]: " NAME
+    NAME="${NAME:-$GUESS}"
+  else
+    NAME="$GUESS"
+  fi
+fi
+python3 - "$HOME" "$HERMES" "$NAME" > webui-extension/local.js <<'PY'
+import json, sys
+home, hermes, name = sys.argv[1], sys.argv[2], " ".join(sys.argv[3].split())[:40]
+print("// Per-machine settings (git-ignored). Regenerate with bin/setup (--name to change the greeting).")
+print("window.HX_LOCAL = {")
+print(f"  home: {json.dumps(home)},")
+print(f"  hermes: {json.dumps(hermes)},")
+print(f"  motion: {json.dumps(home + '/motion')},")
+print(f"  name: {json.dumps(name, ensure_ascii=False)},")
+print("};")
+PY
+if [ -n "$NAME" ]; then ok "Greeting: Morning, $NAME"; else ok "Greeting: Morning (no name)"; fi
+fi
+
+# ── 2. coding agents ──────────────────────────────────────────────────────────────────────────────
+want agents && step "Coding agents" "Who does the work. Change it any time in the WebUI: model picker → Agents."
+if [ -z "$AGENTS" ] && [ -f config/agents.yaml ]; then
+  AGENTS="$(sed -n 's/^enabled:[[:space:]]*\[\(.*\)\]/\1/p' config/agents.yaml | tr -d ' ')"
+  [ -n "$AGENTS" ] && [ "$ASK" = 1 ] && want agents && ! yn "Keep your saved choice ($AGENTS)?" y && AGENTS=""
+fi
+if [ -z "$AGENTS" ]; then
+  if [ "$ASK" = 1 ]; then
+    say "1) Claude only         Claude Code does everything. Needs a Claude subscription."
+    say "2) OpenAI only         Codex does everything. Needs a ChatGPT subscription."
+    say "3) Claude and OpenAI   Claude Code does the work, Codex plans big jobs and covers usage limits."
+    say "                       Needs both subscriptions. (Recommended if you have both.)"
+    while :; do
+      read -r -p "  Pick 1, 2 or 3 [3]: " pick
+      case "${pick:-3}" in 1) AGENTS=claude; break ;; 2) AGENTS=codex; break ;; 3) AGENTS=claude,codex; break ;; esac
+    done
+  else
+    AGENTS=claude,codex
+  fi
+fi
+case ",$AGENTS," in *,claude,*) USE_CLAUDE=1 ;; *) USE_CLAUDE=0 ;; esac
+case ",$AGENTS," in *,codex,*) USE_CODEX=1 ;; *) USE_CODEX=0 ;; esac
+[ "$USE_CLAUDE$USE_CODEX" = 00 ] && { fail "--agents must be claude, codex or claude,codex"; exit 2; }
+want agents && LIST="$(PYTHONPATH="$HERMES" COMMAND_CENTRE_HOME="$HERMES" python3 -c \
+  'import sys; from hmem import agents; print(" and ".join({"claude": "Claude (Claude Code)", "codex": "OpenAI (Codex)"}[a] for a in agents.save(sys.argv[1].split(","))))' "$AGENTS")"
+want agents && ok "Using: $LIST"
+
+# ── 3. tools ──────────────────────────────────────────────────────────────────────────────────────
+if want tools; then
+step "Tools" "The programs Tabbie runs on. Missing ones can be installed for you."
+[ "$(uname)" = Darwin ] && ok "macOS" || warn "Not macOS: background services (launchd, Bonjour) won't work; the rest may"
+# tool, why, install command ("" = manual), required (1/0)
+tool() {
+  local t="$1" why="$2" cmd="$3" req="$4"
+  if have "$t"; then ok "$t — $why"; return 0; fi
+  if [ -z "$cmd" ]; then
+    [ "$req" = 1 ] && fail "$t missing — $why" || warn "$t missing (optional) — $why"
+    return 1
+  fi
+  if yn "$t is missing ($why). Install it now?" "$([ "$req" = 1 ] && echo y || echo n)"; then
+    printf '  %s$ %s%s\n' "$D" "$cmd" "$N"; bash -c "$cmd"; hash -r
+  fi
+  if have "$t"; then ok "$t installed"; return 0; fi
+  [ "$req" = 1 ] && fail "$t still missing. Install: $cmd" || warn "$t skipped (optional)"
+  return 1
+}
+# Everything below installs from its official source with bin/install-tool, on Apple silicon or Intel.
+# No Homebrew needed (and no Mac password): tools go to ~/.local/bin.
+IT="$HERMES/bin/install-tool"
+MISSING=0
+tool git     "version control (Apple's developer tools)" "xcode-select --install" 1 || MISSING=1
+tool python3 "runs Tabbie's own scripts (comes with Apple's developer tools)" "" 1 || MISSING=1
+tool hermes  "Hermes Agent, the hub Tabbie is built on" "$IT hermes" 1 || MISSING=1
+export PATH="$HOME/.hermes/bin:$HOME/.local/bin:$PATH"; hash -r
+[ "$USE_CLAUDE" = 1 ] && { tool claude "Claude Code" "$IT claude" 1 || MISSING=1; }
+[ "$USE_CODEX" = 1 ]  && { tool codex  "Codex"       "$IT codex"  1 || MISSING=1; }
+tool caddy "https://hermes.local, page addresses and phone access" "$IT caddy" 1 || true
+tool uv    "runs the tests (for contributors)" "$IT uv" 0
+if [ "$MISSING" = 1 ]; then
+  echo; fail "Some required tools are missing (above). Install them, then run ${B}bin/setup${N} again."
+  exit 1
+fi
+fi
+
+# ── 4. sign in ────────────────────────────────────────────────────────────────────────────────────
+if want signin; then
+step "Sign in" "Each provider uses its own login in your browser. No API keys."
+signin() {  # label, check command, login command
+  if eval "$2" >/dev/null 2>&1; then ok "$1 — signed in"; return; fi
+  if yn "Sign in to $1 now? (opens your browser)" y && [ "$ASK" = 1 ]; then
+    run bash -c "$3"
+    eval "$2" >/dev/null 2>&1 && ok "$1 — signed in" || warn "$1 — not signed in yet. Later: $3"
+  else
+    warn "$1 — not signed in. Later: $3"
+  fi
+}
+# The hub (chat + routing) runs on the same subscription login as the agents: ChatGPT (openai-codex)
+# or Claude (anthropic, signed in with your Claude account). Never an API key.
+CUR_HUB="$(hermes config get model.provider 2>/dev/null | tail -1 | tr -d '[:space:]')"
+if [ "$USE_CODEX$USE_CLAUDE" = 11 ]; then
+  HUB=openai-codex; [ "$CUR_HUB" = anthropic ] && HUB=anthropic
+  if [ "$ASK" = 1 ]; then
+    say "The hub chats with you and routes each job. Which login should it use?"
+    say "1) ChatGPT (recommended: quick, and leaves your Claude limits for real work)   2) Claude"
+    D1=1; [ "$HUB" = anthropic ] && D1=2
+    read -r -p "  Pick 1 or 2 [$D1]: " pick
+    case "${pick:-$D1}" in 2) HUB=anthropic ;; *) HUB=openai-codex ;; esac
+  fi
+elif [ "$USE_CODEX" = 1 ]; then HUB=openai-codex
+else HUB=anthropic
+fi
+case "$HUB_ARG" in openai-codex|anthropic) HUB="$HUB_ARG" ;; esac
+if [ "$HUB" = openai-codex ]; then HUB_LABEL="ChatGPT"; HUB_MODEL=gpt-6.1-sol; else HUB_LABEL="Claude"; HUB_MODEL=claude-sonnet-5-5; fi
+signin "Hub on your $HUB_LABEL login" "hermes auth list 2>/dev/null | grep -A3 '^$HUB ' | grep -q oauth" "hermes auth add $HUB --type oauth"
+if [ "$CUR_HUB" != "$HUB" ]; then
+  backup_hermes_config
+  hermes config set model.provider "$HUB" >/dev/null 2>&1 && hermes config set model.default "$HUB_MODEL" >/dev/null 2>&1 \
+    && ok "Hub model: $HUB_MODEL ($HUB_LABEL login). Change it any time: hermes model" \
+    || warn "Couldn't set the hub model. Run: hermes model"
+else
+  ok "Hub model: $(hermes config get model.default 2>/dev/null | tail -1) ($HUB_LABEL login)"
+fi
+[ "$USE_CLAUDE" = 1 ] && signin "Claude Code" "claude auth status | grep -q '\"authMethod\": \"claude.ai\"'" "claude auth login"
+[ "$USE_CODEX" = 1 ]  && signin "Codex (ChatGPT)" "codex login status 2>&1 | grep -q ChatGPT" "codex login"
+fi
+
+# ── 5. local files ────────────────────────────────────────────────────────────────────────────────
+if want files; then
+step "Local files" "Folders and settings on this Mac only (none of it is ever committed)."
+mkdir -p state/logs state/requests state/ca general workspaces && chmod 700 state && ok "state/, general/, workspaces/"
+[ -f config/projects.yaml ] || cp config/projects.example.yaml config/projects.yaml
+ok "config/projects.yaml"
+if [ ! -d hermes-webui ]; then
+  git clone -q https://github.com/nesquena/hermes-webui.git hermes-webui && ok "WebUI downloaded (hermes-webui/)" || fail "Couldn't download the WebUI (check your internet), then re-run"
+else
+  ok "WebUI (hermes-webui/)"
+fi
+if [ -d hermes-webui ] && [ ! -f hermes-webui/.env ]; then
+  sed "s|__HOME__|$HOME|g" config/webui.env.example > hermes-webui/.env
+fi
+if [ -f hermes-webui/.env ]; then
+  # bin/setup does the WebUI's first-run job (provider login, model, workspace), so its own wizard
+  # (which offers API-key providers) stays off.
+  grep -q '^HERMES_WEBUI_SKIP_ONBOARDING=' hermes-webui/.env || printf '\nHERMES_WEBUI_SKIP_ONBOARDING=1\n' >> hermes-webui/.env
+  chmod 600 hermes-webui/.env && ok "hermes-webui/.env"
+fi
+PYTHONPATH="$HERMES" python3 -m hmem.cli init >/dev/null && ok "Memory store (memory/, private)"
+if ! grep -q "## Command Centre role" "$HOME/.hermes/SOUL.md" 2>/dev/null; then
+  mkdir -p "$HOME/.hermes"; { echo; tail -n +2 config/SOUL.hub.md; } >> "$HOME/.hermes/SOUL.md"
+fi
+ok "Hub rules (~/.hermes/SOUL.md)"
+mkdir -p "$HOME/.hermes/plugins"
+for p in command-centre fragment-memory limits workboard; do ln -sfn "$HERMES/plugin/$p" "$HOME/.hermes/plugins/$p"; done
+ok "Plugins linked into ~/.hermes/plugins/"
+# Workers can run for an hour: the hub must wait for them (backup first, like every config change).
+T="$(hermes config get timeouts.tools.sequential_call 2>/dev/null | tr -dc '0-9')"
+if [ "${T:-0}" -lt 3900 ]; then
+  backup_hermes_config
+  hermes config set timeouts.tools.sequential_call 3900 >/dev/null 2>&1 \
+    && ok "Hub waits up to 65 min for workers" \
+    || warn "Couldn't set the hub timeout. Add timeouts.tools.sequential_call: 3900 to ~/.hermes/config.yaml"
+else
+  ok "Hub waits up to $((T / 60)) min for workers"
+fi
+fi
+
+# ── 6. password ───────────────────────────────────────────────────────────────────────────────────
+if want password; then
+step "WebUI password" "The WebUI can start agents on your Mac, so it always sits behind a password."
+ENVF=hermes-webui/.env
+if grep -qE '^HERMES_WEBUI_PASSWORD=.+' "$ENVF" 2>/dev/null; then
+  ok "Password is set"
+  if [ "$ASK" = 1 ] && yn "Change it?" n; then SETPW=1; else SETPW=0; fi
+else
+  SETPW=1
+fi
+if [ "$SETPW" = 1 ]; then
+  if [ "$ASK" = 0 ]; then
+    warn "No password yet. Run bin/setup again (with a terminal) to set one before starting the services."
+  else
+    while :; do
+      read -r -s -p "  New password (8+ characters, hidden): " P1; echo
+      read -r -s -p "  Same again: " P2; echo
+      [ "${#P1}" -lt 8 ] && { warn "At least 8 characters, please."; continue; }
+      [ "$P1" != "$P2" ] && { warn "They didn't match. Try again."; continue; }
+      break
+    done
+    # stdin, not argv: the password never shows in the process list
+    printf '%s' "$P1" | python3 -c '
+import os, sys
+path, pw = sys.argv[1], sys.stdin.read()
+lines = [l for l in open(path).read().splitlines() if not l.startswith("HERMES_WEBUI_PASSWORD=")]
+lines.append("HERMES_WEBUI_PASSWORD=" + pw)
+tmp = path + ".tmp"
+with open(os.open(tmp, os.O_WRONLY | os.O_CREAT | os.O_TRUNC, 0o600), "w") as f:
+    f.write("\n".join(lines) + "\n")
+os.replace(tmp, path)' "$ENVF" && ok "Password saved (hermes-webui/.env, only you can read it)"
+    unset P1 P2
+    PW_CHANGED=1
+  fi
+fi
+fi
+
+# ── 7. background services ────────────────────────────────────────────────────────────────────────
+if want services; then
+step "Background services" "Keeps Tabbie running whenever your Mac is on: WebUI, hub, HTTPS, Dreamer."
+RUNNING=0; launchctl list ai.hermes.webui >/dev/null 2>&1 && RUNNING=1
+if [ "$RUNNING" = 1 ]; then
+  ok "Services are installed and running"
+  Q="Reinstall and restart them? Only do this when no request is running in Tabbie."; DEF=n
+  [ "${PW_CHANGED:-0}" = 1 ] && { Q="Restart them so the new password applies? Only when no request is running."; DEF=y; }
+else
+  Q="Install and start them now?"; DEF=y
+fi
+[ -n "$SERVICES" ] && DEF=y
+if { [ "$ASK" = 0 ] && [ -n "$SERVICES" ]; } || { [ "$ASK" = 1 ] && yn "$Q" "$DEF"; }; then
+  if ! grep -qE '^HERMES_WEBUI_PASSWORD=.+' "$ENVF" 2>/dev/null; then
+    fail "Set a WebUI password first (step 6), then run bin/setup again."
+  else
+    CADDY="$(command -v caddy || echo "$HOME/.local/bin/caddy")"
+    for t in services/*.plist.template; do
+      label="$(basename "$t" .plist.template)"
+      if [ "$label" = ai.hermes.caddy ] && ! have caddy; then warn "skipped $label (no caddy)"; continue; fi
+      dest="$HOME/Library/LaunchAgents/$label.plist"
+      sed -e "s|__HOME__|$HOME|g" -e "s|__CADDY__|$CADDY|g" "$t" > "$dest"
+      launchctl bootout "gui/$(id -u)/$label" 2>/dev/null || true
+      launchctl bootstrap "gui/$(id -u)" "$dest" && ok "$label" || fail "$label didn't start (bin/hub logs)"
+    done
+    hermes gateway install >/dev/null 2>&1 && ok "Hermes gateway" || warn "Gateway: run hermes gateway install"
+  fi
+else
+  dim "Skipped. Later: bin/setup --services"
+fi
+fi
+
+# ── 8. secure address ─────────────────────────────────────────────────────────────────────────────
+if want cert; then
+step "Secure address" "https://hermes.local on your home network, with a padlock. Needs Caddy."
+CA="$HOME/Library/Application Support/Caddy/pki/authorities/local/root.crt"
+if ! have caddy; then
+  warn "No Caddy, so no https://hermes.local. Use http://127.0.0.1:8787 on this Mac (brew install caddy, then re-run)."
+else
+  for _ in 1 2 3 4 5 6 7 8 9 10; do [ -f "$CA" ] && break; sleep 1; done
+  if [ ! -f "$CA" ]; then
+    warn "Caddy hasn't made its certificate yet (is the service running? bin/hub logs caddy). Re-run later."
+  else
+    cp "$CA" state/ca/hermes-ca.crt && ok "Phone certificate ready at http://hermes.local/hermes-ca.crt"
+    if security verify-cert -c "$CA" >/dev/null 2>&1; then
+      ok "This Mac trusts it"
+    elif yn "Trust it on this Mac (removes browser warnings)? macOS asks for your password." y; then
+      security add-trusted-cert -r trustRoot -k "$HOME/Library/Keychains/login.keychain-db" "$CA" \
+        && ok "Trusted on this Mac" || warn "Not trusted. Later: open Keychain Access and trust \"Caddy Local Authority\""
+    fi
+  fi
+fi
+fi
+
+# ── 9. phone ──────────────────────────────────────────────────────────────────────────────────────
+if want phone; then
+step "Your phone" "Optional. Use Tabbie from your phone, at home or anywhere."
+PORT=8788; have caddy || PORT=8787
+say "${B}At home (same Wi-Fi):${N} open ${B}http://hermes.local/hermes-ca.crt${N} on the phone and install it."
+say "  iPhone: then Settings › General › About › Certificate Trust Settings → turn it on."
+say "  Then open ${B}https://hermes.local${N}."
+echo
+TS=""; for c in tailscale /Applications/Tailscale.app/Contents/MacOS/Tailscale; do
+  [ -z "$TS" ] && { have "$c" || [ -x "$c" ]; } && TS="$c"
+done
+# a Homebrew tailscaled with its own socket (advanced setups) is used as-is
+SOCK="$HERMES/state/tailscale/tailscaled.sock"; [ -n "$TS" ] && [ -S "$SOCK" ] && TS="$TS --socket $SOCK"
+if [ "$ASK" = 1 ] && yn "Use Tabbie away from home too? (Tailscale, a free private network between your devices)" "$([ -n "$TS" ] && echo y || echo n)"; then
+  if [ -z "$TS" ]; then
+    say "1. Install Tailscale from the Mac App Store (opening it now), open it and log in."
+    say "   Allow the VPN configuration if macOS asks."
+    open "macappstore://apps.apple.com/app/tailscale/id1475387142" 2>/dev/null || open "https://tailscale.com/download"
+    pause "Press Return once Tailscale on this Mac says Connected"
+    [ -x /Applications/Tailscale.app/Contents/MacOS/Tailscale ] && TS=/Applications/Tailscale.app/Contents/MacOS/Tailscale
+    have tailscale && TS=tailscale
+  fi
+  if [ -z "$TS" ]; then
+    warn "Tailscale not found. Install it, then run bin/setup again (README → Use Tabbie on your phone)."
+  elif ! $TS status >/dev/null 2>&1; then
+    warn "Tailscale isn't connected. Open it, log in, then run bin/setup again."
+  else
+    ok "Tailscale connected"
+    if $TS serve status 2>/dev/null | grep -q "127.0.0.1:$PORT"; then
+      ok "Tabbie is shared on your private network"
+    else
+      say "2. Turn on HTTPS for your Tailscale network (one switch): opening the admin page."
+      say "   DNS tab → MagicDNS on → HTTPS Certificates → Enable HTTPS."
+      open "https://login.tailscale.com/admin/dns" 2>/dev/null
+      pause "Press Return once HTTPS is enabled"
+      $TS serve --bg "$PORT" >/dev/null 2>&1 && ok "Tabbie shared on your private network (never public)" \
+        || warn "Couldn't share it. Run: $TS serve --bg $PORT"
+    fi
+    URL="$($TS status --json 2>/dev/null | python3 -c 'import json,sys; print("https://"+json.load(sys.stdin)["Self"]["DNSName"].rstrip("."))' 2>/dev/null)"
+    [ -n "$URL" ] && TS_URL="$URL"
+    echo
+    say "${B}On your phone:${N}"
+    say "1. Install Tailscale (App Store / Google Play) and log in with the ${B}same account${N}. Allow the VPN."
+    say "2. Turn it on, then open ${B}${TS_URL:-the .ts.net address of your Mac}${N} and log in with your WebUI password."
+    say "3. Add it to your home screen: Share → Add to Home Screen (iPhone), ⋮ → Add to Home screen (Android)."
+  fi
+else
+  dim "Skipped. Later: bin/setup, or README → Use Tabbie on your phone."
+fi
+fi
+
+# ── 10. check ─────────────────────────────────────────────────────────────────────────────────────
+if want check; then
+step "Check it all works" "One line per part, with the fix command if something's off."
+bin/hub health
+fi
+
+# ── done ──────────────────────────────────────────────────────────────────────────────────────────
+[ -n "$ONLY" ] && exit 0
+echo
+printf '%s━━ Done %s%s\n' "$G$B" "$(printf '━%.0s' $(seq 1 75))" "$N"
+if have caddy; then say "Open Tabbie:   ${B}https://hermes.local${N}   (or run bin/hub)"; else say "Open Tabbie:   ${B}http://127.0.0.1:8787${N}"; fi
+[ -n "${TS_URL:-}" ] && say "From anywhere: ${B}$TS_URL${N}   (Tailscale on)"
+say "Log in with your WebUI password. Anything marked ! above can be fixed by running bin/setup again."
+echo
+dim "Optional extras: Higgsfield (higgsfield auth login), ElevenLabs (README → Hermes config),"
+dim "Projects for your repos (WebUI → Projects), the motion studio (README → Optional: motion studio)."
+echo

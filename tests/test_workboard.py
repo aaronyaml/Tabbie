@@ -1,4 +1,5 @@
 """Workboard plugin: store + tool layer against a throwaway kanban home (needs the Hermes Agent checkout)."""
+from __future__ import annotations
 import importlib.util, json, os, sys
 from pathlib import Path
 

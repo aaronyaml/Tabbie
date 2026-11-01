@@ -1,4 +1,5 @@
 """Per-conversation executor choice (composer model picker): storage, command building, dispatch."""
+from __future__ import annotations
 import importlib.util, json, sys, tempfile
 from importlib import import_module
 from pathlib import Path

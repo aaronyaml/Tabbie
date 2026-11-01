@@ -1,0 +1,355 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Tabbie setup</title>
+<link rel="icon" href="/brand/favicon.svg">
+<style>
+:root {
+  --accent: #3054FD; --on-accent: #fff;
+  --bg: #F6F6F4; --card: #FFFFFF; --fill: #F1F1EF; --fill-2: #E9E9E6; --hair: #E6E5E1;
+  --text: #141413; --text-2: #6B6B70; --green: #1E7D3A; --orange: #B54708; --red: #C4161C;
+  --tint: color-mix(in srgb, var(--accent) 10%, transparent);
+  --shadow: 0 1px 2px rgba(0,0,0,.04), 0 8px 24px rgba(0,0,0,.08);
+  --font: -apple-system, BlinkMacSystemFont, "SF Pro Text", "Helvetica Neue", system-ui, sans-serif;
+  --mono: ui-monospace, "SF Mono", Menlo, monospace;
+  color-scheme: light;
+}
+@media (prefers-color-scheme: dark) {
+  :root { --accent: #6B85FF; --on-accent: #0B0B0C; --bg: #0F0F10; --card: #1A1A1C; --fill: #242427; --fill-2: #2E2E32;
+    --hair: #2C2C30; --text: #F2F2F0; --text-2: #A1A1A6; --green: #4CC26B; --orange: #F0A35E; --red: #FF6B6B;
+    --shadow: 0 1px 2px rgba(0,0,0,.3), 0 8px 24px rgba(0,0,0,.35); color-scheme: dark; }
+}
+* { box-sizing: border-box; }
+body { margin: 0; background: var(--bg); color: var(--text); font: 15px/1.5 var(--font); -webkit-font-smoothing: antialiased; }
+.wrap > * { min-width: 0; }
+.wrap { max-width: 1040px; margin: 0 auto; padding: 40px 24px 64px; display: grid; grid-template-columns: 260px 1fr; gap: 32px; }
+header.top { grid-column: 1 / -1; display: flex; align-items: center; gap: 14px; }
+header.top img { width: 52px; height: 52px; border-radius: 14px; }
+header.top h1 { margin: 0; font-size: 24px; letter-spacing: -.02em; }
+header.top p { margin: 2px 0 0; color: var(--text-2); }
+nav ol { list-style: none; margin: 0; padding: 0; position: sticky; top: 24px; }
+nav li button { width: 100%; display: flex; align-items: center; gap: 12px; padding: 9px 12px; border: 0; border-radius: 10px;
+  background: transparent; color: var(--text-2); font: 500 14px/1.3 var(--font); text-align: left; cursor: pointer; }
+nav li button:hover { background: var(--fill); color: var(--text); }
+nav li button[aria-current="step"] { background: var(--card); color: var(--text); box-shadow: var(--shadow); }
+.dot { flex: none; width: 22px; height: 22px; border-radius: 50%; display: grid; place-items: center; font-size: 12px; font-weight: 600;
+  background: var(--fill-2); color: var(--text-2); }
+.done .dot { background: var(--green); color: #fff; }
+main .card { background: var(--card); border-radius: 18px; box-shadow: var(--shadow); padding: 28px 30px 26px; }
+main h2 { margin: 0 0 4px; font-size: 22px; letter-spacing: -.02em; }
+.lead { margin: 0 0 22px; color: var(--text-2); }
+.row { display: flex; align-items: center; gap: 12px; padding: 12px 0; border-top: 1px solid var(--hair); }
+.row:first-of-type { border-top: 0; }
+.row .what { flex: 1; min-width: 0; }
+.row .what b { display: block; font-weight: 600; }
+.row .what span { color: var(--text-2); font-size: 13px; }
+.ok { color: var(--green); font-weight: 600; font-size: 14px; white-space: nowrap; }
+.warn { color: var(--orange); }
+.err { color: var(--red); }
+button.btn { height: 36px; padding: 0 16px; border: 0; border-radius: 10px; background: var(--fill); color: var(--text);
+  font: 600 14px/1 var(--font); cursor: pointer; white-space: nowrap; }
+button.btn:hover { background: var(--fill-2); }
+button.btn.primary { background: var(--accent); color: var(--on-accent); }
+button.btn.primary:hover { filter: brightness(1.06); }
+button.btn:disabled { opacity: .55; cursor: default; filter: none; }
+button:focus-visible, input:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+.actions { display: flex; justify-content: space-between; align-items: center; gap: 12px; margin-top: 26px; }
+.actions .right { display: flex; gap: 10px; margin-left: auto; }
+input[type=text], input[type=password] { width: 100%; max-width: 360px; height: 42px; padding: 0 14px; border-radius: 10px;
+  border: 1px solid var(--hair); background: var(--fill); color: var(--text); font: 16px var(--font); }
+label.field { display: block; margin: 0 0 14px; }
+label.field span { display: block; font-size: 13px; color: var(--text-2); margin-bottom: 6px; }
+.choices { display: grid; gap: 10px; }
+.choice { display: flex; gap: 14px; align-items: flex-start; padding: 14px 16px; border-radius: 14px; border: 1.5px solid var(--hair);
+  background: transparent; color: var(--text); text-align: left; font: inherit; cursor: pointer; }
+.choice:hover { border-color: var(--text-2); }
+.choice[aria-pressed="true"] { border-color: var(--accent); background: var(--tint); }
+.choice b { display: block; }
+.choice span { color: var(--text-2); font-size: 13px; }
+.choice .tag { margin-left: auto; font-size: 12px; color: var(--accent); font-weight: 600; white-space: nowrap; }
+.sub { margin-top: 18px; padding-top: 16px; border-top: 1px solid var(--hair); }
+.sub h3 { margin: 0 0 8px; font-size: 15px; }
+.log { margin-top: 14px; max-height: 220px; overflow: auto; padding: 12px 14px; border-radius: 10px; background: var(--fill);
+  font: 12px/1.5 var(--mono); white-space: pre-wrap; color: var(--text-2); }
+.note { margin: 12px 0 0; font-size: 13px; color: var(--text-2); }
+.banner { margin: 0 0 18px; padding: 12px 14px; border-radius: 12px; background: var(--tint); font-size: 14px; }
+.banner.bad { background: color-mix(in srgb, var(--red) 12%, transparent); }
+code { font: 13px var(--mono); background: var(--fill); padding: 1px 6px; border-radius: 6px; }
+ol.steps { margin: 0; padding-left: 20px; } ol.steps li { margin: 6px 0; }
+.url { font: 600 15px var(--mono); word-break: break-all; }
+.spin { display: inline-block; width: 14px; height: 14px; border: 2px solid currentColor; border-right-color: transparent;
+  border-radius: 50%; animation: spin .8s linear infinite; vertical-align: -2px; margin-right: 6px; }
+@keyframes spin { to { transform: rotate(360deg); } }
+@media (max-width: 760px) { .wrap { grid-template-columns: 1fr; padding: 20px 16px 48px; } nav ol { position: static; display: flex; overflow-x: auto; gap: 4px; }
+  nav li { flex: none; } nav li button { white-space: nowrap; } header.top img { width: 44px; height: 44px; } main .card { padding: 22px 18px; } }
+@media (prefers-reduced-motion: reduce) { .spin { animation: none; } }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header class="top">
+    <img src="/brand/tabbie.png" alt="">
+    <div><h1>Set up Tabbie</h1><p>About 10 minutes. Nothing is installed or changed until you press a button.</p></div>
+  </header>
+  <nav aria-label="Setup steps"><ol id="nav"></ol></nav>
+  <main><div class="card" id="card" aria-live="polite"><p class="lead">Checking this Mac…</p></div></main>
+</div>
+<script>
+'use strict';
+const $ = (s, r = document) => r.querySelector(s);
+const esc = (s) => String(s == null ? '' : s).replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+let S = null;           // state from the server
+let cur = 0;            // current step index
+let busy = {};          // action key -> job info
+let note = '';          // message under the current step
+let skipped = {};       // optional steps the user chose to skip
+
+async function api(path, body) {
+  const opt = body === undefined ? { cache: 'no-store' }
+    : { method: 'POST', headers: { 'Content-Type': 'application/json', 'X-Tabbie': '1' }, body: JSON.stringify(body) };
+  const r = await fetch(path, opt);
+  const j = await r.json().catch(() => ({}));
+  if (!r.ok) throw new Error(j.error || ('Error ' + r.status));
+  return j;
+}
+async function refresh() { try { S = await api('/api/state'); } catch (e) { note = e.message; } render(); }
+
+const agents = () => S.agents || [];
+const usesClaude = () => agents().includes('claude');
+const usesCodex = () => agents().includes('codex');
+const toolsNeeded = () => ['git', 'hermes', ...(usesClaude() ? ['claude'] : []), ...(usesCodex() ? ['codex'] : []), 'caddy'];
+
+const STEPS = [
+  { id: 'name', title: 'About you', done: () => S.name !== null },
+  { id: 'agents', title: 'Coding agents', done: () => !!S.agents },
+  { id: 'tools', title: 'Tools', done: () => toolsNeeded().every((t) => S.tools[t]) },
+  { id: 'signin', title: 'Sign in', done: () => S.signin.hub && (!usesClaude() || S.signin.claude) && (!usesCodex() || S.signin.codex) },
+  { id: 'files', title: 'Local files', done: () => S.files },
+  { id: 'password', title: 'Password', done: () => S.password },
+  { id: 'services', title: 'Start Tabbie', done: () => S.services },
+  { id: 'cert', title: 'Secure address', done: () => !S.cert.caddy || S.cert.trusted, optional: true },
+  { id: 'phone', title: 'Your phone', done: () => S.tailscale.served || skipped.phone, optional: true },
+  { id: 'check', title: 'All done', done: () => !!skipped.checked },
+];
+
+function renderNav() {
+  $('#nav').innerHTML = STEPS.map((s, i) => {
+    const d = S && s.done();
+    return `<li class="${d ? 'done' : ''} ${s.optional ? 'opt' : ''}"><button type="button" data-go="${i}" ${i === cur ? 'aria-current="step"' : ''}>`
+      + `<span class="dot">${d ? '✓' : i + 1}</span>${esc(s.title)}${s.optional ? ' <small style="opacity:.7">(optional)</small>' : ''}</button></li>`;
+  }).join('');
+}
+function render() {
+  if (!S) return;
+  renderNav();
+  const s = STEPS[cur];
+  const body = VIEWS[s.id]();
+  const first = cur === 0, last = cur === STEPS.length - 1;
+  $('#card').innerHTML = body
+    + (note ? `<p class="banner ${/fail|couldn|error|not /i.test(note) ? 'bad' : ''}">${esc(note)}</p>` : '')
+    + `<div class="actions">${first ? '' : '<button type="button" class="btn" data-back>Back</button>'}`
+    + `<div class="right">${last ? '' : `<button type="button" class="btn ${s.done() ? 'primary' : ''}" data-next>${s.done() ? 'Continue' : (s.optional ? 'Skip' : 'Skip for now')}</button>`}</div></div>`;
+}
+
+// ── jobs ──────────────────────────────────────────────────────────────────────────────────────────
+async function run(key, action, extra) {
+  note = '';
+  busy[key] = { running: true, lines: [] };
+  render();
+  let res;
+  try { res = await api('/api/do', Object.assign({ action }, extra || {})); }
+  catch (e) { busy[key] = { running: false, failed: true, lines: [e.message] }; note = e.message; await refresh(); return false; }
+  if (res.terminal) { busy[key] = { running: false, lines: [], terminal: true }; note = 'Opened in Terminal. Finish there, then press Check again.'; render(); return true; }
+  if (res.apple) { busy[key] = { running: false, lines: [] }; note = "Apple's installer window opened. Click Install there, wait for it to finish, then press Check again."; render(); return true; }
+  if (!res.job) { busy[key] = { running: false, lines: [] }; await refresh(); return true; }
+  for (;;) {
+    await new Promise((r) => setTimeout(r, 800));
+    let j; try { j = await api('/api/job?id=' + encodeURIComponent(res.job)); } catch (_) { continue; }
+    busy[key] = { running: !j.done, lines: j.lines, failed: j.done && !j.ok };
+    if (j.done) break;
+    if (STEPS[cur].id) render();
+  }
+  await refresh();
+  return !busy[key].failed;
+}
+const isBusy = (k) => busy[k] && busy[k].running;
+const btn = (key, label, attrs, primary) => `<button type="button" class="btn ${primary ? 'primary' : ''}" ${attrs} ${isBusy(key) ? 'disabled' : ''}>`
+  + (isBusy(key) ? '<span class="spin"></span>Working…' : esc(label)) + '</button>';
+const log = (key) => (busy[key] && busy[key].lines && busy[key].lines.length)
+  ? `<div class="log">${esc(busy[key].lines.slice(-40).join('\n'))}</div>` : '';
+
+// ── steps ─────────────────────────────────────────────────────────────────────────────────────────
+const VIEWS = {
+  name: () => `<h2>Hi! What should Tabbie call you?</h2>
+    <p class="lead">Your first name, for the greeting on the chat home: “Morning, Sam”. You can leave it blank.</p>
+    <label class="field"><span>First name</span><input type="text" id="name" maxlength="40" autocomplete="given-name" value="${esc(S.name || '')}"></label>
+    ${btn('name', 'Save', 'data-act="name"', true)}`,
+
+  agents: () => {
+    const sel = window._agents || (S.agents ? (S.agents.length === 2 ? 'both' : S.agents[0]) : 'both');
+    window._agents = sel;
+    const hub = window._hub || (S.hub === 'anthropic' ? 'anthropic' : 'openai-codex');
+    window._hub = hub;
+    const c = (v, t, d, tag) => `<button type="button" class="choice" data-agents="${v}" aria-pressed="${sel === v}"><div><b>${t}</b><span>${d}</span></div>${tag ? `<span class="tag">${tag}</span>` : ''}</button>`;
+    return `<h2>Which AI do you use?</h2>
+      <p class="lead">Tabbie works with your existing subscriptions. Pick what you pay for. You can change this later in Tabbie.</p>
+      <div class="choices">
+        ${c('claude', 'Claude', 'Claude Code does all the work. Needs a Claude subscription (Pro or Max).')}
+        ${c('codex', 'OpenAI', 'Codex does all the work. Needs a ChatGPT subscription (Plus or Pro).')}
+        ${c('both', 'Claude and OpenAI', 'Claude Code does the work, Codex plans big jobs and steps in when Claude hits its limit.', 'Best if you have both')}
+      </div>
+      ${sel === 'both' ? `<div class="sub"><h3>Which one should chat with you?</h3><p class="note" style="margin:0 0 10px">The chat side answers you and decides where each job goes.</p>
+        <div class="choices">
+        <button type="button" class="choice" data-hub="openai-codex" aria-pressed="${hub === 'openai-codex'}"><div><b>ChatGPT</b><span>Quick, and saves your Claude limits for real work.</span></div><span class="tag">Recommended</span></button>
+        <button type="button" class="choice" data-hub="anthropic" aria-pressed="${hub === 'anthropic'}"><div><b>Claude</b><span>Uses your Claude subscription for chatting too.</span></div></button>
+        </div></div>` : ''}
+      <p style="margin-top:18px">${btn('agents', 'Save choice', 'data-act="agents"', true)}</p>`;
+  },
+
+  tools: () => {
+    const info = {
+      git: ['Apple developer tools', "Apple's free git and Python. Opens Apple's installer window."],
+      hermes: ['Hermes Agent', 'The engine Tabbie runs on. Installed from Nous Research.'],
+      claude: ['Claude Code', "Anthropic's coding agent."],
+      codex: ['Codex', "OpenAI's coding agent."],
+      caddy: ['Caddy', 'Gives Tabbie a secure address for your phone and browser.'],
+    };
+    const need = toolsNeeded();
+    const missing = need.filter((t) => !S.tools[t]);
+    const rows = need.map((t) => `<div class="row"><div class="what"><b>${info[t][0]}</b><span>${info[t][1]}</span>${log('i-' + t)}</div>`
+      + (S.tools[t] ? '<span class="ok">✓ Installed</span>' : btn('i-' + t, 'Install', `data-install="${t}"`, false)) + '</div>').join('');
+    return `<h2>Install the tools</h2>
+      <p class="lead">Each one comes from its maker's official download, the right version for this Mac (Apple chip or Intel). No passwords needed, except Apple's own installer.</p>
+      ${missing.length > 1 && !missing.includes('git') ? `<p>${btn('all', `Install all ${missing.length}`, 'data-installall', true)}</p>` : ''}
+      ${rows}
+      <p class="note"><button type="button" class="btn" data-recheck>Check again</button></p>`;
+  },
+
+  signin: () => {
+    const hubName = S.hub === 'anthropic' ? 'Claude' : 'ChatGPT';
+    const rows = [['hub', `Tabbie's chat (${hubName} login)`, 'So Tabbie can talk to you and route your requests.', S.signin.hub]];
+    if (usesClaude()) rows.push(['claude', 'Claude Code (Claude login)', 'Opens claude.ai to sign in.', S.signin.claude]);
+    if (usesCodex()) rows.push(['codex', 'Codex (ChatGPT login)', 'Opens chatgpt.com to sign in.', S.signin.codex]);
+    return `<h2>Sign in</h2>
+      <p class="lead">Each button opens the official sign-in page in your browser. Sign in there and come back. Tabbie never sees your password, and never uses API keys.</p>
+      ${rows.map(([k, t, d, ok]) => `<div class="row"><div class="what"><b>${t}</b><span>${d}</span>${log('s-' + k)}
+        ${busy['s-' + k] && busy['s-' + k].failed ? `<span class="warn">Didn't finish. <button type="button" class="btn" data-signin="${k}" data-terminal="1">Sign in using Terminal instead</button></span>` : ''}</div>`
+        + (ok ? '<span class="ok">✓ Signed in</span>' : btn('s-' + k, 'Sign in', `data-signin="${k}"`, true)) + '</div>').join('')}
+      ${Object.keys(busy).some((k) => k.startsWith('s-') && isBusy(k)) ? '<p class="note">Waiting for you to finish in the browser…</p>' : ''}`;
+  },
+
+  files: () => `<h2>Set up Tabbie's files</h2>
+    <p class="lead">Creates Tabbie's folders and settings on this Mac, downloads the web app, sets up private memory, and connects Tabbie's plugins to Hermes.
+    Your Hermes settings are backed up first. Nothing here is ever uploaded.</p>
+    ${S.files ? '<p class="ok">✓ Files are set up</p>' : ''}
+    ${btn('files', S.files ? 'Run again' : 'Set up files', 'data-act="files"', !S.files)}${log('files')}`,
+
+  password: () => `<h2>Choose a password</h2>
+    <p class="lead">Tabbie can run agents on your Mac, so it always asks for this password, even on your phone. It's stored only on this Mac.</p>
+    ${S.password && !window._pwChange ? `<p class="ok">✓ Password is set</p><button type="button" class="btn" data-pwchange>Change it</button>` : `
+    <label class="field"><span>Password (8 or more characters)</span><input type="password" id="pw1" autocomplete="new-password"></label>
+    <label class="field"><span>Same again</span><input type="password" id="pw2" autocomplete="new-password"></label>
+    ${btn('password', 'Save password', 'data-act="password"', true)}`}`,
+
+  services: () => `<h2>Start Tabbie</h2>
+    <p class="lead">Installs Tabbie's background services so it runs whenever your Mac is on: the web app, the hub, the secure address, and the nightly Dreamer.</p>
+    ${!S.password ? '<p class="banner bad">Choose a password first (step 6).</p>' : ''}
+    ${S.services ? `<p class="ok">✓ Tabbie is running</p><p class="note">Restarting stops anything Tabbie is in the middle of. Only restart when it's idle.</p>
+      ${btn('services', 'Restart services', 'data-act="services"', false)}` : btn('services', 'Start Tabbie', `data-act="services" ${S.password ? '' : 'disabled'}`, true)}
+    ${log('services')}`,
+
+  cert: () => `<h2>Secure address</h2>
+    <p class="lead">Lets your browser open <code>https://hermes.local</code> with a padlock and no warnings.</p>
+    ${!S.cert.caddy ? '<p class="banner">Install Caddy in step 3 to get a secure address.</p>'
+      : S.cert.trusted ? '<p class="ok">✓ This Mac trusts Tabbie\'s certificate</p>'
+      : !S.cert.exists ? '<p class="banner">Start Tabbie first (step 7), then come back.</p>'
+      : `${btn('cert', 'Trust on this Mac', 'data-act="cert"', true)}<p class="note">macOS will ask for your Mac password to confirm.</p>`}
+    ${log('cert')}`,
+
+  phone: () => {
+    const t = S.tailscale;
+    const step = (n, done, text, action) => `<div class="row"><div class="what"><b>${n}. ${text}</b></div>${done ? '<span class="ok">✓ Done</span>' : (action || '')}</div>`;
+    return `<h2>Use Tabbie on your phone</h2>
+      <p class="lead">At home, your phone can open <code>https://hermes.local</code> on the same Wi-Fi. To use it anywhere, Tabbie uses
+      <b>Tailscale</b>: a free, private network between your own devices. Nobody else can reach your Mac.</p>
+      ${step(1, t.installed, 'Install Tailscale on this Mac and log in', btn('ts1', 'Open App Store', 'data-act="ts_install"', !t.installed))}
+      ${step(2, t.connected, 'Tailscale says Connected', '<span class="warn">Open Tailscale from the menu bar and log in</span>')}
+      ${step(3, t.served, 'Turn on secure links, then share Tabbie',
+        `<span style="display:flex;gap:8px">${btn('ts2', 'Open Tailscale settings', 'data-act="ts_dns"')}${btn('ts3', 'Share Tabbie', `data-act="ts_serve" ${t.connected ? '' : 'disabled'}`, true)}</span>`)}
+      ${log('ts3')}
+      <p class="note">In Tailscale settings: open the <b>DNS</b> tab, check <b>MagicDNS</b> is on, then click <b>Enable HTTPS</b>.</p>
+      ${t.served && t.url ? `<div class="sub"><h3>On your phone</h3><ol class="steps">
+        <li>Install <b>Tailscale</b> from the App Store or Google Play, and log in with the <b>same account</b>. Allow the VPN when asked.</li>
+        <li>Open <span class="url">${esc(t.url)}</span> and log in with your Tabbie password.</li>
+        <li>Add it to your home screen: <b>Share → Add to Home Screen</b> (iPhone) or <b>⋮ → Add to Home screen</b> (Android).</li></ol></div>` : ''}`;
+  },
+
+  check: () => {
+    const lines = (busy.check && busy.check.lines) || [];
+    const bad = lines.filter((l) => /✗/.test(l) && !/optional/i.test(l));
+    return `<h2>${bad.length ? 'Almost there' : 'You\'re all set'}</h2>
+      <p class="lead">${busy.check ? (bad.length ? 'A few things need attention. Each line says how to fix it.' : 'Everything checks out.') : 'Run a quick check of every part.'}</p>
+      ${btn('check', busy.check ? 'Check again' : 'Run check', 'data-act="check"', !busy.check)}
+      ${lines.length ? `<div class="log">${lines.map((l) => `<div class="${/✗/.test(l) ? 'err' : /!/.test(l) ? 'warn' : ''}">${esc(l)}</div>`).join('')}</div>` : ''}
+      <div class="sub"><h3>Open Tabbie</h3><p class="note" style="margin:0 0 12px">Log in with your password. Bookmark it, or add it to your Dock.</p>
+      <span style="display:flex;gap:10px"><button type="button" class="btn primary" data-act="open">Open ${esc(S.open_url)}</button>
+      <button type="button" class="btn" data-finish>Close setup</button></span></div>`;
+  },
+};
+
+// ── clicks ────────────────────────────────────────────────────────────────────────────────────────
+document.addEventListener('click', async (e) => {
+  const t = e.target.closest('button');
+  if (!t || t.disabled) return;
+  if (t.dataset.go) { cur = +t.dataset.go; note = ''; render(); return; }
+  if (t.hasAttribute('data-back')) { cur = Math.max(0, cur - 1); note = ''; render(); return; }
+  if (t.hasAttribute('data-next')) {
+    const s = STEPS[cur];
+    if (s.optional && !s.done()) skipped[s.id] = true;
+    cur = Math.min(STEPS.length - 1, cur + 1); note = ''; render(); return;
+  }
+  if (t.dataset.agents) { window._agents = t.dataset.agents; render(); return; }
+  if (t.dataset.hub) { window._hub = t.dataset.hub; render(); return; }
+  if (t.hasAttribute('data-pwchange')) { window._pwChange = true; render(); return; }
+  if (t.hasAttribute('data-recheck')) { await refresh(); return; }
+  if (t.hasAttribute('data-finish')) { try { await api('/api/finish', {}); } catch (_) {} document.body.innerHTML = '<p style="font:16px system-ui;padding:3em;text-align:center">Setup is closed. You can close this tab.<br>Run <code>bin/setup</code> again any time.</p>'; return; }
+  if (t.dataset.install) { await run('i-' + t.dataset.install, 'install', { tool: t.dataset.install }); return; }
+  if (t.hasAttribute('data-installall')) {
+    for (const tool of toolsNeeded().filter((x) => !S.tools[x])) { if (!(await run('i-' + tool, 'install', { tool }))) break; }
+    return;
+  }
+  if (t.dataset.signin) { await run('s-' + t.dataset.signin, 'signin', { who: t.dataset.signin, terminal: !!t.dataset.terminal }); return; }
+  const act = t.dataset.act;
+  if (!act) return;
+  if (act === 'name') { await run('name', 'name', { name: $('#name').value }); if (S.name !== null) { cur++; render(); } return; }
+  if (act === 'agents') {
+    const v = window._agents;
+    await run('agents', 'agents', { agents: v === 'both' ? ['claude', 'codex'] : [v], hub: window._hub });
+    if (S.agents) { cur++; render(); }
+    return;
+  }
+  if (act === 'password') {
+    const a = $('#pw1').value, b = $('#pw2').value;
+    if (a.length < 8) { note = 'At least 8 characters, please.'; render(); return; }
+    if (a !== b) { note = "The two passwords don't match."; render(); return; }
+    await run('password', 'password', { password: a });
+    window._pwChange = false; render(); return;
+  }
+  if (act === 'check') { skipped.checked = true; }
+  if (['ts_install', 'ts_dns', 'ts_serve'].includes(act)) { await run(act === 'ts_install' ? 'ts1' : act === 'ts_dns' ? 'ts2' : 'ts3', act); return; }
+  await run(act, act);
+});
+document.addEventListener('keydown', (e) => {
+  if (e.key === 'Enter' && e.target.id === 'name') { e.preventDefault(); $('[data-act="name"]').click(); }
+});
+
+refresh().then(() => {  // start at the first step that isn't done
+  const i = STEPS.findIndex((s) => !s.done());
+  cur = i < 0 ? STEPS.length - 1 : i;
+  render();
+});
+</script>
+</body>
+</html>

@@ -76,15 +76,17 @@ flowchart LR
 
 ## Requirements
 
-- **macOS** (Apple silicon or Intel). The core runs anywhere Python does; the always-on services
-  use launchd and Bonjour.
-- **Python 3.11+**, **git**, **[uv](https://docs.astral.sh/uv/)**
-- **[Hermes Agent](https://github.com/NousResearch/hermes-agent)**: provides `hermes`
+- **macOS** on Apple silicon or Intel. No Homebrew needed. The core runs anywhere Python does; the
+  always-on services use launchd and Bonjour.
+- **git** and **Python 3** (Apple's free developer tools; setup offers to install them)
+- **[Hermes Agent](https://github.com/NousResearch/hermes-agent)**: the hub (`hermes`)
 - **At least one coding agent** (you pick at setup):
   - **[Claude Code](https://docs.anthropic.com/en/docs/claude-code)** with a Claude subscription: provides `claude`;
   - **[Codex CLI](https://github.com/openai/codex)** with a ChatGPT subscription: provides `codex`.
-- **Optional:**
-  - [Caddy](https://caddyserver.com) (`brew install caddy`), for `https://hermes.local` on your network.
+- **[Caddy](https://caddyserver.com)** for `https://hermes.local`, page addresses and phone access (recommended)
+- [uv](https://docs.astral.sh/uv/) only to run the tests
+
+Setup installs all of these for you.
 
 ---
 
@@ -98,14 +100,16 @@ cd ~/hermes
 bin/setup
 ```
 
-`bin/setup` is a guided setup screen. It goes through every step in order, explains each one, and
-asks before installing or changing anything. The first run takes about 10–15 minutes:
+`bin/setup` opens **Tabbie's setup page in your browser**. It's served only to this Mac, behind a
+one-time link. Each step has a button, nothing is installed or changed until you press it, and
+the first run takes about 10 minutes. On a brand-new Mac it first asks to install Apple's free
+developer tools (git and Python). Leave the Terminal window open until the page says you're done.
 
 | Step | What happens |
 |---|---|
 | 1. About you | Your first name, for the greeting on the chat home ("Morning, Sam", "Afternoon, Sam", "Evening, Sam") |
 | 2. Coding agents | **Claude only**, **OpenAI only**, or **Claude and OpenAI** ([what each means](#choosing-claude-code-codex-or-both)) |
-| 3. Tools | Checks Homebrew, git, Python, Hermes Agent, Claude Code and/or Codex, and Caddy. Offers to install what's missing |
+| 3. Tools | Installs Hermes Agent, Claude Code and/or Codex, and Caddy from their official sources, with the right build for Apple silicon or Intel. No Homebrew and no Mac password |
 | 4. Sign in | Opens each provider's own login in your browser: the hub (ChatGPT or Claude login, your choice when you use both), Claude Code, Codex. No API keys. The WebUI's own first-run wizard, which asks for API keys, is switched off |
 | 5. Local files | Folders, settings, the WebUI, the private memory store, plugins, and the hub's worker timeout (your Hermes config is backed up first) |
 | 6. WebUI password | Asks for a password (hidden as you type) and saves it where only you can read it |
@@ -117,9 +121,10 @@ asks before installing or changing anything. The first run takes about 10–15 m
 It's safe to run again any time: finished steps are ticked and skipped, and anything marked `!`
 tells you exactly what to do. When services are already running it asks before restarting them.
 
-Skip the questions with flags: `bin/setup --yes` uses defaults and leaves sign-ins, the password and
-phone setup for later. Answer some ahead of time with `--agents claude|codex|claude,codex`,
-`--name Sam` and `--services`.
+Prefer the Terminal? `bin/setup --terminal` runs the same steps there. For scripted installs,
+`bin/setup --yes` uses defaults and leaves sign-ins, the password and phone setup for later. Answer
+some ahead of time with `--agents claude|codex|claude,codex`, `--name Sam`, `--hub openai-codex|anthropic`
+and `--services`. A single tool can be installed with `bin/install-tool hermes|claude|codex|caddy|uv`.
 
 Everything it writes on your Mac is git-ignored: `config/agents.yaml`, `config/projects.yaml`,
 `webui-extension/local.js`, `hermes-webui/` and its `.env`, `state/`, `general/`, `workspaces/`, and

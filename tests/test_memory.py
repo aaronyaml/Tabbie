@@ -1,4 +1,5 @@
 """fragment-memory plugin (hub tools) on top of hmem: only explicit user requests write directly."""
+from __future__ import annotations
 import importlib.util, os, sys, tempfile
 from pathlib import Path
 
