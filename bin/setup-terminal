@@ -9,6 +9,7 @@
 set -uo pipefail   # no -e: a step that fails says so and setup carries on
 HERMES="$HOME/hermes"
 cd "$HERMES" 2>/dev/null || { echo "Clone this repo to ~/hermes first (other locations aren't supported yet)."; exit 1; }
+ENVF=hermes-webui/.env   # the WebUI's settings and password (several steps read it)
 export PATH="$HOME/.local/bin:/opt/homebrew/bin:/usr/local/bin:$PATH"
 
 # ── look ──────────────────────────────────────────────────────────────────────────────────────────
@@ -268,7 +269,6 @@ fi
 # ── 6. password ───────────────────────────────────────────────────────────────────────────────────
 if want password; then
 step "WebUI password" "The WebUI can start agents on your Mac, so it always sits behind a password."
-ENVF=hermes-webui/.env
 if grep -qE '^HERMES_WEBUI_PASSWORD=.+' "$ENVF" 2>/dev/null; then
   ok "Password is set"
   if [ "$ASK" = 1 ] && yn "Change it?" n; then SETPW=1; else SETPW=0; fi
