@@ -30,7 +30,8 @@ TEXT_EXT = {".txt", ".md", ".json", ".csv", ".tsv", ".yaml", ".yml", ".xml", ".h
 # @file:path, @file:"quoted path", @file:'quoted', optional :line-range suffix.
 _FILE_REF = re.compile(r"""@file:(?:"([^"]+)"|'([^']+)'|`([^`]+)`|(\S+))""")
 # Bare absolute or ~ paths a user pasted/dragged into the message.
-_BARE_PATH = re.compile(r"""(?<![\w@:])((?:~|/(?:Users|private|tmp|Volumes|var/folders))/[^\s"'`<>|]+)""")
+_BARE_PATH = re.compile(r"""(?<![\w@:])((?:~|/(?:Users|private|tmp|Volumes|var/folders))/[^\s"'`<>|]+"""
+                        r"""|(?<![\w])[A-Za-z]:\\(?:Users|Temp|tmp)\\[^\s"'`<>|]+)""")  # + Windows C:\Users\..
 
 _SECRET_HINTS = (".ssh/", ".aws/", ".gnupg/", "/.env", "credentials", "auth.json", ".netrc",
                  "mcp-tokens", "keychain", "/.codex/", "/.claude/.credentials", "/.config/gh/",
@@ -41,7 +42,7 @@ MAX_FILES = 40  # per message; a pasted directory listing must not copy a whole 
 
 
 def _is_secret(path: str) -> bool:
-    low = path.lower()
+    low = path.replace("\\", "/").lower()  # Windows paths: C:\Users\me\.ssh\id_rsa
     if any(h in low for h in _SECRET_HINTS) or _SECRET_NAME.search(Path(path).name):
         return True
     # Tabbie's own state (sign-in, sidecar token, sessions) never goes to a worker; WebUI uploads do.

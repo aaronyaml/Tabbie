@@ -246,7 +246,8 @@ def parse_transcript(path: Path, t0: float | None = None, t1: float | None = Non
                         tag = f"{name.split('__')[1] if '__' in name else name}:{host}"
                         if tag not in out["taint"]:
                             out["taint"].append(tag)
-                    if isinstance(fp, str) and re.search(r"/Downloads/|^/tmp/|^/private/tmp/", fp) \
+                    if isinstance(fp, str) and re.search(r"/Downloads/|^/tmp/|^/private/tmp/|^[a-z]:/(users/[^/]+/appdata/local/)?te?mp/",
+                                                         fp.replace("\\", "/"), re.I) \
                             and name == "Read" and f"file:{Path(fp).name}" not in out["taint"]:
                         out["taint"].append(f"file:{Path(fp).name[:60]}")
                     out["tools"].setdefault(name, {"calls": 0, "errors": 0})["calls"] += 1

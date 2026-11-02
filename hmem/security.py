@@ -79,7 +79,7 @@ def scrub_obj(o):
 
 
 def is_credential_path(path: str) -> bool:
-    p = str(path or "").rstrip("/")
+    p = str(path or "").replace("\\", "/").rstrip("/")  # Windows separators too
     return bool(_CRED_PATH.search(p)) or "/.ssh/" in p or "/Keychains/" in p or "/.aws/" in p \
         or "/.config/gh/" in p or "/.codex/auth" in p or "/.claude/.credentials" in p
 
@@ -152,9 +152,10 @@ def safe_ref(ref: str) -> bool:
     import os
     if not isinstance(ref, str) or not ref or any(c in ref for c in "\n\r\0`$|;&<>"):
         return False
-    home = os.path.realpath(os.path.expanduser("~"))
-    p = os.path.realpath(os.path.expanduser(ref))
-    return p.startswith(home + os.sep) and not is_credential_path(p) and "/." not in p[len(home):].replace("/.claude/skills", "")
+    home = os.path.normcase(os.path.realpath(os.path.expanduser("~")))
+    p = os.path.normcase(os.path.realpath(os.path.expanduser(ref)))
+    rest = p[len(home):].replace("\\", "/")
+    return p.startswith(home + os.sep) and not is_credential_path(p) and "/." not in rest.replace("/.claude/skills", "")
 
 
 _TITLE_OK = re.compile(r"[^\w .,:;()'/+-]")

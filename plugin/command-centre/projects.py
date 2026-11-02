@@ -174,7 +174,8 @@ _EXPLICIT = [
 ]
 
 
-_NOT_PROJECTS = {Path(p).resolve() for p in ("/", "/tmp", "/private/tmp", str(Path.home()),
+_NOT_PROJECTS = {Path(p).resolve() for p in ("/", "/tmp", "/private/tmp", __import__("tempfile").gettempdir(),
+                                             Path.home().anchor or "/", str(Path.home()),
                                              str(Path.home() / ".hermes" / "hermes-agent"))}
 
 

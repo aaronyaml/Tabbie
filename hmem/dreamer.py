@@ -603,7 +603,7 @@ def _covered_by_stated(findings: list[dict]) -> None:
             f["report_only"], f["detail"] = True, "covered by the user-stated proposals"
 
 
-_PATH_IN_TEXT = re.compile(r"(~/[\w./@+-]+|/Users/[\w./@+-]+)")
+_PATH_IN_TEXT = re.compile(r"(~/[\w./@+-]+|/Users/[\w./@+-]+|[A-Za-z]:\\Users\\[\w.\\@+-]+)")
 _REL_PATH = re.compile(r"`((?:[\w@.-]+/)+[\w@.-]+\.[a-z0-9]{1,6})`")  # `src/auth/session.ts`
 
 

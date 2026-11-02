@@ -44,3 +44,24 @@ def test_tcp_pids_finds_a_listener():
         assert __import__("os").getpid() in procutil.tcp_pids(s.getsockname()[1], listening=True)
     finally:
         s.close()
+
+
+def test_windows_style_credential_paths_are_caught():
+    from hmem import security
+    assert security.is_credential_path(r"C:\Users\me\.ssh\id_rsa")
+    assert security.is_credential_path(r"C:\Users\me\.codex\auth.json")
+    assert security.is_credential_path(r"C:\Users\me\.claude\.credentials.json")
+    assert not security.is_credential_path(r"C:\Users\me\code\app\main.py")
+
+
+def test_attachments_secret_check_and_bare_windows_paths():
+    import importlib.util
+    pkg = Path(__file__).resolve().parents[1] / "plugin" / "command-centre"
+    if "command_centre" not in sys.modules:
+        spec = importlib.util.spec_from_file_location("command_centre", pkg / "__init__.py", submodule_search_locations=[str(pkg)])
+        m = importlib.util.module_from_spec(spec); sys.modules["command_centre"] = m; spec.loader.exec_module(m)
+    att = __import__("importlib").import_module("command_centre.attachments")
+    assert att._is_secret(r"C:\Users\me\.aws\credentials")
+    assert att._is_secret(r"C:\Users\me\.ssh\id_ed25519")
+    found = [m.group(1) for m in att._BARE_PATH.finditer(r"look at C:\Users\me\Pictures\shot.png please")]
+    assert found == [r"C:\Users\me\Pictures\shot.png"]
