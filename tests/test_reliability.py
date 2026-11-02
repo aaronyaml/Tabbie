@@ -33,17 +33,17 @@ def test_is_worker_rejects_unrelated_and_dead_pids():
 
 def test_reaper_skips_stray_files_and_closes_live(tmp_path, monkeypatch):
     rd = tmp_path / "requests"; d = rd / "20261102-000000-aaaaaa"; d.mkdir(parents=True)
-    (rd / ".DS_Store").write_text("x")
-    (d / "request.json").write_text(json.dumps({"status": "executing"}))
-    (d / "live.json").write_text(json.dumps({"open": True, "pid": 12345}))
+    (rd / ".DS_Store").write_text("x", encoding="utf-8")
+    (d / "request.json").write_text(json.dumps({"status": "executing"}), encoding="utf-8")
+    (d / "live.json").write_text(json.dumps({"open": True, "pid": 12345}), encoding="utf-8")
     old = time.time() - 600
     for f in d.iterdir():
         os.utime(f, (old, old))
     monkeypatch.setattr(up, "STATE_DIR", tmp_path)
     monkeypatch.setattr(up, "_workers_alive", lambda: False)
     assert up.reap_orphans() == [d.name]
-    assert json.loads((d / "request.json").read_text())["status"] == "failed"
-    assert json.loads((d / "live.json").read_text()) == {"open": False, "pid": None, "at": json.loads((d / "live.json").read_text())["at"]}
+    assert json.loads((d / "request.json").read_text(encoding="utf-8"))["status"] == "failed"
+    assert json.loads((d / "live.json").read_text(encoding="utf-8")) == {"open": False, "pid": None, "at": json.loads((d / "live.json").read_text(encoding="utf-8"))["at"]}
 
 
 def test_crash_inside_a_run_ends_it_as_failed(monkeypatch, tmp_path):
@@ -81,8 +81,8 @@ def test_old_attachment_copies_are_pruned_and_replies_kept(tmp_path, monkeypatch
     for d in (old, new):
         (d / "attachments" / "originals").mkdir(parents=True)
         f = d / "attachments" / "originals" / "01-a.png"; f.write_bytes(b"x"); f.chmod(0o444)
-        (d / "request.json").write_text(json.dumps({"status": "done"}))
-        (d / "reply-1.md").write_text("hi")
+        (d / "request.json").write_text(json.dumps({"status": "done"}), encoding="utf-8")
+        (d / "reply-1.md").write_text("hi", encoding="utf-8")
     t = time.time() - 40 * 86400
     os.utime(old / "request.json", (t, t))
     assert up.prune_old_attachments(30) == [old.name]

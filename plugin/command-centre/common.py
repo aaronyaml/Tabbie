@@ -24,7 +24,7 @@ LOG_FILE = STATE_DIR / "decisions.jsonl"
 def _load_yaml(path: Path) -> dict:
     if not path.exists():
         return {}
-    text = path.read_text()
+    text = path.read_text(encoding="utf-8")
     try:
         import yaml  # PyYAML
 
@@ -77,7 +77,7 @@ def save_projects_file(data: dict) -> None:
 def projects_file_lock():
     """Hold around load_projects_file() ... save_projects_file() so two writers don't drop each other's change."""
     lf = CONFIG_DIR / ".projects.yaml.lock"
-    with open(lf, "a") as f:
+    with open(lf, "a", encoding="utf-8") as f:
         fcntl.flock(f, fcntl.LOCK_EX)
         try:
             yield
@@ -87,7 +87,7 @@ def projects_file_lock():
 
 def read_json(path: Path, default: Any = None) -> Any:
     try:
-        return json.loads(path.read_text())
+        return json.loads(path.read_text(encoding="utf-8"))
     except (FileNotFoundError, json.JSONDecodeError):
         return default
 
@@ -104,7 +104,7 @@ def write_json(path: Path, data: Any) -> None:
 def log_decision(**fields: Any) -> None:
     LOG_FILE.parent.mkdir(parents=True, exist_ok=True)
     fields.setdefault("ts", time.strftime("%Y-%m-%dT%H:%M:%S"))
-    with LOG_FILE.open("a") as fh:
+    with LOG_FILE.open("a", encoding="utf-8") as fh:
         fh.write(json.dumps(fields, default=str) + "\n")
 
 

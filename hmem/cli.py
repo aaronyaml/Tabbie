@@ -143,7 +143,7 @@ def _run(a) -> int:
         elif a.type == "deprecate":
             ch = {"status": a.status, "superseded_by": a.superseded_by}
         elif a.type == "skill":
-            ch = {"skill_md": open(a.skill_file).read()}
+            ch = {"skill_md": open(a.skill_file, encoding="utf-8").read()}
         key = store.scope_of(target)[1] if target.startswith("projects/") else None
         p = proposals.create(type=a.type, target=target, reason=a.reason, proposed_change=ch, created_by=a.actor,
                              evidence=[e for e in a.evidence.split("|") if e],

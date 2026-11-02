@@ -151,7 +151,7 @@ def _claude_credentials() -> dict:
     f = HOME / ".claude" / ".credentials.json"
     if not f.exists():
         raise RuntimeError("no Claude Code login found")
-    return json.loads(f.read_text()).get("claudeAiOauth") or {}
+    return json.loads(f.read_text(encoding="utf-8")).get("claudeAiOauth") or {}
 
 
 def claude_rows() -> list[dict]:
@@ -216,7 +216,7 @@ def latest_codex_session_limits(root: Path | None = None, max_files: int = 8) ->
     files = sorted(root.glob("*/*/*/*.jsonl"), key=lambda p: p.stat().st_mtime, reverse=True)[:max_files]
     for f in files:
         try:
-            lines = f.read_text(errors="ignore").splitlines()
+            lines = f.read_text(errors="ignore", encoding="utf-8").splitlines()
         except OSError:
             continue
         for line in reversed(lines):
@@ -231,13 +231,13 @@ def _codex_creds() -> list[tuple[str, str, str]]:
     """(who, access_token, account_id) for Codex CLI and Hermes' openai-codex OAuth."""
     creds = []
     try:
-        t = json.loads((CODEX_HOME / "auth.json").read_text()).get("tokens") or {}
+        t = json.loads((CODEX_HOME / "auth.json").read_text(encoding="utf-8")).get("tokens") or {}
         if t.get("access_token"):
             creds.append(("codex", t["access_token"], t.get("account_id") or ""))
     except Exception:
         pass
     try:
-        pool = json.loads((HERMES_HOME / "auth.json").read_text()).get("credential_pool", {}).get("openai-codex") or []
+        pool = json.loads((HERMES_HOME / "auth.json").read_text(encoding="utf-8")).get("credential_pool", {}).get("openai-codex") or []
         for c in sorted(pool, key=lambda c: c.get("priority", 0)):
             if c.get("access_token"):
                 acct = _jwt_claims(c["access_token"]).get("https://api.openai.com/auth", {}).get("chatgpt_account_id", "")
@@ -250,7 +250,7 @@ def _codex_creds() -> list[tuple[str, str, str]]:
 
 def _hub_model() -> str:
     try:
-        m = re.search(r'^model:\s*\n(?:\s+#.*\n)*\s+default:\s*"?([\w.\-]+)', (HERMES_HOME / "config.yaml").read_text(), re.M)
+        m = re.search(r'^model:\s*\n(?:\s+#.*\n)*\s+default:\s*"?([\w.\-]+)', (HERMES_HOME / "config.yaml").read_text(encoding="utf-8"), re.M)
         return m.group(1) if m else "hub"
     except OSError:
         return "hub"
@@ -363,7 +363,7 @@ def elevenlabs_rows() -> list[dict]:
         pass
     # 2) the Hermes MCP OAuth token (works only if it was granted user_read)
     try:
-        tok = json.loads((HERMES_HOME / "mcp-tokens" / "elevenlabs.json").read_text())
+        tok = json.loads((HERMES_HOME / "mcp-tokens" / "elevenlabs.json").read_text(encoding="utf-8"))
         if tok.get("access_token") and (tok.get("expires_at") or 0) > _now():
             return parse_elevenlabs_subscription(
                 _http_json("https://api.us.elevenlabs.io/v1/user/subscription",
@@ -491,7 +491,7 @@ def _clock(epoch: float, now: float) -> str:
         return f"tomorrow {hm}"
     if (t.date() - today.date()).days < 7:
         return f"{t.strftime('%a')} {hm}"
-    return t.strftime("%a %-d %b")
+    return f"{t:%a} {t.day} {t:%b}"  # %-d isn't supported on Windows
 
 
 def _readable_line(r: dict, now: float) -> str:

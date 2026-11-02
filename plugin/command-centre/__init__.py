@@ -139,7 +139,7 @@ def _relay_on(cfg: dict | None = None) -> bool:
 def _note_lines(r: Request, since: float = 0.0) -> list[str]:
     """One Note line per hand-off the delegate server had to refuse (limit, busy) during this run."""
     out = []
-    for ln in (r.dir / "notes.jsonl").read_text().splitlines() if (r.dir / "notes.jsonl").exists() else []:
+    for ln in (r.dir / "notes.jsonl").read_text(encoding="utf-8").splitlines() if (r.dir / "notes.jsonl").exists() else []:
         try:
             n = json.loads(ln)
         except json.JSONDecodeError:
@@ -199,7 +199,7 @@ def _on_transform_llm_output(response_text=None, session_id: str = "", **kwargs)
         def sub(m):
             f = REQUESTS_DIR / m.group(1) / f"reply-{m.group(2)}.md"
             try:
-                body = f.read_text().rstrip()
+                body = f.read_text(encoding="utf-8").rstrip()
             except OSError:
                 return m.group(0)
             used.add((m.group(1), m.group(2)))
@@ -209,7 +209,7 @@ def _on_transform_llm_output(response_text=None, session_id: str = "", **kwargs)
             if (rid, tok) in used:
                 continue
             try:
-                new = new.rstrip() + "\n\n" + (REQUESTS_DIR / rid / f"reply-{tok}.md").read_text().rstrip()
+                new = new.rstrip() + "\n\n" + (REQUESTS_DIR / rid / f"reply-{tok}.md").read_text(encoding="utf-8").rstrip()
             except OSError:
                 pass
         return new if new != response_text else None
@@ -310,7 +310,7 @@ def _on_agent_loop_stopped(session_key: str = "", **kwargs):
         for rid, j in jobs:
             d = REQUESTS_DIR / rid
             try:
-                (d / providers.STOP_MARKER).write_text(json.dumps({"at": time.time(), "by": "hub stop"}))
+                (d / providers.STOP_MARKER).write_text(json.dumps({"at": time.time(), "by": "hub stop"}), encoding="utf-8")
             except OSError:
                 pass
             pid = (read_json(d / "live.json", {}) or {}).get("pid")
@@ -1525,7 +1525,7 @@ def _cmd_takeover(raw_args: str = "", session_id: str = "", session_key: str = "
         stopped = ""
         if pid_file.exists():
             try:
-                if procutil.stop(int(pid_file.read_text())):
+                if procutil.stop(int(pid_file.read_text(encoding="utf-8"))):
                     stopped = " Stopped the running Codex job."
             except Exception:
                 pass
@@ -1698,7 +1698,7 @@ def _tool_execute_approved(params, **kwargs):
         extra = [f"[[plan:{r.id}]]", ""] + [f"- Changed: {c}" for c in data.get("changed_points") or []]
         if note:
             extra += [note]
-        f.write_text("\n".join(extra).strip() + "\n\n" + f.read_text())
+        f.write_text("\n".join(extra).strip() + "\n\n" + f.read_text(encoding="utf-8"), encoding="utf-8")
     if r.data.get("session_id"):
         set_active(r["session_id"], None)
     return json.dumps(out)

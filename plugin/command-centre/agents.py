@@ -723,7 +723,7 @@ def update_index(session_id: str, request_id: str, data: dict) -> None:
     """Session index: one row per request, newest last. Locked (WebUI and gateway both write)."""
     AGENTS_INDEX_DIR.mkdir(parents=True, exist_ok=True)
     path = AGENTS_INDEX_DIR / f"{_safe(session_id)}.json"
-    with open(path.with_suffix(".lock"), "w") as lock:
+    with open(path.with_suffix(".lock"), "w", encoding="utf-8") as lock:
         fcntl.flock(lock, fcntl.LOCK_EX)
         idx = read_json(path, None) or {"session_id": session_id, "requests": {}}
         req = read_json(REQUESTS_DIR / request_id / "request.json", {}) or {}
@@ -770,7 +770,7 @@ def session_view(session_id: str) -> dict:
 
 def load_events(path: Path) -> list[dict]:
     out = []
-    for line in path.read_text().splitlines():
+    for line in path.read_text(encoding="utf-8").splitlines():
         try:
             out.append(json.loads(line))
         except json.JSONDecodeError:

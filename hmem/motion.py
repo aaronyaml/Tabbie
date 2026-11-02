@@ -41,7 +41,7 @@ def studio_dir() -> Path:
     if env:
         return Path(env).expanduser()
     try:
-        m = re.search(r"^studio:\s*['\"]?([^'\"#\n]+?)['\"]?\s*(?:#.*)?$", config_path().read_text(), re.M)
+        m = re.search(r"^studio:\s*['\"]?([^'\"#\n]+?)['\"]?\s*(?:#.*)?$", config_path().read_text(encoding="utf-8"), re.M)
     except OSError:
         m = None
     if m and m.group(1).strip() not in ("", "null", "~"):
@@ -56,7 +56,7 @@ def _which(cmd: str) -> str | None:
 
 def template_version() -> str:
     try:
-        return (TEMPLATE / "VERSION").read_text().strip()
+        return (TEMPLATE / "VERSION").read_text(encoding="utf-8").strip()
     except OSError:
         return ""
 
@@ -75,7 +75,7 @@ def ensure(path: Path | None = None) -> dict:
     for src, dst in _DOTFILES.items():
         if (tmp / src).exists():
             os.replace(tmp / src, tmp / dst)
-    (tmp / MARKER).write_text(f"template {template_version()}\n")
+    (tmp / MARKER).write_text(f"template {template_version()}\n", encoding="utf-8")
     if p.exists():
         p.rmdir()  # empty
     p.parent.mkdir(parents=True, exist_ok=True)
@@ -100,7 +100,7 @@ def sync_template(p: Path | None = None) -> list[str]:
     p = p or studio_dir()
     marker = p / MARKER
     try:
-        have = _ver(marker.read_text())
+        have = _ver(marker.read_text(encoding="utf-8"))
     except OSError:
         return []  # not made from the template: leave it alone
     want = _ver(template_version())
@@ -124,20 +124,20 @@ def sync_template(p: Path | None = None) -> list[str]:
                 added.append(str(f.relative_to(TEMPLATE)))
     doc, tdoc = p / "CLAUDE.md", TEMPLATE / "CLAUDE.md"
     try:
-        text, ttext = doc.read_text(), tdoc.read_text()
+        text, ttext = doc.read_text(encoding="utf-8"), tdoc.read_text(encoding="utf-8")
         m = re.search(r"^## Sound effects.*?(?=^## )", ttext, re.M | re.S)
         if m and "## Sound effects" not in text:
-            doc.write_text(text.rstrip("\n") + "\n\n" + m.group(0).rstrip("\n") + "\n")
+            doc.write_text(text.rstrip("\n") + "\n\n" + m.group(0).rstrip("\n") + "\n", encoding="utf-8")
             added.append("CLAUDE.md (Sound effects)")
     except OSError:
         pass
-    marker.write_text(f"template {want}\n")
+    marker.write_text(f"template {want}\n", encoding="utf-8")
     return added
 
 
 def _merge_manifest(src: Path, dst: Path) -> list[str]:
     try:
-        new, cur = json.loads(src.read_text()), json.loads(dst.read_text())
+        new, cur = json.loads(src.read_text(encoding="utf-8")), json.loads(dst.read_text(encoding="utf-8"))
     except (OSError, ValueError):
         return []
     sounds = cur.setdefault("sounds", {})
@@ -147,7 +147,7 @@ def _merge_manifest(src: Path, dst: Path) -> list[str]:
     if not extra:
         return []
     sounds.update(extra)
-    dst.write_text(json.dumps(cur, indent=1))
+    dst.write_text(json.dumps(cur, indent=1), encoding="utf-8")
     return [f"manifest.json (+{len(extra)} sounds)"]
 
 
@@ -180,7 +180,7 @@ def npm_install(p: Path | None = None, wait: bool = False) -> dict:
             logs.mkdir(parents=True, exist_ok=True)
             log = logs / "motion-npm.log"
             env = {**os.environ, "PATH": os.pathsep.join([str(Path(npm).parent), os.environ.get("PATH", ""), *EXTRA])}
-            with open(log, "w") as f:
+            with open(log, "w", encoding="utf-8") as f:
                 proc = subprocess.Popen([npm, "install", "--no-audit", "--no-fund", "--loglevel=error"], cwd=str(p),
                                         stdout=f, stderr=subprocess.STDOUT, stdin=subprocess.DEVNULL, env=env)
             job = _npm[key] = {"proc": proc, "at": time.time(), "log": str(log)}
@@ -207,7 +207,7 @@ def _inst_file() -> Path:
 
 def install_state() -> dict:
     try:
-        d = json.loads(_inst_file().read_text())
+        d = json.loads(_inst_file().read_text(encoding="utf-8"))
     except (OSError, ValueError):
         d = {}
     st = d.get("state", "")
@@ -228,12 +228,12 @@ def _set(**kw) -> None:
     f = _inst_file()
     f.parent.mkdir(parents=True, exist_ok=True)
     try:
-        d = json.loads(f.read_text())
+        d = json.loads(f.read_text(encoding="utf-8"))
     except (OSError, ValueError):
         d = {}
     d.update(kw, pid=os.getpid(), at=int(time.time()))
     tmp = f.with_suffix(f".{os.getpid()}.tmp")
-    tmp.write_text(json.dumps(d))
+    tmp.write_text(json.dumps(d), encoding="utf-8")
     os.replace(tmp, f)
 
 
@@ -253,7 +253,7 @@ def install() -> dict:
                 _set(step="node")
                 logs = root() / "state" / "logs"
                 logs.mkdir(parents=True, exist_ok=True)
-                with open(logs / "motion-node.log", "w") as f:
+                with open(logs / "motion-node.log", "w", encoding="utf-8") as f:
                     rc = subprocess.run([str(root() / "bin" / "install-tool"), "node"], stdout=f, stderr=subprocess.STDOUT,
                                         stdin=subprocess.DEVNULL, timeout=900).returncode
                 if rc or not _which("node"):
@@ -283,7 +283,7 @@ def films(p: Path | None = None) -> dict:
         dirs = []
     for x in dirs:
         try:
-            pj = json.loads((x / "project.json").read_text())
+            pj = json.loads((x / "project.json").read_text(encoding="utf-8"))
         except (OSError, ValueError):
             continue
         if not isinstance(pj, dict):
@@ -310,7 +310,7 @@ def _env_key(p: Path, name: str) -> bool:
     if os.environ.get(name, "").strip():
         return True
     try:
-        text = (p / ".env").read_text()
+        text = (p / ".env").read_text(encoding="utf-8")
     except OSError:
         return False
     return re.search(rf"^\s*(?:export\s+)?{name}\s*=\s*['\"]?[^\s'\"#]+", text, re.M) is not None
@@ -349,7 +349,7 @@ def set_elevenlabs_key(key: str, check=_check_elevenlabs) -> tuple[int, dict]:
         return 400, {"error": "ElevenLabs says that key isn't valid. Check it and try again."}
     env = p / ".env"
     try:
-        lines = env.read_text().splitlines() if env.exists() else []
+        lines = env.read_text(encoding="utf-8").splitlines() if env.exists() else []
     except OSError:
         lines = []
     lines = [ln for ln in lines if not re.match(r"^\s*(?:export\s+)?ELEVENLABS_API_KEY\s*=", ln)]

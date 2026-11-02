@@ -1,6 +1,7 @@
 """Motion studio folder (hmem/motion.py): created from the template when missing, never touching an
 existing folder, and a status that says what's linked without ever carrying a key."""
 from __future__ import annotations
+import sys
 
 import json
 
@@ -25,10 +26,10 @@ def test_default_is_inside_tabbie(tmp_path):
 def test_config_and_env_override(tmp_path, monkeypatch):
     cfg = tmp_path / "tabbie" / "config"
     cfg.mkdir(parents=True)
-    (cfg / "motion.yaml").write_text("# mine\nstudio: ~/films  # my own studio\n")
+    (cfg / "motion.yaml").write_text("# mine\nstudio: ~/films  # my own studio\n", encoding="utf-8")
     monkeypatch.setenv("HOME", str(tmp_path / "home"))
     assert motion.studio_dir() == tmp_path / "home" / "films"
-    (cfg / "motion.yaml").write_text("studio: studios/a\n")
+    (cfg / "motion.yaml").write_text("studio: studios/a\n", encoding="utf-8")
     assert motion.studio_dir() == tmp_path / "tabbie" / "studios" / "a"  # relative = inside Tabbie
     monkeypatch.setenv("TABBIE_MOTION_STUDIO", str(tmp_path / "x"))
     assert motion.studio_dir() == tmp_path / "x"
@@ -42,7 +43,7 @@ def test_ensure_creates_from_template(tmp_path):
               "src/Root.tsx", "scripts/analyze.mjs", "studio/.gitkeep"):
         assert (p / f).exists(), f
     assert not (p / "gitignore").exists() and not (p / "VERSION").exists()
-    assert json.loads((p / "package.json").read_text())["dependencies"]["remotion"]
+    assert json.loads((p / "package.json").read_text(encoding="utf-8"))["dependencies"]["remotion"]
     assert not list(p.parent.glob(".motion.creating-*"))
     assert motion.ensure()["created"] is False  # second time: left alone
 
@@ -50,7 +51,7 @@ def test_ensure_creates_from_template(tmp_path):
 def test_ensure_never_touches_an_existing_studio(tmp_path):
     p = tmp_path / "mine"
     p.mkdir()
-    (p / "keep.txt").write_text("x")
+    (p / "keep.txt").write_text("x", encoding="utf-8")
     assert motion.ensure(p)["created"] is False
     assert sorted(x.name for x in p.iterdir()) == ["keep.txt"]
     empty = tmp_path / "empty"
@@ -66,7 +67,7 @@ def test_status_creates_and_never_leaks_the_key(tmp_path):
     assert s["elevenlabs"]["linked"] is False and "ELEVENLABS_API_KEY" in s["elevenlabs"]["hint"]
     assert s["higgsfield"]["linked"] is False and "higgsfield auth login" in s["higgsfield"]["hint"]
     secret = "sk_test_do_not_leak_123"
-    (tmp_path / "tabbie" / "motion" / ".env").write_text(f"ELEVENLABS_API_KEY={secret}\n")
+    (tmp_path / "tabbie" / "motion" / ".env").write_text(f"ELEVENLABS_API_KEY={secret}\n", encoding="utf-8")
     s = motion.status()
     assert s["elevenlabs"]["linked"] is True
     assert secret not in json.dumps(s)
@@ -74,7 +75,7 @@ def test_status_creates_and_never_leaks_the_key(tmp_path):
 
 def test_empty_key_is_not_linked(tmp_path):
     motion.ensure()
-    (tmp_path / "tabbie" / "motion" / ".env").write_text("ELEVENLABS_API_KEY=\n# ELEVENLABS_API_KEY=x\n")
+    (tmp_path / "tabbie" / "motion" / ".env").write_text("ELEVENLABS_API_KEY=\n# ELEVENLABS_API_KEY=x\n", encoding="utf-8")
     assert motion.status()["elevenlabs"]["linked"] is False
 
 
@@ -99,9 +100,9 @@ def test_films_lists_the_studio_folder(tmp_path):
     for name, pj in {"old": {"title": "Old", "step": "editor", "sessionId": "abc123", "updatedAt": "2026-01-01T00:00:00Z"},
                      "new": {"title": "New", "updatedAt": "2026-02-01T00:00:00Z"}}.items():
         (st / name).mkdir(parents=True)
-        (st / name / "project.json").write_text(json.dumps({"schema": "tabbie.motion-studio/1", "project": "x", **pj}))
+        (st / name / "project.json").write_text(json.dumps({"schema": "tabbie.motion-studio/1", "project": "x", **pj}), encoding="utf-8")
     (st / "broken").mkdir()
-    (st / "broken" / "project.json").write_text("{")
+    (st / "broken" / "project.json").write_text("{", encoding="utf-8")
     (st / "empty").mkdir()
     assert motion.films()["films"] == [
         {"project": "new", "title": "New", "step": "audio", "updatedAt": "2026-02-01T00:00:00Z"},
@@ -114,12 +115,13 @@ KEY = "sk_" + "a1" * 20
 
 def test_connect_elevenlabs_saves_key_privately(tmp_path):
     p = motion.studio_dir(); p.mkdir(parents=True)
-    (p / ".env").write_text("OTHER=1\nELEVENLABS_API_KEY=old\n")
+    (p / ".env").write_text("OTHER=1\nELEVENLABS_API_KEY=old\n", encoding="utf-8")
     code, res = motion.set_elevenlabs_key(KEY, check=lambda k: "ok")
     assert code == 200 and res == {"ok": True, "checked": True}
-    text = (p / ".env").read_text()
+    text = (p / ".env").read_text(encoding="utf-8")
     assert "OTHER=1" in text and f"ELEVENLABS_API_KEY={KEY}" in text and "=old" not in text
-    assert oct((p / ".env").stat().st_mode & 0o777) == "0o600"
+    if sys.platform != "win32":  # NTFS has no Unix modes; the file sits in the user's own profile
+        assert oct((p / ".env").stat().st_mode & 0o777) == "0o600"
     assert KEY not in json.dumps(motion.status())  # linked now, key never echoed
     assert motion.status()["elevenlabs"]["linked"] is True
 
@@ -149,9 +151,9 @@ def test_hint_never_shows_the_home_folder(tmp_path, monkeypatch):
 def test_new_studio_has_the_sfx_library(tmp_path):
     motion.ensure()
     p = motion.studio_dir()
-    lib = json.loads((p / "public/audio/sfx/manifest.json").read_text())["sounds"]
+    lib = json.loads((p / "public/audio/sfx/manifest.json").read_text(encoding="utf-8"))["sounds"]
     assert len(lib) >= 100 and all((p / "public/audio/sfx" / f).exists() for v in lib.values() for f in v["files"])
-    assert (p / "src/audio/Sfx.tsx").exists() and "## Sound effects" in (p / "CLAUDE.md").read_text()
+    assert (p / "src/audio/Sfx.tsx").exists() and "## Sound effects" in (p / "CLAUDE.md").read_text(encoding="utf-8")
     assert motion.sync_template(p) == []  # already current
 
 
@@ -161,21 +163,21 @@ def test_older_template_studio_gets_the_additions_once(tmp_path):
     sfx = p / "public/audio/sfx"
     (sfx / "whoosh_soft_1.mp3").write_bytes(b"mine")  # the user's own take: never overwritten
     (sfx / "pop_soft_1.mp3").unlink()
-    man = json.loads((sfx / "manifest.json").read_text())
+    man = json.loads((sfx / "manifest.json").read_text(encoding="utf-8"))
     man["sounds"] = {"my_sound": {"category": "ui", "files": ["my_sound_1.mp3"], "durations": [1], "prompt": "x"}}
-    (sfx / "manifest.json").write_text(json.dumps(man))
+    (sfx / "manifest.json").write_text(json.dumps(man), encoding="utf-8")
     doc = p / "CLAUDE.md"
-    doc.write_text(doc.read_text().split("## Sound effects")[0])
-    (p / motion.MARKER).write_text("template 1\n")
+    doc.write_text(doc.read_text(encoding="utf-8").split("## Sound effects")[0], encoding="utf-8")
+    (p / motion.MARKER).write_text("template 1\n", encoding="utf-8")
     added = motion.sync_template(p)
     assert "public/audio/sfx/pop_soft_1.mp3" in added
     assert (sfx / "whoosh_soft_1.mp3").read_bytes() == b"mine"
-    sounds = json.loads((sfx / "manifest.json").read_text())["sounds"]
+    sounds = json.loads((sfx / "manifest.json").read_text(encoding="utf-8"))["sounds"]
     assert "my_sound" in sounds and "pop_soft" in sounds
-    assert doc.read_text().count("## Sound effects") == 1
+    assert doc.read_text(encoding="utf-8").count("## Sound effects") == 1
     assert motion.sync_template(p) == []  # once
 
 
 def test_custom_studio_is_never_synced(tmp_path):
-    p = motion.studio_dir(); p.mkdir(parents=True); (p / "mine.txt").write_text("x")
+    p = motion.studio_dir(); p.mkdir(parents=True); (p / "mine.txt").write_text("x", encoding="utf-8")
     assert motion.sync_template(p) == [] and sorted(x.name for x in p.iterdir()) == ["mine.txt"]

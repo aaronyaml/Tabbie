@@ -67,7 +67,7 @@ def _known_secrets() -> list[str]:
         pairs = list(os.environ.items())
         for f in files:
             try:
-                pairs += [ln.split("=", 1) for ln in f.read_text().splitlines() if "=" in ln and not ln.startswith("#")]
+                pairs += [ln.split("=", 1) for ln in f.read_text(encoding="utf-8").splitlines() if "=" in ln and not ln.startswith("#")]
             except OSError:
                 pass
         for k, v in pairs:
@@ -627,7 +627,7 @@ def legacy_project_name(path: str | None) -> str | None:
     if _PROJECTS["map"] is None:
         m = {}
         try:
-            for ln in (HERMES / "config" / "projects.yaml").read_text().splitlines():
+            for ln in (HERMES / "config" / "projects.yaml").read_text(encoding="utf-8").splitlines():
                 mm = re.match(r"^\s{2}([\w.-]+):\s*(\S+)\s*$", ln)
                 if mm:
                     m[os.path.realpath(os.path.expanduser(mm.group(2)))] = mm.group(1)
@@ -650,7 +650,7 @@ def legacy_project_name(path: str | None) -> str | None:
 
 def _read_json(p: Path):
     try:
-        return json.loads(p.read_text())
+        return json.loads(p.read_text(encoding="utf-8"))
     except (OSError, ValueError):
         return None
 
@@ -802,7 +802,7 @@ def load_all(since: str | None = None) -> list[dict]:
 def _read_jsonl(p: Path) -> dict:
     out = {}
     try:
-        for ln in p.read_text().splitlines():
+        for ln in p.read_text(encoding="utf-8").splitlines():
             try:
                 x = json.loads(ln)
                 out[x["trace"]] = x["label"]
@@ -818,6 +818,6 @@ def label(trace_id: str, value: str) -> None:
         raise ValueError("label is good or bad")
     d = store.root() / ".stats"
     d.mkdir(parents=True, exist_ok=True)
-    with open(d / "labels.jsonl", "a") as f:
+    with open(d / "labels.jsonl", "a", encoding="utf-8") as f:
         f.write(json.dumps({"trace": trace_id, "label": "success" if value == "good" else "failure",
                             "at": _iso(_dt.datetime.now().timestamp())}) + "\n")

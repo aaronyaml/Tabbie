@@ -74,7 +74,7 @@ class Request:
 
     def write_text(self, name: str, text: str) -> Path:
         p = self.dir / name
-        p.write_text(text)
+        p.write_text(text, encoding="utf-8")
         return p
 
 

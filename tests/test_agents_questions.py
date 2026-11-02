@@ -108,7 +108,7 @@ def test_waiting_and_multiple_runs(tmp_path, monkeypatch):
     monkeypatch.setattr(agents, "AGENTS_INDEX_DIR", tmp_path / "agents")
     (tmp_path / "requests" / "r1").mkdir(parents=True)
     (tmp_path / "requests" / "r1" / "request.json").write_text(json.dumps(
-        {"id": "r1", "status": "awaiting_answer", "original_prompt": "do it", "route": "claude"}))
+        {"id": "r1", "status": "awaiting_answer", "original_prompt": "do it", "route": "claude"}), encoding="utf-8")
     run = agents.AgentRun("r1", "s1")
     run.start_main("Claude Code", "claude", now=0)
     run.finish_main(True, waiting=True, now=5)
@@ -209,7 +209,7 @@ def test_sidecar_token_fails_closed(tmp_path, monkeypatch):
     sc = _sidecar()
     monkeypatch.setattr(sc, "TOKEN_FILE", tmp_path / "missing.token")
     assert not sc._token_ok("anything")
-    tok = tmp_path / "t.token"; tok.write_text("s3cret-token-value-123\n")
+    tok = tmp_path / "t.token"; tok.write_text("s3cret-token-value-123\n", encoding="utf-8")
     monkeypatch.setattr(sc, "TOKEN_FILE", tok)
     assert sc._token_ok("s3cret-token-value-123") and not sc._token_ok("wrong") and not sc._token_ok(None)
 

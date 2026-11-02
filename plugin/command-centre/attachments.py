@@ -218,7 +218,7 @@ class Manifest:
                                     "-show_format", "-show_streams", str(src)],
                                    timeout=60, capture_output=True, text=True)
                 if r.returncode == 0:
-                    meta.write_text(r.stdout)
+                    meta.write_text(r.stdout, encoding="utf-8")
                     entry["derived"].append({"type": "media-metadata", "path": str(meta)})
         except Exception as exc:  # derivation is best-effort; the original is what matters
             entry["derived"].append({"type": "error", "detail": str(exc)[:200]})

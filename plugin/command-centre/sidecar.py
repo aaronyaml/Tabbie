@@ -81,7 +81,7 @@ _SID = re.compile(r"^[A-Za-z0-9_.:-]{1,120}$")
 
 def _token_ok(got: str | None) -> bool:
     try:
-        want = TOKEN_FILE.read_text().strip()
+        want = TOKEN_FILE.read_text(encoding="utf-8").strip()
     except OSError:
         return False  # consent never granted (or revoked): fail closed
     return bool(want) and bool(got) and hmac.compare_digest(want.encode(), got.strip().encode())
@@ -295,14 +295,14 @@ def worker_message(body: dict) -> tuple[int, dict]:
     if not rid:
         return 200, {"ok": False, "reason": "no running Claude Code worker"}
     mid = __import__("secrets").token_hex(6)
-    with (d / "inbox.jsonl").open("a") as f:
+    with (d / "inbox.jsonl").open("a", encoding="utf-8") as f:
         f.write(json.dumps({"id": mid, "text": text, "mode": mode, "at": __import__("time").time()}) + "\n")
     return 200, {"ok": True, "id": mid, "request_id": rid}
 
 
 def worker_ack(rid: str, mid: str) -> dict:
     try:
-        lines = (common.REQUESTS_DIR / rid / "inbox-acks.jsonl").read_text().splitlines()
+        lines = (common.REQUESTS_DIR / rid / "inbox-acks.jsonl").read_text(encoding="utf-8").splitlines()
     except OSError:
         lines = []
     return {"delivered": any(f'"id": "{mid}"' in ln for ln in lines)}
@@ -328,7 +328,7 @@ def _codex_running(sid: str):
     """The session's running Codex executor: (request id, folder, pid) from its takeover pid file."""
     pid_file = common.LOCKS_DIR / f"takeover-{sid[:60]}.pid"
     try:
-        pid = int(pid_file.read_text().strip())
+        pid = int(pid_file.read_text(encoding="utf-8").strip())
     except (OSError, ValueError):
         return None, None, None
     if pid <= 1 or not _is_worker(pid):
@@ -356,7 +356,7 @@ def worker_stop(body: dict) -> tuple[int, dict]:
     if not rid or not isinstance(pid, int) or pid <= 1:
         return 200, {"ok": False, "reason": "nothing running"}
     try:
-        (d / STOP_MARKER).write_text(json.dumps({"at": __import__("time").time()}))
+        (d / STOP_MARKER).write_text(json.dumps({"at": __import__("time").time()}), encoding="utf-8")
     except OSError:
         pass
     _signal_group(pid)

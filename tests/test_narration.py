@@ -142,8 +142,8 @@ def test_attach_inside_project_is_copied(tmp_path, monkeypatch):
 def test_attach_rejects_outside_fake_and_non_images(tmp_path, monkeypatch):
     proj = tmp_path / "proj"
     outside = _png(tmp_path / "elsewhere" / "x.png")
-    fake = proj / "fake.png"; fake.parent.mkdir(parents=True, exist_ok=True); fake.write_text("not an image at all")
-    txt = proj / "notes.txt"; txt.write_text("hello hello hello")
+    fake = proj / "fake.png"; fake.parent.mkdir(parents=True, exist_ok=True); fake.write_text("not an image at all", encoding="utf-8")
+    txt = proj / "notes.txt"; txt.write_text("hello hello hello", encoding="utf-8")
     link = proj / "link.png"; os.symlink(outside, link)  # symlink out of the project
     run = _run(tmp_path, monkeypatch, roots=[proj])
     for p in (outside, fake, txt, link, proj / "missing.png", "../elsewhere/x.png"):
@@ -194,7 +194,7 @@ def test_sidecar_payload_and_shot(tmp_path, monkeypatch):
     run.apply_claude(_text(f"Here is the page.\nATTACH: {shot}", "m1"))
     run.apply_claude(_tool("Bash", "m1", "t1", command="true"))
     run.save(force=True)
-    (reqs / RID / "request.json").write_text(json.dumps({"id": RID, "status": "executing"}))
+    (reqs / RID / "request.json").write_text(json.dumps({"id": RID, "status": "executing"}), encoding="utf-8")
     row = sc._request_row(RID)
     assert row["narration"][0]["text"] == "Here is the page."
     assert [(n["kind"], n.get("status")) for n in row["narration"]] == [("text", None), ("op", "running")]

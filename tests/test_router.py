@@ -68,7 +68,7 @@ def test_attachments():
             assert stored.read_bytes() == Path(e["original_path"]).read_bytes()
             assert len(e["sha256"]) == 64 and e["size_bytes"] > 0
         zipe = next(e for e in added if e["kind"] == "archive")
-        assert Path(zipe["derived"][0]["path"], "a/readme.md").read_text() == "hi"
+        assert Path(zipe["derived"][0]["path"], "a/readme.md").read_text(encoding="utf-8") == "hi"
         assert "original:" in m.render()
 
 def test_specific_beats_keyword():
@@ -179,8 +179,8 @@ def test_webui_project_spaces():
     a, b = d / "app", d / "site"; a.mkdir(); b.mkdir()
     projects.WEBUI_STATE = d
     projects.folders_for = lambda p: (p, [])
-    (d / "sessions" / "s9.json").write_text(_j.dumps({"project_id": "p1"}))
-    (d / "projects.json").write_text(_j.dumps([{"project_id": "p1", "workspaces": [str(a), str(b)], "default_workspace": str(a)}]))
+    (d / "sessions" / "s9.json").write_text(_j.dumps({"project_id": "p1"}), encoding="utf-8")
+    (d / "projects.json").write_text(_j.dumps([{"project_id": "p1", "workspaces": [str(a), str(b)], "default_workspace": str(a)}]), encoding="utf-8")
     assert projects.expand_with_project("s9", str(b), []) == (str(b), [str(a)])
     assert projects.expand_with_project("s9", None, []) == (str(a), [str(b)])
     assert projects.expand_with_project("nope", "/x", []) == ("/x", [])
@@ -235,7 +235,7 @@ def test_takeover_off_stops_the_handover(tmp_path, monkeypatch):
     monkeypatch.setattr(agents_mod, "path", lambda: tmp_path / "agents.yaml")
     assert agents_mod.takeover_enabled() and cc._handover_on()  # no file: on by default
     agents_mod.save(["claude", "codex"], takeover=False)
-    assert "takeover: false" in (tmp_path / "agents.yaml").read_text()
+    assert "takeover: false" in (tmp_path / "agents.yaml").read_text(encoding="utf-8")
     assert not agents_mod.takeover_enabled() and not cc._handover_on()
     agents_mod.save()  # other changes keep it off
     assert not agents_mod.takeover_enabled()

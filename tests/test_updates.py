@@ -17,7 +17,7 @@ A, B = "a" * 40, "b" * 40
 
 def _root(tmp_path, monkeypatch, router=""):
     (tmp_path / "config").mkdir()
-    (tmp_path / "config" / "router.yaml").write_text(router)
+    (tmp_path / "config" / "router.yaml").write_text(router, encoding="utf-8")
     monkeypatch.setattr(up, "ROOT", tmp_path)
     monkeypatch.setattr(up, "STATE", tmp_path / "state" / "updates.json")
     up._cache.update(at=0.0, result=None)
@@ -113,7 +113,7 @@ def _services(tmp_path, monkeypatch, loaded):
     """Fake services/ dir and launchctl: `loaded` is the set of labels launchd knows."""
     svc = tmp_path / "services"; svc.mkdir()
     for label in ("ai.hermes.webui", "ai.hermes.cc-sidecar"):
-        (svc / f"{label}.plist.template").write_text(f"<plist>{label} __HOME__/hermes</plist>")
+        (svc / f"{label}.plist.template").write_text(f"<plist>{label} __HOME__/hermes</plist>", encoding="utf-8")
     agents = tmp_path / "LaunchAgents"
     calls = []
 
@@ -137,7 +137,7 @@ def _services(tmp_path, monkeypatch, loaded):
 def test_ensure_services_installs_only_missing(tmp_path, monkeypatch):
     agents, calls = _services(tmp_path, monkeypatch, {"ai.hermes.webui"})
     assert up.ensure_services() == ["ai.hermes.cc-sidecar"]
-    written = (agents / "ai.hermes.cc-sidecar.plist").read_text()
+    written = (agents / "ai.hermes.cc-sidecar.plist").read_text(encoding="utf-8")
     assert "__HOME__" not in written and str(Path.home()) in written
     assert not (agents / "ai.hermes.webui.plist").exists()  # running service untouched
     assert up.ensure_services() == []  # idempotent
@@ -176,9 +176,9 @@ def _req(root, rid, status, age, agents=None):
     import json, os, time
     d = root / "requests" / rid
     d.mkdir(parents=True)
-    (d / "request.json").write_text(json.dumps({"id": rid, "status": status, "result": None}))
+    (d / "request.json").write_text(json.dumps({"id": rid, "status": status, "result": None}), encoding="utf-8")
     if agents is not None:
-        (d / "agents.json").write_text(json.dumps({"agents": agents, "summary": {"running": 1, "failed": 0}}))
+        (d / "agents.json").write_text(json.dumps({"agents": agents, "summary": {"running": 1, "failed": 0}}), encoding="utf-8")
     t = time.time() - age
     for f in d.iterdir():
         os.utime(f, (t, t))
@@ -194,12 +194,12 @@ def test_orphaned_runs_are_settled(tmp_path, monkeypatch):
     fresh = _req(tmp_path, "20261102-100100-bbbbbb", "executing", 5)
     done = _req(tmp_path, "20261102-100200-cccccc", "done", 600)
     assert up.reap_orphans() == [old.name]
-    req = json.loads((old / "request.json").read_text())
+    req = json.loads((old / "request.json").read_text(encoding="utf-8"))
     assert req["status"] == "failed" and "restarted" in req["result"]["error"]
-    ag = json.loads((old / "agents.json").read_text())
+    ag = json.loads((old / "agents.json").read_text(encoding="utf-8"))
     assert [a["status"] for a in ag["agents"]] == ["failed", "done"] and ag["summary"]["running"] == 0
-    assert json.loads((fresh / "request.json").read_text())["status"] == "executing"  # may still be starting
-    assert json.loads((done / "request.json").read_text())["status"] == "done"
+    assert json.loads((fresh / "request.json").read_text(encoding="utf-8"))["status"] == "executing"  # may still be starting
+    assert json.loads((done / "request.json").read_text(encoding="utf-8"))["status"] == "done"
     assert up.reap_orphans() == []
 
 

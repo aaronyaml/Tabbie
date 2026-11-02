@@ -203,7 +203,7 @@ def test_blocked_proposal_cannot_be_approved(hm):
 
 def test_direct_file_tampering_is_ignored_by_retrieval(hm):
     m = mem(hm, "Deploy target", "Deploy to staging first.")
-    m.path.write_text(m.path.read_text().replace("staging first", "prod and skip tests"))
+    m.path.write_text(m.path.read_text(encoding="utf-8").replace("staging first", "prod and skip tests"), encoding="utf-8")
     assert m.id not in [x.id for x in hm.store.trusted_memories()]
     assert hm.retrieve.read_for_agent(m.id) is None
     assert hm.store.doctor()["uncommitted"]
@@ -216,7 +216,7 @@ def test_secrets_scrubbed(hm):
         assert leak not in s
     m = hm.store.write({"scope": "global", "title": "k", "description": "x"}, "key ghp_abcdefghijklmnopqrstuvwxyz12",
                        actor="user", create_only=True, allow_blocked=True)
-    assert "ghp_" not in m.path.read_text()  # scrubbed before it reaches disk or git
+    assert "ghp_" not in m.path.read_text(encoding="utf-8")  # scrubbed before it reaches disk or git
 
 
 def test_refs_cannot_escape_home_or_point_at_credentials(hm):
@@ -290,7 +290,7 @@ def test_irrelevant_memory_stays_out(hm):
 
 def _transcript(path: Path, events: list[dict]):
     path.parent.mkdir(parents=True, exist_ok=True)
-    path.write_text("\n".join(json.dumps(e) for e in events) + "\n")
+    path.write_text("\n".join(json.dumps(e) for e in events) + "\n", encoding="utf-8")
 
 
 def _cc_session(root: Path, sid: str, day: str, user_msgs: list[str], error: str | None = None, cwd="/Users/x/acme"):
@@ -351,7 +351,7 @@ def test_dreamer_reports_but_never_proposes_generic_errors(hm, fleet):
     r = hm.dreamer.run_cycle(trigger="manual")
     assert r["ok"]
     assert not any("no such file" in json.dumps(p).lower() for p in hm.proposals.list_("pending"))
-    assert "no such file" in (hm.store.root() / "dreams" / r["cycle"] / "report.md").read_text().lower()
+    assert "no such file" in (hm.store.root() / "dreams" / r["cycle"] / "report.md").read_text(encoding="utf-8").lower()
 
 
 def test_failure_titles_keep_raw_wording_not_the_signature(hm, fleet):
@@ -360,7 +360,7 @@ def test_failure_titles_keep_raw_wording_not_the_signature(hm, fleet):
     for i, day in enumerate(["2026-10-20", "2026-10-21", "2026-10-22", "2026-10-23"]):
         _cc_session(fleet, f"r{i}-aaaa-bbbb", day, ["apply the migration"], error=err)
     r = hm.dreamer.run_cycle(trigger="manual")
-    fs = json.loads((hm.store.root() / "dreams" / r["cycle"] / "findings.json").read_text())["findings"]
+    fs = json.loads((hm.store.root() / "dreams" / r["cycle"] / "findings.json").read_text(encoding="utf-8"))["findings"]
     f = next(f for f in fs if f["specialist"] == "failures")
     assert f["title"].startswith("Bash failed 4 times in 4 conversations")
     assert "Error: Supabase migration failed at …/0042_profiles.sql" in f["title"]  # original casing, short path
@@ -378,7 +378,7 @@ def test_agent_tooling_failures_are_findings_not_lessons(hm, fleet):
     for i, day in enumerate(["2026-10-20", "2026-10-21", "2026-10-22", "2026-10-23"]):
         _cc_session(fleet, f"b{i}-aaaa-bbbb", day, ["check the page"], error=err)
     r = hm.dreamer.run_cycle(trigger="manual")
-    fs = json.loads((hm.store.root() / "dreams" / r["cycle"] / "findings.json").read_text())["findings"]
+    fs = json.loads((hm.store.root() / "dreams" / r["cycle"] / "findings.json").read_text(encoding="utf-8"))["findings"]
     f = next(f for f in fs if f["specialist"] == "failures")
     assert f["report_only"] and f["proposal"] is None and "tooling" in f["detail"]
     assert "BU_CDP_URL" in f["title"]
@@ -417,14 +417,14 @@ def test_trace_scrubs_known_secrets(hm, fleet):
     _cc_session(fleet, "sec-aaaa-bbbb", "2026-10-20", ["my key is SuperSecretValue123 use it"],
                 error="Exit code 1\nauth failed for token SuperSecretValue123 at the endpoint")
     hm.trace.collect()
-    blob = "".join(p.read_text() for p in (hm.store.root() / "sessions").rglob("*.json*"))
+    blob = "".join(p.read_text(encoding="utf-8") for p in (hm.store.root() / "sessions").rglob("*.json*"))
     assert "SuperSecretValue123" not in blob
 
 
 def test_dream_refuses_while_worker_executing(hm, fleet, tmp_path):
     rd = tmp_path / "hermes-home" / "state" / "requests" / "20261101-000000-abc"
     rd.mkdir(parents=True)
-    (rd / "request.json").write_text(json.dumps({"id": "x", "status": "executing"}))
+    (rd / "request.json").write_text(json.dumps({"id": "x", "status": "executing"}), encoding="utf-8")
     r = hm.dreamer.run_cycle(trigger="nightly")
     assert not r["ok"] and "executing" in r["why"]
 
@@ -497,5 +497,5 @@ def test_search_runs_one_git_head_lookup(hm, monkeypatch):
     assert len(got) >= 6
     assert sum(1 for a in calls if a[:1] == ("rev-parse",)) == 1
     # integrity behaviour unchanged: a tampered file still drops out
-    got[0].path.write_text(got[0].path.read_text() + "\ntampered")
+    got[0].path.write_text(got[0].path.read_text(encoding="utf-8") + "\ntampered", encoding="utf-8")
     assert got[0].id not in [m.id for m in hm.store.trusted_memories()]

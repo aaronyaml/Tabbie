@@ -34,11 +34,15 @@ _BRANCH = re.compile(r"^[A-Za-z0-9_./-]{1,100}$")
 _cache: dict = {"at": 0.0, "result": None}
 
 
+def _uid() -> int:
+    return os.getuid() if hasattr(os, "getuid") else 0  # launchd only exists on macOS
+
+
 def _read_block() -> dict:
     """The `updates:` block of config/router.yaml, stdlib only (the sidecar has no YAML library)."""
     out: dict = {}
     try:
-        lines = (ROOT / "config" / "router.yaml").read_text().splitlines()
+        lines = (ROOT / "config" / "router.yaml").read_text(encoding="utf-8").splitlines()
     except OSError:
         return out
     inside = False
@@ -129,7 +133,7 @@ def check(force: bool = False) -> dict:
 
 def _state() -> dict:
     try:
-        return json.loads(STATE.read_text())
+        return json.loads(STATE.read_text(encoding="utf-8"))
     except (OSError, ValueError):
         return {}
 
@@ -137,7 +141,7 @@ def _state() -> dict:
 def _save_state(d: dict) -> None:
     STATE.parent.mkdir(parents=True, exist_ok=True)
     tmp = STATE.with_suffix(".tmp")
-    tmp.write_text(json.dumps(d, indent=2))
+    tmp.write_text(json.dumps(d, indent=2), encoding="utf-8")
     os.replace(tmp, STATE)
 
 
@@ -204,11 +208,11 @@ def _launchctl(*args: str) -> subprocess.CompletedProcess:
 
 
 def _loaded(label: str) -> bool:
-    return _launchctl("print", f"gui/{os.getuid()}/{label}").returncode == 0
+    return _launchctl("print", f"gui/{_uid()}/{label}").returncode == 0
 
 
 def _render(template: Path) -> str | None:
-    text = template.read_text()
+    text = template.read_text(encoding="utf-8")
     if "__CADDY__" in text:
         caddy = shutil.which("caddy") or str(Path.home() / ".local/bin/caddy")
         if not Path(caddy).exists():
@@ -220,9 +224,9 @@ def _render(template: Path) -> str | None:
 def _install(label: str, text: str) -> bool:
     dest = AGENTS_DIR / f"{label}.plist"
     AGENTS_DIR.mkdir(parents=True, exist_ok=True)
-    dest.write_text(text)
-    _launchctl("bootout", f"gui/{os.getuid()}/{label}")
-    return _launchctl("bootstrap", f"gui/{os.getuid()}", str(dest)).returncode == 0
+    dest.write_text(text, encoding="utf-8")
+    _launchctl("bootout", f"gui/{_uid()}/{label}")
+    return _launchctl("bootstrap", f"gui/{_uid()}", str(dest)).returncode == 0
 
 
 def ensure_services() -> list[str]:
@@ -232,7 +236,7 @@ def ensure_services() -> list[str]:
         return []
     from .flockcompat import fcntl
     STATE_DIR.mkdir(parents=True, exist_ok=True)
-    with open(STATE_DIR / "services.lock", "w") as lock:
+    with open(STATE_DIR / "services.lock", "w", encoding="utf-8") as lock:
         try:  # several Hermes processes start together; one installs, the rest skip
             fcntl.flock(lock, fcntl.LOCK_EX | fcntl.LOCK_NB)
         except OSError:
@@ -259,8 +263,8 @@ def _reinstall_changed(labels: list[str]) -> list[str]:
             continue
         dest = AGENTS_DIR / f"{label}.plist"
         AGENTS_DIR.mkdir(parents=True, exist_ok=True)
-        dest.write_text(text)
-        cmds.append(f"launchctl bootout gui/{os.getuid()}/{label}; launchctl bootstrap gui/{os.getuid()} '{dest}'")
+        dest.write_text(text, encoding="utf-8")
+        cmds.append(f"launchctl bootout gui/{_uid()}/{label}; launchctl bootstrap gui/{_uid()} '{dest}'")
         done.append(label)
     if cmds:
         subprocess.Popen(["/bin/sh", "-c", "sleep 2; " + "; ".join(cmds)], stdin=subprocess.DEVNULL,
@@ -287,7 +291,7 @@ def reap_orphans(min_age: float = 120.0) -> list[str]:
     for d in sorted(x for x in rd.iterdir() if x.is_dir())[-60:]:
         rf = d / "request.json"
         try:
-            req = json.loads(rf.read_text())
+            req = json.loads(rf.read_text(encoding="utf-8"))
         except (OSError, ValueError):
             continue
         if req.get("status") not in ("executing", "planning"):
@@ -304,7 +308,7 @@ def reap_orphans(min_age: float = 120.0) -> list[str]:
         _write(rf, req)
         af = d / "agents.json"
         try:
-            ag = json.loads(af.read_text())
+            ag = json.loads(af.read_text(encoding="utf-8"))
         except (OSError, ValueError):
             ag = None
         if ag:
@@ -349,7 +353,7 @@ def prune_old_attachments(days: float | None = None, *, now: float | None = None
             try:
                 if not att.is_dir() or now - (d / "request.json").stat().st_mtime < days * 86400:
                     continue
-                if json.loads((d / "request.json").read_text()).get("status") in ("executing", "planning"):
+                if json.loads((d / "request.json").read_text(encoding="utf-8")).get("status") in ("executing", "planning"):
                     continue
             except (OSError, ValueError):
                 continue
@@ -362,7 +366,7 @@ def prune_old_attachments(days: float | None = None, *, now: float | None = None
 
 def _write(path: Path, data: dict) -> None:
     tmp = path.with_suffix(path.suffix + ".tmp")
-    tmp.write_text(json.dumps(data, indent=2))
+    tmp.write_text(json.dumps(data, indent=2), encoding="utf-8")
     os.replace(tmp, path)
 
 
@@ -377,7 +381,7 @@ def busy() -> bool:
     if rd.exists():
         for d in sorted(rd.iterdir())[-40:]:
             try:
-                st = json.loads((d / "request.json").read_text()).get("status")
+                st = json.loads((d / "request.json").read_text(encoding="utf-8")).get("status")
             except (OSError, ValueError):
                 continue
             if st in ("executing", "planning"):
@@ -404,7 +408,7 @@ def restart(after_reply=None) -> dict:
         return {"ok": True, "restarted": []}
     if busy():
         return {"ok": False, "error": "A request is running. Try again when it finishes."}
-    uid = os.getuid()
+    uid = _uid()
     done = []
     if "gateway" in needs:
         subprocess.run(["launchctl", "kickstart", "-k", f"gui/{uid}/ai.hermes.gateway"], capture_output=True)

@@ -119,7 +119,7 @@ def test_execute_dispatches_by_choice():
     saved = st.Request(r.id).data["executor"]
     assert saved["provider"] == "codex-cli" and saved["model"] == "gpt-6.1-sol" and saved["chosen"]
     assert out["route"].startswith("Route: Codex GPT-6.1 Sol")
-    agents = json.loads((d / "req" / r.id / "agents.json").read_text())
+    agents = json.loads((d / "req" / r.id / "agents.json").read_text(encoding="utf-8"))
     assert agents["agents"][0]["model"] == "gpt-6.1-sol"
 
     ec.set_choice("s9", "anthropic", "claude-opus-5-5", "high")

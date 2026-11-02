@@ -74,7 +74,7 @@ def test_linked_provider_shows_with_its_billing(env):
 
 def test_config_never_holds_the_key(env):
     _link("deepseek", "sk-very-secret")
-    assert "sk-very-secret" not in (env.tmp / "providers.yaml").read_text()
+    assert "sk-very-secret" not in (env.tmp / "providers.yaml").read_text(encoding="utf-8")
     assert mp.get_key("deepseek") == "sk-very-secret"
     pub = mp.public("deepseek", with_models=False)
     assert "sk-very-secret" not in repr(pub) and pub["linked"] is True
@@ -262,7 +262,7 @@ def test_effort_only_where_the_api_takes_it(env):
 def test_flock_shim_excludes_a_second_holder(tmp_path):
     from hmem import flockcompat as fcntl
     p = tmp_path / "x.lock"
-    a, b = open(p, "w"), open(p, "w")
+    a, b = open(p, "w", encoding="utf-8"), open(p, "w", encoding="utf-8")
     fcntl.flock(a, fcntl.LOCK_EX | fcntl.LOCK_NB)
     with pytest.raises(BlockingIOError):
         fcntl.flock(b, fcntl.LOCK_EX | fcntl.LOCK_NB)

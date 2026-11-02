@@ -84,7 +84,7 @@ def _decisions_since(t0: float) -> list[dict]:
     f = STATE / "decisions.jsonl"
     if not f.exists():
         return out
-    for ln in f.read_text(errors="replace").splitlines()[-4000:]:
+    for ln in f.read_text(errors="replace", encoding="utf-8").splitlines()[-4000:]:
         try:
             d = json.loads(ln)
             ts = datetime.strptime(d.get("ts", ""), "%Y-%m-%dT%H:%M:%S").timestamp()
@@ -100,7 +100,7 @@ def _request_for(text: str, t0: float) -> dict | None:
     best = None
     for f in sorted((STATE / "requests").glob("*/request.json"))[-40:]:
         try:
-            d = json.loads(f.read_text())
+            d = json.loads(f.read_text(encoding="utf-8"))
         except (OSError, json.JSONDecodeError):
             continue
         created = datetime.strptime(d.get("created", "1970-01-01T00:00:00"), "%Y-%m-%dT%H:%M:%S").timestamp()
@@ -117,7 +117,7 @@ def _hub_calls(t0: float, t1: float) -> list[dict]:
     f = HERMES / "logs" / "agent.log"
     out = []
     try:
-        lines = f.read_text(errors="replace").splitlines()[-6000:]
+        lines = f.read_text(errors="replace", encoding="utf-8").splitlines()[-6000:]
     except OSError:
         return out
     for ln in lines:
@@ -157,7 +157,7 @@ def _worker_first_call(req: dict | None) -> dict:
     enc = re.sub(r"[^A-Za-z0-9]", "-", str(Path(cwd).resolve()))
     f = Path.home() / ".claude" / "projects" / enc / f"{sid}.jsonl"
     try:
-        for ln in f.read_text(errors="replace").splitlines():
+        for ln in f.read_text(errors="replace", encoding="utf-8").splitlines():
             ev = json.loads(ln)
             u = ((ev.get("message") or {}).get("usage") or {}) if ev.get("type") == "assistant" else {}
             if u:
@@ -209,7 +209,7 @@ def summarise(runs: list[dict]) -> dict:
 
 
 def compare(a: Path, b: Path) -> None:
-    A, B = json.loads(a.read_text())["summary"], json.loads(b.read_text())["summary"]
+    A, B = json.loads(a.read_text(encoding="utf-8"))["summary"], json.loads(b.read_text(encoding="utf-8"))["summary"]
     for key in sorted(set(A) | set(B)):
         print(f"{key}:")
         for m in ("median_wall_s", "median_overhead_s", "median_hub_latency_s", "median_hub_input",
@@ -243,7 +243,7 @@ def main(argv: list[str]) -> int:
     out = {"label": label, "hub_reasoning": HUB_REASONING[1] if HUB_REASONING else "config", "at": time.strftime("%Y-%m-%dT%H:%M:%S"), "runs": runs, "summary": summarise(runs)}
     dest = STATE / "bench" / f"{label}-{time.strftime('%Y%m%d-%H%M%S')}.json"
     dest.parent.mkdir(parents=True, exist_ok=True)
-    dest.write_text(json.dumps(out, indent=2))
+    dest.write_text(json.dumps(out, indent=2), encoding="utf-8")
     print(json.dumps(out["summary"], indent=2))
     print(f"Saved {dest}", file=sys.stderr)
     return 0 if all(v["pass"] for v in out["summary"].values()) else 1

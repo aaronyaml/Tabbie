@@ -29,7 +29,7 @@ def test_default_is_both_and_save_round_trips():
     assert agents.enabled() == ["claude", "codex"] and not agents.path().exists()
     assert agents.save(["Codex"]) == ["codex"]
     assert agents.enabled() == ["codex"] and agents.has("codex") and not agents.has("claude")
-    assert "enabled: [codex]" in agents.path().read_text()
+    assert "enabled: [codex]" in agents.path().read_text(encoding="utf-8")
     assert agents.save(["codex", "claude", "nope"]) == ["claude", "codex"]  # fixed order, unknowns dropped
     with pytest.raises(ValueError):
         agents.save([])
@@ -41,7 +41,7 @@ def test_default_is_both_and_save_round_trips():
 def test_broken_file_falls_back_to_both():
     agents.path().parent.mkdir(parents=True, exist_ok=True)
     for text in ("", "enabled: []\n", "enabled: [banana]\n", "garbage"):
-        agents.path().write_text(text)
+        agents.path().write_text(text, encoding="utf-8")
         assert agents.enabled() == ["claude", "codex"], text
 
 

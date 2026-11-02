@@ -75,7 +75,7 @@ def test_brief_sent_as_a_file_counts_for_routing_and_effort(monkeypatch, tmp_pat
     home.mkdir(parents=True, exist_ok=True)
     try:
         f = home / "brief.md"
-        f.write_text("Draft the full set of legal documents: terms and conditions, privacy policy, contracts. " * 3)
+        f.write_text("Draft the full set of legal documents: terms and conditions, privacy policy, contracts. " * 3, encoding="utf-8")
         text = f"I've uploaded 1 file(s): {f}"
         got = cc._attached_text(text)
         assert "privacy policy" in got
@@ -126,12 +126,12 @@ def test_project_workspace_label_renames_only(tmp_path, monkeypatch):
     monkeypatch.setenv("HERMES_WEBUI_STATE_DIR", str(tmp_path))
     monkeypatch.setenv("HERMES_WORKSPACES_DIR", str(tmp_path / "ws"))
     f = tmp_path / "workspaces.json"
-    f.write_text(json.dumps([{"path": "/x/other", "name": "other"}, {"path": str(tmp_path / "ws" / "gs-56e2"), "name": "gs-56e2"}]))
+    f.write_text(json.dumps([{"path": "/x/other", "name": "other"}, {"path": str(tmp_path / "ws" / "gs-56e2"), "name": "gs-56e2"}]), encoding="utf-8")
     assert hp.label_webui_workspace({"id": "gs-56e2", "name": "GaffSwipe", "status": "active"})
-    assert [w["name"] for w in json.loads(f.read_text())] == ["other", "GaffSwipe"]
+    assert [w["name"] for w in json.loads(f.read_text(encoding="utf-8"))] == ["other", "GaffSwipe"]
     assert not hp.label_webui_workspace({"id": "new-1", "name": "New", "status": "active"})  # never adds
     assert hp.label_webui_workspace({"id": "gs-56e2", "name": "GaffSwipe", "status": "archived"})
-    assert [w["name"] for w in json.loads(f.read_text())] == ["other"]
+    assert [w["name"] for w in json.loads(f.read_text(encoding="utf-8"))] == ["other"]
 
 
 def test_a_huge_session_is_not_resumed(monkeypatch):
@@ -140,8 +140,8 @@ def test_a_huge_session_is_not_resumed(monkeypatch):
     monkeypatch.setattr(cc, "run_claude", lambda prompt, **k: calls.append(k) or {
         "ok": True, "result": "Done.", "billing": "s", "session_id": f"S{len(calls)}"})
     cc._execute(_req("chatH", "build it"))
-    s = json.loads((d / "cs.json").read_text())
-    key = next(iter(s)); s[key]["ctx"] = 150000; (d / "cs.json").write_text(json.dumps(s))
+    s = json.loads((d / "cs.json").read_text(encoding="utf-8"))
+    key = next(iter(s)); s[key]["ctx"] = 150000; (d / "cs.json").write_text(json.dumps(s), encoding="utf-8")
     cc._execute(_req("chatH", "now polish it"))
     assert calls[1]["resume_session"] is None  # over resume_max_context: fresh session, recent turns instead
 
@@ -170,11 +170,11 @@ def test_busy_claude_slots_send_a_new_chat_to_its_gpt_equivalent(monkeypatch, tm
     got = []
     monkeypatch.setattr(cc, "_astra_takeover", lambda r, reason, choice=None, **k: got.append(reason) or {"ok": True})
     monkeypatch.setattr(cc, "run_claude", lambda prompt, **k: got.append("claude") or {"ok": True, "result": "Done.", "billing": "s"})
-    held = open(tmp_path / "locks" / "claude-worker-0.lock", "w"); fcntl.flock(held, fcntl.LOCK_EX)
+    held = open(tmp_path / "locks" / "claude-worker-0.lock", "w", encoding="utf-8"); fcntl.flock(held, fcntl.LOCK_EX)
     try:
         cc._execute(_req("chatBusy", "fix the bug"))
         assert "busy with other chats" in got[-1]
-        mine = open(tmp_path / "locks" / "claude-session-chatBusy.lock", "w"); fcntl.flock(mine, fcntl.LOCK_EX)
+        mine = open(tmp_path / "locks" / "claude-session-chatBusy.lock", "w", encoding="utf-8"); fcntl.flock(mine, fcntl.LOCK_EX)
         assert not pv.WorkerSlot.all_busy(1, "chatBusy")  # its own earlier job: it queues behind itself
         mine.close()
     finally:
@@ -188,7 +188,7 @@ def _git_repo(d):
     d.mkdir(parents=True, exist_ok=True)
     for c in (["init", "-q"], ["config", "user.email", "t@t"], ["config", "user.name", "t"]):
         sp.run(["git", *c], cwd=d, check=True)
-    (d / "README.md").write_text("x\n"); (d / "auth.py").write_text("def ok():\n    return True\n")
+    (d / "README.md").write_text("x\n", encoding="utf-8"); (d / "auth.py").write_text("def ok():\n    return True\n", encoding="utf-8")
     sp.run(["git", "add", "."], cwd=d, check=True); sp.run(["git", "commit", "-qm", "init"], cwd=d, check=True)
 
 
@@ -203,13 +203,13 @@ def test_risky_changes_get_a_codex_review_line(monkeypatch, tmp_path):
 
     def edit(name):
         def run(prompt, **k):
-            (proj / name).write_text((proj / name).read_text() + "# changed\n")
+            (proj / name).write_text((proj / name).read_text(encoding="utf-8") + "# changed\n", encoding="utf-8")
             return {"ok": True, "result": "Done.", "billing": "s"}
         return run
     monkeypatch.setattr(cc, "run_claude", edit("auth.py"))
     out = cc._execute(_req("chatR", "tighten login", proj))
     assert reviewed and reviewed[0][1] == ["auth.py"] and "# changed" in reviewed[0][0]
-    assert "Review (" in json.dumps(out) or any("Review (" in p.read_text() for p in (cc.REQUESTS_DIR).rglob("reply-*.md"))
+    assert "Review (" in json.dumps(out) or any("Review (" in p.read_text(encoding="utf-8") for p in (cc.REQUESTS_DIR).rglob("reply-*.md"))
     reviewed.clear()
     monkeypatch.setattr(cc, "run_claude", edit("README.md"))
     cc._execute(_req("chatR2", "fix typo", proj))
@@ -220,11 +220,11 @@ def test_risky_changes_get_a_codex_review_line(monkeypatch, tmp_path):
 def test_a_job_records_what_it_changed(monkeypatch, tmp_path):
     _setup(monkeypatch)
     proj = tmp_path / "app"; _git_repo(proj)
-    (proj / "README.md").write_text("x\nmine, not the job's\n")  # dirty before the job: left out
+    (proj / "README.md").write_text("x\nmine, not the job's\n", encoding="utf-8")  # dirty before the job: left out
 
     def run(prompt, **k):
-        (proj / "auth.py").write_text("def ok():\n    return False\n")
-        (proj / "new.txt").write_text("a\nb\nc\n")
+        (proj / "auth.py").write_text("def ok():\n    return False\n", encoding="utf-8")
+        (proj / "new.txt").write_text("a\nb\nc\n", encoding="utf-8")
         return {"ok": True, "result": "Done.", "billing": "s"}
     monkeypatch.setattr(cc, "run_claude", run)
     monkeypatch.setattr(cc, "_auto_review", lambda *a, **k: None)

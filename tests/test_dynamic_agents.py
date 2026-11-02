@@ -46,10 +46,10 @@ def test_setting_default_on_and_round_trip():
     a = _agents()
     assert a.dynamic_enabled() is True  # no file
     a.path().parent.mkdir(parents=True, exist_ok=True)
-    a.path().write_text("enabled: [claude, codex]\n")
+    a.path().write_text("enabled: [claude, codex]\n", encoding="utf-8")
     assert a.dynamic_enabled() is True  # older file without the key
     a.save(None, dynamic=False)
-    text = a.path().read_text()
+    text = a.path().read_text(encoding="utf-8")
     assert "enabled: [claude, codex]" in text and "dynamic: false" in text and a.dynamic_enabled() is False
     a.save(["claude"])  # changing agents keeps the dynamic setting
     assert a.enabled() == ["claude"] and a.dynamic_enabled() is False
@@ -100,7 +100,7 @@ def dm(tmp_path, monkeypatch):
     req = tmp_path / "req"
     rdir = req / "20261102-120000-abc123"
     rdir.mkdir(parents=True)
-    (rdir / "request.json").write_text(json.dumps({"id": rdir.name, "original_prompt": "Build the parser " + "x" * 5000}))
+    (rdir / "request.json").write_text(json.dumps({"id": rdir.name, "original_prompt": "Build the parser " + "x" * 5000}), encoding="utf-8")
     for mod in (m.common, m.agents_mod):
         monkeypatch.setattr(mod, "REQUESTS_DIR", req)
     monkeypatch.setattr(m.agents_mod, "AGENTS_INDEX_DIR", tmp_path / "agents")
@@ -134,7 +134,7 @@ def _codex_runner(seen):
                  {"type": "turn.completed", "usage": {"input_tokens": 1200, "output_tokens": 300}}]
         for ev in lines:
             on_line(json.dumps(ev) + "\n")
-        out.write_text("Found 2 issues: a, b")
+        out.write_text("Found 2 issues: a, b", encoding="utf-8")
         return 0, "\n".join(json.dumps(e) for e in lines), ""
     return run
 
@@ -158,7 +158,7 @@ def test_delegate_runs_codex_with_bundle_row_and_result(dm):
     # its own row file, nested under the calling worker, kind delegate
     rows = list(dm.RDIR.glob("agents-*.json"))
     assert len(rows) == 1
-    a = json.loads(rows[0].read_text())["agents"][0]
+    a = json.loads(rows[0].read_text(encoding="utf-8"))["agents"][0]
     assert a["parent"] == "claude-1" and a["kind"] == "delegate" and a["to"] == "codex" and a["status"] == "done"
     assert a["name"].startswith("Codex GPT-6.1 Sol · Review parser.py") and a["tokens"] == 1500
     assert (dm.RDIR / "delegates").exists() and list((dm.RDIR / "delegates").glob("*/result.md"))
@@ -194,7 +194,7 @@ def test_delegate_refusals_write_notes(dm, monkeypatch):
     ok, text = dm.Delegator(runner=lambda *a, **k: pytest.fail("must not run")).call(
         {"task": "x", "why": "y", "mode": "read"})
     assert not ok and "96%" in text and "Do this part yourself" in text
-    note = json.loads((dm.RDIR / "notes.jsonl").read_text().splitlines()[-1])
+    note = json.loads((dm.RDIR / "notes.jsonl").read_text(encoding="utf-8").splitlines()[-1])
     assert note["kind"] == "delegate_refused" and note["reason"] == "limit"
     monkeypatch.setattr(gate, "check", lambda *a, **k: gate.Gate("codex", "ok"))
 

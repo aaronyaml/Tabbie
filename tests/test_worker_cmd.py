@@ -26,7 +26,7 @@ def home(tmp_path, monkeypatch):
     wire(tmp_path, monkeypatch)
     cdir = tmp_path / "claude"
     (cdir / "skills" / "motion").mkdir(parents=True)
-    (cdir / "settings.json").write_text(json.dumps(USER))
+    (cdir / "settings.json").write_text(json.dumps(USER), encoding="utf-8")
     monkeypatch.setenv("CLAUDE_CONFIG_DIR", str(cdir))
     return tmp_path
 
@@ -53,12 +53,12 @@ def test_lean_vs_full_argv(home):
                                  model="claude-opus-5-5")
     assert lean[lean.index("--setting-sources") + 1] == "project,local"
     assert "--strict-mcp-config" in lean and "--exclude-dynamic-system-prompt-sections" in lean
-    assert json.loads(Path(lean[lean.index("--mcp-config") + 1]).read_text()) == {"mcpServers": {}}
-    settings = json.loads(Path(lean[lean.index("--settings") + 1]).read_text())
+    assert json.loads(Path(lean[lean.index("--mcp-config") + 1]).read_text(encoding="utf-8")) == {"mcpServers": {}}
+    settings = json.loads(Path(lean[lean.index("--settings") + 1]).read_text(encoding="utf-8"))
     assert "vercel@claude-plugins-official" not in settings["enabledPlugins"]
     plug = Path(lean[lean.index("--plugin-dir") + 1])
     assert (plug / "skills").resolve() == (home / "claude" / "skills").resolve()  # all the user's own skills
-    assert json.loads((plug / ".claude-plugin" / "plugin.json").read_text())["name"] == "user-skills"
+    assert json.loads((plug / ".claude-plugin" / "plugin.json").read_text(encoding="utf-8"))["name"] == "user-skills"
     for t in ("Workflow", "ReportFindings", "ListAgents"):
         assert t in lean
     assert "--resume" in lean and lean[lean.index("--model") + 1] == "claude-opus-5-5"
@@ -81,7 +81,7 @@ def test_mcp_only_when_allowed(home, tmp_path):
     f = wp.mcp_config(tmp_path / "mcp.json", {"tabbie": prov.delegate_server_spec(env)})
     cmd = prov.build_claude_cmd({"worker_profile": "lean"}, add_dirs=[], resume_session=None, stream=True,
                                 mcp_config=f, dynamic=True)
-    srv = json.loads(Path(cmd[cmd.index("--mcp-config") + 1]).read_text())["mcpServers"]["tabbie"]
+    srv = json.loads(Path(cmd[cmd.index("--mcp-config") + 1]).read_text(encoding="utf-8"))["mcpServers"]["tabbie"]
     assert srv["args"][0].endswith("delegate_mcp.py") and srv["env"]["TABBIE_PARENT_AGENT"] == "claude-1"
     assert srv["env"]["TABBIE_DELEGATE_FROM"] == "claude" and json.loads(srv["env"]["TABBIE_ADD_DIRS"]) == ["/q"]
     rules = cmd[cmd.index("--append-system-prompt") + 1]

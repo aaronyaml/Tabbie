@@ -64,12 +64,12 @@ def test_failure_stop_and_notes(relay, monkeypatch):
     out = cc._execute(r)
     assert out.get("stopped") and "Stopped by you" in cc._on_transform_llm_output(response_text=out["reply"], session_id="s1")
     assert st.Request(r.id)["status"] == "stopped"
-    agents = json.loads((r.dir / "agents.json").read_text())["agents"]
+    agents = json.loads((r.dir / "agents.json").read_text(encoding="utf-8"))["agents"]
     assert agents[0]["status"] == "stopped" and agents[0]["step"] == "Stopped by you"
 
     r2 = request("z", project=proj)
     (r2.dir / "notes.jsonl").write_text(json.dumps({"at": 9e9, "kind": "delegate_refused", "reason": "limit",
-                                                    "note": "Codex is at 96% of its 5-hour window"}) + "\n")
+                                                    "note": "Codex is at 96% of its 5-hour window"}) + "\n", encoding="utf-8")
     _run(monkeypatch, "Done: did it myself")
     out = cc._execute(r2)
     body = cc._on_transform_llm_output(response_text=out["reply"], session_id="s1")

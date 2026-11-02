@@ -52,7 +52,7 @@ def load(pid: str) -> tuple[dict, str] | None:
     for st in ("pending", "approved", "rejected"):
         p = _path(pid, st)
         if p.exists():
-            return json.loads(p.read_text()), st
+            return json.loads(p.read_text(encoding="utf-8")), st
     return None
 
 
@@ -60,7 +60,7 @@ def list_(status: str = "pending") -> list[dict]:
     d = _dir(status)
     if not d.exists():
         return []
-    return sorted((json.loads(p.read_text()) for p in d.glob("*.json")), key=lambda x: x.get("created_at", ""))
+    return sorted((json.loads(p.read_text(encoding="utf-8")) for p in d.glob("*.json")), key=lambda x: x.get("created_at", ""))
 
 
 def _suppressed(signature: str, project: str | None = None) -> bool:

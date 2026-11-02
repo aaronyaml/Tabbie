@@ -113,7 +113,7 @@ def resolutions(t: dict) -> list[dict]:
 
 
 def run_for(trace_path: Path) -> list[dict]:
-    t = json.loads(trace_path.read_text())
+    t = json.loads(trace_path.read_text(encoding="utf-8"))
     cands = extract(t)
     out = trace_path.parent / "lessons.json"
     if cands:

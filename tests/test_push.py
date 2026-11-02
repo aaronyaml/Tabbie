@@ -43,12 +43,12 @@ def test_only_real_push_services_can_subscribe(monkeypatch, tmp_path):
 def test_watcher_pushes_once_per_finished_or_waiting_job(monkeypatch, tmp_path):
     _wire(monkeypatch, tmp_path)
     web = tmp_path / "web"
-    (web / "sessions" / "aaaaaaaaaaaa.json").write_text(json.dumps({"title": "Fix the login"}))
+    (web / "sessions" / "aaaaaaaaaaaa.json").write_text(json.dumps({"title": "Fix the login"}), encoding="utf-8")
     rd = tmp_path / "req"
 
     def req(rid, **data):
         (rd / rid).mkdir(parents=True, exist_ok=True)
-        (rd / rid / "request.json").write_text(json.dumps({"session_id": "aaaaaaaaaaaa", **data}))
+        (rd / rid / "request.json").write_text(json.dumps({"session_id": "aaaaaaaaaaaa", **data}), encoding="utf-8")
     req("20261102-100000-aaaaaa", status="done", result={"result": "old news"})
     sent = []
     w = push.Watcher(web, send=lambda: sent.append(1))

@@ -58,7 +58,7 @@ def run(dry_run: bool = False) -> dict:
     existing = {m.meta.get("mirror_of"): m for m in store.all_memories(include_inactive=True) if m.meta.get("mirror_of")}
     res = {"created": 0, "updated": 0, "unchanged": 0, "quarantined": 0, "errors": []}
     for src, project in _sources():
-        text = src.read_text(errors="replace")
+        text = src.read_text(errors="replace", encoding="utf-8")
         meta, body = D.parse(text)
         if not body.strip():
             continue

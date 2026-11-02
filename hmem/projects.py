@@ -220,7 +220,7 @@ def _sig() -> tuple:
 def load(pid: str) -> tuple[dict, str]:
     f = _pfile(pid)
     try:
-        text = f.read_text()
+        text = f.read_text(encoding="utf-8")
     except OSError:
         raise ProjectError(f"no project {pid}") from None
     return json.loads(text), D.sha(text)
@@ -475,7 +475,7 @@ def delete(pid: str, actor: str = "user") -> dict:
     lockf = store.root() / ".locks" / f"dream-{pid}.lock"
     if lockf.exists():
         from . import flockcompat as fcntl
-        with open(lockf, "w") as fh:
+        with open(lockf, "w", encoding="utf-8") as fh:
             try:
                 fcntl.flock(fh, fcntl.LOCK_EX | fcntl.LOCK_NB)
                 fcntl.flock(fh, fcntl.LOCK_UN)
@@ -687,8 +687,8 @@ def committed(path: Path, text: str | None = None) -> bool:
     """True if this store file on disk is exactly what git committed. Workers can't Edit the store, but
     a Bash write could; such a file must not reach a prompt (same rule as memories)."""
     try:
-        rel = str(path.resolve().relative_to(store.root().resolve()))
-        text = path.read_text() if text is None else text
+        rel = path.resolve().relative_to(store.root().resolve()).as_posix()
+        text = path.read_text(encoding="utf-8") if text is None else text
     except (OSError, ValueError):
         return False
     return store.committed_blobs().get(rel) == store._blob_sha(text)
@@ -698,9 +698,9 @@ def skills(pid: str) -> list[dict]:
     """Approved project skills: memory/projects/<id>/skills/<name>/SKILL.md (loaded only for this project)."""
     out = []
     for f in sorted((_pdir(pid) / "skills").glob("*/SKILL.md")):
-        text = f.read_text()
+        text = f.read_text(encoding="utf-8")
         if not committed(f, text):
-            store.append_event("integrity_mismatch", ids=[str(f.relative_to(store.root()))])
+            store.append_event("integrity_mismatch", ids=[f.relative_to(store.root()).as_posix()])
             continue
         meta, _ = D.parse(text)
         out.append({"name": str(meta.get("name") or f.parent.name), "description": str(meta.get("description") or "")[:200],

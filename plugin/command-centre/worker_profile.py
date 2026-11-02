@@ -52,7 +52,7 @@ _COPY_KEYS = ("model", "effortLevel", "modelSettings", "autoMode", "alwaysThinki
 def _user_settings() -> dict:
     claude_dir = Path(os.environ.get("CLAUDE_CONFIG_DIR") or Path.home() / ".claude")
     try:
-        return json.loads((claude_dir / "settings.json").read_text())
+        return json.loads((claude_dir / "settings.json").read_text(encoding="utf-8"))
     except (OSError, json.JSONDecodeError):
         return {}
 
@@ -93,13 +93,13 @@ def settings_for(user: dict, keep: list[str] | None = None) -> dict:
 def _write_if_changed(path: Path, data) -> None:
     text = json.dumps(data, indent=2, sort_keys=True)
     try:
-        if path.read_text() == text:
+        if path.read_text(encoding="utf-8") == text:
             return
     except OSError:
         pass
     path.parent.mkdir(parents=True, exist_ok=True)
     tmp = path.with_suffix(".tmp")
-    tmp.write_text(text)
+    tmp.write_text(text, encoding="utf-8")
     os.replace(tmp, path)
 
 

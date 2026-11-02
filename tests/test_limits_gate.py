@@ -1,5 +1,6 @@
 """Limits gate: nothing starts on an account at its limit (plugin/command-centre/limits_gate.py)."""
 from __future__ import annotations
+import os
 import json, subprocess, sys
 from pathlib import Path
 
@@ -87,7 +88,7 @@ def test_shared_file_cache_ttl(g, tmp_path):
     g.check("claude", None, cfg=CFG, now=NOW, fetch=f)
     g.check("claude", None, cfg=CFG, now=NOW + 30, fetch=f)
     assert calls == ["claude"]  # second check within 60s: from the file
-    cached = json.loads((tmp_path / "limits_cache.json").read_text())
+    cached = json.loads((tmp_path / "limits_cache.json").read_text(encoding="utf-8"))
     assert cached["claude"]["at"] == NOW and "token" not in json.dumps(cached).lower()
     g.check("claude", None, cfg=CFG, now=NOW + 61, fetch=f)
     assert calls == ["claude", "claude"]
@@ -109,12 +110,13 @@ def test_limit_gate_cli_exit_codes(tmp_path):
     cache.parent.mkdir(parents=True)
     import time
     rows = claude(98)("claude")
-    cache.write_text(json.dumps({"claude": {"at": time.time(), "rows": rows}}))
-    env = {"PATH": "/usr/bin:/bin", "HOME": str(tmp_path), "COMMAND_CENTRE_HOME": str(tmp_path)}
+    cache.write_text(json.dumps({"claude": {"at": time.time(), "rows": rows}}), encoding="utf-8")
+    env = {"PATH": "/usr/bin:/bin", "HOME": str(tmp_path), "USERPROFILE": str(tmp_path), "COMMAND_CENTRE_HOME": str(tmp_path),
+           **{k: os.environ[k] for k in ("SYSTEMROOT", "TEMP", "TMP") if k in os.environ}}  # Windows needs these
     bin_ = Path(__file__).resolve().parents[1] / "bin" / "limit-gate"
     p = subprocess.run([sys.executable, str(bin_), "claude", "--model", "claude-opus-5-5"], env=env,
                        input="{}", capture_output=True, text=True, timeout=30)
     assert p.returncode == 2 and "98%" in p.stderr and "inline" in p.stderr
-    cache.write_text(json.dumps({"claude": {"at": time.time(), "rows": claude(40)("claude")}}))
+    cache.write_text(json.dumps({"claude": {"at": time.time(), "rows": claude(40)("claude")}}), encoding="utf-8")
     p = subprocess.run([sys.executable, str(bin_), "claude"], env=env, input="{}", capture_output=True, text=True, timeout=30)
     assert p.returncode == 0

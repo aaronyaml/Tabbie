@@ -53,7 +53,7 @@ def main() -> None:
 
     from ruamel.yaml import YAML  # available in the Hermes runtime and via `uv run --with`
     yaml = YAML()
-    data = yaml.load(PROJECTS_YAML.read_text()) if PROJECTS_YAML.exists() else {}
+    data = yaml.load(PROJECTS_YAML.read_text(encoding="utf-8")) if PROJECTS_YAML.exists() else {}
     data = data or {}
     projects = data.setdefault("projects", {})
     known_paths = {str(Path(str(v)).expanduser().resolve()) for v in projects.values()}
@@ -66,7 +66,7 @@ def main() -> None:
             projects[name] = str(p).replace(str(HOME), "~", 1)
             added_projects.append(name)
 
-    ws = json.loads(WORKSPACES.read_text()) if WORKSPACES.exists() else []
+    ws = json.loads(WORKSPACES.read_text(encoding="utf-8")) if WORKSPACES.exists() else []
     ws_paths = {str(Path(w["path"]).expanduser().resolve()) for w in ws if w.get("path")}
     new_ws = [] if str(GENERAL.resolve()) in ws_paths else [{"path": str(GENERAL), "name": "General (chat)"}]
     for p in found:
@@ -80,10 +80,10 @@ def main() -> None:
         for p in found:
             print("  ", p)
         return
-    with PROJECTS_YAML.open("w") as fh:
+    with PROJECTS_YAML.open("w", encoding="utf-8") as fh:
         yaml.dump(data, fh)
     WORKSPACES.parent.mkdir(parents=True, exist_ok=True)
-    WORKSPACES.write_text(json.dumps(general + rest, indent=2))
+    WORKSPACES.write_text(json.dumps(general + rest, indent=2), encoding="utf-8")
 
 
 if __name__ == "__main__":

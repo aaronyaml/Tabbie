@@ -409,7 +409,7 @@ def _dreaming(pid: str) -> bool:
     f = store.root() / ".locks" / f"dream-{pid}.lock"
     if not f.exists():
         return False
-    with open(f, "w") as fh:
+    with open(f, "w", encoding="utf-8") as fh:
         try:
             fcntl.flock(fh, fcntl.LOCK_EX | fcntl.LOCK_NB)
             fcntl.flock(fh, fcntl.LOCK_UN)

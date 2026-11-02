@@ -69,7 +69,7 @@ def rows(agent: str, *, refresh: bool = False, now: float | None = None, fetch=N
         log_decision(event="limits_fetch_failed", agent=agent, error=type(exc).__name__)
         return hit.get("rows"), (float(hit["at"]) if hit.get("at") else None)
     CACHE_FILE.parent.mkdir(parents=True, exist_ok=True)
-    with open(CACHE_FILE.with_suffix(".lock"), "w") as lk:
+    with open(CACHE_FILE.with_suffix(".lock"), "w", encoding="utf-8") as lk:
         fcntl.flock(lk, fcntl.LOCK_EX)
         cache = read_json(CACHE_FILE, {}) or {}
         cache[agent] = {"at": now, "rows": got}

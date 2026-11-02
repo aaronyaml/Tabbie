@@ -217,7 +217,7 @@ class LiveInput:
     def _mark(self, is_open: bool) -> None:
         try:
             (self.dir / "live.json").write_text(json.dumps({"open": is_open, "pid": self.proc.pid if self.proc else None,
-                                                            "at": time.time()}))
+                                                            "at": time.time()}), encoding="utf-8")
         except OSError:
             pass
 
@@ -267,7 +267,7 @@ class LiveInput:
                     except (OSError, ValueError):
                         return
                     self.delivered.append({"id": m.get("id"), "text": text, "mode": m.get("mode") or "queue"})
-                    with (self.dir / "inbox-acks.jsonl").open("a") as a:
+                    with (self.dir / "inbox-acks.jsonl").open("a", encoding="utf-8") as a:
                         a.write(json.dumps({"id": m.get("id"), "at": time.time()}) + "\n")
 
     def on_line(self, line: str) -> None:
@@ -511,7 +511,7 @@ def run_planner(phase: str, request: dict, manifest_text: str, images: list[str]
                               f"planner model '{model}' is not exposed to this Codex login "
                               f"(available: {', '.join(available) or 'none'}). Not substituting another model.")
         schema_file = work_dir / "plan.schema.json"
-        schema_file.write_text(json.dumps(PLAN_SCHEMA))
+        schema_file.write_text(json.dumps(PLAN_SCHEMA), encoding="utf-8")
         out_file = work_dir / f"plan-{phase}-{int(time.time())}.json"
         cmd = ["codex", "exec", "--skip-git-repo-check", "--ephemeral", "-m", model, "-s", "read-only", "-C", cwd,
                "--output-schema", str(schema_file), "-o", str(out_file),
@@ -526,7 +526,7 @@ def run_planner(phase: str, request: dict, manifest_text: str, images: list[str]
                                          stdin=prompt, on_line=_json_lines(on_event))
         else:
             code, out, err = _run(cmd, cwd=cwd, env=_clean_env(_OPENAI_BILLING_VARS), timeout=timeout, stdin=prompt)
-        raw = out_file.read_text() if out_file.exists() else ""
+        raw = out_file.read_text(encoding="utf-8") if out_file.exists() else ""
         if code != 0 or not raw:
             return PlanResult(False, None, provider, model, f"codex exec exit {code}: {err[-600:]}", raw)
         try:
@@ -671,7 +671,7 @@ class WorkerSlot:
 
     def _take(self, path: Path, deadline: float):
         while True:
-            fh = open(path, "w")
+            fh = open(path, "w", encoding="utf-8")
             try:
                 fcntl.flock(fh, fcntl.LOCK_EX | fcntl.LOCK_NB)
                 return fh
@@ -690,7 +690,7 @@ class WorkerSlot:
                 raise TimeoutError("this conversation is still running an earlier Claude job")
         while True:  # machine-wide cap
             for i in range(self.max):
-                fh = open(LOCKS_DIR / f"claude-worker-{i}.lock", "w")
+                fh = open(LOCKS_DIR / f"claude-worker-{i}.lock", "w", encoding="utf-8")
                 try:
                     fcntl.flock(fh, fcntl.LOCK_EX | fcntl.LOCK_NB)
                     self.fh = fh
@@ -709,7 +709,7 @@ class WorkerSlot:
         LOCKS_DIR.mkdir(parents=True, exist_ok=True)
         key = "".join(c if c.isalnum() else "-" for c in (session_key or ""))[:80]
         if key:
-            fh = open(LOCKS_DIR / f"claude-session-{key}.lock", "w")
+            fh = open(LOCKS_DIR / f"claude-session-{key}.lock", "w", encoding="utf-8")
             try:
                 fcntl.flock(fh, fcntl.LOCK_EX | fcntl.LOCK_NB)
                 fcntl.flock(fh, fcntl.LOCK_UN)
@@ -718,7 +718,7 @@ class WorkerSlot:
             finally:
                 fh.close()
         for i in range(max(1, int(max_parallel))):
-            fh = open(LOCKS_DIR / f"claude-worker-{i}.lock", "w")
+            fh = open(LOCKS_DIR / f"claude-worker-{i}.lock", "w", encoding="utf-8")
             try:
                 fcntl.flock(fh, fcntl.LOCK_EX | fcntl.LOCK_NB)
                 fcntl.flock(fh, fcntl.LOCK_UN)
@@ -956,7 +956,7 @@ def claude_transcript_tail(cwd: str, session_id: str | None, max_chars: int = 80
     if not f.exists():
         return ""
     lines = []
-    for raw in f.read_text(errors="replace").splitlines()[-300:]:
+    for raw in f.read_text(errors="replace", encoding="utf-8").splitlines()[-300:]:
         try:
             ev = json.loads(raw)
         except json.JSONDecodeError:
@@ -1064,7 +1064,7 @@ def run_astra_executor(prompt: str, *, cwd: str, add_dirs: list[str], cfg: dict,
     def on_start(proc):
         timings.setdefault("spawn", time.time())
         pid_file.parent.mkdir(parents=True, exist_ok=True)
-        pid_file.write_text(str(proc.pid))
+        pid_file.write_text(str(proc.pid), encoding="utf-8")
     try:
         code, _out, err = _run_stream(cmd, cwd=cwd, env={**_clean_env(_OPENAI_BILLING_VARS), **launch_env},
                                       timeout=int((cfg.get("executor", {}) or {}).get("timeout_seconds", 3600)),
@@ -1072,7 +1072,7 @@ def run_astra_executor(prompt: str, *, cwd: str, add_dirs: list[str], cfg: dict,
     finally:
         pid_file.unlink(missing_ok=True)
         timings["done"] = time.time()
-    result = out_file.read_text() if out_file.exists() else ""
+    result = out_file.read_text(encoding="utf-8") if out_file.exists() else ""
     stopped = code in _STOP_CODES
     by_user = stopped and bool(stop_marker) and Path(stop_marker).exists()
     return {"ok": code == 0 and bool(result), "result": result, "thread_id": thread["id"],

@@ -61,7 +61,7 @@ def config() -> dict:
     p = HERMES / "config" / "router.yaml"
     try:
         sect, out = False, {}
-        for ln in p.read_text().splitlines():
+        for ln in p.read_text(encoding="utf-8").splitlines():
             if re.match(r"^memory:\s*$", ln):
                 sect = True
                 continue
@@ -1034,7 +1034,7 @@ def usage_counts() -> dict[str, int]:
     c = collections.Counter()
     p = store.root() / ".stats" / "events.jsonl"
     if p.exists():
-        with open(p) as fh:
+        with open(p, encoding="utf-8") as fh:
             for ln in fh:
                 if '"retrieval"' in ln or '"read"' in ln:
                     try:
@@ -1076,7 +1076,7 @@ def run_cycle(*, trigger: str = "manual", dry_run: bool = False, llm: bool | Non
     if trigger not in TRIGGERS:
         return {"ok": False, "why": f"unknown trigger {trigger}"}
     # one cycle per scope at a time; different projects may dream side by side
-    lockf = open(store.root() / ".locks" / f"dream-{project or 'global'}.lock", "w")
+    lockf = open(store.root() / ".locks" / f"dream-{project or 'global'}.lock", "w", encoding="utf-8")
     try:
         fcntl.flock(lockf, fcntl.LOCK_EX | fcntl.LOCK_NB)
     except BlockingIOError:
@@ -1142,7 +1142,7 @@ def run_cycle(*, trigger: str = "manual", dry_run: bool = False, llm: bool | Non
 
 def _collect(trigger: str) -> dict:
     """Trace collection is shared by every cycle: one collector at a time, others just use what exists."""
-    f = open(store.root() / ".locks" / "collect.lock", "w")
+    f = open(store.root() / ".locks" / "collect.lock", "w", encoding="utf-8")
     try:
         fcntl.flock(f, fcntl.LOCK_EX | fcntl.LOCK_NB)
     except BlockingIOError:
@@ -1203,7 +1203,7 @@ def maybe_trigger(kind: str, project: str | None = None) -> bool:
         n = 0
         p = store.root() / ".stats" / "events.jsonl"
         if p.exists():
-            with open(p) as fh:
+            with open(p, encoding="utf-8") as fh:
                 for ln in fh:
                     if '"trace"' not in ln:
                         continue

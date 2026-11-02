@@ -39,7 +39,7 @@ def test_codex_non_token_lines_ignored():
 
 def test_latest_session_file(tmp_path):
     d = tmp_path / "2026" / "10" / "28"; d.mkdir(parents=True)
-    (d / "rollout-a.jsonl").write_text('{"payload":{"type":"user_message"}}\n' + CODEX_LINE + "\n")
+    (d / "rollout-a.jsonl").write_text('{"payload":{"type":"user_message"}}\n' + CODEX_LINE + "\n", encoding="utf-8")
     hit = L.latest_codex_session_limits(tmp_path)
     assert hit and hit["windows"][0]["pct"] == 8.0
 

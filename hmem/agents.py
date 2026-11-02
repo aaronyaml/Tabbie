@@ -22,7 +22,7 @@ def path() -> Path:
 def enabled() -> list[str]:
     """Enabled agents in a fixed order. No file (older installs) = both."""
     try:
-        text = path().read_text()
+        text = path().read_text(encoding="utf-8")
     except OSError:
         return list(AGENTS)
     m = re.search(r"^enabled:\s*\[([^\]]*)\]", text, re.M)
@@ -38,7 +38,7 @@ def dynamic_enabled() -> bool:
     """Dynamic agents (Claude Code and Codex may hand parts of a job to each other). Default ON: only an
     explicit `dynamic: false` turns it off."""
     try:
-        text = path().read_text()
+        text = path().read_text(encoding="utf-8")
     except OSError:
         return True
     m = re.search(r"^dynamic:\s*(\S+)", text, re.M)
@@ -49,7 +49,7 @@ def takeover_enabled() -> bool:
     """Takeover: a job that hits Claude's or Codex's usage limit carries on in the other one (same task,
     no question). Default ON: only an explicit `takeover: false` turns it off."""
     try:
-        text = path().read_text()
+        text = path().read_text(encoding="utf-8")
     except OSError:
         return True
     m = re.search(r"^takeover:\s*(\S+)", text, re.M)
@@ -82,6 +82,6 @@ def save(agents: list[str] | None = None, dynamic: bool | None = None, takeover:
                    "# Hand-offs: with both agents signed in, Claude Code and Codex may pass part of a job to each other.\n"
                    f"dynamic: {'true' if dyn else 'false'}\n"
                    "# Takeover: a job that hits one agent's usage limit carries on in the other (same task).\n"
-                   f"takeover: {'true' if take else 'false'}\n")
+                   f"takeover: {'true' if take else 'false'}\n", encoding="utf-8")
     os.replace(tmp, p)
     return picked

@@ -18,7 +18,7 @@ def events(kinds: tuple[str, ...] | None = None) -> list[dict]:
     out = []
     if not p.exists():
         return out
-    with open(p) as fh:
+    with open(p, encoding="utf-8") as fh:
         for ln in fh:
             try:
                 e = json.loads(ln)

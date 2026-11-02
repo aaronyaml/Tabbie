@@ -1,6 +1,7 @@
 """Dreamer: explicit user statements ("I like X", "always Y", "we deploy on Z") from every chat source.
 One statement in one session is enough. The LLM call is always stubbed; HMEM_NO_LLM is set by conftest."""
 from __future__ import annotations
+import re
 import json, subprocess, sys
 from pathlib import Path
 
@@ -39,9 +40,9 @@ def cc_session(e, sid, day, msgs, cwd=None):
     cwd = str(cwd or e.app)
     ev = [{"type": "user", "timestamp": f"{day}T10:00:{i:02d}Z", "sessionId": sid, "cwd": cwd,
            "origin": {"kind": "human"}, "message": {"role": "user", "content": m}} for i, m in enumerate(msgs, 1)]
-    d = e.cp / ("-" + cwd.strip("/").replace("/", "-"))
+    d = e.cp / re.sub(r"[^A-Za-z0-9]", "-", str(cwd))  # Claude Code's own folder naming
     d.mkdir(parents=True, exist_ok=True)
-    (d / f"{sid}.jsonl").write_text("\n".join(json.dumps(x) for x in ev) + "\n")
+    (d / f"{sid}.jsonl").write_text("\n".join(json.dumps(x) for x in ev) + "\n", encoding="utf-8")
 
 
 def webui_session(e, sid, workspace, msgs, t0=1793268210.0):
@@ -50,7 +51,7 @@ def webui_session(e, sid, workspace, msgs, t0=1793268210.0):
         out.append({"role": "user", "content": m, "timestamp": t0 + 60 * i})
         out.append({"role": "assistant", "content": "I like helping! Always happy to.", "timestamp": t0 + 60 * i + 5})
     (e.webui / f"{sid}.json").write_text(json.dumps({"session_id": sid, "title": "chat", "workspace": str(workspace),
-                                                     "created_at": t0, "updated_at": t0 + 3600, "messages": out}))
+                                                     "created_at": t0, "updated_at": t0 + 3600, "messages": out}), encoding="utf-8")
 
 
 def stub_llm(e, monkeypatch, answer):
@@ -78,7 +79,7 @@ def pending(e):
 
 
 def findings(e, r):
-    return json.loads((e.store.root() / "dreams" / r["cycle"] / "findings.json").read_text())["findings"]
+    return json.loads((e.store.root() / "dreams" / r["cycle"] / "findings.json").read_text(encoding="utf-8"))["findings"]
 
 
 def test_single_statement_in_one_session_becomes_a_proposal(env, monkeypatch):

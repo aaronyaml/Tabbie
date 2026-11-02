@@ -70,7 +70,7 @@ def summary(cwd: str, snap: str, limit: int = 40) -> dict | None:
         else:
             p = Path(cwd) / f
             try:
-                add = len(p.read_text(errors="ignore").splitlines()) if p.is_file() and p.stat().st_size < 2_000_000 else 0
+                add = len(p.read_text(errors="ignore", encoding="utf-8").splitlines()) if p.is_file() and p.stat().st_size < 2_000_000 else 0
             except OSError:
                 add = 0
             rem, new = 0, True
@@ -90,7 +90,7 @@ def diff_text(cwd: str, snap: str, files: list[str]) -> str:
         p = Path(cwd) / f
         if f not in out and p.is_file() and p.stat().st_size < 40_000:
             try:
-                out += f"\n--- /dev/null\n+++ b/{f}\n" + "".join("+" + ln for ln in p.read_text().splitlines(True))
+                out += f"\n--- /dev/null\n+++ b/{f}\n" + "".join("+" + ln for ln in p.read_text(encoding="utf-8").splitlines(True))
             except (OSError, UnicodeDecodeError):
                 pass
     return out[:MAX_DIFF]
@@ -109,7 +109,7 @@ def run_review(cwd: str, diff: str, why: list[str], *, model: str, effort: str =
                            env=_clean_env(_OPENAI_BILLING_VARS))
         except (OSError, subprocess.SubprocessError):
             return None
-        text = out_file.read_text().strip() if out_file.exists() else ""
+        text = out_file.read_text(encoding="utf-8").strip() if out_file.exists() else ""
     return text or None
 
 

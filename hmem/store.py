@@ -144,7 +144,7 @@ def _atomic_write(path: Path, text: str) -> None:
 def _lock(name: str, timeout: float = 30.0):
     d = root() / ".locks"
     d.mkdir(parents=True, exist_ok=True)
-    f = open(d / f"{D.slug(name)}.lock", "w")
+    f = open(d / f"{D.slug(name)}.lock", "w", encoding="utf-8")
     deadline = time.time() + timeout
     while True:
         try:
@@ -189,11 +189,11 @@ def init() -> Path:
         (r / d).mkdir(parents=True, exist_ok=True)
     gi = r / ".gitignore"
     want = "INDEX.md\nsessions/\n.stats/\n.locks/\n.archive/\n*.tmp\n.*.md.*\n"
-    if not gi.exists() or gi.read_text() != want:
+    if not gi.exists() or gi.read_text(encoding="utf-8") != want:
         _atomic_write(gi, want)
     readme = Path(__file__).with_name("README.memory.md")
-    if readme.exists() and (not (r / "README.md").exists() or (r / "README.md").read_text() != readme.read_text()):
-        _atomic_write(r / "README.md", readme.read_text())
+    if readme.exists() and (not (r / "README.md").exists() or (r / "README.md").read_text(encoding="utf-8") != readme.read_text(encoding="utf-8")):
+        _atomic_write(r / "README.md", readme.read_text(encoding="utf-8"))
     if not (r / ".git").exists():
         with _lock("store"):  # two first-time callers at once would both `git init` and clash on its config lock
             if not (r / ".git").exists():
@@ -234,7 +234,7 @@ def read(mem_id: str) -> Memory | None:
     p = path_for(mem_id)
     if not p.exists():
         return None
-    text = p.read_text()
+    text = p.read_text(encoding="utf-8")
     meta, body = D.parse(text)
     return Memory(meta, body, p, D.sha(text), text)
 
@@ -246,7 +246,7 @@ def all_memories(include_inactive: bool = False) -> list[Memory]:
         for p in sorted((r / top).rglob("*.md")):
             if any(part.startswith(".") for part in p.relative_to(r).parts):
                 continue
-            text = p.read_text()
+            text = p.read_text(encoding="utf-8")
             meta, body = D.parse(text)
             if not meta.get("id"):
                 continue
@@ -283,7 +283,7 @@ def committed_blobs() -> dict[str, str]:
 
 def is_committed(m: "Memory", blobs: dict[str, str] | None = None) -> bool:
     """blobs: a committed_blobs() result to reuse (one HEAD lookup for a whole batch of memories)."""
-    rel = str(m.path.resolve().relative_to(root().resolve()))
+    rel = m.path.resolve().relative_to(root().resolve()).as_posix()
     return (committed_blobs() if blobs is None else blobs).get(rel) == _blob_sha(m.text_raw)
 
 
@@ -341,7 +341,7 @@ def write(meta: dict, body: str, *, actor: str, expected_hash: str | None = None
         raise ValidationError("blocked by poisoning scan: " + "; ".join(f["rule"] for f in findings if f["severity"] == "block"))
     p = path_for(mem_id)
     with _lock("store"):
-        cur = p.read_text() if p.exists() else None
+        cur = p.read_text(encoding="utf-8") if p.exists() else None
         if cur is not None:
             if create_only:
                 raise ConflictError(f"{mem_id} already exists", D.sha(cur))
@@ -363,7 +363,7 @@ def write(meta: dict, body: str, *, actor: str, expected_hash: str | None = None
             raise ValidationError("; ".join(errs))
         text = D.render(meta, body)
         _atomic_write(p, text)
-        rel = str(p.relative_to(root().resolve()))
+        rel = p.relative_to(root().resolve()).as_posix()
         commit([rel], actor, f"{'update' if cur else 'create'} {mem_id} v{meta['version']}\n\nactor: {actor}\n"
                              f"reason: {reason or '-'}\nsources: {', '.join(meta.get('source_sessions') or []) or '-'}")
     append_event("write", id=mem_id, actor=actor, version=meta["version"], created=cur is None)
@@ -388,14 +388,14 @@ def set_status(mem_id: str, status: str, *, actor: str, expected_hash: str | Non
         with _lock("store"):
             dest.parent.mkdir(parents=True, exist_ok=True)
             os.replace(updated.path, dest)
-            commit([str(updated.path.relative_to(root().resolve())), str(dest.relative_to(root()))], actor,
+            commit([updated.path.relative_to(root().resolve()).as_posix(), dest.relative_to(root()).as_posix()], actor,
                    f"archive {mem_id}\n\nreason: {reason or '-'}")
         write_index()
     return updated
 
 
 def history(mem_id: str, n: int = 20) -> list[dict]:
-    rel = str(path_for(mem_id).relative_to(root().resolve()))
+    rel = path_for(mem_id).relative_to(root().resolve()).as_posix()
     r = _git("log", f"-n{n}", "--format=%H%x1f%an%x1f%aI%x1f%s", "--follow", "--", rel, check=False)
     return [dict(zip(("sha", "actor", "at", "subject"), ln.split("\x1f"))) for ln in r.stdout.splitlines() if ln]
 
@@ -404,7 +404,7 @@ def rollback(mem_id: str, to_sha: str, *, actor: str = "user") -> Memory:
     """Restore a memory to its content at commit to_sha (itself a new, auditable commit)."""
     if actor != "user":
         raise PermissionDenied("only the user rolls memory back")
-    rel = str(path_for(mem_id).relative_to(root().resolve()))
+    rel = path_for(mem_id).relative_to(root().resolve()).as_posix()
     old = _git("show", f"{to_sha}:{rel}").stdout
     cur = read(mem_id)
     meta, body = D.parse(old)

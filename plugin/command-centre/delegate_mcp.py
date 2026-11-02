@@ -111,7 +111,7 @@ def _note(rdir: Path | None, **fields) -> None:
     if not rdir:
         return
     try:
-        with (rdir / "notes.jsonl").open("a") as f:
+        with (rdir / "notes.jsonl").open("a", encoding="utf-8") as f:
             f.write(json.dumps({"at": time.time(), **fields}) + "\n")
     except OSError:
         pass
@@ -233,7 +233,7 @@ class Delegator:
         ddir = (rdir / "delegates" / did) if rdir else Path(cwd) / ".tabbie-delegate" / did
         ddir.mkdir(parents=True, exist_ok=True)
         prompt = bundle(args, caller=LABEL[caller], rdir=rdir, cwd=cwd, add_dirs=add_dirs, mode=mode)
-        (ddir / "prompt.md").write_text(prompt)
+        (ddir / "prompt.md").write_text(prompt, encoding="utf-8")
         before = _changed_files(cwd) if mode == "write" else set()
 
         run = agents_mod.AgentRun(rdir.name if rdir else did, _env("TABBIE_SESSION_ID"))
@@ -288,7 +288,7 @@ class Delegator:
         dur = round(time.time() - started, 1)
         text, tokens = "", 0
         if target == "codex":
-            text = out_file.read_text() if out_file.exists() else ""
+            text = out_file.read_text(encoding="utf-8") if out_file.exists() else ""
             for ln in out.splitlines():
                 try:
                     ev = json.loads(ln)
@@ -319,7 +319,7 @@ class Delegator:
             row["tokens"] = row.get("tokens") or tokens
             if rdir:
                 run.save(force=True)
-        (ddir / "result.md").write_text(text or (err or "")[-4000:])
+        (ddir / "result.md").write_text(text or (err or "")[-4000:], encoding="utf-8")
         changed = sorted(_changed_files(cwd) - before) if mode == "write" else []
         if not ok:
             limit = providers.usage_limit_info({"ok": False, "error": err, "result": text})
