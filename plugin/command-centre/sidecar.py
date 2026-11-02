@@ -379,6 +379,36 @@ def worker_stop(body: dict) -> tuple[int, dict]:
     return 200, {"ok": True, "request_id": rid}
 
 
+_retry_lock = threading.Lock()
+RETRY_WINDOW_S = 2 * 3600
+
+
+def retry_claim(body: dict) -> tuple[int, dict]:
+    """A chat's newest request was cut off by a restart (the reaper's INTERRUPTED): let exactly one
+    browser tab resend it, once, and only within RETRY_WINDOW_S. The tab then runs upstream /retry."""
+    import time as _t
+    sid = str(body.get("session") or "")
+    if not _SID.match(sid):
+        return 400, {"error": "bad session id"}
+    idx = common.read_json(agents.AGENTS_INDEX_DIR / f"{agents._safe(sid)}.json", None) or {}
+    rid = max(idx.get("requests") or {"": 0})
+    if not _RID.match(rid):
+        return 200, {"ok": False}
+    f = common.REQUESTS_DIR / rid / "request.json"
+    with _retry_lock:
+        req = common.read_json(f, {}) or {}
+        err = str((req.get("result") or {}).get("error") or "")
+        try:
+            age = _t.time() - f.stat().st_mtime
+        except OSError:
+            return 200, {"ok": False}
+        if req.get("status") != "failed" or err != updates.INTERRUPTED or req.get("auto_retried") or age > RETRY_WINDOW_S:
+            return 200, {"ok": False}
+        req["auto_retried"] = _t.strftime("%Y-%m-%dT%H:%M:%S")
+        common.write_json(f, req)
+    return 200, {"ok": True, "request_id": rid}
+
+
 _files_cache: dict[str, tuple] = {}
 
 
@@ -705,6 +735,8 @@ class Handler(BaseHTTPRequestHandler):
                 return self._send(*worker_message(body))
             if u.path == "/worker/stop" and isinstance(body, dict):
                 return self._send(*worker_stop(body))
+            if u.path == "/retry/claim" and isinstance(body, dict):
+                return self._send(*retry_claim(body))
             if u.path == "/motion/ensure":
                 return self._send(200, motion_studio.status(create=True))
             if u.path == "/motion/install":

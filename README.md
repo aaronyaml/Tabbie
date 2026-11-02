@@ -253,6 +253,8 @@ Then tell the user:
 - **Never expose Tabbie publicly.** No port forwarding, no `tailscale funnel`, no binding 8787 or
   8788 to `0.0.0.0`. The WebUI password always stays on.
 - **Don't restart services while a request is running** (`bin/hub health` / the WebUI shows it).
+  If one is cut off anyway (crash, reboot), Tabbie sends it again once when you next open that chat
+  (within 2 hours; one tab only).
 - **Every background service must be running, including Tabbie's helper (`ai.hermes.cc-sidecar`).**
   `bin/hub health` has a line for it. If it's ✗: `bin/hub services` installs any service that's
   missing (safe any time; running ones are left alone), then `bin/hub health` again. Without the

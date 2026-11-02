@@ -118,7 +118,7 @@
       "id": "cc-agents",
       "name": "Agents & questions",
       "scripts": [
-        "cc-agents.js?v=17"
+        "cc-agents.js?v=18"
       ],
       "stylesheets": [
         "cc-agents.css?v=10"

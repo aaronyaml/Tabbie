@@ -34,9 +34,24 @@
   let inflight = null;
   let lastFetch = 0;
 
+  // A run cut off by a restart (Mac rebooted, Tabbie crashed): resend it once when its chat is opened.
+  // The sidecar hands the claim to one tab only and only for the chat's newest request, within 2 h.
+  const retryAsked = new Set();
+  async function autoRetry(s) {
+    if (retryAsked.has(s)) return;
+    retryAsked.add(s);
+    try {
+      const r = await post('retry/claim', { session: s });
+      if (!r || !r.ok || sid() !== s || (typeof S !== 'undefined' && S.busy) || typeof window.cmdRetry !== 'function') return;
+      toast('Tabbie restarted while this was running. Sending it again.', 4000);
+      await window.cmdRetry();
+    } catch (_) { /* consent / offline: the reply already says to send it again */ }
+  }
+
   async function refresh(force) {
     const s = sid();
     if (!s) { data = null; dataSid = ''; render(); return; }
+    if (!retryAsked.has(s)) autoRetry(s);
     if (inflight) return inflight.then(() => (sid() !== dataSid ? refresh(true) : null));
     if (!force && s === dataSid && Date.now() - lastFetch < 1200) return;
     inflight = (async () => {

@@ -213,3 +213,22 @@ def test_request_files_running_codex_and_bad_session(tmp_path, monkeypatch):
     (d / "request.json").write_text(json.dumps({"id": RID, "status": "done",
                                                 "executor": {"provider": "claude-cli", "session_id": "x; rm -rf ~"}}))
     assert sc.request_files(RID)["resume_cmd"] is None
+
+
+def test_retry_claim_once_for_a_recent_interrupted_run(tmp_path, monkeypatch):
+    sc = _sidecar()
+    d = _wire(sc, tmp_path, monkeypatch)
+    monkeypatch.setattr(sc.agents, "AGENTS_INDEX_DIR", tmp_path / "agents")
+    (tmp_path / "agents").mkdir()
+    (tmp_path / "agents" / f"{sc.agents._safe(SID)}.json").write_text(json.dumps({"requests": {RID: {}}}))
+    req = {"id": RID, "status": "failed", "result": {"ok": False, "error": sc.updates.INTERRUPTED}}
+    (d / "request.json").write_text(json.dumps(req))
+    assert sc.retry_claim({"session": SID})[1] == {"ok": True, "request_id": RID}
+    assert sc.retry_claim({"session": SID})[1] == {"ok": False}            # once only
+    (d / "request.json").write_text(json.dumps({**req, "result": {"ok": False, "error": "boom"}}))
+    assert sc.retry_claim({"session": SID})[1] == {"ok": False}            # only restart cut-offs
+    (d / "request.json").write_text(json.dumps(req))
+    old = time.time() - 3 * 3600
+    os.utime(d / "request.json", (old, old))
+    assert sc.retry_claim({"session": SID})[1] == {"ok": False}            # too old
+    assert sc.retry_claim({"session": "../x"})[0] == 400
