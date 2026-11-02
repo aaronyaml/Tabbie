@@ -195,8 +195,10 @@ def init() -> Path:
     if readme.exists() and (not (r / "README.md").exists() or (r / "README.md").read_text() != readme.read_text()):
         _atomic_write(r / "README.md", readme.read_text())
     if not (r / ".git").exists():
-        _git("init", "-q", "-b", "main")
-        commit(["."], "user", "init memory store")
+        with _lock("store"):  # two first-time callers at once would both `git init` and clash on its config lock
+            if not (r / ".git").exists():
+                _git("init", "-q", "-b", "main")
+                commit(["."], "user", "init memory store")
     elif _git("status", "--porcelain", "--", "README.md", ".gitignore", check=False).stdout.strip():
         with _lock("store"):
             commit(["README.md", ".gitignore"], "user", "update memory map")
