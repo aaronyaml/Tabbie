@@ -30,6 +30,11 @@ from hmem.paths import hermes_home  # noqa: E402
 os.environ["PATH"] = os.pathsep.join([str(hermes_home() / "bin"), str(Path.home() / ".local" / "bin"),
                                       os.environ.get("PATH", "")])
 G, R, Y, N = "\033[32m", "\033[31m", "\033[33m", "\033[0m"
+for _s in (sys.stdout, sys.stderr):  # a pipe would get the ANSI code page, which has no ✓
+    try:
+        _s.reconfigure(encoding="utf-8", errors="replace")
+    except (AttributeError, ValueError):
+        pass
 if sys.platform == "win32":
     os.system("")  # turns on ANSI colours in the Windows console
 

@@ -187,8 +187,8 @@ def remove(pid: str) -> None:
 
 
 # ---------------------------------------------------------------- keys (OS credential store)
-# macOS: the login Keychain through the built-in `security` tool. Windows (and anything else): the
-# `keyring` library (Windows Credential Manager). Never a file, log or command line.
+# macOS: the login Keychain through the built-in `security` tool. Windows: Credential Manager
+# (hmem/wincred.py). Anything else: the `keyring` library. Never a file, log or command line.
 
 def _use_security() -> bool:
     import shutil
@@ -197,6 +197,11 @@ def _use_security() -> bool:
 
 
 def _keyring():
+    import sys
+    if sys.platform == "win32":
+        from .procutil import procutil  # noqa: F401  (puts ~/hermes on sys.path)
+        from hmem import wincred  # Credential Manager straight through the Win32 API: no package needed
+        return wincred
     try:
         import keyring
         return keyring

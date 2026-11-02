@@ -20,7 +20,7 @@ def test_setup_name_step_writes_local_js(tmp_path):
     before = local.read_bytes() if local.exists() else None
     try:
         r = subprocess.run([sys.executable, str(ROOT / "setup" / "windows.py"), "--yes", "--only", "name",
-                            "--name", "Sam"], capture_output=True, text=True, encoding="utf-8", timeout=120)
+                            "--name", "Sam"], capture_output=True, text=True, encoding="utf-8", errors="replace", timeout=120)
         assert r.returncode == 0, r.stdout + r.stderr
         text = local.read_text(encoding="utf-8")
         assert '"Sam"' in text and "window.HX_LOCAL" in text
@@ -34,8 +34,8 @@ def test_setup_name_step_writes_local_js(tmp_path):
 @win
 def test_hub_logs_and_help():
     r = subprocess.run([sys.executable, str(ROOT / "bin" / "hub.py"), "logs", "supervisor"],
-                       capture_output=True, text=True, encoding="utf-8", timeout=60)
+                       capture_output=True, text=True, encoding="utf-8", errors="replace", timeout=60)
     assert r.returncode == 0, r.stdout + r.stderr
     r = subprocess.run([sys.executable, str(ROOT / "bin" / "hub.py"), "nope"],
-                       capture_output=True, text=True, encoding="utf-8", timeout=60)
+                       capture_output=True, text=True, encoding="utf-8", errors="replace", timeout=60)
     assert r.returncode == 2 and "hub health" in r.stdout

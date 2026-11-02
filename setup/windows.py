@@ -41,6 +41,11 @@ ARCH = "aarch64" if os.environ.get("PROCESSOR_ARCHITECTURE", "").upper() == "ARM
 PLUGINS = ("command-centre", "fragment-memory", "limits", "workboard")
 STEPS = ("name", "agents", "tools", "signin", "files", "password", "services", "cert", "motion", "phone", "check")
 
+for _s in (sys.stdout, sys.stderr):  # a pipe would get the ANSI code page, which has no ✓
+    try:
+        _s.reconfigure(encoding="utf-8", errors="replace")
+    except (AttributeError, ValueError):
+        pass
 if sys.platform == "win32":
     os.system("")  # ANSI colours in the console
 B, D, G, Y, R, C, N = "\033[1m", "\033[2m", "\033[32m", "\033[33m", "\033[31m", "\033[36m", "\033[0m"

@@ -1,7 +1,7 @@
 """Model providers beyond the Claude / ChatGPT logins: config, key storage, picker catalog, worker env,
 routing and fallbacks. Offline: the key store, model lists and CLIs are faked."""
 from __future__ import annotations
-import importlib.util, sys, tempfile, types
+import importlib.util, os, sys, tempfile, types
 from importlib import import_module
 from pathlib import Path
 
@@ -269,3 +269,16 @@ def test_flock_shim_excludes_a_second_holder(tmp_path):
     fcntl.flock(a, fcntl.LOCK_UN)
     fcntl.flock(b, fcntl.LOCK_EX | fcntl.LOCK_NB)
     fcntl.flock(b, fcntl.LOCK_UN)
+
+
+@pytest.mark.skipif(sys.platform != "win32", reason="Windows Credential Manager")
+def test_windows_credential_manager_round_trip():
+    from hmem import wincred
+    svc, acct = "tabbie-test", f"ci-{os.getpid()}"
+    wincred.set_password(svc, acct, "sk-test-ünïcode")
+    try:
+        assert wincred.get_password(svc, acct) == "sk-test-ünïcode"
+    finally:
+        wincred.delete_password(svc, acct)
+    assert wincred.get_password(svc, acct) is None
+    wincred.delete_password(svc, acct)  # already gone: no error

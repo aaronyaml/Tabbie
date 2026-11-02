@@ -33,6 +33,7 @@ from __future__ import annotations
 import json
 import os
 import re
+import sys
 from pathlib import Path
 
 from .common import ROOT, STATE_DIR, write_json
@@ -42,6 +43,14 @@ WORKER_DIR = STATE_DIR / "worker"
 SETTINGS_FILE = WORKER_DIR / "claude-settings.json"
 SKILLS_PLUGIN = WORKER_DIR / "user-skills"
 LIMIT_GATE = ROOT / "bin" / "limit-gate"
+
+
+def gate_command(agent: str, purpose: str = "subagent") -> str:
+    """The limit-gate command line for a hook or a worker's shell. Windows has no shebangs, so it runs
+    through this Python there (forward slashes: fine in cmd, PowerShell and Git Bash alike)."""
+    if sys.platform == "win32":
+        return f'"{Path(sys.executable).as_posix()}" "{LIMIT_GATE.as_posix()}" {agent} --purpose {purpose}'
+    return f"{LIMIT_GATE} {agent} --purpose {purpose}"
 DEFAULT_KEEP = ["frontend-design", "impeccable", "ui-ux-pro-max", "taste-skill", "stop-slop"]
 LEAN_DISALLOWED = ["Workflow", "ReportFindings", "ListAgents"]
 # A request that names one of the dropped plugins' tools runs with the full profile instead.
@@ -86,7 +95,7 @@ def settings_for(user: dict, keep: list[str] | None = None) -> dict:
             hooks.setdefault("PreToolUse", []).append({**entry, "hooks": cmds})
     hooks.setdefault("PreToolUse", []).append({
         "matcher": "Agent|Task",
-        "hooks": [{"type": "command", "command": f"{LIMIT_GATE} claude --purpose subagent", "timeout": 20}]})
+        "hooks": [{"type": "command", "command": gate_command("claude"), "timeout": 20}]})
     out["hooks"] = hooks
     return out
 

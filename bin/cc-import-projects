@@ -33,7 +33,7 @@ def candidates() -> list[Path]:
                 if (d / ".claude").is_dir() or (d / "CLAUDE.md").is_file():
                     found.add(d.resolve())
     # Folders Claude Code has sessions for: ~/.claude/projects/-Users-me-<name>
-    prefix = "-" + str(HOME).strip("/").replace("/", "-") + "-"
+    prefix = re.sub(r"[^A-Za-z0-9]", "-", str(HOME)) + "-"  # Claude Code: C:\Users\me -> C--Users-me
     for enc in (HOME / ".claude" / "projects").glob(prefix + "*"):
         d = HOME / enc.name[len(prefix):]
         if d.is_dir() and d.parent == HOME and d.name not in SKIP and not d.name.startswith("."):

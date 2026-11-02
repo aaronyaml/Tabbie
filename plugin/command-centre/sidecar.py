@@ -220,7 +220,19 @@ _shot_lock = threading.Lock()
 
 
 def _sips(src: Path, dest: Path, px: int, quality: int) -> bool:
+    """Shrink a screenshot to a JPEG: macOS's sips, else Pillow (the Windows sidecar runs with it)."""
     tmp = dest.with_name(f".tmp-{dest.name}")
+    if not shutil.which("sips"):
+        try:
+            from PIL import Image
+            with Image.open(src) as im:
+                im.thumbnail((px, px))
+                im.convert("RGB").save(tmp, "JPEG", quality=quality)
+            os.replace(tmp, dest)
+            return True
+        except Exception:  # no Pillow, or not an image it reads: the caller serves the original
+            tmp.unlink(missing_ok=True)
+            return False
     try:
         subprocess.run(["sips", "-s", "format", "jpeg", "-s", "formatOptions", str(quality), "-Z", str(px),
                         str(src), "--out", str(tmp)], capture_output=True, timeout=8, check=True)

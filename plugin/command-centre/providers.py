@@ -18,6 +18,7 @@ from pathlib import Path
 
 from .flockcompat import fcntl
 from .procutil import procutil
+from . import worker_profile
 from .common import LOCKS_DIR, read_json
 from .questions import QUESTION_ITEM_SCHEMA, QUESTION_RULES
 
@@ -611,7 +612,7 @@ DYNAMIC_RULES = """DYNAMIC AGENTS — your judgement:
 _DYN = {
     "claude": {"own_subagents": "Agent/Task", "other": "Codex (OpenAI GPT)", "extra": ""},
     "codex": {"own_subagents": "spawn_agent", "other": "Claude Code (Anthropic Claude)",
-              "extra": "- Before spawn_agent, run `~/hermes/bin/limit-gate codex`; if it exits 2, work inline instead.\n"},
+              "extra": f"- Before spawn_agent, run `{worker_profile.gate_command('codex')}`; if it exits 2, work inline instead.\n"},
 }
 
 

@@ -87,7 +87,7 @@ def specs() -> dict[str, dict]:
     uv = _exe("uv")
     sidecar = str(ROOT / "plugin" / "command-centre" / "sidecar.py")
     out["sidecar"] = {"argv": ([uv, "run", "--no-project", "-q", "--with", "pyyaml", "--with", "ruamel.yaml",
-                                "--with", "pywebpush", "python", "-I", sidecar] if uv else [_python(), "-I", sidecar]),
+                                "--with", "pywebpush", "--with", "pillow", "python", "-I", sidecar] if uv else [_python(), "-I", sidecar]),
                       "cwd": ROOT, "log": LOGS / "cc-sidecar.log"}
     if uv:  # hermes.local over mDNS (python-zeroconf; dns-sd does this on macOS)
         out["mdns"] = {"argv": [uv, "run", "--no-project", "-q", "--with", "zeroconf", "python", "-I",
@@ -155,7 +155,7 @@ def _requests() -> set[str]:
     try:
         reqs = json.loads(f.read_text(encoding="utf-8"))
     except (OSError, ValueError):
-        return set(), False
+        return set()
     now = time.time()
     due = [r for r in reqs if r.get("at", 0) <= now]
     if not due:
