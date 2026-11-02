@@ -134,6 +134,22 @@
           + (open ? `<div class="hx-narr-lines">${steps.map((x) => stepHtml(x, false)).join('')}</div>` : '');
       }
     }
+    // what the job changed in the project (git): a toggle with the files, once the run has settled
+    const ch = live ? null : reqs.map((r) => r.changes).filter(Boolean);
+    if (ch && ch.length) {
+      const files = ch.flatMap((c) => c.files || []);
+      const count = ch.reduce((a, c) => a + (c.count || 0), 0);
+      const add = ch.reduce((a, c) => a + (c.add || 0), 0), del = ch.reduce((a, c) => a + (c.del || 0), 0);
+      const more = count - files.length;
+      const chOpen = openKeys.has('ch:' + key);
+      html += `<button type="button" class="hx-narr-toggle hx-ch-toggle" data-narr="${chOpen ? 'chclose' : 'chopen'}" aria-expanded="${chOpen}">
+          <span>${icon('FileEditIcon', 13)} ${count} file${count === 1 ? '' : 's'} changed <b class="hx-ch-add">+${add}</b>${del ? ` <b class="hx-ch-del">−${del}</b>` : ''}</span>
+          <span class="hx-narr-caret">${icon('ArrowDown01Icon', 12)}</span></button>`
+        + (chOpen ? `<div class="hx-ch-list">${files.map((f) => `<div class="hx-ch-row" title="${esc(f.path)}">
+            <span class="hx-ch-path">${esc(f.path)}${f.new ? ' <i>new</i>' : ''}</span>
+            <span class="hx-ch-n"><b class="hx-ch-add">+${f.add}</b>${f.del ? ` <b class="hx-ch-del">−${f.del}</b>` : ''}</span></div>`).join('')}
+            ${more > 0 ? `<div class="hx-ch-more">and ${more} more</div>` : ''}</div>` : '');
+    }
     if (imgs.length) {
       html += `<div class="hx-narr-shots">${imgs.map(({ rid, i }) => `<button type="button" class="hx-narr-shot" data-rid="${esc(rid)}" data-img="${esc(i.id)}" data-name="${esc(i.name)}" aria-label="Open ${esc(i.name)}" title="${esc(i.name)}">
           <img src="${esc(shotUrl(rid, i.id, 'thumb'))}" alt="${esc(i.name)}" loading="lazy" decoding="async"></button>`).join('')}</div>`;
@@ -212,7 +228,9 @@
     const n = e.target.closest('[data-narr]');
     if (n) {
       const k = box.dataset.key || '';
-      n.dataset.narr === 'open' ? openKeys.add(k) : openKeys.delete(k);
+      const v = n.dataset.narr;
+      if (v === 'chopen' || v === 'chclose') v === 'chopen' ? openKeys.add('ch:' + k) : openKeys.delete('ch:' + k);
+      else v === 'open' ? openKeys.add(k) : openKeys.delete(k);
       render();
       return;
     }

@@ -79,3 +79,20 @@
 .hx-shot-box.is-zoomed .hx-shot-img { cursor: grab; border-radius: 0; }
 .hx-shot-box.is-zoomed .hx-shot-nav, .hx-shot-box.is-zoomed .hx-shot-foot { opacity: 0; pointer-events: none; }
 .hx-shot-img { cursor: zoom-in; }
+
+/* what the job changed: "3 files changed +40 −2", opens to a file list */
+.hx-ch-toggle > span:first-child { display: inline-flex; align-items: center; gap: 5px; }
+.hx-ch-toggle svg { width: 13px; height: 13px; }
+.hx-ch-add { color: #2fa05a; font-weight: 600; }
+.hx-ch-del { color: #d0453a; font-weight: 600; }
+.hx-ch-list { display: flex; flex-direction: column; gap: 2px; margin-top: 4px; padding-left: 10px;
+  border-left: 2px solid var(--hx-border, rgba(127,127,127,.22)); font-size: 12.5px; }
+.hx-ch-row { display: flex; justify-content: space-between; gap: 12px; min-width: 0; color: var(--hx-text-2, #8a8a8e); }
+.hx-ch-path { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 12px; }
+.hx-ch-path i { font-style: normal; font-family: inherit; font-size: 11px; opacity: .8; }
+.hx-ch-n { flex: none; font-variant-numeric: tabular-nums; }
+.hx-ch-more { color: var(--hx-text-2, #8a8a8e); font-size: 12px; }
+.hx-narr .hx-ch-toggle .hx-narr-caret { transform: none; }
+.hx-narr .hx-ch-toggle[aria-expanded="true"] .hx-narr-caret { transform: rotate(180deg); }
+.hx-narr .hx-ch-toggle { margin-left: 14px; }

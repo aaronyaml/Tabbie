@@ -51,6 +51,34 @@ def changed(cwd: str, snap: str) -> list[str]:
     return sorted(f for f in now if f and f not in set(dirty_before))
 
 
+def summary(cwd: str, snap: str, limit: int = 40) -> dict | None:
+    """What a job changed, for the reply's "N files changed" card: files with lines added/removed
+    (new untracked files count all their lines). None when nothing changed."""
+    files = changed(cwd, snap)
+    if not files:
+        return None
+    head = snap.split("\n", 1)[0]
+    stat: dict[str, tuple[int, int]] = {}
+    for ln in _git(cwd, "diff", "--numstat", head, "--", *files[:200]).splitlines():
+        parts = ln.split("\t")
+        if len(parts) == 3:  # binary files show "-"
+            stat[parts[2]] = (int(parts[0]) if parts[0].isdigit() else 0, int(parts[1]) if parts[1].isdigit() else 0)
+    rows = []
+    for f in files:
+        if f in stat:
+            add, rem, new = *stat[f], False
+        else:
+            p = Path(cwd) / f
+            try:
+                add = len(p.read_text(errors="ignore").splitlines()) if p.is_file() and p.stat().st_size < 2_000_000 else 0
+            except OSError:
+                add = 0
+            rem, new = 0, True
+        rows.append({"path": f, "add": add, "del": rem, "new": new})
+    return {"count": len(rows), "add": sum(x["add"] for x in rows), "del": sum(x["del"] for x in rows),
+            "files": rows[:limit]}
+
+
 def risky(files: list[str]) -> list[str]:
     return [f for f in files if RISKY.search(f)]
 

@@ -143,10 +143,10 @@
       "id": "cc-narration",
       "name": "Worker narration & attached images",
       "scripts": [
-        "cc-narration.js?v=13"
+        "cc-narration.js?v=15"
       ],
       "stylesheets": [
-        "cc-narration.css?v=7"
+        "cc-narration.css?v=9"
       ]
     },
     {

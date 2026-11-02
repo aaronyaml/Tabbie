@@ -964,6 +964,19 @@ def _usage_row(u) -> dict | None:
     return {"input": inp, "cached": cached, "output": n("output_tokens") + n("reasoning_output_tokens")}
 
 
+def _record_changes(r: Request, cwd: str, snap: str | None) -> None:
+    """Store what the job changed (review.summary) on the request, for the reply's changes card."""
+    if not snap:
+        return
+    try:
+        ch = review.summary(cwd, snap)
+    except Exception:
+        ch = None
+    if ch:
+        r["changes"] = ch
+        r.save()
+
+
 def _auto_review(r: Request, cwd: str, snap: str, claude_model: str | None, feed=None) -> str | None:
     """Codex reviews a finished Claude job's sensitive changes (see review.py). Never fails the request."""
     try:
@@ -1093,7 +1106,7 @@ def _run_request(r: Request, feed=None, force: dict | None = None) -> dict:
                              effort=claude_effort, profile=profile)
     timings: dict = {}
     started = time.time()
-    snap = review.snapshot(cwd) if (r["project"] and ecfg.get("auto_review", True)) else None
+    snap = review.snapshot(cwd) if r["project"] else None
     res = run_claude(prompt, cwd=cwd, add_dirs=add_dirs, cfg=cfg, resume_session=resume, on_progress=feed,
                      session_key=r["session_id"], on_event=_agent_events(run, "claude"),
                      model=claude_model, effort=claude_effort, inbox=r.dir, profile=profile, delegate=delegate,
@@ -1129,7 +1142,8 @@ def _run_request(r: Request, feed=None, force: dict | None = None) -> dict:
     r["status"] = "done" if res.get("ok") else ("stopped" if res.get("stopped_by_user") else "failed")
     r.save()
     clean, asked = questions.extract(res.get("result") or "") if res.get("ok") else ("", None)
-    if snap and res.get("ok") and not asked and not res.get("stopped_by_user"):
+    _record_changes(r, cwd, snap)
+    if snap and ecfg.get("auto_review", True) and res.get("ok") and not asked and not res.get("stopped_by_user"):
         extra = _auto_review(r, cwd, snap, claude_model or ecfg.get("model"), feed)
         if extra:
             clean = (clean or (res.get("result") or "")).rstrip() + "\n\n" + extra
@@ -1298,6 +1312,7 @@ def _astra_takeover(r: Request, reason: str, choice: dict | None = None, feed=No
     _notify(f"Using {who}{'' if choice else ' (takeover)'}: {cwd}")
     timings: dict = {}
     started = time.time()
+    snap = review.snapshot(cwd) if r["project"] else None
     res = run_astra_executor(prompt, cwd=cwd, add_dirs=add_dirs, cfg=cfg,
                              pid_file=LOCKS_DIR / f"takeover-{r['session_id'][:60]}.pid",
                              on_event=_agent_events(run, "codex"), resume_thread=thread,
@@ -1313,6 +1328,7 @@ def _astra_takeover(r: Request, reason: str, choice: dict | None = None, feed=No
     r["result"] = res
     r["status"] = "done" if res.get("ok") else ("stopped" if res.get("stopped_by_user") else "failed")
     r.save()
+    _record_changes(r, cwd, snap)
     with run.lock:
         run.finish_main(bool(res.get("ok")), step=None if res.get("ok") else res.get("error"),
                         stopped=bool(res.get("stopped_by_user")))

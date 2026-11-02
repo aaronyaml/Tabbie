@@ -215,3 +215,20 @@ def test_risky_changes_get_a_codex_review_line(monkeypatch, tmp_path):
     cc._execute(_req("chatR2", "fix typo", proj))
     assert not reviewed  # nothing sensitive changed
     assert rv.note("LGTM", "GPT-6.1 Sol").endswith("no problems found in the sensitive changes.")
+
+
+def test_a_job_records_what_it_changed(monkeypatch, tmp_path):
+    _setup(monkeypatch)
+    proj = tmp_path / "app"; _git_repo(proj)
+    (proj / "README.md").write_text("x\nmine, not the job's\n")  # dirty before the job: left out
+
+    def run(prompt, **k):
+        (proj / "auth.py").write_text("def ok():\n    return False\n")
+        (proj / "new.txt").write_text("a\nb\nc\n")
+        return {"ok": True, "result": "Done.", "billing": "s"}
+    monkeypatch.setattr(cc, "run_claude", run)
+    monkeypatch.setattr(cc, "_auto_review", lambda *a, **k: None)
+    out = cc._execute(_req("chatC", "flip it", proj))
+    ch = cc.Request(out["request_id"]).data["changes"]
+    assert ch["count"] == 2 and ch["add"] == 4 and ch["del"] == 1
+    assert {f["path"]: (f["add"], f["del"], f["new"]) for f in ch["files"]} == {"auth.py": (1, 1, False), "new.txt": (3, 0, True)}

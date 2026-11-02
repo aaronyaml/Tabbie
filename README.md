@@ -108,6 +108,9 @@ low effort) reviews just that diff and the reply gets a short **Review** line: "
 or up to six `path:line — problem — fix` findings. It's skipped when Codex is off or near its limit;
 `executor.auto_review: false` turns it off.
 
+Every job in a git project also gets a **files changed** line under its reply (`3 files changed +58 −12`);
+tap it for the files and their line counts. Edits you had made before the job are left out.
+
 ### Hand-offs (dynamic agents)
 
 With **both** Claude Code and Codex linked, each worker gets a `delegate` tool and uses its own

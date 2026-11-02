@@ -150,7 +150,7 @@ def _request_row(rid: str) -> dict:
     return {"id": rid, "status": req.get("status"), "route": req.get("route"), "created": req.get("created"),
             "session_id": req.get("session_id"), "prompt": agents._short(req.get("original_prompt"), 120),
             "summary": summary, "agents_list": ags,
-            "questions": question_rounds(req), **narration_of(rid, data, req)}
+            "questions": question_rounds(req), "changes": req.get("changes"), **narration_of(rid, data, req)}
 
 
 BACKFILL = "images-backfill.json"
