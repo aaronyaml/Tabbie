@@ -93,13 +93,13 @@ Each request passes through the hub, a worker and back. To cut both time and tok
 - **Planner finalize skip** (`planner.finalize: auto`): an approved plan goes straight to Claude
   when the brief is already complete.
 
-Measured with `bin/bench-latency` (3 runs each, Opus 5.5):
+Measured with `bin/bench-latency` (two passes of 3 runs each, Opus 5.5):
 
 | Request | Time |
 |---|---|
-| Overhead around a job (R1: `sleep 45`, minus the 45 s) | 10–12 s (was 28–42 s) |
-| Small real job (R2: count files) | 10–14 s |
-| Long answer (R3: explain a file) | 12–17 s |
+| Overhead around a job (R1: `sleep 45`, minus the 45 s) | 10–13 s (was 28–42 s) |
+| Small real job (R2: count files) | 9–14 s |
+| Long answer (R3: explain a file) | 11–17 s |
 | Worker's first call | about 21k tokens, half cached (was 35–48k) |
 
 `bin/bench-latency --label NAME [--runs 3] [--only R1,R2]` runs it again; results go to `state/bench/`.
