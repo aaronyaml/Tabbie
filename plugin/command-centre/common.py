@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+import contextlib
+import fcntl
 import json
 import os
 import tempfile
@@ -45,7 +47,17 @@ def _dump_yaml(path: Path, data: dict) -> None:
         buf = io.StringIO()
         YAML().dump(data, buf)
         text = buf.getvalue()
-    path.write_text(text)
+    fd, tmp = tempfile.mkstemp(dir=path.parent, prefix=f".{path.name}.")  # never a half-written file
+    try:
+        with os.fdopen(fd, "w") as f:
+            f.write(text)
+        if path.exists():
+            os.chmod(tmp, path.stat().st_mode & 0o777)
+        os.replace(tmp, path)
+    except BaseException:
+        with contextlib.suppress(OSError):
+            os.unlink(tmp)
+        raise
 
 
 def load_config() -> dict:
@@ -58,6 +70,18 @@ def load_projects_file() -> dict:
 
 def save_projects_file(data: dict) -> None:
     _dump_yaml(CONFIG_DIR / "projects.yaml", data)
+
+
+@contextlib.contextmanager
+def projects_file_lock():
+    """Hold around load_projects_file() ... save_projects_file() so two writers don't drop each other's change."""
+    lf = CONFIG_DIR / ".projects.yaml.lock"
+    with open(lf, "a") as f:
+        fcntl.flock(f, fcntl.LOCK_EX)
+        try:
+            yield
+        finally:
+            fcntl.flock(f, fcntl.LOCK_UN)
 
 
 def read_json(path: Path, default: Any = None) -> Any:

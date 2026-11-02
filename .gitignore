@@ -62,3 +62,5 @@ webui-extension/.build/
 .DS_Store
 .claude/
 CLAUDE.local.md
+config/.projects.yaml.lock
+config/.*.yaml.*

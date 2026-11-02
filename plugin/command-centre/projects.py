@@ -16,7 +16,7 @@ import re
 import time
 from pathlib import Path
 
-from .common import STATE_DIR, load_projects_file, read_json, save_projects_file, write_json
+from .common import STATE_DIR, load_projects_file, projects_file_lock, read_json, save_projects_file, write_json
 
 CURRENT_FILE = STATE_DIR / "current_project.json"
 GENERAL_DIR = Path.home() / "hermes" / "general"  # WebUI "General" workspace = no project
@@ -93,11 +93,12 @@ def create_workspace(name: str, folders: list[str], primary: str | None = None) 
     if not slug or not paths:
         return False, "Need a name and at least one folder."
     primary_path = str(Path(primary).expanduser().resolve()) if primary else paths[0]
-    data = load_projects_file()
-    data.setdefault("workspaces", {})[slug] = {
-        "folders": [p.replace(str(Path.home()), "~", 1) for p in paths],
-        "primary": primary_path.replace(str(Path.home()), "~", 1)}
-    save_projects_file(data)
+    with projects_file_lock():
+        data = load_projects_file()
+        data.setdefault("workspaces", {})[slug] = {
+            "folders": [p.replace(str(Path.home()), "~", 1) for p in paths],
+            "primary": primary_path.replace(str(Path.home()), "~", 1)}
+        save_projects_file(data)
     wdir = WORKSPACES_DIR / slug
     wdir.mkdir(parents=True, exist_ok=True)
     for link in wdir.iterdir():
@@ -153,10 +154,11 @@ def set_current(name_or_path: str) -> tuple[str | None, str]:
         p = Path(target).expanduser()
         if p.is_dir():
             path = str(p.resolve())
-            data = load_projects_file()
-            data.setdefault("projects", {})
-            data["projects"].setdefault(p.resolve().name.lower(), path)
-            save_projects_file(data)
+            with projects_file_lock():
+                data = load_projects_file()
+                data.setdefault("projects", {})
+                data["projects"].setdefault(p.resolve().name.lower(), path)
+                save_projects_file(data)
     if not path:
         close = [n for n in projects if target.lower() in n][:8]
         hint = f" Close matches: {', '.join(close)}." if close else ""
