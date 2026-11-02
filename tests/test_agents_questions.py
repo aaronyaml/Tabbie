@@ -281,6 +281,48 @@ def test_background_task_is_not_a_subagent():
     assert s["agents"] == 1 and s["running"] == 0  # a background shell task is not an agent
 
 
+
+def _bash_bg(tid, task):
+    """A real `run_in_background` Bash call: task_started, then an instant tool_result ack."""
+    return [{"type": "system", "subtype": "task_started", "tool_use_id": tid, "task_id": task, "is_backgrounded": True,
+             "description": "Sleep 20 seconds then echo hi", "task_type": "local_bash"},
+            {"type": "user", "message": {"content": [{"type": "tool_result", "tool_use_id": tid,
+             "content": f"Command running in background with ID: {task}."}]},
+             "tool_use_result": {"backgroundTaskId": task}}]
+
+
+def test_background_task_stays_running_until_it_ends():
+    # shape from a real capture: the turn ends (result) while the task runs, Claude wakes on its notification
+    # (a second init) and answers, then a second result
+    run = _replay([*_bash_bg("bg1", "b1"),
+                   {"type": "result", "subtype": "success", "duration_ms": 3000, "num_turns": 2}])
+    main, bg = run.agents
+    assert bg["status"] == "running" and main["status"] == "running"
+    assert main["step"] == "Waiting for background tasks"
+    for ev in [{"type": "system", "subtype": "task_notification", "tool_use_id": "bg1", "task_id": "b1",
+                "status": "completed"},
+               {"type": "system", "subtype": "init", "model": "claude-haiku"},
+               _assistant([{"type": "text", "text": "It printed hi."}], mid="m9"),
+               {"type": "result", "subtype": "success", "duration_ms": 2000, "num_turns": 1}]:
+        run.apply_claude(ev, now=1100.0)
+    assert bg["status"] == "done" and main["status"] == "done"
+    assert main["duration_s"] == 100.0  # the whole run, not the last turn's 2s
+
+
+def test_background_list_settles_tasks_without_a_notification():
+    run = _replay([*_bash_bg("bg1", "b1"),
+                   {"type": "system", "subtype": "background_tasks_changed", "tasks": []}])
+    assert run.agents[1]["status"] == "done"
+
+
+def test_activity_after_a_result_reopens_the_main_agent():
+    run = _replay([{"type": "result", "subtype": "success", "duration_ms": 1000, "num_turns": 1},
+                   {"type": "system", "subtype": "init", "model": "claude-haiku"}])
+    assert run.main()["status"] == "running" and run.main()["ended"] is None
+    run.finish_main(True, stopped=True)
+    run.apply_claude({"type": "system", "subtype": "init"}, now=2000.0)
+    assert run.main()["status"] == "stopped"  # Stop is final
+
 def test_real_subagents_keep_kind_subagent():
     run = _replay(agents.load_events(FIX))
     assert [a.get("kind") for a in run.agents] == [None, "subagent", "subagent"]

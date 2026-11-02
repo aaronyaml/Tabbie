@@ -83,3 +83,18 @@ def test_delivered_messages_reach_run_claudes_result(tmp_path, monkeypatch):
 def test_no_live_messages_without_an_inbox(tmp_path):
     live = pv.LiveInput(tmp_path)
     assert live.delivered == []
+
+
+def test_stays_open_while_background_tasks_run(tmp_path):
+    # Claude ends a turn (result) while a background task runs, then wakes when it finishes: chat messages
+    # must still reach it in between, so stdin closes only at a result with nothing running in the background
+    import io, types
+    live = pv.LiveInput(tmp_path)
+    live.proc, live.open = types.SimpleNamespace(stdin=io.StringIO(), pid=None), True
+    ev = lambda **e: json.dumps(e)
+    live.on_line(ev(type="system", subtype="task_started", tool_use_id="t1", is_backgrounded=True))
+    live.on_line(ev(type="result", result="started it"))
+    assert live.open
+    live.on_line(ev(type="system", subtype="task_notification", tool_use_id="t1", status="completed"))
+    live.on_line(ev(type="result", result="it printed hi"))
+    assert not live.open

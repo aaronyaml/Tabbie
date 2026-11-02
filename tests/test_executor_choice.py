@@ -107,7 +107,7 @@ def test_execute_dispatches_by_choice():
                                  raw_message=text, project=str(proj), project_source="t")
 
     out = cc._execute(req("one"))  # default: Claude Code with Opus 5.5
-    assert out["ok"] and claude_calls[-1]["model"] == "claude-opus-5-5" and claude_calls[-1]["effort"] is None
+    assert out["ok"] and claude_calls[-1]["model"] == "claude-opus-5-5" and claude_calls[-1]["effort"] == "medium"
     assert out["route"].startswith("Route: Claude Opus 5.5 —")
 
     ec.set_choice("s9", "openai", "gpt-6.1-sol", "low")
@@ -187,3 +187,16 @@ def test_sidecar_executor_without_id_returns_new_chat_default(monkeypatch):
         assert [m["id"] for m in body["catalog"]["providers"]["openai"]["models"]] == ["gpt-6.1-sol"]
     code, _ = _get(sc, "/executor?id=bad%20id!", monkeypatch)
     assert code == 400
+
+
+def test_auto_effort_is_mostly_medium_and_rarely_high():
+    ae = cc.executor_choice.auto_effort
+    assert ae("what does the deploy script do?") == "low"
+    assert ae("commit and push") == "low" and ae("restart the dev server") == "low"
+    assert ae("add a dark mode toggle to the settings page") == "medium"
+    assert ae("deploy a team of legal specialists to analyse and provision anything that needs legal sign-off, "
+              "t&c, privacy policy, contracts, agreements etc") == "medium"
+    assert ae("refactor the auth flow and add tests for every edge case you can find") == "medium"
+    assert ae("what is wrong here? " + "context " * 40) == "medium"  # long: not a quick question
+    assert ae("think hard about the migration plan") == "high" and ae("ultrathink: why does it leak") == "high"
+    assert ae("") == "medium"

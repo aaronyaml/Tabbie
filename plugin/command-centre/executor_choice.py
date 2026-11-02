@@ -11,6 +11,7 @@ Only models verified to run on the user's subscriptions are listed (tiny `say hi
 
 from __future__ import annotations
 
+import re
 from pathlib import Path
 
 from .state import save_session_state, session_state
@@ -82,8 +83,11 @@ def get_choice(session_id: str) -> dict:
     """The conversation's choice, or the default. Always a complete, valid dict."""
     raw = session_state(session_id).get(KEY) or {}
     p, m, e = raw.get("provider"), raw.get("model"), raw.get("effort") or None
-    if not (isinstance(p, str) and isinstance(m, str) and valid(p, m, e)) or p not in providers_on():
-        d = default_choice()  # also when the picked agent was switched off in settings
+    if isinstance(p, str) and isinstance(m, str) and valid(p, m, e) and p not in providers_on() \
+            and AGENT_OF.get("openai" if p == "anthropic" else "anthropic") in _agents().enabled():
+        p, m = (peer := peer_model(p, m))["provider"], peer["model"]  # agent switched off: its equivalent
+    elif not (isinstance(p, str) and isinstance(m, str) and valid(p, m, e)) or p not in providers_on():
+        d = default_choice()
         p, m, e = d["provider"], d["model"], d["effort"]
     info = model_info(p, m)
     return {"provider": p, "model": m, "effort": e, "name": info["name"], "desc": info["desc"],
@@ -122,6 +126,26 @@ def public_catalog(available_openai: list[str] | None = None) -> dict:
             "agents": _agents().enabled()}
 
 
+# Auto effort (the picker's "Auto"): Tabbie picks per request instead of leaving it to each CLI's default
+# (Claude Code would inherit the user's own effortLevel, often high, on every run). Medium for nearly
+# everything; low for short questions and one-step chores; high only when the user asks for it.
+_HIGH_RX = re.compile(r"\b(ultrathink|think (really |very )?(hard|deeply|carefully)|deep(ly)? (think|reason)|"
+                      r"(max|maximum|high|highest) effort|reason (it )?(through )?carefully|as thoroughly as (you|possible)|"
+                      r"exhaustive(ly)?)\b", re.I)
+_LOW_RX = re.compile(r"^(what|which|where|who|when|why|how (many|much|long)|is|are|does|do|did|can|could|show|list|"
+                     r"open|run|start|stop|restart|rename|bump|commit|push|pull|undo|revert|fix (the |a |this )?typo)\b",
+                     re.I)
+
+
+def auto_effort(text: str | None) -> str:
+    t = " ".join(str(text or "").split())
+    if _HIGH_RX.search(t):
+        return "high"
+    if len(t.split()) <= 15 and _LOW_RX.search(t):
+        return "low"
+    return "medium"
+
+
 def claude_args(model: str | None, effort: str | None) -> list[str]:
     out = ["--model", model] if model else []
     return out + (["--effort", effort] if effort else [])
@@ -134,9 +158,9 @@ def codex_effort_args(effort: str | None) -> list[str]:
 # Same-tier model on the other provider, for hand-offs and limit switches. Override per model in
 # router.yaml: dynamic_agents.models: {claude-opus-5-5: gpt-6-astra, ...}.
 PEER = {
-    "claude-opus-5-5": "gpt-6-astra", "claude-fable-5-1": "gpt-6-astra",
-    "claude-sonnet-5-5": "gpt-6.1-sol", "claude-haiku-5-5": "gpt-6-luna",
-    "gpt-6-astra": "claude-opus-5-5", "gpt-6.1-sol": "claude-sonnet-5-5",
+    "claude-opus-5-5": "gpt-6.1-sol", "claude-fable-5-1": "gpt-6-astra",
+    "claude-sonnet-5-5": "gpt-6.1-terra", "claude-haiku-5-5": "gpt-6-luna",
+    "gpt-6.1-sol": "claude-opus-5-5", "gpt-6-astra": "claude-fable-5-1",
     "gpt-6.1-terra": "claude-sonnet-5-5", "gpt-6-luna": "claude-haiku-5-5",
 }
 

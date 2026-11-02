@@ -1,6 +1,14 @@
 {
   "extensions": [
     {
+      "id": "overflow-loader",
+      "name": "Extension overflow loader (past upstream's 32-file limit)",
+      "scripts": [
+        "overflow-loader.js?v=2"
+      ],
+      "stylesheets": []
+    },
+    {
       "id": "local",
       "name": "Local settings (local.js, written by bin/setup)",
       "scripts": [

@@ -69,10 +69,14 @@ def test_rule_variants_name_the_other_provider():
 
 
 def test_peer_model_same_tier():
-    assert ec.peer_model("anthropic", "claude-opus-5-5")["model"] == "gpt-6-astra"
-    assert ec.peer_model("openai", "gpt-6.1-sol")["model"] == "claude-sonnet-5-5"
+    assert ec.peer_model("anthropic", "claude-opus-5-5")["model"] == "gpt-6.1-sol"
+    assert ec.peer_model("openai", "gpt-6.1-sol")["model"] == "claude-opus-5-5"
+    assert ec.peer_model("anthropic", "claude-fable-5-1")["model"] == "gpt-6-astra"
+    assert ec.peer_model("openai", "gpt-6-astra")["model"] == "claude-fable-5-1"
+    for a, b in ec.PEER.items():
+        assert ec.PEER[b] == a  # every pair goes both ways
     assert ec.peer_model("anthropic", "claude-haiku-5-5", available_openai=["gpt-6-astra"])["model"] == "gpt-6-astra"
-    assert ec.peer_model("anthropic", "claude-opus-5-5", {"claude-opus-5-5": "gpt-6.1-sol"})["model"] == "gpt-6.1-sol"
+    assert ec.peer_model("anthropic", "claude-opus-5-5", {"claude-opus-5-5": "gpt-6.1-terra"})["model"] == "gpt-6.1-terra"
 
 
 def test_sidecar_agents_payload_has_dynamic_and_linked(monkeypatch):
@@ -141,9 +145,9 @@ def test_delegate_runs_codex_with_bundle_row_and_result(dm):
     ok, text = d.call({"task": "Review parser.py for edge cases", "why": "independent review",
                        "context": "c" * 20000, "files": [f"f{i}.py" for i in range(50)], "mode": "read",
                        "expect": "bullets"})
-    assert ok and text.startswith("Result from Codex GPT-6 Astra (read,") and "Found 2 issues: a, b" in text
+    assert ok and text.startswith("Result from Codex GPT-6.1 Sol (read,") and "Found 2 issues: a, b" in text
     cmd, env, prompt = seen["cmd"], seen["env"], seen["stdin"]
-    assert cmd[:2] == ["codex", "exec"] and cmd[cmd.index("-m") + 1] == "gpt-6-astra"
+    assert cmd[:2] == ["codex", "exec"] and cmd[cmd.index("-m") + 1] == "gpt-6.1-sol"
     assert cmd[cmd.index("-s") + 1] == "read-only" and "--ephemeral" in cmd and not any("tabbie" in c for c in cmd)
     assert env["TABBIE_DELEGATE_DEPTH"] == "1" and "OPENAI_API_KEY" not in env
     # the bundle: rules, folders, the user's request (capped), task, capped context, ≤30 files
@@ -156,7 +160,7 @@ def test_delegate_runs_codex_with_bundle_row_and_result(dm):
     assert len(rows) == 1
     a = json.loads(rows[0].read_text())["agents"][0]
     assert a["parent"] == "claude-1" and a["kind"] == "delegate" and a["to"] == "codex" and a["status"] == "done"
-    assert a["name"].startswith("Codex GPT-6 Astra · Review parser.py") and a["tokens"] == 1500
+    assert a["name"].startswith("Codex GPT-6.1 Sol · Review parser.py") and a["tokens"] == 1500
     assert (dm.RDIR / "delegates").exists() and list((dm.RDIR / "delegates").glob("*/result.md"))
     merged = dm.agents_mod.merged_agents(dm.RDIR.name)
     assert [x["id"] for x in merged] == [a["id"]]
@@ -177,7 +181,7 @@ def test_codex_caller_delegates_to_claude(dm, monkeypatch):
     ok, text = dm.Delegator(runner=run).call({"task": "Polish the onboarding copy", "why": "writing", "mode": "write"})
     cmd = seen["cmd"]
     assert ok and "Rewrote the copy" in text and "Files changed:" in text
-    assert cmd[0] == "claude" and "--no-session-persistence" in cmd and cmd[cmd.index("--model") + 1] == "claude-sonnet-5-5"
+    assert cmd[0] == "claude" and "--no-session-persistence" in cmd and cmd[cmd.index("--model") + 1] == "claude-opus-5-5"
     assert "--strict-mcp-config" in cmd and "ANTHROPIC_API_KEY" not in seen["env"]
     rules = cmd[cmd.index("--append-system-prompt") + 1]
     assert "DYNAMIC AGENTS" not in rules  # the delegate gets no delegate tool and no hand-off rules

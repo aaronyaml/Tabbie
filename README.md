@@ -111,8 +111,11 @@ On by default. Turn it off with the **Hand-offs** pill in the model picker's Age
 ### Usage limits gate
 
 Before any worker, planner or hand-off starts, Tabbie checks the subscription's usage (cached for
-60 s). At 95% or more it doesn't start: it offers to switch the request to the other agent instead,
-and a planner at its limit falls back to the other planner. Hand-offs to Codex stop at 90%, so they
+60 s). At 95% or more the request runs on the other agent's equivalent model instead, and the reply's
+route line says so (Opus 5.5 ↔ GPT-6.1 Sol, Fable 5.1 ↔ GPT-6-Astra, Sonnet 5.5 ↔ GPT-6.1 Terra,
+Haiku 5.5 ↔ GPT-6 Luna; the same pairs are used for hand-offs and when an agent is switched off). If the
+other agent is also at its limit or not signed in, nothing starts and Tabbie says when the limit resets.
+A planner at its limit falls back to the other planner. Hand-offs to Codex stop at 90%, so they
 never use up the ChatGPT allowance the hub shares. If usage can't be read, it starts anyway (logged). `bin/limit-gate` runs the same check (it's also used as a hook).
 
 ---
@@ -725,7 +728,7 @@ limits:
   block_at_pct: 95
   reserve_for_hub_pct: 90
 dynamic_agents:
-  models: {}                 # override the same-tier peer, e.g. {claude-opus-5-5: gpt-6-astra}
+  models: {}                 # override the equivalent model, e.g. {claude-opus-5-5: gpt-6-astra}
   hints: []                  # optional strength hints; none = pure judgement
 ``` Auto-approval of Dreamer proposals is off (`memory.auto_approve`); it never covers
 global memory, skills or deletions.

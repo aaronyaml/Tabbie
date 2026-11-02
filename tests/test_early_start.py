@@ -129,23 +129,20 @@ def _blocked(agent_block):
     return check
 
 
-def test_selected_executor_at_limit_offers_the_other(early, monkeypatch):
+def test_selected_executor_at_limit_switches_to_its_equivalent(early, monkeypatch):
     monkeypatch.setattr(gate, "check", _blocked({"claude"}))
     monkeypatch.setenv("TABBIE_LINKED", "claude,codex")
     ran = []
-    monkeypatch.setattr(cc, "run_claude", lambda *a, **k: pytest.fail("nothing may spawn"))
+    monkeypatch.setattr(cc, "run_claude", lambda *a, **k: pytest.fail("Claude is at its limit"))
     monkeypatch.setattr(cc, "run_astra_executor", lambda prompt, **k: ran.append(k) or {
         "ok": True, "result": "Done.", "model": k["model"], "billing": "chatgpt", "thread_id": "t"})
     r = request("fix it", project=early / "proj")
     out = cc._execute(r)
-    assert out["ok"] is False and "Let GPT do this one?" in out["action"] and "Claude is at 97%" in out["action"]
-    offer = st.session_state("s1")["takeover_offer"]
-    assert offer == {"rid": r.id, "to": "codex", "kind": "switch", "model": "gpt-6-astra"}
-    assert st.Request(r.id)["status"] == "limit_blocked"
-    # the user's "yes" routes to cc_takeover, which runs just this request on GPT
-    assert "cc_takeover" in cc._route_turn("s1", "yes")
-    res = json.loads(cc._tool_takeover({"request_id": r.id, "accept": True}))
-    assert res["ok"] and ran[-1]["model"] == "gpt-6-astra" and not st.session_state("s1").get("takeover")
+    # no question: Opus 5.5's equivalent (GPT-6.1 Sol) runs it, and the route line says why
+    assert out["ok"] and ran[-1]["model"] == "gpt-6.1-sol" and "action" not in out
+    assert ran[-1]["effort"] == "medium"  # Auto's pick carries over
+    assert "Codex GPT-6.1 Sol" in out["route"] and "at its limit" in out["route"]
+    assert not st.session_state("s1").get("takeover_offer") and not st.session_state("s1").get("takeover")
 
 
 def test_other_not_linked_gives_one_line(early, monkeypatch):
@@ -155,18 +152,16 @@ def test_other_not_linked_gives_one_line(early, monkeypatch):
     assert "action" not in out and "Claude is at 97%" in out["note"] and "Nothing was started" in out["note"]
 
 
-def test_codex_pick_at_limit_offers_claude(early, monkeypatch):
-    cc.executor_choice.set_choice("s7", "openai", "gpt-6.1-sol")
+def test_codex_pick_at_limit_switches_to_claude_equivalent(early, monkeypatch):
+    cc.executor_choice.set_choice("s7", "openai", "gpt-6.1-sol", "low")
     monkeypatch.setattr(gate, "check", _blocked({"codex"}))
     monkeypatch.setenv("TABBIE_LINKED", "claude,codex")
-    monkeypatch.setattr(cc, "run_astra_executor", lambda *a, **k: pytest.fail("nothing may spawn"))
+    monkeypatch.setattr(cc, "run_astra_executor", lambda *a, **k: pytest.fail("Codex is at its limit"))
     seen = []
     monkeypatch.setattr(cc, "run_claude", lambda prompt, **k: seen.append(k) or {"ok": True, "result": "Done.", "billing": "s"})
-    r = request("fix it", sid="s7", project=early / "proj")
-    out = cc._execute(r)
-    assert "Let Claude do this one?" in out["action"]
-    res = json.loads(cc._tool_takeover({"request_id": r.id, "accept": True}))
-    assert res["ok"] and seen[-1]["model"] == "claude-sonnet-5-5"
+    out = cc._execute(request("fix it", sid="s7", project=early / "proj"))
+    assert out["ok"] and seen[-1]["model"] == "claude-opus-5-5" and "Claude Opus 5.5" in out["route"]
+    assert seen[-1]["effort"] == "low"  # the picked effort carries over to Claude
 
 
 def test_planner_falls_back_to_other_cli(early, monkeypatch):

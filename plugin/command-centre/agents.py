@@ -305,22 +305,41 @@ class AgentRun:
         main = self.main() or self.start_main("Claude Code", "claude", now=now)
         t, st = ev.get("type"), ev.get("subtype")
         if t == "system" and st == "init":
+            self._reopen(main)
             main["model"] = ev.get("model") or main["model"]
             main["step"] = "Started"
             return True
+        if t == "system" and st == "background_tasks_changed":
+            # the live background list: a task that left it has ended, even if its notification never came
+            live = {x.get("task_id") for x in ev.get("tasks") or [] if isinstance(x, dict)}
+            changed = False
+            for a in self.agents:
+                if a.get("kind") == "background" and a["status"] == "running" and a.get("task_id") \
+                        and a["task_id"] not in live:
+                    _finish(a, "done", now)
+                    a["step"], changed = "Done", True
+            return changed
         if t == "system" and st in ("task_started", "task_progress", "task_notification"):
             tid = ev.get("tool_use_id")
             if not tid:
                 return False
             existing = self.get(tid)
+            if st == "task_started" and ev.get("is_backgrounded") is False and ev.get("task_type") != "local_agent" \
+                    and existing is None:
+                return False  # a foreground command inside a subagent: not a task of its own
+            if existing is None and st != "task_started":
+                return False  # progress or the end of a task we skipped (or never saw start)
             background = (ev.get("task_type") not in (None, "local_agent") if st == "task_started"
                           else (existing is None and not ev.get("subagent_type")))
             if existing is None and background:
                 # a background shell task (e.g. "sleep 50" in the background): a muted row, not an agent
                 a = self._sub(tid, ev.get("description") or "Background task", now)
                 a["kind"], a["description"] = "background", "background task"
+                a["step"] = "Running in the background"
             else:
                 a = self._sub(tid, ev.get("description") or ev.get("subagent_type") or "Subagent", now)
+            if ev.get("task_id") and not a.get("task_id"):
+                a["task_id"] = str(ev["task_id"])[:80]
             if a.get("kind") == "background":
                 if ev.get("description"):
                     a["name"] = _short(ev["description"], 80)
@@ -329,6 +348,8 @@ class AgentRun:
                     _finish(a, "done" if ok else "failed", now)
                     a["step"] = "Done" if ok else "Failed"
                 return True
+            if st == "task_started" and ev.get("is_backgrounded"):
+                a["async"] = True  # launched in the background: runs on after its tool call returns
             if ev.get("subagent_type"):
                 a["description"] = ev["subagent_type"]
             if ev.get("description"):
@@ -349,6 +370,8 @@ class AgentRun:
         if t == "assistant":
             msg = ev.get("message") or {}
             parent = ev.get("parent_tool_use_id")
+            if not parent:
+                self._reopen(main)
             a = self._sub(parent, "Subagent", now) if parent else main
             if msg.get("model") and not a.get("model"):
                 a["model"] = msg["model"]
@@ -387,9 +410,12 @@ class AgentRun:
                     continue
                 changed = self.end_op(b.get("tool_use_id"), bool(b.get("is_error")), now) or changed
                 a = self.get(b.get("tool_use_id") or "")
-                if not a or a["parent"] is None:
-                    continue
+                if not a or a["parent"] is None or a.get("kind") == "background":
+                    continue  # a background task's tool_result is only "running in background with ID ..."
                 tur = ev.get("tool_use_result") if isinstance(ev.get("tool_use_result"), dict) else {}
+                if tur.get("isAsync") or tur.get("status") == "async_launched":
+                    a["async"] = True  # only "Async agent launched": it reports back in a task_notification
+                    continue
                 if tur.get("totalTokens"):
                     a["tokens"] = int(tur["totalTokens"])
                 if tur.get("totalToolUseCount") is not None:
@@ -407,17 +433,28 @@ class AgentRun:
             return changed
         if t == "result":
             ok = not ev.get("is_error") and ev.get("subtype", "success") == "success"
+            if ok and any((a.get("kind") == "background" or a.get("async")) and a["status"] == "running"
+                          for a in self.agents):
+                # Claude ends the turn while background tasks run, then wakes when they finish and goes on
+                main["step"], main["reopened"] = "Waiting for background tasks", True  # duration: whole run
+                return True
             for a in self.agents:
                 if a["status"] == "running" and (a["parent"] == main["id"] or a["parent"] == "sub"):
                     _finish(a, "done" if ok else "failed", now)
             _finish(main, "done" if ok else "failed", now,
-                    (ev["duration_ms"] / 1000) if ev.get("duration_ms") else None)
+                    (ev["duration_ms"] / 1000) if ev.get("duration_ms") and not main.get("reopened") else None)
             self.drop_final(main["id"])
             main["step"] = "Done" if ok else _short(ev.get("result") or "Failed", 140)
             if ev.get("num_turns") is not None:
                 main["turns"] = ev["num_turns"]
             return True
         return False
+
+    def _reopen(self, main: dict) -> None:
+        """Claude can end a turn (a result event) and then carry on in the same process, e.g. woken by a
+        background task finishing. Activity after that means the main agent is running again."""
+        if main["status"] in ("done", "failed"):
+            main["status"], main["ended"], main["duration_s"], main["reopened"] = "running", None, None, True
 
     # -- narration + attached images -------------------------------------------------------
     def _act(self, a: dict) -> None:

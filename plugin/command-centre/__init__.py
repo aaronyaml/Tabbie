@@ -347,9 +347,25 @@ _WHO = {"claude": "Claude", "codex": "Codex"}
 _OTHER_NAME = {"claude": "Claude", "codex": "GPT"}
 
 
+def _auto_effort(r: Request) -> str:
+    """Effort for a run whose chat is on Auto: what the user typed decides (see executor_choice.auto_effort)."""
+    return executor_choice.auto_effort(r.data.get("raw_message") or r["original_prompt"] or "")
+
+
+def _takeover_peer(r: Request) -> str | None:
+    """The GPT equivalent of the Claude model a takeover continues from (Opus 5.5 -> GPT-6.1 Sol)."""
+    ex = r.data.get("executor") or {}
+    if not str(ex.get("provider") or "").startswith("claude"):
+        return None
+    m = ex.get("model") or executor_choice.DEFAULT["model"]
+    return executor_choice.peer_model("anthropic", m, (load_config().get("dynamic_agents") or {}).get("models") or {},
+                                      _codex_models_safe())["model"]
+
+
 def _limit_block(r: Request, agent: str, model: str | None, *, offer: bool = True) -> dict | None:
-    """Before spawning: None = go. Blocked: nothing starts; offer the other provider (when linked, enabled
-    and itself below the limit) through the clarify flow, else one line with the reset time."""
+    """Before spawning: None = go. Blocked: when the other provider is linked, enabled and itself below the
+    limit, {"switch": <its same-tier model>} and the caller runs that instead (no question); else nothing
+    starts and the hub says one line with the reset time."""
     try:
         g = limits_gate.check(agent, model, purpose="work")
     except Exception as exc:  # the gate itself must never stop work
@@ -360,8 +376,6 @@ def _limit_block(r: Request, agent: str, model: str | None, *, offer: bool = Tru
         r.save()
         return None
     other = limits_gate.other(agent)
-    r["status"] = "limit_blocked"
-    r.save()
     log_decision(event="limit_blocked", request=r.id, agent=agent, model=model, pct=g.pct, window=g.window)
     if offer and agents().has(other) and providers.linked(other):
         prov = "anthropic" if agent == "claude" else "openai"
@@ -370,16 +384,10 @@ def _limit_block(r: Request, agent: str, model: str | None, *, offer: bool = Tru
                                           (load_config().get("dynamic_agents") or {}).get("models") or {},
                                           _codex_models_safe())
         if not limits_gate.check(other, peer["model"], purpose="work").blocked:
-            st = session_state(r["session_id"])
-            st["takeover_offer"] = {"rid": r.id, "to": other, "kind": "switch", "model": peer["model"]}
-            save_session_state(r["session_id"], st)
-            when = limits_gate.clock(g.resets_at)
-            q = (f"{_WHO[agent]} is at {g.pct:g}%" + (f" (resets {when})" if when else "")
-                 + f". Let {_OTHER_NAME[other]} do this one?")
-            return {"request_id": r.id, "ok": False, "usage_limit": g.message, "route": _route_line(r),
-                    "action": (f"Nothing has started. Use the clarify tool with ONE question: '{q}' with choices "
-                               f"['Yes', 'No']. Then call cc_takeover(request_id=\"{r.id}\", accept=<true if Yes>). "
-                               "If clarify is unavailable, ask the same as plain text.")}
+            log_decision(event="limit_switch_auto", request=r.id, to=other, model=peer["model"])
+            return {"switch": peer}
+    r["status"] = "limit_blocked"
+    r.save()
     return {"request_id": r.id, "ok": False, "usage_limit": g.message,
             "note": f"Nothing was started. Tell the user in one line: {g.message}."
                     + ("" if agents().has(other) else "")}
@@ -868,7 +876,8 @@ def _execute(r: Request, feed=None, force: dict | None = None) -> dict:
     if force:
         info = executor_choice.model_info(force["provider"], force["model"]) or {"name": force["model"]}
         choice = {**choice, "provider": force["provider"], "model": force["model"], "name": info["name"],
-                  "worker": executor_choice.CATALOG[force["provider"]]["worker"]}
+                  "worker": executor_choice.CATALOG[force["provider"]]["worker"],
+                  "effort": force.get("effort") or choice["effort"]}
     picked = choice if choice["provider"] == "openai" else None
     if answer and q.get("source") == "astra":
         chosen_run = (r.data.get("executor") or {}).get("chosen")
@@ -878,9 +887,14 @@ def _execute(r: Request, feed=None, force: dict | None = None) -> dict:
     if picked and not answer:  # the user picked an OpenAI model for this conversation: Codex executes
         return _astra_takeover(r, reason=r["route_reason"], choice=picked, feed=feed, offer=not force)
     claude_model = choice["model"] if choice["provider"] == "anthropic" else None
-    claude_effort = choice["effort"] if choice["provider"] == "anthropic" else None
+    claude_effort = (choice["effort"] if choice["provider"] == "anthropic" else None) or _auto_effort(r)
     ecfg = dict(cfg.get("executor", {}) or {})
     blocked = _limit_block(r, "claude", claude_model or ecfg.get("model"), offer=not force)
+    if blocked and blocked.get("switch"):  # Claude is at its limit: its GPT equivalent does this one
+        peer = blocked["switch"]
+        return _astra_takeover(r, reason=f"Claude {choice['name']} is at its limit, so its equivalent took this one",
+                               choice={"provider": "openai", "model": peer["model"], "name": peer["name"],
+                                       "effort": claude_effort}, feed=feed, offer=False)
     if blocked:
         return blocked
     resume = None
@@ -937,7 +951,8 @@ def _execute(r: Request, feed=None, force: dict | None = None) -> dict:
         res["live_messages"] = sent + (res.get("live_messages") or [])
     r["pending_answer"] = None
     r["executor"] = {"provider": "claude-cli", "billing": res.get("billing"), "model": claude_model,
-                     "effort": claude_effort, "session_id": res.get("session_id") or resume, "resumed": bool(resume),
+                     "effort": claude_effort, "auto_effort": not choice["effort"],
+                     "session_id": res.get("session_id") or resume, "resumed": bool(resume),
                      "profile": res.get("profile") or profile, "dynamic": bool(delegate)}
     r["timings"] = {**(r.data.get("timings") or {}), **{k: round(v, 3) for k, v in timings.items()}}
     r["result"] = res
@@ -984,7 +999,7 @@ def _execute(r: Request, feed=None, force: dict | None = None) -> dict:
                            + "\", accept=<true if Yes>). If clarify is unavailable, ask the same as plain text.")}
     out = {
         "request_id": r.id,
-        "route": _route_line(r) if not force else f"Route: Claude {choice['name']} — {_WHO['codex']} was near its limit",
+        "route": _route_line(r) if not force else f"Route: Claude {choice['name']} — {_WHO['codex']} is at its limit, so its equivalent took this one",
         "ok": res.get("ok"),
         "executor": f"Claude Code (claude -p --model {claude_model})" if claude_model else "Claude Code (claude -p)",
         "billing": res.get("billing"),
@@ -1060,9 +1075,13 @@ def _astra_takeover(r: Request, reason: str, choice: dict | None = None, feed=No
     answer = r.data.get("pending_answer")
     thread = (r.data.get("executor") or {}).get("thread_id") if answer else None
     model = choice["model"] if choice else ((cfg.get("takeover", {}) or {}).get("model")
-                                            or (cfg.get("planner", {}) or {}).get("model"))
+                                            or _takeover_peer(r) or (cfg.get("planner", {}) or {}).get("model"))
     # a takeover exists because Claude is out: only a picked-Codex run may offer Claude instead
     blocked = _limit_block(r, "codex", model, offer=bool(choice) and offer)
+    effort = (choice or {}).get("effort") or (r.data.get("executor") or {}).get("effort") or _auto_effort(r)
+    if blocked and blocked.get("switch"):  # Codex is at its limit: its Claude equivalent does this one
+        return _execute(r, force={"provider": "anthropic", "model": blocked["switch"]["model"], "effort": effort},
+                        feed=feed)
     if blocked:
         return blocked
     manifest = Manifest(r.dir)
@@ -1074,7 +1093,7 @@ def _astra_takeover(r: Request, reason: str, choice: dict | None = None, feed=No
                    description="executor (Codex)", model=model)
     run.save(force=True)
     delegate = _delegate_env(r, run, parent="codex", cwd=cwd, add_dirs=add_dirs, model=model,
-                             effort=choice.get("effort") if choice else None) if choice else None
+                             effort=effort) if choice else None
     if answer and thread:
         prompt = questions.answer_prompt(r.data.get("question") or {}, answer)
         r.write_text(f"answer-{len(r.data.get('question_log') or [])}.md", prompt)
@@ -1093,12 +1112,12 @@ def _astra_takeover(r: Request, reason: str, choice: dict | None = None, feed=No
     res = run_astra_executor(prompt, cwd=cwd, add_dirs=add_dirs, cfg=cfg,
                              pid_file=LOCKS_DIR / f"takeover-{r['session_id'][:60]}.pid",
                              on_event=_agent_events(run, "codex"), resume_thread=thread,
-                             model=choice["model"] if choice else None,
-                             effort=choice["effort"] if choice else None,
+                             model=choice["model"] if choice else model,
+                             effort=effort,
                              stop_marker=r.dir / "stopped_by_user", delegate=delegate, timings=timings)
     r["pending_answer"] = None
     r["executor"] = {"provider": "codex-cli" if choice else "codex-cli (takeover)", "model": res.get("model"),
-                     "effort": choice["effort"] if choice else None, "chosen": bool(choice),
+                     "effort": effort, "auto_effort": not (choice or {}).get("effort"), "chosen": bool(choice),
                      "billing": res.get("billing"), "thread_id": res.get("thread_id"), "dynamic": bool(delegate)}
     r["timings"] = {**(r.data.get("timings") or {}), **{k: round(v, 3) for k, v in timings.items()}}
     r["result"] = res

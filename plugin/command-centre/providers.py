@@ -201,6 +201,7 @@ class LiveInput:
         self.proc = None
         self.open = False
         self.interrupts = 0
+        self.background: set = set()  # background task tool_use ids still running
         self.offset = 0
         self.delivered: list[dict] = []
 
@@ -265,15 +266,25 @@ class LiveInput:
                         a.write(json.dumps({"id": m.get("id"), "at": time.time()}) + "\n")
 
     def on_line(self, line: str) -> None:
-        if '"result"' not in line:
+        if '"result"' not in line and '"task_' not in line:
             return
         try:
             ev = json.loads(line)
         except json.JSONDecodeError:
             return
+        st = ev.get("subtype")
+        if ev.get("type") == "system" and st in ("task_started", "task_notification") and ev.get("tool_use_id"):
+            with self.lock:
+                if st == "task_notification":
+                    self.background.discard(ev["tool_use_id"])
+                elif ev.get("is_backgrounded"):
+                    self.background.add(ev["tool_use_id"])
+            return
         if ev.get("type") != "result":
             return
         with self.lock:
+            if self.background:  # Claude wakes when they finish and carries on: chat messages still go in
+                return
             if self.interrupts:  # the end of the step a Send now interrupted: its message runs next
                 self.interrupts -= 1
                 return
@@ -553,6 +564,9 @@ WORKER_RULES = """You are the execution worker of the user's command centre (dis
   the specific attachments its job needs. Do not generate paid assets the task did not ask for.
 - Subagents get only the context their task needs (relevant requirement, decisions, files,
   acceptance criteria), never the whole conversation.
+- Your run ends when your final message is written. Never end with work still running in the
+  background ("I'll check once they report back"): wait for every background subagent and command,
+  check their results, then write the final message.
 - Reference files/paths instead of pasting large unchanged content. Do not re-read or re-send
   attachments you already have.
 - Be exhaustive in execution, minimal in words. Before each major step, write ONE short status line
@@ -950,7 +964,7 @@ def run_astra_executor(prompt: str, *, cwd: str, add_dirs: list[str], cfg: dict,
     pcfg = cfg.get("planner", {}) or {}
     if not model:  # takeover: the configured Astra model at the planner's effort
         model = (cfg.get("takeover", {}) or {}).get("model") or pcfg.get("model")
-        effort = pcfg.get("reasoning_effort", "high")
+        effort = effort or pcfg.get("reasoning_effort", "medium")
     ok, why = codex_auth()
     if not ok:
         return {"ok": False, "error": f"Codex auth check failed: {why}", "billing": None}
