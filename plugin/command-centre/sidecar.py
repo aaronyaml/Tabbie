@@ -647,15 +647,16 @@ def agents_payload() -> dict:
             linked[a] = False
     return {"enabled": agent_set.enabled(), "labels": agent_set.LABEL,
             "installed": {a: bool(shutil.which(a)) for a in agent_set.AGENTS},
-            "dynamic": agent_set.dynamic_enabled(), "takeover": agent_set.takeover_enabled(), "linked": linked,
+            "dynamic": agent_set.dynamic_enabled(), "takeover": agent_set.takeover_enabled(),
+            "step_commits": agent_set.step_commits_enabled(), "uat": agent_set.uat_enabled(), "linked": linked,
             "dynamic_available": agent_set.dynamic_allowed(linked)}
 
 
 def set_agents(body: dict) -> tuple[int, dict]:
     try:
-        dyn, take = body.get("dynamic"), body.get("takeover")
-        agent_set.save(body.get("enabled") if "enabled" in body else None,
-                       dynamic=None if dyn is None else bool(dyn), takeover=None if take is None else bool(take))
+        flag = lambda k: None if body.get(k) is None else bool(body[k])  # noqa: E731
+        agent_set.save(body.get("enabled") if "enabled" in body else None, dynamic=flag("dynamic"),
+                       takeover=flag("takeover"), step_commits=flag("step_commits"), uat=flag("uat"))
     except (TypeError, ValueError) as exc:
         return 400, {"error": str(exc)}
     return 200, agents_payload()

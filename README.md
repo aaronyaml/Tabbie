@@ -41,6 +41,8 @@ On top of that:
 - **Takeover**: when Claude or Codex hits its limit mid-task, the other one carries on with the same task.
 - **Hand-offs**: with both agents linked, Claude can pass a task to Codex (or Codex to Claude), or
   to its own subagents, when it judges that's better. On by default.
+- **Small commits and tests**: in a git project a worker commits each working step on its own and
+  writes and runs acceptance tests before it says it's done. On by default.
 - **Fast and lean**: workers start with a slim profile and the reply is relayed verbatim, so a small
   job finishes in about 10–15 s.
 
@@ -113,6 +115,22 @@ or up to six `path:line — problem — fix` findings. It's skipped when Codex i
 
 Every job in a git project also gets a **files changed** line under its reply (`3 files changed +58 −12`);
 tap it for the files and their line counts. Edits you had made before the job are left out.
+
+### Small commits and test before done
+
+Both are on by default, for Claude Code and Codex workers alike:
+
+- **Small commits**: in a git project the worker commits each working step on its own (one logical
+  change per commit), staging only the files it changed, so your own uncommitted edits stay out. It
+  keeps to the files the task needs and says why if it needs many. It never pushes, amends, rebases
+  or force-pushes unless you ask. Outside a git repo it doesn't commit.
+- **Test before done**: any job that changes code writes acceptance tests for what changed (for UI,
+  in a real browser), runs them with the project's existing tests, and fixes things until they pass.
+  The reply's **Verified** line says what ran; a check that couldn't run is reported as not run.
+
+Say otherwise in a request ("don't commit", "one commit", "skip tests") and that request follows
+you. To turn either off for good, use the **Small commits** or **Test before done** switch in the
+model picker's Agents row (`step_commits:` / `uat:` in `config/agents.yaml`).
 
 ### Hand-offs (dynamic agents)
 

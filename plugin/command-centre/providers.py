@@ -596,6 +596,28 @@ WORKER_RULES = """You are the execution worker of the user's command centre (dis
 """ + QUESTION_RULES.replace("{", "{{").replace("}", "}}")
 
 
+STEP_COMMIT_RULES = """SMALL COMMITS (on unless this request says otherwise, e.g. "don't commit" or "one commit"):
+- In a git repo, commit each self-contained working step as soon as it works (one logical change per
+  commit), not one big commit at the end. Stage only the files that step changed (`git add <paths>`,
+  never `git add -A` or `git add .`), so the user's own uncommitted edits stay out.
+- Message: what changed and why, in plain words. Follow the project's commit conventions if it has them.
+- Keep the change small: touch only the files the task needs. No drive-by refactors, renames or
+  reformatting. If it really needs many files, say why in one Note line.
+- Never push, amend, rebase, reset or force anything unless asked. Not a git repo, or mid-merge/rebase:
+  don't commit, and say so in one Note line.
+"""
+
+UAT_RULES = """TEST BEFORE DONE (on unless this request says otherwise, e.g. "skip tests"):
+- Any job that changes code: before your final message, write acceptance tests for what you changed,
+  from the user's point of view (the project's own test framework; for UI, drive the real app in a
+  browser), and run them with the project's existing tests. Fix and re-run until they pass. With small
+  commits on, the tests go in with the step they cover.
+- Verified: name what you ran and the result. A check that can't run here is reported as not run,
+  never as passed.
+- Jobs that change no code (questions, docs, images) skip this.
+"""
+
+
 DYNAMIC_RULES = """DYNAMIC AGENTS — your judgement:
 - You choose how to do this job: alone, with your own subagents ({own_subagents}), or by handing a
   self-contained part to {other} through the `delegate` tool (MCP server "tabbie"). None of these is
@@ -617,10 +639,16 @@ _DYN = {
 
 
 def worker_rules(provider: str = "claude", *, dynamic: bool = False, max_subagents=2,
-                 hints: list[str] | None = None) -> str:
-    """The worker system rules. Two static variants per provider (dynamic on/off) keep the prompt
-    prefix byte-identical across requests, so it caches. hints: router.yaml dynamic_agents.hints."""
+                 hints: list[str] | None = None, step_commits: bool | None = None, uat: bool | None = None) -> str:
+    """The worker system rules. A few static variants per provider (dynamic, small commits, test before
+    done: each on/off) keep the prompt prefix byte-identical across requests, so it caches.
+    hints: router.yaml dynamic_agents.hints. step_commits/uat: None = the agents.yaml setting."""
+    from hmem import agents as agent_set
     base = WORKER_RULES.format(max_subagents=max_subagents)
+    if agent_set.step_commits_enabled() if step_commits is None else step_commits:
+        base += "\n" + STEP_COMMIT_RULES
+    if agent_set.uat_enabled() if uat is None else uat:
+        base += "\n" + UAT_RULES
     if not dynamic:
         return base
     extra = "".join(f"- Hint: {str(h).strip()}\n" for h in (hints or []) if str(h).strip())

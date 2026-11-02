@@ -38,6 +38,20 @@ def test_default_is_both_and_save_round_trips():
     assert agents.enabled() == ["claude", "codex"]  # a refused save leaves the file alone
 
 
+def test_small_commits_and_tests_default_on_and_switch_off():
+    assert agents.step_commits_enabled() and agents.uat_enabled()  # no file: on
+    agents.save(step_commits=False)
+    assert not agents.step_commits_enabled() and agents.uat_enabled() and agents.takeover_enabled()
+    agents.save(uat=False)
+    assert not agents.step_commits_enabled() and not agents.uat_enabled()
+    on = prov.worker_rules("claude")
+    assert "SMALL COMMITS" not in on and "TEST BEFORE DONE" not in on
+    agents.save(step_commits=True, uat=True)
+    rules = prov.worker_rules("codex", dynamic=True)
+    assert "SMALL COMMITS" in rules and "git add -A" in rules and "TEST BEFORE DONE" in rules
+    assert rules == prov.worker_rules("codex", dynamic=True)  # still byte-identical: the prefix caches
+
+
 def test_broken_file_falls_back_to_both():
     agents.path().parent.mkdir(parents=True, exist_ok=True)
     for text in ("", "enabled: []\n", "enabled: [banana]\n", "garbage"):

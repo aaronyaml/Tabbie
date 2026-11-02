@@ -34,26 +34,37 @@ def has(agent: str) -> bool:
     return agent in enabled()
 
 
-def dynamic_enabled() -> bool:
-    """Dynamic agents (Claude Code and Codex may hand parts of a job to each other). Default ON: only an
-    explicit `dynamic: false` turns it off."""
+def _flag(key: str) -> bool:
+    """A default-ON switch in agents.yaml: only an explicit `<key>: false` turns it off."""
     try:
         text = path().read_text(encoding="utf-8")
     except OSError:
         return True
-    m = re.search(r"^dynamic:\s*(\S+)", text, re.M)
+    m = re.search(rf"^{key}:\s*(\S+)", text, re.M)
     return not (m and m.group(1).strip().strip("'\"").lower() in ("false", "no", "off", "0"))
+
+
+def dynamic_enabled() -> bool:
+    """Dynamic agents (Claude Code and Codex may hand parts of a job to each other). Default ON."""
+    return _flag("dynamic")
 
 
 def takeover_enabled() -> bool:
     """Takeover: a job that hits Claude's or Codex's usage limit carries on in the other one (same task,
-    no question). Default ON: only an explicit `takeover: false` turns it off."""
-    try:
-        text = path().read_text(encoding="utf-8")
-    except OSError:
-        return True
-    m = re.search(r"^takeover:\s*(\S+)", text, re.M)
-    return not (m and m.group(1).strip().strip("'\"").lower() in ("false", "no", "off", "0"))
+    no question). Default ON."""
+    return _flag("takeover")
+
+
+def step_commits_enabled() -> bool:
+    """Small commits: in a git project a worker commits each working step on its own and keeps the change
+    to the files the task needs. Default ON; a request that says otherwise wins for that request."""
+    return _flag("step_commits")
+
+
+def uat_enabled() -> bool:
+    """Test before done: a worker writes and runs acceptance tests for any code change before it reports.
+    Default ON; a request that says otherwise wins for that request."""
+    return _flag("uat")
 
 
 def dynamic_allowed(linked: dict | None = None) -> bool:
@@ -63,7 +74,8 @@ def dynamic_allowed(linked: dict | None = None) -> bool:
     return dynamic_enabled() and both and (linked is None or all(linked.get(a) for a in AGENTS))
 
 
-def save(agents: list[str] | None = None, dynamic: bool | None = None, takeover: bool | None = None) -> list[str]:
+def save(agents: list[str] | None = None, dynamic: bool | None = None, takeover: bool | None = None,
+         step_commits: bool | None = None, uat: bool | None = None) -> list[str]:
     """Write config/agents.yaml. None for any argument keeps its current setting."""
     if agents is None:
         picked = enabled()
@@ -73,6 +85,8 @@ def save(agents: list[str] | None = None, dynamic: bool | None = None, takeover:
         raise ValueError("pick at least one agent: claude, codex or both")
     dyn = dynamic_enabled() if dynamic is None else bool(dynamic)
     take = takeover_enabled() if takeover is None else bool(takeover)
+    steps = step_commits_enabled() if step_commits is None else bool(step_commits)
+    test = uat_enabled() if uat is None else bool(uat)
     p = path()
     p.parent.mkdir(parents=True, exist_ok=True)
     tmp = p.with_suffix(".tmp")
@@ -82,6 +96,10 @@ def save(agents: list[str] | None = None, dynamic: bool | None = None, takeover:
                    "# Hand-offs: with both agents signed in, Claude Code and Codex may pass part of a job to each other.\n"
                    f"dynamic: {'true' if dyn else 'false'}\n"
                    "# Takeover: a job that hits one agent's usage limit carries on in the other (same task).\n"
-                   f"takeover: {'true' if take else 'false'}\n", encoding="utf-8")
+                   f"takeover: {'true' if take else 'false'}\n"
+                   "# Small commits: in a git project each working step is its own commit, touching only what the task needs.\n"
+                   f"step_commits: {'true' if steps else 'false'}\n"
+                   "# Test before done: acceptance tests are written and run for every code change before the reply.\n"
+                   f"uat: {'true' if test else 'false'}\n", encoding="utf-8")
     os.replace(tmp, p)
     return picked

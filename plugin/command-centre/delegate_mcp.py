@@ -65,6 +65,7 @@ self-contained part of it. Do only that part, well.
   message; the caller decides.
 - mode=read: do not modify any file. mode=write: change only what the task needs; the caller will not
   touch those files until you return.
+- Never git commit, push or stage anything: the caller owns the commits (and runs the tests).
 - Reference paths instead of pasting large unchanged content.
 - Final message, short: what you did or found, files changed (paths), anything the caller must check."""
 

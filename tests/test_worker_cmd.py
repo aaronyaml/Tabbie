@@ -119,5 +119,8 @@ def test_worker_rules_variants_are_static():
     assert a == prov.worker_rules("claude", dynamic=True)  # byte-identical: the prefix caches
     b = prov.worker_rules("codex", dynamic=True)
     assert "Claude Code (Anthropic Claude)" in b and re.search(r'limit-gate"? codex', b) and "spawn_agent" in b
-    assert prov.worker_rules("claude") == prov.WORKER_RULES.format(max_subagents=2)
+    assert prov.worker_rules("claude", step_commits=False, uat=False) == prov.WORKER_RULES.format(max_subagents=2)
+    both = prov.worker_rules("claude", step_commits=True, uat=True)
+    assert both.startswith(prov.WORKER_RULES.format(max_subagents=2))
+    assert "unless this request says otherwise" in both and "never as passed" in both
     assert "Hint: GPT for SQL" in prov.worker_rules("claude", dynamic=True, hints=["GPT for SQL"])
