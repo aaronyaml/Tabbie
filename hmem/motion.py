@@ -230,6 +230,14 @@ def films(p: Path | None = None) -> dict:
 
 
 # ── what's linked (for the Generate buttons) ──────────────────────────────────────────────────
+def _tilde(p: Path) -> str:
+    """Show a path under home as ~/…: shorter, and never puts the user's name on screen."""
+    try:
+        return "~/" + str(Path(p).relative_to(Path.home()))
+    except ValueError:
+        return str(p)
+
+
 def _env_key(p: Path, name: str) -> bool:
     if os.environ.get(name, "").strip():
         return True
@@ -238,6 +246,53 @@ def _env_key(p: Path, name: str) -> bool:
     except OSError:
         return False
     return re.search(rf"^\s*(?:export\s+)?{name}\s*=\s*['\"]?[^\s'\"#]+", text, re.M) is not None
+
+
+_KEY = re.compile(r"^[A-Za-z0-9_-]{20,200}$")
+
+
+def _check_elevenlabs(key: str) -> str:
+    """"ok", "bad" (ElevenLabs says the key is invalid) or "unknown" (couldn't ask). A key limited to
+    music may not read /v1/user: only an explicit invalid-key answer counts as bad."""
+    import urllib.error
+    import urllib.request
+    req = urllib.request.Request("https://api.elevenlabs.io/v1/user", headers={"xi-api-key": key})
+    try:
+        with urllib.request.urlopen(req, timeout=8):
+            return "ok"
+    except urllib.error.HTTPError as exc:
+        body = exc.read(2000).decode("utf-8", "replace").lower()
+        return "bad" if exc.code == 401 and "invalid" in body else "ok"
+    except (OSError, ValueError):
+        return "unknown"
+
+
+def set_elevenlabs_key(key: str, check=_check_elevenlabs) -> tuple[int, dict]:
+    """Save the user's ElevenLabs API key in the studio's .env (git-ignored, 0600). Never logged or
+    echoed back. Replaces an existing ELEVENLABS_API_KEY line, keeps every other line."""
+    key = (key or "").strip()
+    if not _KEY.match(key):
+        return 400, {"error": "That doesn't look like an ElevenLabs API key. Copy it again from elevenlabs.io."}
+    p = studio_dir()
+    if not p.is_dir():
+        return 409, {"error": "Install Motion first, then connect ElevenLabs."}
+    verdict = check(key)
+    if verdict == "bad":
+        return 400, {"error": "ElevenLabs says that key isn't valid. Check it and try again."}
+    env = p / ".env"
+    try:
+        lines = env.read_text().splitlines() if env.exists() else []
+    except OSError:
+        lines = []
+    lines = [ln for ln in lines if not re.match(r"^\s*(?:export\s+)?ELEVENLABS_API_KEY\s*=", ln)]
+    lines.append(f"ELEVENLABS_API_KEY={key}")
+    tmp = env.with_name(".env.tabbie-tmp")
+    fd = os.open(tmp, os.O_WRONLY | os.O_CREAT | os.O_TRUNC, 0o600)
+    with os.fdopen(fd, "w") as f:
+        f.write("\n".join(lines) + "\n")
+    os.replace(tmp, env)
+    os.chmod(env, 0o600)
+    return 200, {"ok": True, "checked": verdict == "ok"}
 
 
 _hf: dict = {"at": 0.0, "ok": False}
@@ -281,8 +336,8 @@ def status(create: bool = False) -> dict:
             # studio's .env. The hosted ElevenLabs MCP (`hermes mcp login elevenlabs`) has no music tool.
             "linked": exists and _env_key(p, "ELEVENLABS_API_KEY"),
             "mcp": (Path.home() / ".hermes" / "mcp-tokens" / "elevenlabs.json").is_file(),
-            "hint": f"To generate music, link ElevenLabs: add ELEVENLABS_API_KEY=<your key> to {p}/.env "
-                    "(elevenlabs.io → Developers → API keys), then reopen Motion.",
+            "hint": "Generate audio needs ElevenLabs: connect it with your API key (elevenlabs.io → Developers → "
+                    f"API keys), or add ELEVENLABS_API_KEY=<your key> to {_tilde(p)}/.env yourself.",
         },
         "higgsfield": {
             "linked": higgsfield_linked(),

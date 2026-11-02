@@ -119,7 +119,7 @@ async function refresh() { try { S = await api('/api/state'); } catch (e) { note
 const agents = () => S.agents || [];
 const usesClaude = () => agents().includes('claude');
 const usesCodex = () => agents().includes('codex');
-const toolsNeeded = () => ['git', 'hermes', ...(usesClaude() ? ['claude'] : []), ...(usesCodex() ? ['codex'] : []), 'caddy'];
+const toolsNeeded = () => ['git', 'hermes', ...(usesClaude() ? ['claude'] : []), ...(usesCodex() ? ['codex'] : []), 'caddy', 'uv'];
 
 const STEPS = [
   { id: 'name', title: 'About you', done: () => S.name !== null },
@@ -216,6 +216,7 @@ const VIEWS = {
       claude: ['Claude Code', "Anthropic's coding agent."],
       codex: ['Codex', "OpenAI's coding agent."],
       caddy: ['Caddy', 'Serves Tabbie at https://hermes.local, with its icons and page addresses. Required.'],
+      uv: ['uv', "Runs Tabbie's helper service: the agents panel, Stop, Hand-offs and updates. Required."],
     };
     const need = toolsNeeded();
     const missing = need.filter((t) => !S.tools[t]);

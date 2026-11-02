@@ -107,3 +107,40 @@ def test_films_lists_the_studio_folder(tmp_path):
         {"project": "new", "title": "New", "step": "audio", "updatedAt": "2026-02-01T00:00:00Z"},
         {"project": "old", "title": "Old", "step": "editor", "updatedAt": "2026-01-01T00:00:00Z", "sessionId": "abc123"},
     ]
+
+
+KEY = "sk_" + "a1" * 20
+
+
+def test_connect_elevenlabs_saves_key_privately(tmp_path):
+    p = motion.studio_dir(); p.mkdir(parents=True)
+    (p / ".env").write_text("OTHER=1\nELEVENLABS_API_KEY=old\n")
+    code, res = motion.set_elevenlabs_key(KEY, check=lambda k: "ok")
+    assert code == 200 and res == {"ok": True, "checked": True}
+    text = (p / ".env").read_text()
+    assert "OTHER=1" in text and f"ELEVENLABS_API_KEY={KEY}" in text and "=old" not in text
+    assert oct((p / ".env").stat().st_mode & 0o777) == "0o600"
+    assert KEY not in json.dumps(motion.status())  # linked now, key never echoed
+    assert motion.status()["elevenlabs"]["linked"] is True
+
+
+def test_connect_elevenlabs_refuses_bad_keys(tmp_path):
+    p = motion.studio_dir(); p.mkdir(parents=True)
+    assert motion.set_elevenlabs_key("abc", check=lambda k: "ok")[0] == 400
+    assert motion.set_elevenlabs_key(KEY, check=lambda k: "bad")[0] == 400
+    assert not (p / ".env").exists()  # nothing written for a rejected key
+
+
+def test_connect_elevenlabs_offline_still_saves(tmp_path):
+    p = motion.studio_dir(); p.mkdir(parents=True)
+    code, res = motion.set_elevenlabs_key(KEY, check=lambda k: "unknown")
+    assert code == 200 and res["checked"] is False
+
+
+def test_connect_elevenlabs_needs_the_studio(tmp_path):
+    assert motion.set_elevenlabs_key(KEY, check=lambda k: "ok")[0] == 409
+
+
+def test_hint_never_shows_the_home_folder(tmp_path, monkeypatch):
+    monkeypatch.setattr(motion.Path, "home", classmethod(lambda cls: tmp_path))
+    assert str(tmp_path) not in motion.status()["elevenlabs"]["hint"]

@@ -167,7 +167,7 @@ export PATH="$HOME/.hermes/bin:$HOME/.local/bin:$PATH"; hash -r
 [ "$USE_CLAUDE" = 1 ] && { tool claude "Claude Code" "$IT claude" 1 || MISSING=1; }
 [ "$USE_CODEX" = 1 ]  && { tool codex  "Codex"       "$IT codex"  1 || MISSING=1; }
 tool caddy "serves Tabbie at https://hermes.local with its icons, page addresses and phone access" "$IT caddy" 1 || MISSING=1
-tool uv    "runs the tests (for contributors)" "$IT uv" 0
+tool uv    "runs Tabbie's helper service (agents panel, Stop, Hand-offs, updates) and the tests" "$IT uv" 1 || MISSING=1
 if [ "$MISSING" = 1 ]; then
   echo; fail "Some required tools are missing (above). Install them, then run ${B}bin/setup${N} again."
   exit 1
@@ -306,11 +306,21 @@ fi
 if want services; then
 step "Background services" "Keeps Tabbie running whenever your Mac is on: WebUI, hub, HTTPS, Dreamer."
 RUNNING=0; launchctl list ai.hermes.webui >/dev/null 2>&1 && RUNNING=1
-if [ "$RUNNING" = 1 ]; then
+MISSING=""
+for t in services/*.plist.template; do
+  label="$(basename "$t" .plist.template)"
+  launchctl list "$label" >/dev/null 2>&1 || MISSING="$MISSING $label"
+done
+if [ "$RUNNING" = 1 ] && [ -n "$MISSING" ] && [ "${PW_CHANGED:-0}" != 1 ]; then
+  warn "Not installed yet:$MISSING (added by an update)"
+  Q="Install the missing ones now? The running ones are left alone."; DEF=y
+elif [ "$RUNNING" = 1 ]; then
+  MISSING=""
   ok "Services are installed and running"
   Q="Reinstall and restart them? Only do this when no request is running in Tabbie."; DEF=n
   [ "${PW_CHANGED:-0}" = 1 ] && { Q="Restart them so the new password applies? Only when no request is running."; DEF=y; }
 else
+  MISSING=""
   Q="Install and start them now?"; DEF=y
 fi
 [ -n "$SERVICES" ] && DEF=y
@@ -321,6 +331,7 @@ if { [ "$ASK" = 0 ] && [ -n "$SERVICES" ]; } || { [ "$ASK" = 1 ] && yn "$Q" "$DE
     CADDY="$(command -v caddy || echo "$HOME/.local/bin/caddy")"
     for t in services/*.plist.template; do
       label="$(basename "$t" .plist.template)"
+      [ -n "$MISSING" ] && case " $MISSING " in *" $label "*) ;; *) continue ;; esac
       dest="$HOME/Library/LaunchAgents/$label.plist"
       sed -e "s|__HOME__|$HOME|g" -e "s|__CADDY__|$CADDY|g" "$t" > "$dest"
       launchctl bootout "gui/$(id -u)/$label" 2>/dev/null || true

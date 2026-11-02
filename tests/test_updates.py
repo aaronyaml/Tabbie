@@ -107,3 +107,66 @@ def test_restart_now_when_idle(tmp_path, monkeypatch):
     monkeypatch.setattr(up, "busy", lambda: False)
     monkeypatch.setattr(up, "restart", lambda after_reply=None: {"ok": True, "restarted": ["gateway"]})
     assert up.restart_when_idle() == {"ok": True, "restarted": ["gateway"]}
+
+
+def _services(tmp_path, monkeypatch, loaded):
+    """Fake services/ dir and launchctl: `loaded` is the set of labels launchd knows."""
+    svc = tmp_path / "services"; svc.mkdir()
+    for label in ("ai.hermes.webui", "ai.hermes.cc-sidecar"):
+        (svc / f"{label}.plist.template").write_text(f"<plist>{label} __HOME__/hermes</plist>")
+    agents = tmp_path / "LaunchAgents"
+    calls = []
+
+    def launchctl(*args):
+        calls.append(args)
+        if args[0] == "print":
+            rc = 0 if args[1].rsplit("/", 1)[-1] in loaded else 113
+        else:
+            rc = 0
+            if args[0] == "bootstrap":
+                loaded.add(Path(args[2]).name[: -len(".plist")])
+        return type("P", (), {"returncode": rc})()
+    monkeypatch.setattr(up, "SERVICES", svc)
+    monkeypatch.setattr(up, "AGENTS_DIR", agents)
+    monkeypatch.setattr(up, "_launchctl", launchctl)
+    monkeypatch.setattr(up.sys, "platform", "darwin")
+    monkeypatch.delenv("TABBIE_NO_SERVICES", raising=False)
+    return agents, calls
+
+
+def test_ensure_services_installs_only_missing(tmp_path, monkeypatch):
+    agents, calls = _services(tmp_path, monkeypatch, {"ai.hermes.webui"})
+    assert up.ensure_services() == ["ai.hermes.cc-sidecar"]
+    written = (agents / "ai.hermes.cc-sidecar.plist").read_text()
+    assert "__HOME__" not in written and str(Path.home()) in written
+    assert not (agents / "ai.hermes.webui.plist").exists()  # running service untouched
+    assert up.ensure_services() == []  # idempotent
+
+
+def test_ensure_services_skips_when_setup_never_installed_them(tmp_path, monkeypatch):
+    agents, calls = _services(tmp_path, monkeypatch, set())
+    assert up.ensure_services() == []
+    assert not agents.exists()
+
+
+def test_ensure_services_off_in_tests_and_off_mac(tmp_path, monkeypatch):
+    _services(tmp_path, monkeypatch, {"ai.hermes.webui"})
+    monkeypatch.setenv("TABBIE_NO_SERVICES", "1")
+    assert up.ensure_services() == []
+    monkeypatch.delenv("TABBIE_NO_SERVICES")
+    monkeypatch.setattr(up.sys, "platform", "linux")
+    assert up.ensure_services() == []
+
+
+def test_changed_service_waits_for_restart(tmp_path, monkeypatch):
+    _root(tmp_path, monkeypatch)
+    agents, calls = _services(tmp_path, monkeypatch, {"ai.hermes.webui", "ai.hermes.cc-sidecar"})
+    up._save_state({"needs": [], "services": ["ai.hermes.cc-sidecar"]})
+    assert "services" in up.pending_restart()
+    popen = []
+    monkeypatch.setattr(up, "busy", lambda: False)
+    monkeypatch.setattr(up.subprocess, "Popen", lambda *a, **k: popen.append(a[0]))
+    res = up.restart()
+    assert res["ok"] and "ai.hermes.cc-sidecar" in res["restarted"]
+    assert (agents / "ai.hermes.cc-sidecar.plist").exists() and "bootstrap" in popen[0][-1]
+    assert up.pending_restart() == []

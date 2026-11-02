@@ -145,7 +145,42 @@
     if (needsInstall()) throw new Error('Motion isn’t installed yet: press Download Motion studio first.');
   }
   const linked = (k) => !ST || !ST[k] || ST[k].linked !== false;
-  const unlinkedNote = (k) => (linked(k) ? '' : `<p class="hxs-note hxs-unlinked-note">${icon('Link01Icon', 14)}<span>${esc(ST[k].hint)}</span></p>`);
+  // ElevenLabs can be connected right here: paste the API key, the sidecar checks it with ElevenLabs and saves it
+  // in the studio's .env (never in the browser's storage, never sent back). Not a <form>: forms keep drafts.
+  const EL = { open: false, busy: false, err: '', key: '' };
+  const unlinkedNote = (k) => (linked(k) ? '' : `<p class="hxs-note hxs-unlinked-note">${icon('Link01Icon', 14)}<span>${esc(ST[k].hint)}</span></p>`
+    + (k === 'elevenlabs' ? elConnect() : ''));
+  function elConnect() {
+    if (!EL.open) return `<div class="hxs-connect"><button type="button" class="hxs-ghost hxs-sm" data-act="el-open">${icon('Link01Icon', 14)}<span>Connect ElevenLabs</span></button></div>`;
+    return `<div class="hxs-connect hxs-connect-box">
+        <label for="hxsElKey">ElevenLabs API key</label>
+        <input id="hxsElKey" type="password" autocomplete="off" spellcheck="false" placeholder="sk_…" value="${esc(EL.key)}"${EL.busy ? ' disabled' : ''}>
+        <div class="hxs-connect-row">
+          <a href="https://elevenlabs.io/app/settings/api-keys" target="_blank" rel="noopener noreferrer">Get a key</a>
+          <span class="hxs-connect-sp"></span>
+          <button type="button" class="hxs-ghost hxs-sm" data-act="el-cancel"${EL.busy ? ' disabled' : ''}>Cancel</button>
+          <button type="button" class="hxs-primary hxs-sm" data-act="el-save"${EL.busy ? ' disabled' : ''}>${EL.busy ? 'Checking…' : 'Connect'}</button>
+        </div>
+        ${EL.err ? `<p class="hxs-note hxs-err-note">${esc(EL.err)}</p>` : ''}
+        <p class="hxs-note">Kept only on this Mac, in the studio's .env. Music uses your ElevenLabs credits.</p>
+      </div>`;
+  }
+  async function elSave() {
+    const inp = root.querySelector('#hxsElKey');
+    const key = ((inp && inp.value) || EL.key).trim();
+    if (!key) { EL.err = 'Paste your API key first.'; return render(); }
+    EL.busy = true; EL.err = ''; EL.key = key; render();
+    try {
+      const r = await fetchT(`${SIDE}elevenlabs`, 20000, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ key }) });
+      const d = await r.json().catch(() => ({}));
+      if (!r.ok) { EL.err = d.error || 'Couldn’t save the key. Try again.'; return; }
+      Object.assign(EL, { open: false, key: '' });
+      if (d.status && d.status.path) ST = d.status; else await studioCheck(true);
+      try { if (typeof window.showToast === 'function') window.showToast('ElevenLabs connected', 3000); } catch (_) {}
+    } catch (_) {
+      EL.err = 'Can’t reach Tabbie on your Mac right now. Try again.';
+    } finally { EL.busy = false; render(); }
+  }
   // Controls that need a provider carry data-needs="elevenlabs|higgsfield": greyed out, the how-to as tooltip.
   function gate() {
     root.querySelectorAll('[data-needs]').forEach((el) => {
@@ -1845,6 +1880,9 @@
       if (swr && swr.classList.contains('is-swiped') && !t.closest('[data-del]')) { swr.classList.remove('is-swiped'); return; }
       const dl = t.closest('[data-del]');
       if (dl) { delAsk = dl.dataset.del; return render(); }
+      if (a && a.dataset.act === 'el-open') { EL.open = true; EL.err = ''; render(); const i = root.querySelector('#hxsElKey'); if (i) i.focus(); return; }
+      if (a && a.dataset.act === 'el-cancel') { Object.assign(EL, { open: false, err: '', key: '' }); return render(); }
+      if (a && a.dataset.act === 'el-save') return elSave();
       if (a && a.dataset.act === 'mo-install') {
         a.disabled = true;
         ST.install = { state: 'running', step: '' }; render();
@@ -1936,6 +1974,7 @@
       if (f.dataset.form === 'redo') { const ins = String(fd.get('instruction') || '').trim(), tr = String(fd.get('treatment') || ''); if (ins) startJob('revision', () => { draftClear('redo'); return submitRedo(ins, tr); }); }
     });
     root.addEventListener('input', (e) => {
+      if (e.target.id === 'hxsElKey') { EL.key = e.target.value; return; }  // never into drafts
       if (e.target.form) draftSave(e.target);
       if (e.target.matches && e.target.matches('textarea[data-brief]')) { if (P) { P.brief = e.target.value; saveSoon('project', () => saveProject()); } return; }
       const qo = e.target.closest('.hxs-qc-other');

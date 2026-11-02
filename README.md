@@ -57,21 +57,9 @@ pay-per-token billing.
 
 ## How it works
 
-```mermaid
-flowchart LR
-    you(["You<br/>WebUI · phone · CLI"]) --> hub["Hermes hub<br/><i>command-centre plugin</i>"]
-    hub -->|"chat"| reply(["Hub answers"])
-    hub -->|"clear, scoped job"| claude["Claude Code<br/>in the project's folders"]
-    hub -->|"big or ambiguous"| plan["Planner (Codex)"]
-    plan -->|"questions / plan"| ok{"You approve?"}
-    ok -->|"yes"| claude
-    ok -->|"revise"| plan
-    claude --> trace[("Sanitised trace")]
-    trace --> dream["Dreamer"]
-    dream -->|"proposals + evidence"| review{"You review"}
-    review -->|"approve"| mem[("Versioned memory")]
-    mem -.->|"short context"| claude
-```
+<p align="center">
+  <img src="docs/images/how-it-works.png" alt="You send a request to the Hermes hub. Chat is answered by the hub; a clear, scoped job goes to Claude Code; a big or ambiguous one goes to the Codex planner, which asks questions or proposes a plan for you to approve, then Claude Code runs it. Each run leaves a sanitised trace; the Dreamer turns traces into proposals with evidence; what you approve becomes versioned memory, fed back to Claude as short context." width="420">
+</p>
 
 1. Every message passes through the `command-centre` plugin. It scores the request
    (deterministic regex signals, no LLM call), creates a request record on disk, ingests
@@ -142,7 +130,9 @@ never use up the ChatGPT allowance the hub shares. If usage can't be read, it st
   `https://hermes.local`. Caddy serves Tabbie's icons, page addresses (`/kanban`, `/projects` …),
   the Motion studio and phone access. Without it you get the plain Hermes WebUI on port 8787, with
   the wrong icons and missing pages. Setup installs it (`bin/install-tool caddy`); no Homebrew.
-- [uv](https://docs.astral.sh/uv/) only to run the tests
+- **[uv](https://docs.astral.sh/uv/)**: **required.** Runs Tabbie's helper service (the agents panel, Stop,
+  Hand-offs, Motion and updates) with the Python packages it needs, and the tests. Setup installs it
+  (`bin/install-tool uv`).
 - [Node.js](https://nodejs.org) only for the Motion studio (Remotion renders with it; `bin/install-tool node`)
 
 Setup installs all of these for you.
@@ -256,6 +246,11 @@ Then tell the user:
 - **Never expose Tabbie publicly.** No port forwarding, no `tailscale funnel`, no binding 8787 or
   8788 to `0.0.0.0`. The WebUI password always stays on.
 - **Don't restart services while a request is running** (`bin/hub health` / the WebUI shows it).
+- **Every background service must be running, including Tabbie's helper (`ai.hermes.cc-sidecar`).**
+  `bin/hub health` has a line for it. If it's ✗: `bin/hub services` installs any service that's
+  missing (safe any time; running ones are left alone), then `bin/hub health` again. Without the
+  helper the WebUI says it can't reach Tabbie on the Mac: no agents panel, Stop, Hand-offs pill,
+  Motion or updates.
 
 ---
 
@@ -360,10 +355,14 @@ bin/hub health            # one line per component, with the fix command
 | `ai.hermes.webui` | WebUI on `127.0.0.1:8787` |
 | `ai.hermes.caddy` | HTTPS for `hermes.local`; LAN and Tailscale addresses only, everything else is dropped |
 | `ai.hermes.mdns` | Bonjour name `hermes.local` → your Mac's LAN IP |
-| `ai.hermes.cc-sidecar` | Data sidecar for the WebUI extension on `127.0.0.1:8794` (token-protected) |
+| `ai.hermes.cc-sidecar` | Tabbie's helper for the WebUI extension on `127.0.0.1:8794` (token-protected): agents panel, Stop, Hand-offs, Projects, Motion, updates. Runs through `uv` with PyYAML |
 | `ai.hermes.dreamer` | Nightly Dreamer run (03:30, low priority) |
 
-The templates live in `services/*.plist.template`. Nothing is exposed to the internet. Always open Tabbie through
+The templates live in `services/*.plist.template`. **New services install themselves:** when an update
+adds one, Tabbie installs it the next time it starts (and `bin/hub update`, `bin/hub restart` and
+`bin/setup` do too), so nobody has to re-run setup for it. `bin/hub services` does it by hand. A
+service that's already running is never touched, except when an update changes its own template;
+then it's reinstalled with the other restarts, once Tabbie is idle. Nothing is exposed to the internet. Always open Tabbie through
 Caddy (`https://hermes.local`, or `bin/hub`): the bare WebUI on `127.0.0.1:8787` lacks Tabbie's icons and page addresses.
 
 **Trust the local HTTPS certificate** (once per device). It enables passkeys and the installable app:
@@ -509,7 +508,9 @@ After downloading:
   by itself about a minute after everything finishes. Updates to the hub's plugins also restart the
   WebUI (chats run them there), and the page reloads itself once it's back.
 - Interface-only updates just need a page reload.
-- If the update changed setup steps, it tells you to run `bin/setup` again.
+- New background services an update brings are installed automatically (see
+  [Start the services](#start-the-services)). If the update changed other setup steps, it tells you
+  to run `bin/setup` again.
 
 Your settings and the files you've edited are never overwritten. If an update would change a file
 you've edited, it stops and tells you which file, and nothing changes. To check another repo or
@@ -661,10 +662,13 @@ the moments, approve a storyboard, and Claude Code (or Codex) builds and renders
   by that install, so nothing has to exist beforehand. To use a studio of your own instead, copy `config/motion.example.yaml` to
   `config/motion.yaml` and set `studio:`; a folder that already has files in it is used as it is, never changed.
 - **Node.js** renders the films: setup installs it (`bin/install-tool node`, nodejs.org's official build).
-- **Generate audio** uses ElevenLabs Music, which needs your ElevenLabs API key in the studio's `.env`
-  (`ELEVENLABS_API_KEY=…`; it uses your ElevenLabs credits). The hosted ElevenLabs MCP has no music tool.
-  **Asset generation** needs Higgsfield (`higgsfield auth login`). Until they're linked, Motion greys those
-  buttons out and the tooltip says how to link them; `bin/hub health` lists both.
+- **Generate audio** uses ElevenLabs Music, which needs your ElevenLabs API key (it uses your ElevenLabs
+  credits). Until it's linked, the button is greyed out with a **Connect ElevenLabs** button under it:
+  paste your key (elevenlabs.io → Developers → API keys), Tabbie checks it with ElevenLabs and saves it
+  in the studio's `.env` (`ELEVENLABS_API_KEY=…`, readable only by you, never shown again or kept in
+  the browser). You can also add that line yourself. The hosted ElevenLabs MCP has no music tool.
+  **Asset generation** needs Higgsfield (`higgsfield auth login` in the Terminal); until then those
+  buttons are greyed out and the tooltip says how. `bin/hub health` lists both.
 - Remotion is free for individuals and companies of up to three people; larger companies need a
   [Remotion company licence](https://www.remotion.dev/license). npm installs it; Tabbie doesn't ship it.
 
@@ -764,12 +768,16 @@ The tests use temporary folders only and never touch your memory or state.
 ## Troubleshooting
 
 - `bin/hub health` checks every component and prints the fix command.
-- `bin/hub logs webui|gateway|caddy|mdns|decisions` shows logs.
+- `bin/hub logs webui|gateway|caddy|mdns|sidecar|decisions` shows logs.
 - **Page hangs in a Mac browser**: System Settings › Privacy & Security › Local Network → allow the browser.
 - **Wrong route**: `/cc route <text>` shows the score. Tune the signals in `router.py` or `router.plan_threshold`.
 - **Claude refuses to run**: `claude auth status` must show a `claude.ai` login. API keys are refused on purpose.
 - **Planner errors**: `/cc planner` lists the models your login exposes.
-- **Restart everything**: `bin/hub restart`. Don't restart while a request is running.
+- **"Can't reach Tabbie on your Mac" / "couldn't connect to the sidecar"** (agents panel, Stop, Hand-offs,
+  Motion or updates don't work): Tabbie's helper isn't running. `bin/hub services` installs it if it's
+  missing (common on installs older than the helper), then check `bin/hub health` and `bin/hub logs sidecar`.
+  If `uv` is missing: `bin/install-tool uv`, then `launchctl kickstart -k gui/$(id -u)/ai.hermes.cc-sidecar`.
+- **Restart everything**: `bin/hub restart` (installs missing services first). Don't restart while a request is running.
 
 ## License
 

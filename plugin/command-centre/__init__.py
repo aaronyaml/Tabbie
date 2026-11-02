@@ -1490,3 +1490,15 @@ def register(ctx):
                          description="Toggle Codex takeover (executes instead of Claude) for this session")
     ctx.register_command("cc", _cmd_cc, description="Command Centre: status, project, cancel, route, planner",
                          args_hint="[status|project <name>|projects|cancel|route <text>|planner]")
+
+    def _ensure_services():
+        # A service added by an update (e.g. the cc-sidecar on installs older than it) gets installed
+        # the first time Tabbie starts with the new code, so nobody has to re-run setup for it.
+        try:
+            from . import updates
+            done = updates.ensure_services()
+            if done:
+                log_decision(event="services_installed", labels=done)
+        except Exception as exc:
+            log_decision(event="services_check_failed", error=repr(exc)[:200])
+    threading.Thread(target=_ensure_services, daemon=True, name="tabbie-ensure-services").start()

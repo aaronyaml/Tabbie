@@ -3,8 +3,9 @@
 #   hub              open Hermes WebUI (https://hermes.local)
 #   hub cli          Hermes in the terminal (same config, routing, sessions)
 #   hub health       lightweight health check of every component
-#   hub restart      restart gateway + WebUI + proxy + mDNS
-#   hub logs [name]  tail logs: webui | gateway | caddy | mdns | decisions
+#   hub restart      install any missing service, then restart gateway + WebUI + proxy + mDNS
+#   hub services     install any background service that's missing (e.g. one added by an update)
+#   hub logs [name]  tail logs: webui | gateway | caddy | mdns | sidecar | decisions
 #   hub import       import Claude project folders into Hermes + WebUI spaces
 #   hub limits       usage limits: Claude Max, ChatGPT (Astra + hub), Higgsfield, ElevenLabs
 #   hub update       check GitHub for a newer Tabbie, and download it if you say yes
@@ -23,6 +24,7 @@ case "${1:-open}" in
     check "Hermes gateway (launchd)"  "hermes gateway status | grep -q -E 'running|supervised'" "hermes gateway install"
     check "Hermes WebUI"              "curl -sf -m 5 http://127.0.0.1:8787/health" "hub logs webui"
     check "HTTPS proxy (Caddy)"       "launchctl list ai.hermes.caddy | grep -q '\"PID\"'" "hub logs caddy"
+    check "Tabbie helper (cc-sidecar)" "launchctl list ai.hermes.cc-sidecar | grep -q '\"PID\"'" "bin/setup --services (installs it), then hub logs sidecar"
     check "hermes.local (mDNS)"       "dscacheutil -q host -a name hermes.local | grep -q ip_address" "hub logs mdns"
     check "WebUI via hermes.local"    "curl -sk -m 5 -o /dev/null -w '%{http_code}' https://hermes.local/login | grep -q 200"
     PL="$(hermes plugins list 2>/dev/null)"
@@ -47,7 +49,18 @@ case "${1:-open}" in
     opt   "Motion: music (ElevenLabs key)" "grep -qE '^[[:space:]]*ELEVENLABS_API_KEY=[^[:space:]]+' \"$MS/.env\"" "add ELEVENLABS_API_KEY=… to $MS/.env"
     check "Attachments store"         "test -w ~/hermes/state"
     ;;
+  services)
+    python3 -I - <<'PY'
+import importlib, importlib.util, os, sys
+pkg = os.path.expanduser("~/hermes/plugin/command-centre")
+spec = importlib.util.spec_from_file_location("cc", f"{pkg}/__init__.py", submodule_search_locations=[pkg])
+sys.modules["cc"] = importlib.util.module_from_spec(spec)
+got = importlib.import_module("cc.updates").ensure_services()
+print("Installed: " + ", ".join(got) if got else "All services are installed.")
+PY
+    ;;
   restart)
+    "$0" services | grep -v "^All services" || true
     hermes gateway restart >/dev/null 2>&1
     for s in webui caddy mdns; do launchctl kickstart -k "gui/$UID_/ai.hermes.$s"; done
     echo "restarted" ;;
@@ -57,6 +70,7 @@ case "${1:-open}" in
       gateway) tail -n 60 ~/.hermes/logs/gateway.log ;;
       caddy) tail -n 40 ~/hermes/state/logs/caddy.log ;;
       mdns) tail -n 20 ~/hermes/state/logs/mdns.log ;;
+      sidecar|cc-sidecar) tail -n 40 ~/hermes/state/logs/cc-sidecar.log ;;
       decisions) tail -n 30 ~/hermes/state/decisions.jsonl ;;
     esac ;;
   import) uv run --no-project -q --with ruamel.yaml python ~/hermes/bin/cc-import-projects "${@:2}" ;;
@@ -70,6 +84,9 @@ spec = importlib.util.spec_from_file_location("cc", f"{pkg}/__init__.py", submod
 sys.modules["cc"] = importlib.util.module_from_spec(spec)  # submodules only; the Hermes plugin itself isn't loaded
 import importlib
 u = importlib.import_module("cc.updates")
+got = u.ensure_services()
+if got:
+    print("Installed missing services: " + ", ".join(got))
 try:
     sys.stdin = open("/dev/tty")  # stdin is this script; questions go to the terminal
 except OSError:

@@ -87,7 +87,9 @@ def state() -> dict:
         "codex_in": lambda: have("codex") and "ChatGPT" in sh(["codex", "login", "status"])[1],
         "hub_in": lambda: have("hermes") and bool(hub) and re.search(
             rf"^{re.escape(hub)} .*\n(?:\s+.*\n)*?\s+#\d+\s+\S+\s+oauth", sh(["hermes", "auth", "list"])[1] + "\n", re.M) is not None,
-        "services": lambda: sh(["launchctl", "list", "ai.hermes.webui"])[0] == 0,
+        # every service in services/ (an update can add one, e.g. the cc-sidecar), not just the WebUI
+        "services": lambda: all(sh(["launchctl", "list", t.name[: -len(".plist.template")]])[0] == 0
+                                for t in (ROOT / "services").glob("*.plist.template")),
         "trusted": lambda: CADDY_CA.exists() and sh(["security", "verify-cert", "-c", str(CADDY_CA)])[0] == 0,
         "git": lambda: sh(["xcode-select", "-p"])[0] == 0 and have("git"),
         # Linked isn't enough: Hermes loads a user plugin only once it's enabled.

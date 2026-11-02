@@ -206,11 +206,11 @@
       "scripts": [
         "motion.js?v=9",
         "motion-scrub.js?v=6",
-        "motion-studio.js?v=25"
+        "motion-studio.js?v=26"
       ],
       "stylesheets": [
         "motion.css?v=8",
-        "motion-studio.css?v=15"
+        "motion-studio.css?v=18"
       ]
     },
     {

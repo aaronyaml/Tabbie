@@ -17,6 +17,7 @@ import os
 import re
 import shutil
 import subprocess
+import sys
 import time
 import urllib.request
 from pathlib import Path
@@ -175,13 +176,95 @@ def apply() -> dict:
         last = (str(exc).strip().splitlines() or [""])[-1]
         return {"ok": False, "error": f"Update failed, nothing changed ({last[:160]})"}
     needs = _needs(files)
-    _save_state({"from": before, "to": after, "at": int(time.time()), "needs": needs})
+    installed = ensure_services()  # new services: nothing runs in them yet, so install right away
+    changed = sorted({f[len("services/"):-len(".plist.template")] for f in files
+                      if f.startswith("services/") and f.endswith(".plist.template")} - set(installed))
+    _save_state({"from": before, "to": after, "at": int(time.time()), "needs": needs, "services": changed})
     _cache.update(at=0.0, result=None)
-    return {"ok": True, "from": before[:7], "to": after[:7], "files": len(files), "needs": needs}
+    return {"ok": True, "from": before[:7], "to": after[:7], "files": len(files), "needs": needs,
+            "installed": installed}
 
 
 def pending_restart() -> list[str]:
-    return [n for n in (_state().get("needs") or []) if n in ("gateway", "webui", "sidecar", "caddy")]
+    return [n for n in (_state().get("needs") or []) if n in ("gateway", "webui", "sidecar", "caddy")] \
+        + (["services"] if _state().get("services") else [])
+
+
+# ---------------------------------------------------------------- background services
+# bin/setup installs services/*.plist.template as LaunchAgents. An update can add a new service (the
+# cc-sidecar arrived after some installs) or change one, so updates install what's missing and
+# reinstall what changed. Nothing happens on a Mac where setup never installed services.
+SERVICES = ROOT / "services"
+AGENTS_DIR = Path.home() / "Library" / "LaunchAgents"
+
+
+def _launchctl(*args: str) -> subprocess.CompletedProcess:
+    return subprocess.run(["launchctl", *args], capture_output=True, text=True, timeout=30)
+
+
+def _loaded(label: str) -> bool:
+    return _launchctl("print", f"gui/{os.getuid()}/{label}").returncode == 0
+
+
+def _render(template: Path) -> str | None:
+    text = template.read_text()
+    if "__CADDY__" in text:
+        caddy = shutil.which("caddy") or str(Path.home() / ".local/bin/caddy")
+        if not Path(caddy).exists():
+            return None  # setup installs Caddy first; leave this service to it
+        text = text.replace("__CADDY__", caddy)
+    return text.replace("__HOME__", str(Path.home()))
+
+
+def _install(label: str, text: str) -> bool:
+    dest = AGENTS_DIR / f"{label}.plist"
+    AGENTS_DIR.mkdir(parents=True, exist_ok=True)
+    dest.write_text(text)
+    _launchctl("bootout", f"gui/{os.getuid()}/{label}")
+    return _launchctl("bootstrap", f"gui/{os.getuid()}", str(dest)).returncode == 0
+
+
+def ensure_services() -> list[str]:
+    """Install any service from services/ that isn't loaded yet. Safe to call any time: a missing
+    service has nothing running in it. Returns the labels it installed."""
+    if sys.platform != "darwin" or os.environ.get("TABBIE_NO_SERVICES") or not _loaded("ai.hermes.webui"):
+        return []
+    import fcntl
+    STATE_DIR.mkdir(parents=True, exist_ok=True)
+    with open(STATE_DIR / "services.lock", "w") as lock:
+        try:  # several Hermes processes start together; one installs, the rest skip
+            fcntl.flock(lock, fcntl.LOCK_EX | fcntl.LOCK_NB)
+        except OSError:
+            return []
+        done = []
+        for t in sorted(SERVICES.glob("*.plist.template")):
+            label = t.name[: -len(".plist.template")]
+            if _loaded(label):
+                continue
+            text = _render(t)
+            if text and _install(label, text):
+                done.append(label)
+        return done
+
+
+def _reinstall_changed(labels: list[str]) -> list[str]:
+    """Rewrite and reload services whose template an update changed (idle only, from restart()).
+    Detached, so restarting the sidecar or WebUI from inside it still finishes."""
+    cmds, done = [], []
+    for label in labels:
+        t = SERVICES / f"{label}.plist.template"
+        text = _render(t) if t.exists() else None
+        if not text:
+            continue
+        dest = AGENTS_DIR / f"{label}.plist"
+        AGENTS_DIR.mkdir(parents=True, exist_ok=True)
+        dest.write_text(text)
+        cmds.append(f"launchctl bootout gui/{os.getuid()}/{label}; launchctl bootstrap gui/{os.getuid()} '{dest}'")
+        done.append(label)
+    if cmds:
+        subprocess.Popen(["/bin/sh", "-c", "sleep 2; " + "; ".join(cmds)], stdin=subprocess.DEVNULL,
+                         stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, start_new_session=True)
+    return done
 
 
 def busy() -> bool:
@@ -234,7 +317,10 @@ def restart(after_reply=None) -> dict:
                          start_new_session=True)
         done.append("webui")
     st = _state()
+    if st.get("services") and sys.platform == "darwin" and not os.environ.get("TABBIE_NO_SERVICES"):
+        done += _reinstall_changed(st["services"])
     st["needs"] = [n for n in st.get("needs", []) if n not in ("gateway", "webui", "caddy", "sidecar")]
+    st.pop("services", None)
     _save_state(st)
     if "sidecar" in needs and after_reply:
         after_reply()

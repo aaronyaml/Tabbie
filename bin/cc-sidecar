@@ -1,4 +1,16 @@
 #!/bin/bash
 # launchd entrypoint: Command Centre WebUI sidecar (agents panel, projects API), 127.0.0.1:8794.
+# It reads config/*.yaml, so it needs a YAML library. macOS's own python3 has none, so run it through
+# uv with PyYAML (cached after the first start). Fallbacks: a python3 that already has YAML, then any.
 export PATH="$HOME/.hermes/bin:$HOME/.local/bin:/opt/homebrew/bin:/usr/local/bin:/usr/bin:/bin"
-exec python3 -I "$HOME/hermes/plugin/command-centre/sidecar.py"
+SIDECAR="$HOME/hermes/plugin/command-centre/sidecar.py"
+cd "$HOME/hermes" || exit 1
+UV="$(command -v uv || ls -d "$HOME"/.hermes/tools/uv-*/uv 2>/dev/null | tail -1)"
+if [ -n "$UV" ] && [ -x "$UV" ]; then
+  exec "$UV" run --no-project -q --with pyyaml python -I "$SIDECAR"
+fi
+for py in python3 /usr/bin/python3; do
+  "$py" -I -c "import yaml" 2>/dev/null && exec "$py" -I "$SIDECAR"
+done
+echo "cc-sidecar: no uv and no Python with PyYAML; settings that read config/*.yaml will fail. Run: bin/install-tool uv" >&2
+exec python3 -I "$SIDECAR"

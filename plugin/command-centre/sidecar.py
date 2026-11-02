@@ -25,6 +25,7 @@ GET /motion/status, POST /motion/ensure -> the Motion studio folder (created fro
                                        npm install in the background) and whether ElevenLabs / Higgsfield are
                                        linked (booleans + how-to hints only; hmem/motion.py)
 GET /motion/films                    -> the films in <studio>/studio from their project.json (Motion panel home)
+POST /motion/elevenlabs {key}        -> save the user's ElevenLabs API key in the studio's .env (never echoed)
 POST /motion/install                 -> install what Motion is missing (Node.js, studio, packages) in the
                                        background; progress in /motion/status "install"
 """
@@ -548,6 +549,9 @@ class Handler(BaseHTTPRequestHandler):
                 return self._send(200, motion_studio.status())
             if u.path == "/motion/films":
                 return self._send(200, motion_studio.films())
+            if u.path == "/motion/elevenlabs" and isinstance(body, dict):
+                code, res = motion_studio.set_elevenlabs_key(str(body.get("key") or ""))
+                return self._send(code, {**res, **({"status": motion_studio.status()} if code == 200 else {})})
             if u.path == "/update":
                 res = updates.apply()
                 return self._send(200 if res["ok"] else 409, res)

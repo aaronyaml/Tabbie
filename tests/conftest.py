@@ -11,6 +11,7 @@ os.environ["HMEM_WEBUI_SESSIONS"] = os.path.join(_TMP, "webui", "sessions")  # n
 os.environ["HMEM_NO_LLM"] = "1"  # never a real `claude -p` call; tests stub the LLM where they need it
 os.environ["TABBIE_LIMITS_GATE"] = "off"  # never a real usage-endpoint call (tests pass their own rows)
 os.environ["TABBIE_LINKED"] = ""  # no `claude auth` / `codex login` subprocess: nothing linked unless a test says so
+os.environ["TABBIE_NO_SERVICES"] = "1"  # never install or reload real LaunchAgents
 
 
 @pytest.fixture(autouse=True)
