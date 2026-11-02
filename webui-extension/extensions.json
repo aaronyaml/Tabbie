@@ -20,7 +20,7 @@
       "id": "spaces-projects",
       "name": "Spaces & Projects",
       "scripts": [
-        "spaces-projects.js?v=5"
+        "spaces-projects.js?v=7"
       ],
       "stylesheets": [
         "spaces-projects.css?v=6"

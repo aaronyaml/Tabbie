@@ -413,9 +413,35 @@
     if (root.matches('.project-ctx-menu')) enhanceCtxMenu(root);
     if (root.matches('.ws-opt[data-path]')) enhanceWsOpt(root);
     root.querySelectorAll && root.querySelectorAll('.ws-opt[data-path]').forEach(enhanceWsOpt);
+    if (root.matches('.ws-dropdown') || (root.querySelector && root.querySelector('.ws-dropdown'))) watchDropdowns();
     if (root.matches('.ws-list-container')) groupWsList(root);
     root.querySelectorAll && root.querySelectorAll('.ws-list-container').forEach(groupWsList);
   }
+  // The composer's folder menu opens upward with a fixed height; on the home screen the composer sits
+  // high, so the top of the menu (the Projects heading) went off-screen. Open it below when there's
+  // more room there, and never taller than the room it has.
+  function fitWsDropdown(dd) {
+    if (!dd.classList.contains('open')) return;
+    const host = (dd.offsetParent || dd.parentElement).getBoundingClientRect();
+    const above = host.top - 14, below = innerHeight - host.bottom - 14;
+    const down = above < 320 && below > above;
+    const want = down ? ['calc(100% + 6px)', 'auto', Math.max(160, Math.min(320, below)) + 'px']
+      : ['', '', above < 320 ? Math.max(160, above) + 'px' : ''];
+    const st = dd.style;
+    if (st.top !== want[0] || st.bottom !== want[1] || st.maxHeight !== want[2]) {  // upstream rewrites style on open
+      st.top = want[0]; st.bottom = want[1]; st.maxHeight = want[2];
+    }
+  }
+  const ddObs = new MutationObserver((muts) => muts.forEach((m) => fitWsDropdown(m.target)));
+  function watchDropdowns() {
+    document.querySelectorAll('.ws-dropdown:not([data-hx-fit])').forEach((dd) => {
+      dd.dataset.hxFit = '1';
+      ddObs.observe(dd, { attributes: true, attributeFilter: ['class', 'style'] });
+      fitWsDropdown(dd);
+    });
+  }
+  addEventListener('resize', () => document.querySelectorAll('.ws-dropdown.open').forEach(fitWsDropdown));
+
   let detailQueued = false;
   const mo = new MutationObserver((muts) => {
     for (const m of muts) {
@@ -428,6 +454,7 @@
   });
   function boot() {
     addHeaderButton();
+    watchDropdowns();
     scan(document.body);
     enhanceDetail();
     mo.observe(document.body, { childList: true, subtree: true });
