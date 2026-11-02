@@ -98,6 +98,16 @@
       "stylesheets": []
     },
     {
+      "id": "push",
+      "name": "Push notifications on this device",
+      "scripts": [
+        "push.js?v=3"
+      ],
+      "stylesheets": [
+        "push.css?v=1"
+      ]
+    },
+    {
       "id": "running-reply-fix",
       "name": "Keep the previous reply when reopening a running chat",
       "scripts": [

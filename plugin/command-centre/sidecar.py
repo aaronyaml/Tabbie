@@ -61,6 +61,7 @@ executor_choice = importlib.import_module("cc_sidecar_pkg.executor_choice")
 providers = importlib.import_module("cc_sidecar_pkg.providers")
 updates = importlib.import_module("cc_sidecar_pkg.updates")
 hub_setup = importlib.import_module("cc_sidecar_pkg.hub_setup")
+push = importlib.import_module("cc_sidecar_pkg.push")
 _HERMES_HOME = str(PKG.parents[1])  # ~/hermes: hmem (memory + Projects) lives here
 if _HERMES_HOME not in sys.path:
     sys.path.insert(0, _HERMES_HOME)
@@ -722,6 +723,10 @@ class Handler(BaseHTTPRequestHandler):
         try:
             if u.path.startswith(("/projects", "/fs/")):
                 return self._send(*projects_api.handle("GET", u.path, q))
+            if u.path == "/push/key":
+                return self._send(200, {"key": push.public_key(), **push.status(q.get("endpoint", ""))})
+            if u.path == "/push/latest":
+                return self._send(200, {"events": push.latest()})
             if u.path == "/session":
                 sid = q.get("id", "")
                 if not _SID.match(sid):
@@ -812,6 +817,12 @@ class Handler(BaseHTTPRequestHandler):
                 return self._send(*worker_stop(body))
             if u.path == "/retry/claim" and isinstance(body, dict):
                 return self._send(*retry_claim(body))
+            if u.path == "/push/subscribe" and isinstance(body, dict):
+                return self._send(*push.subscribe(body))
+            if u.path == "/push/unsubscribe" and isinstance(body, dict):
+                return self._send(*push.unsubscribe(body))
+            if u.path == "/push/test":
+                return self._send(200, {"sent": push.send_all()})
             if u.path == "/motion/ensure":
                 return self._send(200, motion_studio.status(create=True))
             if u.path == "/motion/install":
@@ -849,6 +860,7 @@ def main():
     srv = ThreadingHTTPServer((HOST, PORT), Handler)
     srv.daemon_threads = True
     updates.resume(after_reply=_exit_soon)  # a restart deferred until Tabbie is idle
+    push.Watcher(WEBUI_STATE).start()  # phone / browser push when a job finishes or needs you
     srv.serve_forever()
 
 

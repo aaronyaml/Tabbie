@@ -520,6 +520,15 @@ asks for your password. Nothing is opened on your router, and port 8787 is never
 
 ## Using it
 
+### Notifications on your phone
+
+In **Settings → Preferences**, under Browser notifications, tap **Notify this device**. Tabbie then
+pings that phone or browser when a job finishes, asks you something or has a plan to approve, even with
+Tabbie closed. On iPhone, open Tabbie from its home-screen icon first (iOS 16.4 or later) and use an
+`https://` address (`https://hermes.local` or your Tailscale one). The push itself is empty: Apple's or
+Google's push service only carries a ping, and the phone then asks Tabbie (behind its password) what
+happened. Keys and subscriptions stay on the Mac in `state/push/`.
+
 ### Updates
 
 Tabbie checks GitHub ([aaronyaml/Tabbie](https://github.com/aaronyaml/Tabbie)) for a newer version
