@@ -290,10 +290,10 @@
       "id": "model-picker",
       "name": "Model picker",
       "scripts": [
-        "model-picker.js?v=8"
+        "model-picker.js?v=11"
       ],
       "stylesheets": [
-        "model-picker.css?v=6"
+        "model-picker.css?v=9"
       ]
     },
     {

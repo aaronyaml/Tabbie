@@ -323,6 +323,29 @@ def fetch_models(pid: str) -> list[dict]:
     return out or list(known.values())
 
 
+def check(pid: str) -> tuple[bool, str]:
+    """Ask the provider for its model list with the saved key: (works, a line for the user)."""
+    import urllib.error
+    p = get(pid)
+    if not p:
+        return False, "unknown provider"
+    key = None if p.get("auth") == "none" else get_key(pid)
+    if p.get("auth") != "none" and not key:
+        return False, "no key saved"
+    try:
+        _get_json(p.get("models_url") or (p["base_url"].rstrip("/") + "/v1/models"), key, timeout=10)
+    except urllib.error.HTTPError as exc:
+        if exc.code in (401, 403):
+            return False, f"{p['name']} rejected the key ({exc.code})"
+        if exc.code == 404:  # some endpoints have no model list: the key can't be checked this way
+            return True, "saved (this provider has no model list to check the key against)"
+        return False, f"{p['name']} answered {exc.code}"
+    except Exception as exc:
+        return False, f"couldn't reach {p['name']}: {type(exc).__name__}"
+    models(pid, refresh=True)
+    return True, "works"
+
+
 def models(pid: str, refresh: bool = False) -> list[dict]:
     """Cached model list (MODELS_TTL); a refresh asks the provider again."""
     data = _load()

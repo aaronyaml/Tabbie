@@ -58,6 +58,7 @@ sys.modules["cc_sidecar_pkg"] = _pkg
 agents = importlib.import_module("cc_sidecar_pkg.agents")
 common = importlib.import_module("cc_sidecar_pkg.common")
 executor_choice = importlib.import_module("cc_sidecar_pkg.executor_choice")
+model_providers = importlib.import_module("cc_sidecar_pkg.model_providers")
 providers = importlib.import_module("cc_sidecar_pkg.providers")
 updates = importlib.import_module("cc_sidecar_pkg.updates")
 hub_setup = importlib.import_module("cc_sidecar_pkg.hub_setup")
@@ -665,6 +666,61 @@ def set_agents(body: dict) -> tuple[int, dict]:
     return 200, agents_payload()
 
 
+def providers_payload() -> dict:
+    """GET /providers: every provider Tabbie knows (presets + custom), linked or not. Never a key."""
+    out = []
+    for pid in model_providers.all_providers():
+        try:
+            out.append(model_providers.public(pid, with_models=False))
+        except Exception as exc:
+            sys.stderr.write(f"cc-sidecar providers error: {pid}: {exc!r}\n")
+    installed = {a: bool(shutil.which(a)) for a in ("claude", "codex")}
+    return {"providers": out, "installed": installed, "platform": sys.platform}
+
+
+def set_provider(body: dict) -> tuple[int, dict]:
+    """POST /providers {action, id, ...}: key (save + turn on + check), check, models, enable, disable,
+    remove (key too), add (custom endpoint). The key is never echoed back or logged."""
+    act, pid = str(body.get("action") or ""), str(body.get("id") or "")
+    mp = model_providers
+    try:
+        if act == "add":
+            ms = body.get("models") or []
+            ms = [str(m) for m in (ms if isinstance(ms, list) else str(ms).split(","))][:40]
+            mp.add_custom(pid, str(body.get("name") or pid), str(body.get("base_url") or ""), ms,
+                          billing=str(body.get("billing") or "pay-per-use"), auth=str(body.get("auth") or "key"),
+                          worker=str(body.get("worker") or "claude"))
+            act = "key" if body.get("key") else "enable"
+        if not mp.get(pid):
+            return 404, {"error": "unknown provider"}
+        if act == "key":
+            mp.set_key(pid, str(body.get("key") or ""))
+            mp.set_enabled(pid, True)
+            ok, msg = mp.check(pid)
+            if not ok and "rejected" in msg:  # a wrong key isn't kept (a network blip keeps it)
+                mp.delete_key(pid)
+                mp.set_enabled(pid, False)
+            return 200, {**providers_payload(), "result": {"id": pid, "ok": ok, "message": msg}}
+        if act == "check":
+            ok, msg = mp.check(pid)
+            return 200, {**providers_payload(), "result": {"id": pid, "ok": ok, "message": msg}}
+        if act == "models":
+            return 200, {"id": pid, "models": mp.models(pid, refresh=bool(body.get("refresh")))}
+        if act in ("enable", "disable"):
+            mp.set_enabled(pid, act == "enable")
+        elif act == "remove":
+            if mp.get(pid).get("custom"):
+                mp.remove(pid)
+            else:
+                mp.delete_key(pid)
+                mp.set_enabled(pid, False)
+        else:
+            return 400, {"error": "unknown action"}
+    except (ValueError, RuntimeError) as exc:
+        return 400, {"error": str(exc)}
+    return 200, providers_payload()
+
+
 def update_payload(force: bool = False) -> dict:
     s = updates.settings()
     if not s.get("check", True):
@@ -739,6 +795,8 @@ class Handler(BaseHTTPRequestHandler):
                 if not _SID.match(sid):
                     return self._send(400, {"error": "bad session id"})
                 return self._send(200, executor_payload(sid))
+            if u.path == "/providers":
+                return self._send(200, providers_payload())
             if u.path == "/agents":
                 return self._send(200, agents_payload())
             if u.path == "/motion/status":
@@ -809,6 +867,8 @@ class Handler(BaseHTTPRequestHandler):
                 return self._send(*projects_api.handle("POST", u.path, None, body))
             if u.path == "/executor" and isinstance(body, dict):
                 return self._send(*set_executor(body))
+            if u.path == "/providers" and isinstance(body, dict):
+                return self._send(*set_provider(body))
             if u.path == "/agents" and isinstance(body, dict):
                 return self._send(*set_agents(body))
             if u.path == "/worker/message" and isinstance(body, dict):

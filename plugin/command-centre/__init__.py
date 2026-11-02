@@ -1098,6 +1098,8 @@ def _run_request(r: Request, feed=None, force: dict | None = None) -> dict:
         return _astra_takeover(r, reason=r["route_reason"], choice=picked, feed=feed, offer=not force)
     claude_model = choice["model"] if on_claude else None
     claude_effort = (choice["effort"] if on_claude else None) or _auto_effort(r)
+    if endpoint and not executor_choice.takes_effort(endpoint):
+        claude_effort = None
     ecfg = dict(cfg.get("executor", {}) or {})
     blocked = None if endpoint else _limit_block(r, "claude", claude_model or ecfg.get("model"), offer=not force)
     if blocked and blocked.get("switch") and executor_choice.is_endpoint(blocked["switch"]["provider"]):
@@ -1351,6 +1353,8 @@ def _astra_takeover(r: Request, reason: str, choice: dict | None = None, feed=No
     # a takeover exists because Claude is out: only a picked-Codex run may offer Claude instead
     blocked = None if endpoint else _limit_block(r, "codex", model, offer=bool(choice) and offer)
     effort = (choice or {}).get("effort") or (r.data.get("executor") or {}).get("effort") or _auto_effort(r)
+    if endpoint and not executor_choice.takes_effort(endpoint):
+        effort = None
     if blocked and blocked.get("switch"):  # Codex is at its limit: its Claude equivalent (or a linked provider) does it
         return _execute(r, force={"provider": blocked["switch"]["provider"], "model": blocked["switch"]["model"],
                                   "effort": effort}, feed=feed)

@@ -1,6 +1,9 @@
 /* Hermes — composer model picker. Chooses the EXECUTOR model for this conversation (the worker
  * that runs each request), replacing upstream's hub-model chip + reasoning chip (hidden in CSS).
- *   step 1: Anthropic / OpenAI     step 2: that provider's models (+ optional effort)
+ *   step 1: Anthropic / OpenAI / linked providers   step 2: that provider's models (+ optional effort)
+ *   step 3: Providers: add an API key (Anthropic, OpenAI, DeepSeek, Kimi, GLM...), a local Ollama or a
+ *           custom endpoint. Keys go straight to the Mac's Keychain; the page never keeps or shows one.
+ *   GET/POST api/extensions/cc-agents/sidecar/providers  (list | {action: key|check|enable|disable|remove|add})
  * Phone: bottom sheet. Desktop: popover above the chip.
  * Data: cc-agents sidecar via the WebUI's authenticated, consent-gated proxy:
  *   GET  api/extensions/cc-agents/sidecar/executor?id=<session>  -> {choice, catalog}
@@ -21,8 +24,15 @@
 
   const API = 'api/extensions/cc-agents/sidecar/executor';
   const AGENTS_API = 'api/extensions/cc-agents/sidecar/agents';
+  const PROVIDERS_API = 'api/extensions/cc-agents/sidecar/providers';
   const AGENTS = [['claude', 'Claude'], ['codex', 'OpenAI']];
-  const PROVIDER_ICON = { anthropic: 'AiBrain01Icon', openai: 'AiMagicIcon' };
+  const PROVIDER_ICON = { anthropic: 'AiBrain01Icon', openai: 'AiMagicIcon', 'anthropic-api': 'AiBrain01Icon', 'openai-api': 'AiMagicIcon' };
+  const iconFor = (p, pv) => PROVIDER_ICON[p] || ((pv || {}).billing === 'local' ? 'CpuIcon' : 'ServerStack01Icon');
+  const BILLING_NOTE = {
+    'pay-per-use': (n) => `Billed by ${n} per use with your API key, separate from any Claude or ChatGPT plan.`,
+    subscription: (n) => `Uses your ${n} plan.`,
+    local: () => 'Runs on this Mac. Free.',
+  };
   const EFFORT_LABEL = { '': 'Auto', low: 'Low', medium: 'Medium', high: 'High' };
   const FALLBACK = {
     providers: {
@@ -59,6 +69,11 @@
   let handoffs = { dynamic: true, available: null, known: false };  // GET /agents (known: answered once)
   let step = 1;
   let browsing = 'anthropic';
+  let query = '';          // step 2 model search (long lists, e.g. OpenRouter)
+  let provs = null;        // step 3: GET /providers
+  let provOpen = '';       // step 3: the provider row that is expanded ('' none, '+custom' the custom form)
+  let provMsg = {};        // step 3: last result per provider {ok, message}
+  let provBusy = '';
   let open = false;
 
   const modelOf = (p, m) => ((catalog.providers[p] || {}).models || []).find((x) => x.id === m);
@@ -221,7 +236,7 @@
   function paintChip() {
     if (!chip) return;
     const label = nameOf(choice);
-    chip.innerHTML = `<span class="hx-mp-chip-ic">${icon(PROVIDER_ICON[choice.provider], 15)}</span>`
+    chip.innerHTML = `<span class="hx-mp-chip-ic">${icon(iconFor(choice.provider, catalog.providers[choice.provider]), 15)}</span>`
       + `<span class="hx-mp-chip-label">${esc(label)}</span>`
       + `<span class="hx-mp-chip-chev">${icon('ArrowDown01Icon', 12)}</span>`;
     chip.title = 'Model for this conversation';
@@ -237,7 +252,7 @@
       + '<div class="hx-mp-panel" role="dialog" aria-modal="true" aria-label="Choose a model">'
       + '<div class="hx-mp-grab" aria-hidden="true"></div>'
       + '<div class="hx-mp-frame"><div class="hx-mp-track"><section class="hx-mp-pane" data-step="1"></section>'
-      + '<section class="hx-mp-pane" data-step="2"></section></div></div></div>';
+      + '<section class="hx-mp-pane" data-step="2"></section><section class="hx-mp-pane" data-step="3"></section></div></div></div>';
     document.body.appendChild(root);
     panel = root.querySelector('.hx-mp-panel');
     frame = root.querySelector('.hx-mp-frame');
@@ -245,6 +260,7 @@
     root.querySelector('.hx-mp-scrim').addEventListener('click', close);
     panel.addEventListener('click', onClick);
     panel.addEventListener('keydown', onKey);
+    panel.addEventListener('input', onInput);
     let y0 = null;  // phone: drag the sheet down to dismiss
     panel.addEventListener('touchstart', (e) => { y0 = panel.scrollTop <= 0 ? e.touches[0].clientY : null; }, { passive: true });
     panel.addEventListener('touchmove', (e) => {
@@ -265,9 +281,10 @@
       const pv = catalog.providers[p];
       const cur = choice.provider === p;
       const sub = cur ? nameOf(choice) : pv.worker;
+      const badge = pv.billing_label ? `<span class="hx-mp-badge" data-billing="${esc(pv.billing)}">${esc(pv.billing_label)}</span>` : '';
       return `<button type="button" class="hx-mp-row hx-mp-prov${cur ? ' is-current' : ''}" data-provider="${esc(p)}">`
-        + `<span class="hx-mp-tile">${icon(PROVIDER_ICON[p], 22)}</span>`
-        + `<span class="hx-mp-text"><span class="hx-mp-name">${esc(pv.name)}</span><span class="hx-mp-desc">${esc(sub)}</span></span>`
+        + `<span class="hx-mp-tile">${icon(iconFor(p, pv), 22)}</span>`
+        + `<span class="hx-mp-text"><span class="hx-mp-name">${esc(pv.name)}${badge}</span><span class="hx-mp-desc">${esc(sub)}</span></span>`
         + `<span class="hx-mp-go">${icon('ArrowRight01Icon', 16)}</span></button>`;
     }).join('');
     const on = catalog.agents || AGENTS.map((x) => x[0]);
@@ -286,7 +303,10 @@
         + ` aria-pressed="${tkOn}"${bothOn ? '' : ' aria-disabled="true" disabled'}`
         + ` title="${bothOn ? 'When Claude or Codex hits its usage limit, the other carries on with the same task' : 'Needs Claude Code and Codex both on'}">Takeover</button>`;
     return `<header class="hx-mp-head"><span class="hx-mp-title">Model</span></header>`
-      + `<div class="hx-mp-list">${rows}</div>`
+      + `<div class="hx-mp-list">${rows}`
+      + `<button type="button" class="hx-mp-row hx-mp-add" data-manage><span class="hx-mp-tile">${icon('Add01Icon', 20)}</span>`
+      + `<span class="hx-mp-text"><span class="hx-mp-name">More models</span><span class="hx-mp-desc">DeepSeek, Kimi, GLM, OpenRouter, API keys, Ollama…</span></span>`
+      + `<span class="hx-mp-go">${icon('ArrowRight01Icon', 16)}</span></button></div>`
       + `<div class="hx-mp-effort hx-mp-agents"><span class="hx-mp-effort-label">Agents</span><div class="hx-mp-segs" role="group" aria-label="Coding agents on this Mac">${agents}${ho}${tk}</div></div>`
       + (unavail ? '<p class="hx-mp-cap hx-mp-ho-cap">Hand-offs: needs Claude Code and Codex signed in</p>' : '')
       + (notice ? noteHtml() : `<p class="hx-mp-cap">${sid() ? 'For this conversation' : 'For this new chat'}</p>`);
@@ -294,9 +314,12 @@
 
   function paneTwo() {
     const pv = catalog.providers[browsing] || { models: [] };
+    const many = (pv.models || []).length > 8;
+    const q = many ? query.trim().toLowerCase() : '';
     const rows = pv.models.map((m) => {
       const on = choice.provider === browsing && choice.model === m.id;
-      return `<button type="button" class="hx-mp-row hx-mp-model${on ? ' is-on' : ''}" data-model="${esc(m.id)}" aria-pressed="${on}">`
+      const hide = q && !(m.name + ' ' + m.id).toLowerCase().includes(q);
+      return `<button type="button" class="hx-mp-row hx-mp-model${on ? ' is-on' : ''}" data-model="${esc(m.id)}" aria-pressed="${on}"${hide ? ' hidden' : ''} data-q="${esc((m.name + ' ' + m.id).toLowerCase())}">`
         + `<span class="hx-mp-text"><span class="hx-mp-name">${esc(m.name)}</span><span class="hx-mp-desc">${esc(m.desc)}</span></span>`
         + `<span class="hx-mp-check">${on ? icon('Tick02Icon', 18) : ''}</span></button>`;
     }).join('');
@@ -305,21 +328,129 @@
     const seg = levels.map((l) => `<button type="button" class="hx-mp-seg${eff === l ? ' is-on' : ''}" data-effort="${l}" aria-pressed="${eff === l}">${EFFORT_LABEL[l] || l}</button>`).join('');
     return `<header class="hx-mp-head hx-mp-head-2"><button type="button" class="hx-mp-back" data-back aria-label="Back">${icon('ArrowLeft01Icon', 18)}</button>`
       + `<span class="hx-mp-title">${esc(pv.name || '')}</span><span class="hx-mp-spacer"></span></header>`
-      + `<div class="hx-mp-list">${rows}</div>`
-      + `<div class="hx-mp-effort"><span class="hx-mp-effort-label">Effort</span><div class="hx-mp-segs" role="group" aria-label="Effort">${seg}</div></div>`
+      + (pv.billing_label ? `<p class="hx-mp-cap hx-mp-bill">${esc((BILLING_NOTE[pv.billing] || (() => ''))(pv.name))}</p>` : '')
+      + (many ? `<div class="hx-mp-searchwrap">${icon('Search01Icon', 15)}<input type="search" class="hx-mp-search" data-search placeholder="Search ${(pv.models || []).length} models" value="${esc(query)}" autocomplete="off" spellcheck="false"></div>` : '')
+      + `<div class="hx-mp-list${many ? ' is-long' : ''}">${rows}</div>`
+      + (pv.effort === false ? '' : `<div class="hx-mp-effort"><span class="hx-mp-effort-label">Effort</span><div class="hx-mp-segs" role="group" aria-label="Effort">${seg}</div></div>`)
       + (notice ? noteHtml() : '');
   }
+  // ── step 3: providers ───────────────────────────────────────────────────
+  async function loadProviders() {
+    try {
+      const r = await fetch(PROVIDERS_API, { credentials: 'same-origin', cache: 'no-store' });
+      provs = r.ok ? await r.json() : { error: r.status === 403 ? NO_CONSENT : 'Couldn’t load providers.' };
+    } catch (_) { provs = { error: OFFLINE }; }
+    if (open && step === 3) paint();
+  }
+  async function provAction(data, after) {
+    provBusy = data.id || '+custom';
+    paint();
+    try {
+      const j = await post(PROVIDERS_API, data);
+      if (j && j.providers) provs = Object.assign({}, provs, { providers: j.providers });
+      if (j && j.result) provMsg[j.result.id] = j.result;
+      else delete provMsg[data.id];
+      if (after) after(j);
+      await load(sid());  // the picker's provider list changes with what's linked
+    } catch (e) {
+      provMsg[data.id || '+custom'] = { ok: false, message: (e && e.message && !/^\d+$/.test(e.message)) ? e.message : 'Couldn’t save. Try again.' };
+    } finally { provBusy = ''; if (open) paint(); }
+  }
+  function provRow(p) {
+    const isOpen = provOpen === p.id;
+    const state = p.linked ? 'Linked' : (p.auth === 'none' ? (p.enabled ? 'Not running' : 'Off') : 'Add key');
+    const msg = provMsg[p.id];
+    let body = '';
+    if (isOpen) {
+      const note = (BILLING_NOTE[p.billing] || (() => ''))(p.name);
+      const runs = p.worker === 'codex' ? 'Runs in Codex.' : 'Runs in Claude Code.';
+      body = `<div class="hx-mp-form" data-for="${esc(p.id)}"><p class="hx-mp-cap">${esc(note)} ${runs}</p>`;
+      if (p.auth !== 'none') {
+        body += `<div class="hx-mp-keyrow"><input type="password" class="hx-mp-input" data-key="${esc(p.id)}" placeholder="${p.linked ? 'Replace key' : 'Paste API key'}" autocomplete="off" autocapitalize="off" spellcheck="false" aria-label="${esc(p.name)} API key">`
+          + `<button type="button" class="hx-mp-btn is-primary" data-savekey="${esc(p.id)}"${provBusy === p.id ? ' disabled' : ''}>${provBusy === p.id ? 'Checking…' : 'Save'}</button></div>`
+          + (p.key_url ? `<a class="hx-mp-link" href="${esc(p.key_url)}" target="_blank" rel="noopener noreferrer">Get a key ${icon('ArrowUpRight01Icon', 13)}</a>` : '');
+      } else {
+        body += `<div class="hx-mp-keyrow"><button type="button" class="hx-mp-btn is-primary" data-enable="${esc(p.id)}" data-on="${p.enabled ? '' : '1'}"${provBusy === p.id ? ' disabled' : ''}>${p.enabled ? 'Turn off' : 'Turn on'}</button></div>`;
+      }
+      if (p.linked || p.custom) {
+        body += `<div class="hx-mp-keyrow hx-mp-quiet">${p.linked ? `<button type="button" class="hx-mp-btn" data-check="${esc(p.id)}">Check</button>` : ''}`
+          + `<button type="button" class="hx-mp-btn is-danger" data-remove="${esc(p.id)}">${p.custom ? 'Remove' : 'Remove key'}</button></div>`;
+      }
+      if (msg) body += `<p class="hx-mp-result${msg.ok ? ' is-ok' : ''}" role="status">${esc(msg.ok ? (msg.message === 'works' ? 'Linked. Its models are in the picker now.' : msg.message) : msg.message)}</p>`;
+      body += '</div>';
+    }
+    const badge = p.billing_label ? `<span class="hx-mp-badge" data-billing="${esc(p.billing)}">${esc(p.billing_label)}</span>` : '';
+    return `<div class="hx-mp-provitem${isOpen ? ' is-open' : ''}"><button type="button" class="hx-mp-row" data-prov="${esc(p.id)}" aria-expanded="${isOpen}">`
+      + `<span class="hx-mp-tile">${icon(iconFor(p.id, p), 20)}</span>`
+      + `<span class="hx-mp-text"><span class="hx-mp-name">${esc(p.name)}${badge}</span><span class="hx-mp-desc">${p.linked ? icon('Tick02Icon', 12) + ' ' : ''}${esc(state)}</span></span>`
+      + `<span class="hx-mp-go hx-mp-chev">${icon('ArrowDown01Icon', 14)}</span></button>${body}</div>`;
+  }
+  function customForm() {
+    const isOpen = provOpen === '+custom';
+    const msg = provMsg['+custom'];
+    let body = '';
+    if (isOpen) {
+      body = '<div class="hx-mp-form">'
+        + '<input class="hx-mp-input" data-c="name" placeholder="Name (e.g. My server)" autocomplete="off">'
+        + '<input class="hx-mp-input" data-c="base_url" placeholder="Base URL (https://…)" autocomplete="off" autocapitalize="off" spellcheck="false" inputmode="url">'
+        + '<input class="hx-mp-input" data-c="models" placeholder="Model ids, comma separated" autocomplete="off" autocapitalize="off" spellcheck="false">'
+        + '<div class="hx-mp-segs hx-mp-worker" role="group" aria-label="API type">'
+        + '<button type="button" class="hx-mp-seg is-on" data-cworker="claude" aria-pressed="true">Anthropic API</button>'
+        + '<button type="button" class="hx-mp-seg" data-cworker="codex" aria-pressed="false">OpenAI Responses</button></div>'
+        + '<input type="password" class="hx-mp-input" data-c="key" placeholder="API key (blank for a local server)" autocomplete="off" autocapitalize="off" spellcheck="false">'
+        + `<div class="hx-mp-keyrow"><button type="button" class="hx-mp-btn is-primary" data-addcustom${provBusy === '+custom' ? ' disabled' : ''}>${provBusy === '+custom' ? 'Adding…' : 'Add'}</button></div>`
+        + '<p class="hx-mp-cap">Anthropic API endpoints run in Claude Code; OpenAI Responses endpoints run in Codex.</p>'
+        + (msg ? `<p class="hx-mp-result${msg.ok ? ' is-ok' : ''}" role="status">${esc(msg.message)}</p>` : '')
+        + '</div>';
+    }
+    return `<div class="hx-mp-provitem${isOpen ? ' is-open' : ''}"><button type="button" class="hx-mp-row" data-prov="+custom" aria-expanded="${isOpen}">`
+      + `<span class="hx-mp-tile">${icon('Link01Icon', 20)}</span>`
+      + '<span class="hx-mp-text"><span class="hx-mp-name">Custom endpoint</span><span class="hx-mp-desc">Any Anthropic or OpenAI Responses compatible API</span></span>'
+      + `<span class="hx-mp-go hx-mp-chev">${icon('ArrowDown01Icon', 14)}</span></button>${body}</div>`;
+  }
+  function paneThree() {
+    const head = `<header class="hx-mp-head hx-mp-head-2"><button type="button" class="hx-mp-back" data-back aria-label="Back">${icon('ArrowLeft01Icon', 18)}</button>`
+      + '<span class="hx-mp-title">More models</span><span class="hx-mp-spacer"></span></header>';
+    if (!provs) return head + '<p class="hx-mp-cap">Loading…</p>';
+    if (provs.error) return head + `<p class="hx-mp-cap">${esc(provs.error)}</p>`;
+    const all = provs.providers || [];
+    const keys = all.filter((p) => p.id === 'anthropic-api' || p.id === 'openai-api');
+    const rest = all.filter((p) => !keys.includes(p) && !p.custom);
+    const custom = all.filter((p) => p.custom);
+    return head + '<div class="hx-mp-list hx-mp-provlist">'
+      + '<p class="hx-mp-group">Claude or GPT with an API key</p>' + keys.map(provRow).join('')
+      + '<p class="hx-mp-group">Other providers</p>' + rest.map(provRow).join('')
+      + (custom.length ? '<p class="hx-mp-group">Yours</p>' + custom.map(provRow).join('') : '')
+      + customForm() + '</div>'
+      + '<p class="hx-mp-cap">Keys are stored in this Mac’s Keychain and never shown again. Only providers you link appear in the picker.</p>';
+  }
+
   function noteHtml() {
     return `<div class="hx-mp-note" role="status"><span>${esc(notice)}</span>`
       + (offline ? '<button type="button" class="hx-mp-retry" data-retry>Try again</button>' : '') + '</div>';
   }
 
   function paint() {
-    const [a, b] = track.querySelectorAll('.hx-mp-pane');
+    const [a, b, c] = track.querySelectorAll('.hx-mp-pane');
+    // keep what's typed in step 3 across repaints (a key being pasted, the custom form)
+    const kept = {};
+    c.querySelectorAll('input').forEach((i) => { if (i.value) kept[(i.dataset.key || '') + '|' + (i.dataset.c || '')] = i.value; });
+    const focused = c.contains(document.activeElement) && document.activeElement.tagName === 'INPUT'
+      ? (document.activeElement.dataset.key || '') + '|' + (document.activeElement.dataset.c || '') : null;
+    const worker = (c.querySelector('[data-cworker].is-on') || {}).dataset;
+    const scrolls = [...track.querySelectorAll('.hx-mp-provlist, .hx-mp-list.is-long')].map((l) => [l.closest('.hx-mp-pane').dataset.step, l.scrollTop]);
     a.innerHTML = paneOne();
     b.innerHTML = paneTwo();
-    a.inert = step !== 1; b.inert = step !== 2;
-    track.style.transform = step === 2 ? 'translateX(-50%)' : '';
+    c.innerHTML = step === 3 ? paneThree() : '';
+    c.querySelectorAll('input').forEach((i) => {
+      const k = (i.dataset.key || '') + '|' + (i.dataset.c || '');
+      if (kept[k]) i.value = kept[k];
+      if (k === focused) i.focus({ preventScroll: true });
+    });
+    if (worker && worker.cworker) setWorker(c, worker.cworker);
+    scrolls.forEach(([st, top]) => { const l = track.querySelector(`.hx-mp-pane[data-step="${st}"] .hx-mp-provlist, .hx-mp-pane[data-step="${st}"] .hx-mp-list.is-long`); if (l) l.scrollTop = top; });
+    a.inert = step !== 1; b.inert = step !== 2; c.inert = step !== 3;
+    track.style.transform = step > 1 ? `translateX(-${(step - 1) * 100 / 3}%)` : '';
     fit();
   }
   function fit() {
@@ -387,8 +518,32 @@
     if (t.dataset.agent) { toggleAgent(t.dataset.agent).then(loadHandoffs); return; }
     if (t.hasAttribute('data-handoffs')) { toggleHandoffs(); return; }
     if (t.hasAttribute('data-takeover')) { toggleTakeover(); return; }
-    if (t.dataset.provider) { browsing = t.dataset.provider; go(2); return; }
-    if (t.hasAttribute('data-back')) { go(1, `[data-provider="${browsing}"]`); return; }
+    if (t.dataset.provider) { if (browsing !== t.dataset.provider) query = ''; browsing = t.dataset.provider; go(2); return; }
+    if (t.hasAttribute('data-back')) { go(1, step === 3 ? '[data-manage]' : `[data-provider="${browsing}"]`); return; }
+    if (t.hasAttribute('data-manage')) { loadProviders(); go(3, '[data-prov]'); return; }
+    if (t.dataset.prov) {
+      provOpen = provOpen === t.dataset.prov ? '' : t.dataset.prov;
+      paint();
+      const item = track.querySelector('.hx-mp-provitem.is-open');
+      if (item) item.scrollIntoView({ block: 'nearest' });
+      const f = item && item.querySelector('input');
+      if (f && !phone()) f.focus({ preventScroll: true });
+      return;
+    }
+    if (t.dataset.savekey) {
+      const id = t.dataset.savekey;
+      const inp = track.querySelector(`[data-key="${CSS.escape(id)}"]`);
+      const key = inp ? inp.value.trim() : '';
+      if (!key) { provMsg[id] = { ok: false, message: 'Paste the key first.' }; paint(); return; }
+      if (inp) inp.value = '';  // never left in the page
+      provAction({ action: 'key', id, key });
+      return;
+    }
+    if (t.dataset.enable) { provAction({ action: t.dataset.on ? 'enable' : 'disable', id: t.dataset.enable }); return; }
+    if (t.dataset.check) { provAction({ action: 'check', id: t.dataset.check }); return; }
+    if (t.dataset.remove) { provAction({ action: 'remove', id: t.dataset.remove }, () => { if (provOpen === t.dataset.remove) provOpen = ''; }); return; }
+    if (t.dataset.cworker) { setWorker(track, t.dataset.cworker); return; }
+    if (t.hasAttribute('data-addcustom')) { addCustom(); return; }
     if (t.dataset.model) {
       save({ provider: browsing, model: t.dataset.model, effort: choice.effort || null });
       paint();
@@ -397,16 +552,47 @@
     }
     if (t.hasAttribute('data-effort')) {
       const effort = t.dataset.effort || null;
-      const base = choice.provider === browsing ? choice : { provider: browsing, model: catalog.providers[browsing].models[0].id };
+      const base = choice.provider === browsing ? choice : { provider: browsing, model: (catalog.providers[browsing].models[0] || {}).id };
       save({ provider: base.provider, model: base.model, effort });
       paint();
     }
   }
+  function setWorker(scope, w) {
+    scope.querySelectorAll('[data-cworker]').forEach((b) => { const on = b.dataset.cworker === w; b.classList.toggle('is-on', on); b.setAttribute('aria-pressed', on); });
+  }
+  function addCustom() {
+    const v = (k) => ((track.querySelector(`[data-c="${k}"]`) || {}).value || '').trim();
+    const name = v('name'), url = v('base_url'), models = v('models'), key = v('key');
+    const id = (name || url.replace(/^https?:\/\//, '')).toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '').slice(0, 30) || 'custom';
+    const local = /^http:\/\/(127\.0\.0\.1|localhost)/.test(url);
+    if (!url || !models) { provMsg['+custom'] = { ok: false, message: 'Add the base URL and at least one model id.' }; paint(); return; }
+    const worker = (track.querySelector('[data-cworker].is-on') || {}).dataset;
+    const keyInput = track.querySelector('[data-c="key"]');
+    if (keyInput) keyInput.value = '';
+    provAction({ action: 'add', id, name: name || id, base_url: url, models, worker: worker ? worker.cworker : 'claude',
+      auth: key ? 'key' : 'none', billing: local ? 'local' : 'pay-per-use', ...(key ? { key } : {}) },
+    (j) => { if (j && j.providers) { provOpen = id; track.querySelectorAll('[data-c]').forEach((i) => { i.value = ''; }); } });
+  }
+  function onInput(e) {
+    const t = e.target;
+    if (!t.hasAttribute || !t.hasAttribute('data-search')) return;
+    query = t.value;
+    const q = query.trim().toLowerCase();
+    track.querySelectorAll('.hx-mp-pane[data-step="2"] .hx-mp-model').forEach((r) => { r.hidden = !!q && !r.dataset.q.includes(q); });
+    fit();
+  }
   function onKey(e) {
-    if (e.key === 'Escape') { e.preventDefault(); step === 2 ? go(1, `[data-provider="${browsing}"]`) : close(); return; }
-    if (e.key === 'ArrowLeft' && step === 2 && !e.target.closest('.hx-mp-segs')) { go(1, `[data-provider="${browsing}"]`); return; }
+    if (e.key === 'Escape') { e.preventDefault(); step > 1 ? go(1, step === 3 ? '[data-manage]' : `[data-provider="${browsing}"]`) : close(); return; }
+    if (e.key === 'Enter' && e.target.dataset && e.target.dataset.key) {
+      e.preventDefault();
+      const b = track.querySelector(`[data-savekey="${CSS.escape(e.target.dataset.key)}"]`);
+      if (b) b.click();
+      return;
+    }
+    if (e.target.tagName === 'INPUT') return;  // typing a key or a search: arrows move the caret
+    if (e.key === 'ArrowLeft' && step > 1 && !e.target.closest('.hx-mp-segs')) { go(1, step === 3 ? '[data-manage]' : `[data-provider="${browsing}"]`); return; }
     if (e.key === 'ArrowDown' || e.key === 'ArrowUp') {
-      const rows = [...track.querySelectorAll('.hx-mp-pane')[step - 1].querySelectorAll('.hx-mp-row')];
+      const rows = [...track.querySelectorAll('.hx-mp-pane')[step - 1].querySelectorAll('.hx-mp-row:not([hidden])')];
       const i = rows.indexOf(document.activeElement);
       if (i < 0) return;
       e.preventDefault();

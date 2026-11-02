@@ -204,3 +204,56 @@ def test_run_claude_endpoint_without_key_fails_cleanly(env, tmp_path):
     res = pv.run_claude("hi", cwd=str(tmp_path), add_dirs=[], cfg={"executor": {}}, resume_session=None,
                         model="deepseek-v4-pro", endpoint="deepseek")
     assert res["ok"] is False and "no key" in res["error"]
+
+
+def _sidecar(monkeypatch, tmp_path):
+    spec = importlib.util.spec_from_file_location("cc_sidecar_providers", PKG / "sidecar.py")
+    sc = importlib.util.module_from_spec(spec); spec.loader.exec_module(sc)
+    smp = sc.model_providers  # the sidecar's own copy of the module
+    monkeypatch.setattr(smp, "CONFIG", tmp_path / "sc-providers.yaml")
+    kr = _Keyring()
+    monkeypatch.setattr(smp, "_use_security", lambda: False)
+    monkeypatch.setattr(smp, "_keyring", lambda: kr)
+    smp._HAS.clear()
+    return sc, smp
+
+
+def test_sidecar_saves_a_key_without_echoing_it(monkeypatch, tmp_path):
+    sc, smp = _sidecar(monkeypatch, tmp_path)
+    monkeypatch.setattr(smp, "_get_json", lambda url, key, timeout=12: {"data": [{"id": "deepseek-v4-pro"}]})
+    code, out = sc.set_provider({"action": "key", "id": "deepseek", "key": "sk-secret-777"})
+    assert code == 200 and out["result"] == {"id": "deepseek", "ok": True, "message": "works"}
+    assert "sk-secret-777" not in repr(out)
+    ds = next(p for p in out["providers"] if p["id"] == "deepseek")
+    assert ds["linked"] and ds["enabled"] and ds["billing_label"] == "Pay per use"
+    assert "sk-secret-777" not in repr(sc.providers_payload())
+
+
+def test_sidecar_reports_a_rejected_key(monkeypatch, tmp_path):
+    import urllib.error
+    sc, smp = _sidecar(monkeypatch, tmp_path)
+
+    def denied(url, key, timeout=12):
+        raise urllib.error.HTTPError(url, 401, "no", {}, None)
+    monkeypatch.setattr(smp, "_get_json", denied)
+    code, out = sc.set_provider({"action": "key", "id": "kimi", "key": "bad-key"})
+    assert code == 200 and out["result"]["ok"] is False and "rejected" in out["result"]["message"]
+    assert smp.get_key("kimi") is None and "kimi" not in smp.enabled_ids()  # a wrong key isn't kept
+
+
+def test_sidecar_custom_endpoint_and_remove(monkeypatch, tmp_path):
+    sc, smp = _sidecar(monkeypatch, tmp_path)
+    monkeypatch.setattr(smp, "_get_json", lambda *a, **k: {"models": [{"name": "qwen3-coder:30b"}]})
+    code, out = sc.set_provider({"action": "add", "id": "lab", "name": "Lab box", "base_url": "http://127.0.0.1:9000",
+                                 "models": "qwen3-coder:30b", "auth": "none", "billing": "local"})
+    assert code == 200 and any(p["id"] == "lab" and p["custom"] for p in out["providers"])
+    assert sc.set_provider({"action": "add", "id": "x", "base_url": "ftp://nope", "models": []})[0] == 400
+    assert sc.set_provider({"action": "remove", "id": "lab"})[0] == 200
+    assert not smp.get("lab")
+    assert sc.set_provider({"action": "key", "id": "nope", "key": "k"})[0] == 404
+
+
+def test_effort_only_where_the_api_takes_it(env):
+    _link("deepseek"); _link("anthropic-api", "sk-a")
+    cat = ec.public_catalog()["providers"]
+    assert cat["anthropic"]["effort"] and cat["anthropic-api"]["effort"] and not cat["deepseek"]["effort"]

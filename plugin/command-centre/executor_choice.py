@@ -133,6 +133,11 @@ def valid(provider: str, model: str, effort: str | None) -> bool:
     return model_info(provider, model) is not None and (effort is None or effort in EFFORTS)
 
 
+def takes_effort(provider: str) -> bool:
+    """Claude / OpenAI models take an effort level; other providers' endpoints may reject it."""
+    return not is_endpoint(provider) or bool((_mp().get(provider) or {}).get("official"))
+
+
 def label(provider: str, name: str) -> str:
     """"DeepSeek V4 Pro", "Kimi K2" ...: the provider name only when the model name lacks it."""
     pn = provider_name(provider)
@@ -187,6 +192,7 @@ def public_catalog(available_openai: list[str] | None = None) -> dict:
         if pid == "openai" and available_openai:
             models = [m for m in models if m["id"] in available_openai]
         entry = {"name": provider_name(pid), "worker": _worker_label(pid), "agent": worker_of(pid), "models": models}
+        entry["effort"] = takes_effort(pid)
         if is_endpoint(pid):
             p = _mp().get(pid) or {}
             entry.update(endpoint=True, billing=p.get("billing"), billing_label=_mp().BILLING_LABEL.get(p.get("billing"), ""))
