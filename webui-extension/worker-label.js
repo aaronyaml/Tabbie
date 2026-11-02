@@ -39,11 +39,14 @@
     });
   }
 
-  let queued = false;
-  new MutationObserver(() => {
-    if (queued) return;
-    queued = true;
-    requestAnimationFrame(() => { queued = false; fix(); });
-  }).observe(document.body, { childList: true, subtree: true, characterData: true });
+  if (window.hxDom) window.hxDom.on(fix);  // shared, throttled page watcher (hx-dom.js)
+  else {
+    let queued = false;
+    new MutationObserver(() => {
+      if (queued) return;
+      queued = true;
+      requestAnimationFrame(() => { queued = false; fix(); });
+    }).observe(document.body, { childList: true, subtree: true, characterData: true });
+  }
   fix();
 })();

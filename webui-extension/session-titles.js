@@ -103,7 +103,8 @@
   }
   function start() {
     if (!wrapRows()) { const iv = setInterval(() => { if (wrapRows()) clearInterval(iv); }, 300); setTimeout(() => clearInterval(iv), 30000); }
-    new MutationObserver(schedule).observe(document.body, { childList: true, subtree: true, characterData: true });
+    if (window.hxDom) window.hxDom.on(fixDom);  // shared, throttled page watcher (hx-dom.js)
+    else new MutationObserver(schedule).observe(document.body, { childList: true, subtree: true, characterData: true });
     fixDom();
   }
   if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', start); else start();

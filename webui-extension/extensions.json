@@ -4,7 +4,8 @@
       "id": "overflow-loader",
       "name": "Extension overflow loader (past upstream's 32-file limit)",
       "scripts": [
-        "overflow-loader.js?v=2"
+        "overflow-loader.js?v=2",
+        "hx-dom.js?v=1"
       ],
       "stylesheets": []
     },
@@ -180,7 +181,7 @@
       "id": "session-titles",
       "name": "Readable session lists (hide hub workers, clean pasted titles)",
       "scripts": [
-        "session-titles.js?v=2"
+        "session-titles.js?v=3"
       ],
       "stylesheets": []
     },
@@ -311,7 +312,7 @@
       "id": "worker-label",
       "name": "Reply model label",
       "scripts": [
-        "worker-label.js?v=1"
+        "worker-label.js?v=2"
       ],
       "stylesheets": []
     },
@@ -329,7 +330,7 @@
       "id": "plan-chip",
       "name": "Plan chip",
       "scripts": [
-        "plan-chip.js?v=2"
+        "plan-chip.js?v=3"
       ],
       "stylesheets": [
         "plan-chip.css?v=2"

@@ -80,11 +80,14 @@
     });
   }
 
-  let queued = false;
-  new MutationObserver(() => {
-    if (queued) return;
-    queued = true;
-    requestAnimationFrame(() => { queued = false; scan(); });
-  }).observe(document.body, { childList: true, subtree: true, characterData: true });
+  if (window.hxDom) window.hxDom.on(scan);  // shared, throttled page watcher (hx-dom.js)
+  else {
+    let queued = false;
+    new MutationObserver(() => {
+      if (queued) return;
+      queued = true;
+      requestAnimationFrame(() => { queued = false; scan(); });
+    }).observe(document.body, { childList: true, subtree: true, characterData: true });
+  }
   scan();
 })();
