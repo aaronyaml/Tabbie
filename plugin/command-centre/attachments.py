@@ -33,7 +33,19 @@ _FILE_REF = re.compile(r"""@file:(?:"([^"]+)"|'([^']+)'|`([^`]+)`|(\S+))""")
 _BARE_PATH = re.compile(r"""(?<![\w@:])((?:~|/(?:Users|private|tmp|Volumes|var/folders))/[^\s"'`<>|]+)""")
 
 _SECRET_HINTS = (".ssh/", ".aws/", ".gnupg/", "/.env", "credentials", "auth.json", ".netrc",
-                 "mcp-tokens", "keychain")
+                 "mcp-tokens", "keychain", "/.codex/", "/.claude/.credentials", "/.config/gh/",
+                 "/.docker/config.json", "/.kube/")
+# Private keys and tokens by file name, wherever they live.
+_SECRET_NAME = re.compile(r"(^id_(rsa|dsa|ecdsa|ed25519)(\.pub)?$|\.(pem|key|p12|pfx|token|keystore|jks)$)", re.I)
+MAX_FILES = 40  # per message; a pasted directory listing must not copy a whole tree
+
+
+def _is_secret(path: str) -> bool:
+    low = path.lower()
+    if any(h in low for h in _SECRET_HINTS) or _SECRET_NAME.search(Path(path).name):
+        return True
+    # Tabbie's own state (sign-in, sidecar token, sessions) never goes to a worker; WebUI uploads do.
+    return "/.hermes/" in low and "/.hermes/webui/attachments/" not in low
 
 
 def kind_of(ext: str, mime: str | None) -> str:
@@ -103,10 +115,12 @@ def find_candidates(message: Any) -> tuple[list[Path], list[tuple[bytes, str]]]:
             key = str(p)
             if key in seen or not p.is_file():
                 continue
-            if any(h in key for h in _SECRET_HINTS):
+            if _is_secret(key):
                 continue  # never ingest credential files, even if referenced
             seen.add(key)
             paths.append(p)
+            if len(paths) >= MAX_FILES:
+                return paths, inline
     return paths, inline
 
 
@@ -133,7 +147,9 @@ class Manifest:
         target = self.originals / f"{idx:02d}-{safe}"
         if isinstance(src_bytes_or_path, Path):
             max_mb = float(cfg.get("max_file_mb", 500))
-            if src_bytes_or_path.stat().st_size > max_mb * 1024 * 1024:
+            size = src_bytes_or_path.stat().st_size
+            total = sum(e.get("size_bytes", 0) for e in self.items)
+            if size > max_mb * 1024 * 1024 or total + size > float(cfg.get("max_total_mb", 1000)) * 1024 * 1024:
                 return None
             shutil.copy2(src_bytes_or_path, target)
         else:

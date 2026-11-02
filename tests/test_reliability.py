@@ -64,3 +64,12 @@ def test_crash_inside_a_run_ends_it_as_failed(monkeypatch, tmp_path):
     out = cc._execute(r)
     assert out["ok"] is False and "internal error" in out["error"]
     assert st.Request(r.id)["status"] == "failed"
+
+
+def test_attachments_never_pick_up_keys_or_tabbie_state():
+    at = import_module("command_centre.attachments")
+    assert at._is_secret("/u/x/.ssh/config") and at._is_secret("/u/proj/server.pem")
+    assert at._is_secret("/u/proj/id_ed25519") and at._is_secret("/u/.hermes/webui/sidecar-auth/sidecar.token")
+    assert at._is_secret("/u/.hermes/webui/settings.json")
+    assert not at._is_secret("/u/.hermes/webui/attachments/abc/photo.png")
+    assert not at._is_secret("/u/proj/README.md") and not at._is_secret("/u/proj/keys.ts")

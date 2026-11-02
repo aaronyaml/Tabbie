@@ -608,6 +608,9 @@ Design notes: `docs/memory/ARCHITECTURE.md`, `docs/projects/ARCHITECTURE.md`.
   - stored byte-exact and read-only under `state/requests/<id>/attachments/`;
   - a manifest records each file's name, type, size and sha256;
   - derived files (extracted ZIPs, PDF text, media info) sit beside the originals.
+  - never picked up: keys and credential files (`.ssh/`, `*.pem`, `id_*`, `*.token`, cloud/CLI
+    configs) and Tabbie's own `~/.hermes/` state except WebUI uploads; at most 40 files and
+    `max_total_mb` (1000) per message.
 - **Agents panel**: each reply shows a live block of the worker and its subagents (status, latest
   step, tokens, time). The Agents pill opens the whole session; tap a request there to jump to its
   reply. **Stop** ends a running worker and keeps the work so far. Finished jobs list the files they
