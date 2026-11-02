@@ -12,6 +12,7 @@ os.environ["HMEM_NO_LLM"] = "1"  # never a real `claude -p` call; tests stub the
 os.environ["TABBIE_LIMITS_GATE"] = "off"  # never a real usage-endpoint call (tests pass their own rows)
 os.environ["TABBIE_LINKED"] = ""  # no `claude auth` / `codex login` subprocess: nothing linked unless a test says so
 os.environ["TABBIE_NO_SERVICES"] = "1"  # never install or reload real LaunchAgents
+os.environ["TABBIE_SIDECAR_PEER_CHECK"] = "off"  # test clients are not the WebUI process
 os.environ["HERMES_WEBUI_STATE_DIR"] = os.path.join(_TMP, "webui-state")  # never the real WebUI folder list
 
 

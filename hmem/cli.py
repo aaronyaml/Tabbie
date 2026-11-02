@@ -82,6 +82,7 @@ def main(argv: list[str] | None = None) -> int:
 
 
 _USER_ONLY = {"approve", "reject", "deprecate", "doctor", "migrate"}
+_NEEDS_TTY = {"approve", "reject", "deprecate"}
 _USER_ONLY_PROJECT = {"create", "add-folder", "remove-folder", "primary", "archive", "unarchive", "claim-history"}
 
 
@@ -93,6 +94,9 @@ def _run(a) -> int:
             raise ValueError(f"`hmem {c}` is for the user (WebUI or their own terminal), not a worker; use `hmem propose`")
         if c == "add" and a.actor == "user":
             a.actor = "agent"
+    if c in _NEEDS_TTY and not sys.stdin.isatty() and os.environ.get("HMEM_ALLOW_NO_TTY") != "1":
+        # HERMES_WORKER can be unset by whoever runs the command; a worker's shell has no terminal, the user's does
+        raise ValueError(f"`hmem {c}` needs your own terminal (or the WebUI); workers can only `hmem propose`")
     if c == "init":
         _p(str(store.init()))
     elif c == "search":

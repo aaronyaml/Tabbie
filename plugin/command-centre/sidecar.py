@@ -84,6 +84,29 @@ def _token_ok(got: str | None) -> bool:
     return bool(want) and bool(got) and hmac.compare_digest(want.encode(), got.strip().encode())
 
 
+WEBUI_PORT = int(os.environ.get("HERMES_WEBUI_PORT") or 8787)
+_LSOF = shutil.which("lsof") or "/usr/sbin/lsof"
+
+
+def _pids(*args: str) -> set[int]:
+    try:
+        out = subprocess.run([_LSOF, "-nP", *args], capture_output=True, text=True, timeout=5).stdout
+    except (OSError, subprocess.SubprocessError):
+        return set()
+    return {int(x) for x in re.findall(r"^p(\d+)$", out, re.M)}
+
+
+def _from_webui(peer_port: int) -> bool:
+    """Changes must come from the WebUI server itself (its proxy, behind the login). A worker runs as the
+    same user and can read the token, so the token alone can't tell the two apart: the process on the
+    other end of the connection can. TABBIE_SIDECAR_PEER_CHECK=off turns this off (tests)."""
+    if os.environ.get("TABBIE_SIDECAR_PEER_CHECK") == "off":
+        return True
+    webui = _pids(f"-iTCP:{WEBUI_PORT}", "-sTCP:LISTEN", "-Fp")
+    peer = _pids(f"-iTCP:{int(peer_port)}", "-sTCP:ESTABLISHED", "-Fp") - {os.getpid()}
+    return bool(webui) and bool(peer) and peer <= webui
+
+
 def question_rounds(req: dict) -> list[dict]:
     """Every question round of a request, oldest first: {round, source, questions, answer, pending}."""
     out = []
@@ -652,6 +675,9 @@ class Handler(BaseHTTPRequestHandler):
         u = urlsplit(self.path)
         if not _token_ok(self.headers.get("X-Hermes-Sidecar-Token")):
             return self._send(401, {"error": "unauthorized"})
+        if not _from_webui(self.client_address[1]):
+            sys.stderr.write(f"cc-sidecar: refused POST {u.path[:60]} not sent by the WebUI\n")
+            return self._send(403, {"error": "changes go through the WebUI"})
         try:
             n = int(self.headers.get("Content-Length") or 0)
             limit = projects_api.MAX_BODY if u.path.startswith("/projects") else 4096

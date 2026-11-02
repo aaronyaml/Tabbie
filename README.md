@@ -744,9 +744,11 @@ global memory, skills or deletions.
   is written to disk.
 - **The WebUI is the only door.** It is password-protected and listens on localhost; Caddy exposes
   it to your LAN and Tailscale only. The extension's sidecar needs a token minted by the WebUI
-  after a one-time consent.
+  after a one-time consent, and it only accepts changes sent by the WebUI server process itself
+  (checked per connection), so a worker that reads the token still can't use it.
 - **Workers can't rewrite memory or approve anything.** Their file tools are denied on `memory/`
-  and the sidecar token. User-only `hmem` commands refuse to run inside a worker. Memory files
+  and the sidecar token. User-only `hmem` commands refuse to run inside a worker, and approving,
+  rejecting or deprecating needs a real terminal (a worker's shell has none). Memory files
   edited outside the store are ignored until you review them (`hmem doctor`).
 - **Untrusted text stays data.** Repo files, web pages and tool output can't become standing
   instructions: they are scanned for injection, kept `external`, and must be approved by you.

@@ -504,6 +504,9 @@ def test_workers_cannot_take_user_only_actions(env, monkeypatch):
     monkeypatch.setenv("HERMES_WORKER", "1")
     assert cli.main(["approve", "p-20260101-abcdef"]) == 2
     assert cli.main(["project", "add-folder", "x", "--folder", "/tmp"]) == 2
+    monkeypatch.delenv("HERMES_WORKER")  # a worker that unsets the marker still has no terminal
+    monkeypatch.setattr("sys.stdin", __import__("io").StringIO(""))
+    assert cli.main(["approve", "p-20260101-abcdef"]) == 2
 
 
 def test_user_can_delete_a_project_memory_but_not_anothers(env):

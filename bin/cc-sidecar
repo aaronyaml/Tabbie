@@ -7,7 +7,7 @@ SIDECAR="$HOME/hermes/plugin/command-centre/sidecar.py"
 cd "$HOME/hermes" || exit 1
 UV="$(command -v uv || ls -d "$HOME"/.hermes/tools/uv-*/uv 2>/dev/null | tail -1)"
 if [ -n "$UV" ] && [ -x "$UV" ]; then
-  exec "$UV" run --no-project -q --with pyyaml python -I "$SIDECAR"
+  exec "$UV" run --no-project -q --with pyyaml --with ruamel.yaml python -I "$SIDECAR"
 fi
 for py in python3 /usr/bin/python3; do
   "$py" -I -c "import yaml" 2>/dev/null && exec "$py" -I "$SIDECAR"
