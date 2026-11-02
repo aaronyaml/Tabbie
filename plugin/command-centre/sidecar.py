@@ -8,6 +8,7 @@ request. No token file, wrong token -> 401. Only /health answers without it (no 
 
 GET /session?id=<webui session id>  -> requests (oldest first) with agents, question rounds
 GET /request?id=<request id>        -> one request's agents + question rounds
+GET /plan?id=<request id>           -> the planner's final brief for that request (chat Plan chip)
 GET /executor?id=<webui session id> -> the conversation's executor choice + the picker catalog
 POST /executor {id, provider, model, effort} -> set it (composer model picker)
 GET /agents, POST /agents {enabled}  -> which coding agents this install uses (Claude Code, Codex, both)
@@ -113,6 +114,15 @@ def _request_row(rid: str) -> dict:
             "session_id": req.get("session_id"), "prompt": agents._short(req.get("original_prompt"), 120),
             "summary": summary, "agents_list": ags,
             "questions": question_rounds(req)}
+
+
+def plan_payload(rid: str) -> dict:
+    """The final brief the planner wrote for an approved request (the chat's collapsed Plan chip)."""
+    req = common.read_json(common.REQUESTS_DIR / rid / "request.json", {}) or {}
+    brief = str(req.get("brief") or "")
+    return {"id": rid, "planner": req.get("planner") or "", "approved_at": req.get("approved_at"),
+            "modifications": list(req.get("modifications") or [])[-3:], "brief": brief[:60000],
+            "truncated": len(brief) > 60000}
 
 
 def session_payload(sid: str) -> dict:
@@ -273,6 +283,11 @@ class Handler(BaseHTTPRequestHandler):
                 return self._send(200, update_payload(q.get("force") == "1"))
             if u.path == "/title":
                 return self._send(200, title_for(q.get("text", "")))
+            if u.path == "/plan":
+                rid = q.get("id", "")
+                if not _RID.match(rid):
+                    return self._send(400, {"error": "bad request id"})
+                return self._send(200, plan_payload(rid))
             if u.path == "/request":
                 rid = q.get("id", "")
                 if not _RID.match(rid):

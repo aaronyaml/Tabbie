@@ -280,6 +280,16 @@
       "stylesheets": [
         "helper-consent.css?v=1"
       ]
+    },
+    {
+      "id": "plan-chip",
+      "name": "Plan chip",
+      "scripts": [
+        "plan-chip.js?v=1"
+      ],
+      "stylesheets": [
+        "plan-chip.css?v=1"
+      ]
     }
   ]
 }

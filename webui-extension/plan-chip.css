@@ -1,0 +1,15 @@
+/* Tabbie — collapsed planner brief in a reply (plan-chip.js). */
+.hx-plan { margin: 6px 0 10px; max-width: 680px; }
+.hx-plan > summary { display: inline-flex; align-items: center; gap: 6px; height: 28px; padding: 0 12px; border-radius: 14px;
+  list-style: none; cursor: pointer; user-select: none; background: var(--hx-fill, rgba(127,127,127,.12));
+  color: var(--hx-text, inherit); font: 500 13px/1 var(--font-ui, system-ui); -webkit-tap-highlight-color: transparent; }
+.hx-plan > summary::-webkit-details-marker { display: none; }
+.hx-plan > summary em { font-style: normal; font-weight: 400; color: var(--hx-text-2, #8a8a8e); }
+.hx-plan > summary svg { width: 14px; height: 14px; }
+.hx-plan > summary:focus-visible { outline: 2px solid var(--focus-ring-strong, #3054FD); outline-offset: 2px; }
+.hx-plan[open] > summary { background: var(--hx-tint, rgba(48,84,253,.1)); color: var(--hx-ink, #3054FD); }
+.hx-plan-body { margin-top: 8px; padding: 12px 14px; border-radius: 14px; border: 0.5px solid var(--hx-hair, rgba(127,127,127,.25));
+  max-height: 60vh; overflow: auto; font-size: 14px; }
+.hx-plan-dim { margin: 0 0 6px; color: var(--hx-text-2, #8a8a8e); font-size: 12.5px; }
+.hx-plan-md > :first-child { margin-top: 0; } .hx-plan-md > :last-child { margin-bottom: 0; }
+.hx-plan-md pre { white-space: pre-wrap; overflow-wrap: anywhere; margin: 0; font-size: 12.5px; }

@@ -151,9 +151,10 @@ def _directive_execute_approved(r: Request) -> str:
         f"{TAG} User approved request {r.id}"
         + (f" with modifications: {r['modifications'][-1]!r}" if r["modifications"] else "")
         + f".\nACTION: call cc_execute_approved(request_id=\"{r.id}\") now." + _DIRECT + f" Reply starting with "
-        f"`Route: Astra → approval → {_worker_label(r['session_id'])} — executing approved brief`, show any changed points the "
-        f"tool reports (one bullet each), then relay Claude's result as short Done / Verified / "
-        f"Note bullets."
+        f"`Route: Astra → approval → {_worker_label(r['session_id'])} — executing approved brief`, then the line "
+        f"`[[plan:{r.id}]]` exactly as written, on its own (the app shows the planner's brief there, collapsed; "
+        f"never paste the brief yourself), show any changed points the tool reports (one bullet each), then relay "
+        f"Claude's result as short Done / Verified / Note bullets."
     )
 
 
@@ -879,6 +880,7 @@ def _tool_execute_approved(params, **kwargs):
     out["changed_points"] = res.data.get("changed_points", [])
     out["specialists_planned"] = res.data.get("specialists", [])
     out["brief_path"] = str(r.dir / "brief.md")
+    out["plan_embed"] = f"[[plan:{r.id}]]"  # the reply shows the brief behind this, collapsed (plan-chip.js)
     if r.data.get("session_id"):
         set_active(r["session_id"], None)
     return json.dumps(out)
