@@ -98,6 +98,14 @@
       "stylesheets": []
     },
     {
+      "id": "running-reply-fix",
+      "name": "Keep the previous reply when reopening a running chat",
+      "scripts": [
+        "running-reply-fix.js?v=1"
+      ],
+      "stylesheets": []
+    },
+    {
       "id": "workboard",
       "name": "Workboard embeds",
       "scripts": [
