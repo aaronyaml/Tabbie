@@ -37,6 +37,25 @@ Tabbie created this folder from its template; it's yours to change. Style: `MOTI
   Needs `ELEVENLABS_API_KEY` in `.env`; if it's missing, stop and say so (the panel tells the user how to link it).
 - `npm run editmap -- <slug>`: export and lint the edit map.
 
+## Sound effects (ready to use, no ElevenLabs needed)
+`public/audio/sfx/` holds Tabbie's sound-effects library: 110 sounds (whooshes, UI clicks and taps, pops,
+impacts, risers, bass hits, digital blips, shimmers, tails, ambient pads and beds, textures, foley), most
+with 2-3 variants. **Reuse these before making anything new.** `public/audio/sfx/manifest.json` lists every
+sound: `category`, `files` (`<name>_<n>.mp3`), `durations` (s) and `prompt` (what it sounds like): search it.
+```tsx
+import { Sfx, SfxTrack, SfxBus, AmbientBed, cue } from "../../audio";
+<Sfx name="whoosh_soft" atSec={1.2} />                      // one hit; variant={2} for another take
+<SfxTrack cues={[cue("pop_soft", 42), cue("impact_low", 90, { gainDb: -3 })]} />
+<SfxBus gains={{ whoosh: -9 }}>…</SfxBus>                   // per-category dB, defaults in src/audio/library.ts
+<AmbientBed name="ambient_pad" />                           // looping bed with fades
+```
+- Mix them under the music: most hits sit 10-20 dB below it. A whoosh within ~0.3 s of a sung or spoken word
+  reads as an extra syllable; move it. Audition variants; don't stack two whooshes on one cut.
+- Only when nothing in the library fits **and** `ELEVENLABS_API_KEY` is in `.env`: make a new one with
+  ElevenLabs' sound-generation API, save it as `public/audio/sfx/<new_name>_1.mp3`, and add its entry to
+  `manifest.json` (category, files, durations, prompt). Never overwrite or rename a library sound. No key:
+  use the closest library sound and say so.
+
 ## Edit map (`src/components/<slug>/editMap.ts`, schema `motion.edit-map/1`)
 Export one object; the composition reads the same object for its timing.
 ```ts

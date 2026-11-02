@@ -1,0 +1,1314 @@
+{
+ "_doc": "Tabbie's sound-effects library: reuse these before making new ones (no ElevenLabs needed to use them). Each sound has 1-3 variants (<name>_<n>.mp3 in this folder); the prompt says what it sounds like. In Remotion: <Sfx name=\"whoosh_soft\" atSec={1.2} /> from src/audio. New sounds need ElevenLabs.",
+ "style": "clean, minimal, premium Apple-style product video sound design, high fidelity, no music, no voice",
+ "sounds": {
+  "whoosh_soft": {
+   "category": "whoosh",
+   "files": [
+    "whoosh_soft_1.mp3",
+    "whoosh_soft_2.mp3"
+   ],
+   "durations": [
+    0.885,
+    1.0
+   ],
+   "prompt": "soft airy whoosh, gentle air movement passing by, smooth"
+  },
+  "whoosh_fast": {
+   "category": "whoosh",
+   "files": [
+    "whoosh_fast_1.mp3",
+    "whoosh_fast_2.mp3"
+   ],
+   "durations": [
+    0.601,
+    0.601
+   ],
+   "prompt": "fast short swish whoosh, crisp air swipe, quick transition"
+  },
+  "whoosh_text": {
+   "category": "whoosh",
+   "files": [
+    "whoosh_text_1.mp3",
+    "whoosh_text_2.mp3"
+   ],
+   "durations": [
+    0.68,
+    0.68
+   ],
+   "prompt": "very light delicate airy swish for text appearing on screen, subtle shimmer of air"
+  },
+  "whoosh_camera": {
+   "category": "whoosh",
+   "files": [
+    "whoosh_camera_1.mp3",
+    "whoosh_camera_2.mp3"
+   ],
+   "durations": [
+    1.76,
+    1.719
+   ],
+   "prompt": "slow deep cinematic camera move whoosh, low smooth air rush, wide stereo"
+  },
+  "click_ui": {
+   "category": "ui",
+   "files": [
+    "click_ui_1.mp3",
+    "click_ui_2.mp3"
+   ],
+   "durations": [
+    0.481,
+    0.481
+   ],
+   "prompt": "single tiny crisp UI click, clean digital interface tap, very short"
+  },
+  "tap_soft": {
+   "category": "ui",
+   "files": [
+    "tap_soft_1.mp3",
+    "tap_soft_2.mp3"
+   ],
+   "durations": [
+    0.481,
+    0.481
+   ],
+   "prompt": "soft glassy rounded tap, gentle touchscreen tap, single"
+  },
+  "pop_soft": {
+   "category": "pop",
+   "files": [
+    "pop_soft_1.mp3",
+    "pop_soft_2.mp3",
+    "pop_soft_3.mp3"
+   ],
+   "durations": [
+    0.414,
+    0.481,
+    0.481
+   ],
+   "prompt": "soft subtle bubble pop for a card appearing on screen, round and warm, single"
+  },
+  "pop_glass": {
+   "category": "pop",
+   "files": [
+    "pop_glass_1.mp3",
+    "pop_glass_2.mp3"
+   ],
+   "durations": [
+    0.601,
+    0.601
+   ],
+   "prompt": "small bright glassy pop with tiny sparkle, UI element appearing, single"
+  },
+  "impact_low": {
+   "category": "impact",
+   "files": [
+    "impact_low_1.mp3",
+    "impact_low_2.mp3"
+   ],
+   "durations": [
+    2.0,
+    2.0
+   ],
+   "prompt": "deep soft cinematic low impact boom with short smooth reverb tail, sub bass, not distorted"
+  },
+  "riser": {
+   "category": "riser",
+   "files": [
+    "riser_1.mp3"
+   ],
+   "durations": [
+    1.491
+   ],
+   "prompt": "smooth airy cinematic riser swell building up then stopping, filtered noise and shimmer rising in pitch"
+  },
+  "riser_short": {
+   "category": "riser",
+   "files": [
+    "riser_short_1.mp3"
+   ],
+   "durations": [
+    0.707
+   ],
+   "prompt": "short quick reverse swell sucking in before a transition, airy rise"
+  },
+  "bass_hit": {
+   "category": "bass",
+   "files": [
+    "bass_hit_1.mp3"
+   ],
+   "durations": [
+    1.48
+   ],
+   "prompt": "clean deep sub bass hit, single round 808 thump, short decay, no click"
+  },
+  "bass_hit_soft": {
+   "category": "bass",
+   "files": [
+    "bass_hit_soft_1.mp3"
+   ],
+   "durations": [
+    1.201
+   ],
+   "prompt": "soft muted sub bass pulse, gentle single low thud"
+  },
+  "data_transfer": {
+   "category": "digital",
+   "files": [
+    "data_transfer_1.mp3"
+   ],
+   "durations": [
+    1.36
+   ],
+   "prompt": "light digital data transfer sound, soft fast high-pitched sine blips and chirps, file uploading, subtle modern UI"
+  },
+  "digital_blip": {
+   "category": "digital",
+   "files": [
+    "digital_blip_1.mp3",
+    "digital_blip_2.mp3"
+   ],
+   "durations": [
+    0.481,
+    0.481
+   ],
+   "prompt": "tiny soft digital blip, gentle sine notification beep, single"
+  },
+  "counter_tick": {
+   "category": "digital",
+   "files": [
+    "counter_tick_1.mp3"
+   ],
+   "durations": [
+    1.76
+   ],
+   "prompt": "rapid soft mechanical number counter ticking that slows down and stops, delicate clicks"
+  },
+  "shimmer": {
+   "category": "shimmer",
+   "files": [
+    "shimmer_1.mp3",
+    "shimmer_2.mp3"
+   ],
+   "durations": [
+    1.6,
+    1.6
+   ],
+   "prompt": "soft magical shimmer sparkle, gentle high chimes and glitter, light sweep"
+  },
+  "tail_reverb": {
+   "category": "tail",
+   "files": [
+    "tail_reverb_1.mp3"
+   ],
+   "durations": [
+    2.48
+   ],
+   "prompt": "soft airy transition tail, distant reverberant swell fading out smoothly"
+  },
+  "pen_scribble": {
+   "category": "ui",
+   "files": [
+    "pen_scribble_1.mp3"
+   ],
+   "durations": [
+    0.88
+   ],
+   "prompt": "quick soft marker pen drawing a circle on paper, single stroke"
+  },
+  "ambient_pad": {
+   "category": "pad",
+   "files": [
+    "ambient_pad_1.mp3"
+   ],
+   "durations": [
+    15.0
+   ],
+   "prompt": "calm warm ambient synth pad drone, slow evolving, airy, futuristic, soft, no melody, no drums"
+  },
+  "swipe_card": {
+   "category": "whoosh",
+   "files": [
+    "swipe_card_1.mp3",
+    "swipe_card_2.mp3",
+    "swipe_card_3.mp3"
+   ],
+   "durations": [
+    0.481,
+    0.427,
+    0.481
+   ],
+   "prompt": "short smooth directional swipe whoosh of a light card flicked sideways across a glass touchscreen, soft air, quick, premium iOS, no impact"
+  },
+  "card_settle": {
+   "category": "pop",
+   "files": [
+    "card_settle_1.mp3",
+    "card_settle_2.mp3"
+   ],
+   "durations": [
+    0.322,
+    0.409
+   ],
+   "prompt": "tiny soft muted thud of a light card settling into place on a soft surface, gentle, rounded, very short, premium UI"
+  },
+  "press_ui": {
+   "category": "ui",
+   "files": [
+    "press_ui_1.mp3",
+    "press_ui_2.mp3"
+   ],
+   "durations": [
+    0.416,
+    0.481
+   ],
+   "prompt": "single soft tactile button press click, muted plastic and glass, short, clean native iPhone UI tap, no reverb"
+  },
+  "confirm_soft": {
+   "category": "digital",
+   "files": [
+    "confirm_soft_1.mp3",
+    "confirm_soft_2.mp3"
+   ],
+   "durations": [
+    0.88,
+    0.88
+   ],
+   "prompt": "soft warm positive confirmation chime, two gentle rising sine bell notes, airy and premium, like a subtle iOS success sound, short tail"
+  },
+  "brand_sting": {
+   "category": "shimmer",
+   "files": [
+    "brand_sting_1.mp3"
+   ],
+   "durations": [
+    2.0
+   ],
+   "prompt": "subtle premium brand logo sting, warm soft synth bloom with gentle low thump and airy shimmer tail, elegant, minimal, Apple style"
+  },
+  "type_tick": {
+   "category": "pop",
+   "files": [
+    "type_tick_1.mp3",
+    "type_tick_2.mp3"
+   ],
+   "durations": [
+    0.481,
+    0.481
+   ],
+   "prompt": "tiny soft muted typography impact tick, word landing on screen, subtle low-mid tap, very short, clean"
+  },
+  "key_soft": {
+   "category": "ui",
+   "files": [
+    "key_soft_1.mp3",
+    "key_soft_2.mp3"
+   ],
+   "durations": [
+    0.433,
+    0.478
+   ],
+   "prompt": "single soft premium laptop keyboard key press, low profile scissor switch, close mic, quiet, clean, very short, no room"
+  },
+  "terminal_run": {
+   "category": "digital",
+   "files": [
+    "terminal_run_1.mp3"
+   ],
+   "durations": [
+    0.572
+   ],
+   "prompt": "subtle premium software execute sound, soft muted digital tick followed by tiny airy sweep, apple interface, restrained, clean"
+  },
+  "card_snap": {
+   "category": "pop",
+   "files": [
+    "card_snap_1.mp3",
+    "card_snap_2.mp3"
+   ],
+   "durations": [
+    0.481,
+    0.481
+   ],
+   "prompt": "soft tactile paper card snapping into place on a desk, muted, short, premium interface sound, clean, close"
+  },
+  "morph_swell": {
+   "category": "whoosh",
+   "files": [
+    "morph_swell_1.mp3",
+    "morph_swell_2.mp3"
+   ],
+   "durations": [
+    1.0,
+    1.0
+   ],
+   "prompt": "smooth soft airy morph swell, gentle filtered whoosh that blooms and resolves, premium product film transition, restrained, no harsh hiss"
+  },
+  "sub_sweep": {
+   "category": "bass",
+   "files": [
+    "sub_sweep_1.mp3"
+   ],
+   "durations": [
+    1.201
+   ],
+   "prompt": "soft low frequency camera sweep, deep subtle sub whoosh rising into a push, cinematic but restrained, clean low end, no high hiss"
+  },
+  "material_apply": {
+   "category": "shimmer",
+   "files": [
+    "material_apply_1.mp3",
+    "material_apply_2.mp3"
+   ],
+   "durations": [
+    0.8,
+    0.8
+   ],
+   "prompt": "subtle soft ceramic glaze material applied to a 3d object, delicate glassy shimmer with soft tactile body, premium, short, restrained"
+  },
+  "mesh_build": {
+   "category": "digital",
+   "files": [
+    "mesh_build_1.mp3",
+    "mesh_build_2.mp3"
+   ],
+   "durations": [
+    0.593,
+    0.595
+   ],
+   "prompt": "tiny precise mechanical click and soft hum of 3d geometry subdividing, refined clockwork tick, premium, subtle, clean"
+  },
+  "logo_move": {
+   "category": "whoosh",
+   "files": [
+    "logo_move_1.mp3"
+   ],
+   "durations": [
+    1.0
+   ],
+   "prompt": "elegant weighty object gliding through air past camera, smooth soft low whoosh with gentle air, apple product film, restrained, no hiss"
+  },
+  "select_soft": {
+   "category": "ui",
+   "files": [
+    "select_soft_1.mp3"
+   ],
+   "durations": [
+    0.439
+   ],
+   "prompt": "very quiet soft selection tick, gentle muted glassy tap, premium file selection in an app, short, clean"
+  },
+  "credit_tone": {
+   "category": "shimmer",
+   "files": [
+    "credit_tone_1.mp3"
+   ],
+   "durations": [
+    2.472
+   ],
+   "prompt": "single quiet warm sine tone with soft felt piano body, low restrained resonant note that slowly decays, minimal, intimate, no melody"
+  },
+  "beat_impact": {
+   "category": "impact",
+   "files": [
+    "beat_impact_1.mp3",
+    "beat_impact_2.mp3"
+   ],
+   "durations": [
+    0.601,
+    0.601
+   ],
+   "prompt": "soft deep muted impact thump layered under music, felt mallet on padded surface, short, clean low mid, restrained, premium"
+  },
+  "engine_start": {
+   "category": "impact",
+   "files": [
+    "engine_start_1.mp3",
+    "engine_start_2.mp3"
+   ],
+   "durations": [
+    2.489,
+    2.56
+   ],
+   "prompt": "exotic sports car engine ignition in a quiet studio garage: brief starter whir then the flat-six catches with one deep throttle blip and settles to a low idle, close mic, clean, premium automotive film, no music"
+  },
+  "engine_rev": {
+   "category": "impact",
+   "files": [
+    "engine_rev_1.mp3",
+    "engine_rev_2.mp3",
+    "engine_rev_3.mp3",
+    "engine_rev_4.mp3"
+   ],
+   "durations": [
+    2.48,
+    2.48,
+    2.48,
+    2.48
+   ],
+   "prompt": "real field recording of a sports car flat-six engine at idle receiving one quick throttle rev, RPM rises and falls smoothly, continuous mechanical engine drone, exhaust burble on the decay, close microphone, no animals, no voices, no music"
+  },
+  "watch_tick": {
+   "category": "ui",
+   "files": [
+    "watch_tick_1.mp3",
+    "watch_tick_2.mp3"
+   ],
+   "durations": [
+    0.45,
+    0.481
+   ],
+   "prompt": "single precise mechanical wristwatch tick, tiny metallic escapement click, macro, dry, clean, no reverb"
+  },
+  "jet_spool": {
+   "category": "pad",
+   "files": [
+    "jet_spool_1.mp3"
+   ],
+   "durations": [
+    3.48
+   ],
+   "prompt": "private jet turbine engines spooling up, smooth rising airy whine at a distance, cinematic, clean, no voices, no music"
+  },
+  "paper_riffle": {
+   "category": "ui",
+   "files": [
+    "paper_riffle_1.mp3",
+    "paper_riffle_2.mp3"
+   ],
+   "durations": [
+    1.0,
+    1.0
+   ],
+   "prompt": "crisp paper stack riffle, a thumb flicking quickly through the edges of a thick stack of new banknotes, close, dry, clean, premium"
+  },
+  "metal_card": {
+   "category": "pop",
+   "files": [
+    "metal_card_1.mp3",
+    "metal_card_2.mp3"
+   ],
+   "durations": [
+    0.8,
+    0.8
+   ],
+   "prompt": "heavy metal credit card set down on a glass table, solid dense metallic clink with a short clean resonance, close, no reverb"
+  },
+  "door_heavy": {
+   "category": "impact",
+   "files": [
+    "door_heavy_1.mp3"
+   ],
+   "durations": [
+    1.0
+   ],
+   "prompt": "heavy luxury door closing, deep solid thunk with a soft precise latch, close, clean, expensive"
+  },
+  "logo_impact": {
+   "category": "impact",
+   "files": [
+    "logo_impact_1.mp3",
+    "logo_impact_2.mp3"
+   ],
+   "durations": [
+    2.0,
+    2.0
+   ],
+   "prompt": "restrained cinematic logo impact: deep soft sub boom with a short polished metallic shimmer tail, premium, not aggressive, no music"
+  },
+  "engine_roar": {
+   "category": "impact",
+   "files": [
+    "engine_roar_1.mp3",
+    "engine_roar_2.mp3",
+    "engine_roar_3.mp3",
+    "engine_roar_4.mp3"
+   ],
+   "durations": [
+    3.001,
+    3.001,
+    3.001,
+    3.001
+   ],
+   "prompt": "real field recording of a V12 supercar revving hard while parked: one long full-throttle rev, RPM climbs smoothly to a high metallic scream then drops, deep exhaust rumble underneath, mechanical, continuous engine tone, close microphone at the exhaust, no animals, no voices, no music"
+  },
+  "ka_ching": {
+   "category": "ui",
+   "files": [
+    "ka_ching_1.mp3",
+    "ka_ching_2.mp3",
+    "ka_ching_3.mp3"
+   ],
+   "durations": [
+    0.88,
+    0.88,
+    0.88
+   ],
+   "prompt": "crisp premium cash register ka-ching, single bright bell chime with mechanical drawer click, clean, short, no reverb tail"
+  },
+  "jet_flyby": {
+   "category": "whoosh",
+   "files": [
+    "jet_flyby_1.mp3",
+    "jet_flyby_2.mp3"
+   ],
+   "durations": [
+    2.478,
+    2.48
+   ],
+   "prompt": "private jet low fly-by, turbine roar passing left to right with doppler, powerful, clean"
+  },
+  "cash_flick": {
+   "category": "ui",
+   "files": [
+    "cash_flick_1.mp3",
+    "cash_flick_2.mp3"
+   ],
+   "durations": [
+    0.481,
+    0.481
+   ],
+   "prompt": "single crisp banknote stack flick, fast paper flutter riffle, close up, short"
+  },
+  "imsg_receive": {
+   "category": "pop",
+   "files": [
+    "imsg_receive_1.mp3",
+    "imsg_receive_2.mp3",
+    "imsg_receive_3.mp3"
+   ],
+   "durations": [
+    0.481,
+    0.481,
+    0.481
+   ],
+   "prompt": "iPhone iMessage received sound, soft bright two-tone glassy marimba-like blip, short, clean, very gentle"
+  },
+  "imsg_send": {
+   "category": "whoosh",
+   "files": [
+    "imsg_send_1.mp3",
+    "imsg_send_2.mp3"
+   ],
+   "durations": [
+    0.481,
+    0.481
+   ],
+   "prompt": "iPhone iMessage send swoosh, very short soft upward airy swish with tiny pop at the end, clean"
+  },
+  "poll_select": {
+   "category": "ui",
+   "files": [
+    "poll_select_1.mp3",
+    "poll_select_2.mp3"
+   ],
+   "durations": [
+    0.481,
+    0.476
+   ],
+   "prompt": "tiny soft haptic tick, iOS selection tap, glassy and warm, extremely short"
+  },
+  "lock_in": {
+   "category": "digital",
+   "files": [
+    "lock_in_1.mp3",
+    "lock_in_2.mp3"
+   ],
+   "durations": [
+    0.68,
+    0.68
+   ],
+   "prompt": "soft satisfying confirmation chime, two gentle rising glass notes, premium iOS success sound, short"
+  },
+  "map_expand": {
+   "category": "whoosh",
+   "files": [
+    "map_expand_1.mp3",
+    "map_expand_2.mp3"
+   ],
+   "durations": [
+    0.88,
+    0.88
+   ],
+   "prompt": "smooth soft airy expanding whoosh with gentle low swell, interface panel opening full screen, premium"
+  },
+  "map_collapse": {
+   "category": "whoosh",
+   "files": [
+    "map_collapse_1.mp3",
+    "map_collapse_2.mp3"
+   ],
+   "durations": [
+    0.8,
+    0.747
+   ],
+   "prompt": "smooth soft airy reverse whoosh contracting inward, interface panel closing into a card, premium, gentle"
+  },
+  "pin_drop": {
+   "category": "pop",
+   "files": [
+    "pin_drop_1.mp3",
+    "pin_drop_2.mp3"
+   ],
+   "durations": [
+    0.481,
+    0.481
+   ],
+   "prompt": "small map pin dropping and landing, soft rubbery thup with tiny bounce, clean, gentle"
+  },
+  "nav_start": {
+   "category": "digital",
+   "files": [
+    "nav_start_1.mp3",
+    "nav_start_2.mp3"
+   ],
+   "durations": [
+    0.8,
+    0.8
+   ],
+   "prompt": "gentle navigation start tone, soft bright ascending chime, two notes, Apple Maps style, clean"
+  },
+  "turn_tick": {
+   "category": "ui",
+   "files": [
+    "turn_tick_1.mp3",
+    "turn_tick_2.mp3"
+   ],
+   "durations": [
+    0.481,
+    0.481
+   ],
+   "prompt": "very soft navigation prompt tick, short single gentle glassy blip"
+  },
+  "arrive_chime": {
+   "category": "shimmer",
+   "files": [
+    "arrive_chime_1.mp3",
+    "arrive_chime_2.mp3"
+   ],
+   "durations": [
+    1.201,
+    1.201
+   ],
+   "prompt": "arrival chime, soft warm bell-like three-note descending tone, gentle, premium, short tail"
+  },
+  "cash_sheet": {
+   "category": "whoosh",
+   "files": [
+    "cash_sheet_1.mp3",
+    "cash_sheet_2.mp3"
+   ],
+   "durations": [
+    0.601,
+    0.574
+   ],
+   "prompt": "soft card sheet sliding up from bottom of phone, smooth short air glide with light settle"
+  },
+  "payment_done": {
+   "category": "shimmer",
+   "files": [
+    "payment_done_1.mp3",
+    "payment_done_2.mp3",
+    "payment_done_3.mp3"
+   ],
+   "durations": [
+    0.88,
+    0.88,
+    0.88
+   ],
+   "prompt": "Apple Pay payment success sound, soft clean bright ding with gentle shimmer, short, premium"
+  },
+  "tapback_pop": {
+   "category": "pop",
+   "files": [
+    "tapback_pop_1.mp3",
+    "tapback_pop_2.mp3",
+    "tapback_pop_3.mp3"
+   ],
+   "durations": [
+    0.481,
+    0.481,
+    0.481
+   ],
+   "prompt": "tiny cute soft bubble pop, iMessage tapback reaction, rounded and warm, extremely short"
+  },
+  "phone_move": {
+   "category": "whoosh",
+   "files": [
+    "phone_move_1.mp3",
+    "phone_move_2.mp3"
+   ],
+   "durations": [
+    1.6,
+    1.247
+   ],
+   "prompt": "slow smooth camera push through air, soft low airy swell building forward, cinematic but subtle"
+  },
+  "scroll_flick": {
+   "category": "whoosh",
+   "files": [
+    "scroll_flick_1.mp3",
+    "scroll_flick_2.mp3",
+    "scroll_flick_3.mp3"
+   ],
+   "durations": [
+    0.481,
+    0.481,
+    0.481
+   ],
+   "prompt": "very short soft finger swipe on a glass phone screen, tiny airy upward flick with faint skin-on-glass friction, intimate close mic, subtle"
+  },
+  "scroll_tick": {
+   "category": "ui",
+   "files": [
+    "scroll_tick_1.mp3",
+    "scroll_tick_2.mp3"
+   ],
+   "durations": [
+    0.444,
+    0.481
+   ],
+   "prompt": "extremely tiny soft haptic tick of a phone feed snapping into place, muted glassy click, almost subliminal"
+  },
+  "like_pop": {
+   "category": "pop",
+   "files": [
+    "like_pop_1.mp3",
+    "like_pop_2.mp3",
+    "like_pop_3.mp3"
+   ],
+   "durations": [
+    0.481,
+    0.481,
+    0.481
+   ],
+   "prompt": "tiny soft bright bubble pop of a heart like button on a phone, rounded and warm, very short, restrained"
+  },
+  "notif_soft": {
+   "category": "pop",
+   "files": [
+    "notif_soft_1.mp3",
+    "notif_soft_2.mp3",
+    "notif_soft_3.mp3"
+   ],
+   "durations": [
+    0.68,
+    0.68,
+    0.68
+   ],
+   "prompt": "soft short smartphone notification sound, two gentle glassy notes, quiet and polished, not loud"
+  },
+  "haptic_buzz": {
+   "category": "ui",
+   "files": [
+    "haptic_buzz_1.mp3",
+    "haptic_buzz_2.mp3"
+   ],
+   "durations": [
+    0.481,
+    0.481
+   ],
+   "prompt": "short muted phone vibration buzz on a wooden table, soft low rattle, very brief"
+  },
+  "suction_release": {
+   "category": "whoosh",
+   "files": [
+    "suction_release_1.mp3",
+    "suction_release_2.mp3"
+   ],
+   "durations": [
+    1.201,
+    1.1
+   ],
+   "prompt": "soft airy suction then release: a short inward reverse whoosh pulling in, then a gentle open exhale of fresh air into a wide space, cinematic, smooth"
+  },
+  "wind_meadow": {
+   "category": "pad",
+   "files": [
+    "wind_meadow_1.mp3"
+   ],
+   "durations": [
+    12.0
+   ],
+   "prompt": "gentle warm summer wind across an open grass meadow, soft rustling grass, airy and wide, field recording ambience, calm"
+  },
+  "birds_distant": {
+   "category": "pad",
+   "files": [
+    "birds_distant_1.mp3"
+   ],
+   "durations": [
+    10.0
+   ],
+   "prompt": "distant birdsong in open countryside on a calm summer evening, a few sparse songbirds far away, airy, natural field recording"
+  },
+  "grass_brush": {
+   "category": "ui",
+   "files": [
+    "grass_brush_1.mp3",
+    "grass_brush_2.mp3"
+   ],
+   "durations": [
+    1.201,
+    1.153
+   ],
+   "prompt": "a hand slowly brushing through tall dry grass, soft close rustle of grass blades sliding over fingers, intimate foley"
+  },
+  "cloth_move": {
+   "category": "ui",
+   "files": [
+    "cloth_move_1.mp3",
+    "cloth_move_2.mp3"
+   ],
+   "durations": [
+    0.698,
+    0.686
+   ],
+   "prompt": "soft cotton sleeve movement foley, a gentle arm reach, very quiet fabric rustle"
+  },
+  "water_lap": {
+   "category": "pad",
+   "files": [
+    "water_lap_1.mp3"
+   ],
+   "durations": [
+    6.0
+   ],
+   "prompt": "calm lake water gently lapping at the shore, soft small ripples, close and peaceful, natural field recording"
+  },
+  "footsteps_grass": {
+   "category": "ui",
+   "files": [
+    "footsteps_grass_1.mp3"
+   ],
+   "durations": [
+    2.48
+   ],
+   "prompt": "a few relaxed footsteps of two people walking on soft grass, gentle muffled steps, natural foley"
+  },
+  "people_laugh": {
+   "category": "pad",
+   "files": [
+    "people_laugh_1.mp3",
+    "people_laugh_2.mp3"
+   ],
+   "durations": [
+    3.0,
+    3.0
+   ],
+   "prompt": "friends laughing softly together outdoors at a distance, warm natural relaxed laughter, open air, no words"
+  },
+  "dog_pant": {
+   "category": "ui",
+   "files": [
+    "dog_pant_1.mp3"
+   ],
+   "durations": [
+    1.48
+   ],
+   "prompt": "a happy dog running past on grass, light paw patter and soft panting, outdoors, natural"
+  },
+  "sub_bloom": {
+   "category": "impact",
+   "files": [
+    "sub_bloom_1.mp3",
+    "sub_bloom_2.mp3"
+   ],
+   "durations": [
+    3.001,
+    3.001
+   ],
+   "prompt": "deep soft sub bass impact that blooms into a bright airy high-frequency shimmer, like darkness opening into white light, clean futuristic, no drums"
+  },
+  "data_chatter": {
+   "category": "ui",
+   "files": [
+    "data_chatter_1.mp3",
+    "data_chatter_2.mp3"
+   ],
+   "durations": [
+    1.48,
+    1.48
+   ],
+   "prompt": "microscopic digital data ticks and tiny clicks, faint machine telemetry chatter, very quiet and precise"
+  },
+  "glitch_soft": {
+   "category": "ui",
+   "files": [
+    "glitch_soft_1.mp3",
+    "glitch_soft_2.mp3"
+   ],
+   "durations": [
+    0.601,
+    0.601
+   ],
+   "prompt": "subtle short digital interference glitch, tiny crackle of data, clean and quiet"
+  },
+  "glass_click": {
+   "category": "ui",
+   "files": [
+    "glass_click_1.mp3",
+    "glass_click_2.mp3"
+   ],
+   "durations": [
+    0.481,
+    0.481
+   ],
+   "prompt": "glassy premium interface click, crisp tiny glass tap, clean"
+  },
+  "ring_expand": {
+   "category": "whoosh",
+   "files": [
+    "ring_expand_1.mp3",
+    "ring_expand_2.mp3"
+   ],
+   "durations": [
+    1.48,
+    1.48
+   ],
+   "prompt": "airy expanding resonant ring sweep rushing toward the listener, soft whoosh with tonal shimmer"
+  },
+  "leaf_grow": {
+   "category": "texture",
+   "files": [
+    "leaf_grow_1.mp3",
+    "leaf_grow_2.mp3"
+   ],
+   "durations": [
+    2.37,
+    2.48
+   ],
+   "prompt": "soft organic growth texture, gentle rustling of small leaves and twigs, delicate and natural"
+  },
+  "sine_pulse": {
+   "category": "ui",
+   "files": [
+    "sine_pulse_1.mp3",
+    "sine_pulse_2.mp3"
+   ],
+   "durations": [
+    1.201,
+    1.201
+   ],
+   "prompt": "clean analogue sine wave pulse, soft electronic tone oscillating briefly, futuristic and minimal"
+  },
+  "ref_whistle": {
+   "category": "ui",
+   "files": [
+    "ref_whistle_1.mp3",
+    "ref_whistle_2.mp3"
+   ],
+   "durations": [
+    0.88,
+    0.88
+   ],
+   "prompt": "single referee whistle blast heard from a distance in a large stadium, short and clean, soft natural reverb, not shrill"
+  },
+  "crowd_swell": {
+   "category": "pad",
+   "files": [
+    "crowd_swell_1.mp3",
+    "crowd_swell_2.mp3"
+   ],
+   "durations": [
+    3.0,
+    3.0
+   ],
+   "prompt": "distant stadium crowd roar swelling after a goal, warm and blurred, heard from far away, cinematic and restrained, no chanting words"
+  },
+  "summer_birds": {
+   "category": "pad",
+   "files": [
+    "summer_birds_1.mp3"
+   ],
+   "durations": [
+    24.0
+   ],
+   "prompt": "lively warm summer morning in a leafy garden, many songbirds chirping, trilling and calling from nearby trees, blackbird and robin song, natural stereo field recording, peaceful, no wind noise"
+  },
+  "trees_breeze": {
+   "category": "pad",
+   "files": [
+    "trees_breeze_1.mp3"
+   ],
+   "durations": [
+    24.0
+   ],
+   "prompt": "soft summer breeze gently blowing through a tall leafy tree canopy, slow waves of rustling leaves swelling and settling, calm, natural stereo field recording"
+  },
+  "summer_insects": {
+   "category": "pad",
+   "files": [
+    "summer_insects_1.mp3"
+   ],
+   "durations": [
+    20.0
+   ],
+   "prompt": "hot lazy summer afternoon meadow, soft distant crickets and gentle cicada hum, an occasional bee buzzing past, calm natural field recording"
+  },
+  "brook_soft": {
+   "category": "pad",
+   "files": [
+    "brook_soft_1.mp3"
+   ],
+   "durations": [
+    15.0
+   ],
+   "prompt": "small clear brook trickling gently over stones in a sunny wood, soft and calm, natural field recording"
+  },
+  "bird_chirp": {
+   "category": "ui",
+   "files": [
+    "bird_chirp_1.mp3",
+    "bird_chirp_2.mp3",
+    "bird_chirp_3.mp3"
+   ],
+   "durations": [
+    1.4,
+    1.48,
+    1.48
+   ],
+   "prompt": "a single bright songbird chirp close by, short cheerful tweet, clean natural recording"
+  },
+  "tension_drone": {
+   "category": "riser",
+   "files": [
+    "tension_drone_1.mp3"
+   ],
+   "durations": [
+    7.821
+   ],
+   "prompt": "dark intense rising tension drone, low pulsing sub rumble with crackling digital static and distorted data noise swelling louder and faster, building pressure, cinematic"
+  },
+  "glitch_hard": {
+   "category": "digital",
+   "files": [
+    "glitch_hard_1.mp3",
+    "glitch_hard_2.mp3"
+   ],
+   "durations": [
+    0.68,
+    0.68
+   ],
+   "prompt": "aggressive sharp digital glitch burst, harsh bit-crushed stutter and electric static crackle, punchy"
+  },
+  "eden_birds": {
+   "category": "pad",
+   "files": [
+    "eden_birds_1.mp3"
+   ],
+   "durations": [
+    24.0
+   ],
+   "prompt": "heavenly paradise garden at golden dawn, a few soft sweet songbirds singing slow gentle flute-like melodies far away, soft natural reverb, serene and tranquil, no harsh chirps, no wind noise"
+  },
+  "eden_air": {
+   "category": "pad",
+   "files": [
+    "eden_air_1.mp3"
+   ],
+   "durations": [
+    24.0
+   ],
+   "prompt": "warm still golden air in a paradise garden, a very soft gentle breeze barely stirring leaves, faint distant waterfall, velvety, serene, peaceful, quiet"
+  },
+  "eden_stream": {
+   "category": "pad",
+   "files": [
+    "eden_stream_1.mp3"
+   ],
+   "durations": [
+    20.0
+   ],
+   "prompt": "very gentle clear spring water softly trickling into a calm pool in a paradise garden, delicate, quiet, serene"
+  },
+  "eden_call": {
+   "category": "ui",
+   "files": [
+    "eden_call_1.mp3",
+    "eden_call_2.mp3",
+    "eden_call_3.mp3"
+   ],
+   "durations": [
+    2.48,
+    2.449,
+    2.48
+   ],
+   "prompt": "a single soft sweet melodic songbird call in the distance, gentle and pure, with soft natural reverb, peaceful"
+  },
+  "eden_glow": {
+   "category": "pad",
+   "files": [
+    "eden_glow_1.mp3"
+   ],
+   "durations": [
+    6.0
+   ],
+   "prompt": "soft ethereal golden shimmer swell, gentle harp glissando and airy angelic chime tones blooming and fading, heavenly, very soft"
+  },
+  "hard_bite_soft": {
+   "category": "impact",
+   "files": [
+    "hard_bite_soft_1.mp3",
+    "hard_bite_soft_2.mp3",
+    "hard_bite_soft_3.mp3"
+   ],
+   "durations": [
+    0.601,
+    0.601,
+    0.601
+   ],
+   "prompt": "a single close-up soft bite into a fluffy marshmallow, gentle squish, airy and soft, very short, dry close mic"
+  },
+  "hard_bite_crunch": {
+   "category": "impact",
+   "files": [
+    "hard_bite_crunch_1.mp3",
+    "hard_bite_crunch_2.mp3",
+    "hard_bite_crunch_3.mp3"
+   ],
+   "durations": [
+    0.601,
+    0.601,
+    0.601
+   ],
+   "prompt": "a single crisp bite into a fresh cookie, short dry crunch, close-up foley, clean, tight"
+  },
+  "hard_bite_juicy": {
+   "category": "impact",
+   "files": [
+    "hard_bite_juicy_1.mp3",
+    "hard_bite_juicy_2.mp3",
+    "hard_bite_juicy_3.mp3"
+   ],
+   "durations": [
+    0.601,
+    0.601,
+    0.601
+   ],
+   "prompt": "a single juicy bite into a ripe peach, short soft wet crunch, close-up foley, clean"
+  },
+  "hard_bite_bread": {
+   "category": "impact",
+   "files": [
+    "hard_bite_bread_1.mp3",
+    "hard_bite_bread_2.mp3",
+    "hard_bite_bread_3.mp3"
+   ],
+   "durations": [
+    0.601,
+    0.601,
+    0.601
+   ],
+   "prompt": "a single bite into a soft brioche bun, muffled tearing, short, close-up foley, clean"
+  },
+  "hard_land": {
+   "category": "impact",
+   "files": [
+    "hard_land_1.mp3",
+    "hard_land_2.mp3",
+    "hard_land_3.mp3"
+   ],
+   "durations": [
+    1.48,
+    1.48,
+    1.48
+   ],
+   "prompt": "a heavy polished steel ball dropping onto a hard stone studio floor, one deep solid thud with a short low metallic resonance, weighty, cinematic, no ringing bell"
+  },
+  "hard_tink": {
+   "category": "ui",
+   "files": [
+    "hard_tink_1.mp3",
+    "hard_tink_2.mp3",
+    "hard_tink_3.mp3"
+   ],
+   "durations": [
+    0.8,
+    0.8,
+    0.8
+   ],
+   "prompt": "teeth clinking against a solid steel ball, a single tiny bright tink, short, dry, delicate"
+  },
+  "hard_chip": {
+   "category": "ui",
+   "files": [
+    "hard_chip_1.mp3",
+    "hard_chip_2.mp3"
+   ],
+   "durations": [
+    0.601,
+    0.601
+   ],
+   "prompt": "tiny hard fragments bouncing on a stone floor, three small light ticks, delicate, quiet"
+  },
+  "hard_fall": {
+   "category": "whoosh",
+   "files": [
+    "hard_fall_1.mp3",
+    "hard_fall_2.mp3"
+   ],
+   "durations": [
+    1.0,
+    1.0
+   ],
+   "prompt": "a heavy object falling fast through air, short soft low descending air rush, subtle, no impact"
+  },
+  "hardx_bite_bread": {
+   "category": "foley",
+   "files": [
+    "hardx_bite_bread_1.mp3",
+    "hardx_bite_bread_2.mp3",
+    "hardx_bite_bread_3.mp3"
+   ],
+   "durations": [
+    0.601,
+    0.601,
+    0.601
+   ],
+   "prompt": "bite bread (foley)"
+  },
+  "hardx_bite_crunch": {
+   "category": "foley",
+   "files": [
+    "hardx_bite_crunch_1.mp3",
+    "hardx_bite_crunch_2.mp3",
+    "hardx_bite_crunch_3.mp3"
+   ],
+   "durations": [
+    0.601,
+    0.601,
+    0.601
+   ],
+   "prompt": "bite crunch (foley)"
+  },
+  "hardx_bite_juicy": {
+   "category": "foley",
+   "files": [
+    "hardx_bite_juicy_1.mp3",
+    "hardx_bite_juicy_2.mp3",
+    "hardx_bite_juicy_3.mp3"
+   ],
+   "durations": [
+    0.601,
+    0.601,
+    0.601
+   ],
+   "prompt": "bite juicy (foley)"
+  },
+  "hardx_bite_soft": {
+   "category": "foley",
+   "files": [
+    "hardx_bite_soft_1.mp3",
+    "hardx_bite_soft_2.mp3",
+    "hardx_bite_soft_3.mp3"
+   ],
+   "durations": [
+    0.601,
+    0.601,
+    0.601
+   ],
+   "prompt": "bite soft (foley)"
+  }
+ }
+}

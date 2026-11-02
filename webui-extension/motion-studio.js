@@ -148,10 +148,8 @@
   // ElevenLabs can be connected right here: paste the API key, the sidecar checks it with ElevenLabs and saves it
   // in the studio's .env (never in the browser's storage, never sent back). Not a <form>: forms keep drafts.
   const EL = { open: false, busy: false, err: '', key: '' };
-  const unlinkedNote = (k) => (linked(k) ? '' : `<p class="hxs-note hxs-unlinked-note">${icon('Link01Icon', 14)}<span>${esc(ST[k].hint)}</span></p>`
-    + (k === 'elevenlabs' ? elConnect() : ''));
   function elConnect() {
-    if (!EL.open) return `<div class="hxs-connect"><button type="button" class="hxs-ghost hxs-sm" data-act="el-open">${icon('Link01Icon', 14)}<span>Connect ElevenLabs</span></button></div>`;
+    if (!EL.open) return `<div class="hxs-connect"><button type="button" class="hxs-ghost hxs-sm" data-act="el-open">${icon('Link01Icon', 14)}<span>Connect ElevenLabs</span></button><a class="hxs-connect-get" href="https://elevenlabs.io/app/settings/api-keys" target="_blank" rel="noopener noreferrer">Get a key</a></div>`;
     return `<div class="hxs-connect hxs-connect-box">
         <label for="hxsElKey">ElevenLabs API key</label>
         <input id="hxsElKey" type="password" autocomplete="off" spellcheck="false" placeholder="sk_…" value="${esc(EL.key)}"${EL.busy ? ' disabled' : ''}>
@@ -162,7 +160,7 @@
           <button type="button" class="hxs-primary hxs-sm" data-act="el-save"${EL.busy ? ' disabled' : ''}>${EL.busy ? 'Checking…' : 'Connect'}</button>
         </div>
         ${EL.err ? `<p class="hxs-note hxs-err-note">${esc(EL.err)}</p>` : ''}
-        <p class="hxs-note">Kept only on this Mac, in the studio's .env. Music uses your ElevenLabs credits.</p>
+        <p class="hxs-note">Kept only on this Mac, in the studio's .env. Music uses your ElevenLabs credits. Or add ELEVENLABS_API_KEY to that file yourself.</p>
       </div>`;
   }
   async function elSave() {
@@ -1326,8 +1324,9 @@
     return `${head}
       ${locked ? lockNote(`Locked after mapping. Start a new film to change the track${a && a.name ? ` (${esc(a.name)})` : ''}.`) : `<div class="hxs-choices">
         <button type="button" class="hxs-choice${mode === 'upload' ? ' is-on' : ''}" data-audio-mode="upload">${icon('Upload04Icon', 22)}<b>Upload my own audio</b><span>MP3, WAV, M4A or a video with sound</span></button>
-        <button type="button" class="hxs-choice${mode === 'generate' ? ' is-on' : ''}" data-audio-mode="generate" data-needs="elevenlabs">${icon('SparklesIcon', 22)}<b>Generate audio</b><span>Describe it and ${NAME} makes it</span></button>
-      </div>${unlinkedNote('elevenlabs')}
+        ${linked('elevenlabs') ? `<button type="button" class="hxs-choice${mode === 'generate' ? ' is-on' : ''}" data-audio-mode="generate" data-needs="elevenlabs">${icon('SparklesIcon', 22)}<b>Generate audio</b><span>Describe it and ${NAME} makes it</span></button>`
+          : `<div class="hxs-choice hxs-choice-off">${icon('SparklesIcon', 22)}<b>Generate audio</b><span>Only this option needs ElevenLabs: uploading your own track works without it.</span>${elConnect()}</div>`}
+      </div>
       ${mode === 'upload' && !tr ? `<label class="hxs-drop">${icon('Upload04Icon', 22)}<span>${a && a.name ? esc(a.name) : 'Choose a file or drop it here'}</span><input type="file" accept="${AUDIO_ACCEPT}" data-file="audio" class="hxs-file"></label>` : ''}`}
       ${mode === 'generate' && !locked ? `<form class="hxs-gen" data-form="gen">
           <textarea name="prompt" rows="3" maxlength="800" placeholder="e.g. 20 seconds, punchy minimal techno, big drop at 8s, ends on a clean hit">${esc((a && a.prompt) || '')}</textarea>

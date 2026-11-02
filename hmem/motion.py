@@ -83,6 +83,74 @@ def ensure(path: Path | None = None) -> dict:
     return {"path": str(p), "created": True}
 
 
+# ── template additions for studios made from an older template ──────────────────────────────────
+# A studio is the user's once created, so updates never overwrite it. Things a newer template adds that a
+# film can't break (the sound-effects library and its code) are copied in once: only missing files, and
+# manifest entries the studio doesn't have yet. Studios not made from the template are never touched.
+ADDITIONS = ("public/audio/sfx", "src/audio")
+
+
+def _ver(text: str) -> int:
+    m = re.search(r"(\d+)", text or "")
+    return int(m.group(1)) if m else 0
+
+
+def sync_template(p: Path | None = None) -> list[str]:
+    """Bring a template-made studio up to the current template's additions. Returns the files added."""
+    p = p or studio_dir()
+    marker = p / MARKER
+    try:
+        have = _ver(marker.read_text())
+    except OSError:
+        return []  # not made from the template: leave it alone
+    want = _ver(template_version())
+    if not want or have >= want:
+        return []
+    added = []
+    for rel in ADDITIONS:
+        src = TEMPLATE / rel
+        if not src.is_dir():
+            continue
+        for f in sorted(src.rglob("*")):
+            if not f.is_file() or f.name == ".DS_Store":
+                continue
+            dst = p / f.relative_to(TEMPLATE)
+            if dst.name == "manifest.json" and dst.exists():
+                added += _merge_manifest(f, dst)
+                continue
+            if not dst.exists():
+                dst.parent.mkdir(parents=True, exist_ok=True)
+                shutil.copy2(f, dst)
+                added.append(str(f.relative_to(TEMPLATE)))
+    doc, tdoc = p / "CLAUDE.md", TEMPLATE / "CLAUDE.md"
+    try:
+        text, ttext = doc.read_text(), tdoc.read_text()
+        m = re.search(r"^## Sound effects.*?(?=^## )", ttext, re.M | re.S)
+        if m and "## Sound effects" not in text:
+            doc.write_text(text.rstrip("\n") + "\n\n" + m.group(0).rstrip("\n") + "\n")
+            added.append("CLAUDE.md (Sound effects)")
+    except OSError:
+        pass
+    marker.write_text(f"template {want}\n")
+    return added
+
+
+def _merge_manifest(src: Path, dst: Path) -> list[str]:
+    try:
+        new, cur = json.loads(src.read_text()), json.loads(dst.read_text())
+    except (OSError, ValueError):
+        return []
+    sounds = cur.setdefault("sounds", {})
+    if not isinstance(sounds, dict):
+        return []
+    extra = {k: v for k, v in (new.get("sounds") or {}).items() if k not in sounds}
+    if not extra:
+        return []
+    sounds.update(extra)
+    dst.write_text(json.dumps(cur, indent=1))
+    return [f"manifest.json (+{len(extra)} sounds)"]
+
+
 # ── npm install (once per studio, in the background) ───────────────────────────────────────────
 _npm: dict = {}
 _npm_lock = threading.Lock()
@@ -324,6 +392,11 @@ def status(create: bool = False) -> dict:
         except (OSError, RuntimeError) as exc:
             out["error"] = str(exc)[:200]
     exists = p.is_dir()
+    if exists:
+        try:
+            out["synced"] = sync_template(p)
+        except OSError as exc:
+            out["sync_error"] = str(exc)[:200]
     node = _which("node")
     npm = npm_install(p) if (create and exists) else {"state": "ready" if exists and deps_ready(p) else
                                                        ("no-node" if not node else "missing")}

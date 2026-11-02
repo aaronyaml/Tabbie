@@ -662,8 +662,14 @@ the moments, approve a storyboard, and Claude Code (or Codex) builds and renders
   by that install, so nothing has to exist beforehand. To use a studio of your own instead, copy `config/motion.example.yaml` to
   `config/motion.yaml` and set `studio:`; a folder that already has files in it is used as it is, never changed.
 - **Node.js** renders the films: setup installs it (`bin/install-tool node`, nodejs.org's official build).
+- **Sound effects come with it.** The studio ships a library of about 110 ready-made sound effects
+  (whooshes, clicks, pops, risers, impacts, ambient beds, foley) in `public/audio/sfx/`, listed in
+  `manifest.json`, with `src/audio/Sfx.tsx` to drop them into a film. Agents reuse these first, so films
+  get sound without ElevenLabs. Studios made from an older template get the library added the next time
+  Motion opens (only missing files; your own sounds and edits are kept). A custom studio is never changed.
 - **Generate audio** uses ElevenLabs Music, which needs your ElevenLabs API key (it uses your ElevenLabs
-  credits). Until it's linked, the button is greyed out with a **Connect ElevenLabs** button under it:
+  credits). Only that option needs it: uploading your own track works without it. Until it's linked, the
+  Generate audio card is greyed out with a **Connect ElevenLabs** button inside it:
   paste your key (elevenlabs.io → Developers → API keys), Tabbie checks it with ElevenLabs and saves it
   in the studio's `.env` (`ELEVENLABS_API_KEY=…`, readable only by you, never shown again or kept in
   the browser). You can also add that line yourself. The hosted ElevenLabs MCP has no music tool.

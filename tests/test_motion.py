@@ -144,3 +144,38 @@ def test_connect_elevenlabs_needs_the_studio(tmp_path):
 def test_hint_never_shows_the_home_folder(tmp_path, monkeypatch):
     monkeypatch.setattr(motion.Path, "home", classmethod(lambda cls: tmp_path))
     assert str(tmp_path) not in motion.status()["elevenlabs"]["hint"]
+
+
+def test_new_studio_has_the_sfx_library(tmp_path):
+    motion.ensure()
+    p = motion.studio_dir()
+    lib = json.loads((p / "public/audio/sfx/manifest.json").read_text())["sounds"]
+    assert len(lib) >= 100 and all((p / "public/audio/sfx" / f).exists() for v in lib.values() for f in v["files"])
+    assert (p / "src/audio/Sfx.tsx").exists() and "## Sound effects" in (p / "CLAUDE.md").read_text()
+    assert motion.sync_template(p) == []  # already current
+
+
+def test_older_template_studio_gets_the_additions_once(tmp_path):
+    motion.ensure()
+    p = motion.studio_dir()
+    sfx = p / "public/audio/sfx"
+    (sfx / "whoosh_soft_1.mp3").write_bytes(b"mine")  # the user's own take: never overwritten
+    (sfx / "pop_soft_1.mp3").unlink()
+    man = json.loads((sfx / "manifest.json").read_text())
+    man["sounds"] = {"my_sound": {"category": "ui", "files": ["my_sound_1.mp3"], "durations": [1], "prompt": "x"}}
+    (sfx / "manifest.json").write_text(json.dumps(man))
+    doc = p / "CLAUDE.md"
+    doc.write_text(doc.read_text().split("## Sound effects")[0])
+    (p / motion.MARKER).write_text("template 1\n")
+    added = motion.sync_template(p)
+    assert "public/audio/sfx/pop_soft_1.mp3" in added
+    assert (sfx / "whoosh_soft_1.mp3").read_bytes() == b"mine"
+    sounds = json.loads((sfx / "manifest.json").read_text())["sounds"]
+    assert "my_sound" in sounds and "pop_soft" in sounds
+    assert doc.read_text().count("## Sound effects") == 1
+    assert motion.sync_template(p) == []  # once
+
+
+def test_custom_studio_is_never_synced(tmp_path):
+    p = motion.studio_dir(); p.mkdir(parents=True); (p / "mine.txt").write_text("x")
+    assert motion.sync_template(p) == [] and sorted(x.name for x in p.iterdir()) == ["mine.txt"]

@@ -123,7 +123,11 @@ html.hx-studio-open #hxStudio { display: block; position: fixed; top: 0; right: 
 .hxs-choice.is-unlinked, .hxs-primary.is-unlinked { opacity: .45; cursor: not-allowed; filter: grayscale(1); box-shadow: none; }
 .hxs-unlinked-note { display: flex; align-items: flex-start; gap: 6px; }
 .hxs-unlinked-note svg { flex: none; margin-top: 2px; }
-.hxs-connect { margin: 10px 0 0; }
+.hxs-connect { margin: 10px 0 0; display: flex; align-items: center; gap: 12px; flex-wrap: wrap; }
+.hxs-connect-get { font-size: 13px; font-weight: 500; color: var(--hx-ink, #3054FD); }
+.hxs-choice-off { cursor: default; }
+.hxs-choice-off > svg, .hxs-choice-off > b { opacity: .55; }
+.hxs-choice-off .hxs-connect-box { width: 100%; max-width: none; margin-top: 12px; padding: 0; background: none; }
 .hxs-connect-box { display: grid; gap: 8px; max-width: 460px; padding: 14px; border-radius: 16px; background: var(--hx-fill, rgba(127,127,127,.1)); }
 .hxs-connect-box label { font-size: 13px; font-weight: 600; }
 .hxs-connect-box input { height: 40px; padding: 0 12px; border-radius: 10px; border: 1px solid rgba(127,127,127,.45);
