@@ -76,3 +76,18 @@ def test_empty_key_is_not_linked(tmp_path):
     motion.ensure()
     (tmp_path / "tabbie" / "motion" / ".env").write_text("ELEVENLABS_API_KEY=\n# ELEVENLABS_API_KEY=x\n")
     assert motion.status()["elevenlabs"]["linked"] is False
+
+
+def test_install_from_the_panel(monkeypatch):
+    import time
+    monkeypatch.setattr(motion, "_which", lambda c: "/usr/bin/" + c)
+    monkeypatch.setattr(motion, "deps_ready", lambda p: (p / "package.json").exists())
+    monkeypatch.setattr(motion, "npm_install", lambda p=None, wait=False: {"state": "ready"})
+    assert motion.status()["installed"] is False  # nothing there yet: the panel shows Download
+    motion.install()
+    for _ in range(50):
+        if motion.install_state()["state"] != "running":
+            break
+        time.sleep(0.05)
+    s = motion.status()
+    assert s["install"]["state"] == "done" and s["installed"] and s["exists"]

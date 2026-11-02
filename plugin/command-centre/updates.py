@@ -5,8 +5,9 @@ check()    compares this install's commit with the repo's branch on GitHub (git 
 apply()    fast-forwards this checkout to that commit (git fetch + merge --ff-only). Your own edits
            (e.g. config/router.yaml) stay; git refuses if the update would overwrite one, or if the
            history has diverged, so nothing is ever lost.
-restart()  restarts what the update touched (gateway, HTTPS proxy, sidecar), only when no worker is
-           running. WebUI extension files need just a page reload.
+restart()  restarts what the update touched (gateway, WebUI, HTTPS proxy, sidecar), only when no
+           worker or chat is running. WebUI chats run the router plugin inside the WebUI process, so
+           plugin changes need the WebUI restarted too. WebUI extension files need just a page reload.
 Settings: `updates:` in config/router.yaml (repo, branch, check). No tokens: the repo is public.
 """
 from __future__ import annotations
@@ -142,7 +143,7 @@ def _needs(files: list[str]) -> list[str]:
     need = set()
     for f in files:
         if f.startswith(("plugin/", "hmem/", "config/router.yaml")):
-            need.update(("gateway", "sidecar"))
+            need.update(("gateway", "webui", "sidecar"))
         if f == "services/Caddyfile":
             need.add("caddy")
         if f.startswith("webui-extension/"):
@@ -180,7 +181,7 @@ def apply() -> dict:
 
 
 def pending_restart() -> list[str]:
-    return [n for n in (_state().get("needs") or []) if n in ("gateway", "sidecar", "caddy")]
+    return [n for n in (_state().get("needs") or []) if n in ("gateway", "webui", "sidecar", "caddy")]
 
 
 def busy() -> bool:
@@ -195,7 +196,18 @@ def busy() -> bool:
             if st in ("executing", "planning"):
                 return True
     out = subprocess.run(["pgrep", "-f", r"claude -p|codex exec|remotion render"], capture_output=True, text=True)
-    return bool(out.stdout.strip())
+    return bool(out.stdout.strip()) or _chatting()
+
+
+def _chatting() -> bool:
+    """A WebUI reply is streaming (the hub answering by itself leaves no request record)."""
+    port = os.environ.get("HERMES_WEBUI_PORT") or "8787"
+    try:
+        with urllib.request.urlopen(f"http://127.0.0.1:{port}/health", timeout=3) as r:
+            h = json.loads(r.read() or b"{}")
+        return bool(h.get("active_streams") or h.get("active_runs"))
+    except (OSError, ValueError):
+        return False
 
 
 def restart(after_reply=None) -> dict:
@@ -215,8 +227,14 @@ def restart(after_reply=None) -> dict:
         caddy = shutil.which("caddy") or str(Path.home() / ".local/bin/caddy")
         subprocess.run([caddy, "reload", "--config", str(ROOT / "services" / "Caddyfile")], capture_output=True)
         done.append("caddy")
+    if "webui" in needs:
+        # The browser's restart call comes through the WebUI, so let it answer first.
+        subprocess.Popen(["/bin/sh", "-c", f"sleep 2; launchctl kickstart -k gui/{uid}/ai.hermes.webui"],
+                         stdin=subprocess.DEVNULL, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL,
+                         start_new_session=True)
+        done.append("webui")
     st = _state()
-    st["needs"] = [n for n in st.get("needs", []) if n not in ("gateway", "caddy", "sidecar")]
+    st["needs"] = [n for n in st.get("needs", []) if n not in ("gateway", "webui", "caddy", "sidecar")]
     _save_state(st)
     if "sidecar" in needs and after_reply:
         after_reply()

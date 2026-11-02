@@ -180,11 +180,11 @@
       "scripts": [
         "motion.js?v=9",
         "motion-scrub.js?v=6",
-        "motion-studio.js?v=22"
+        "motion-studio.js?v=23"
       ],
       "stylesheets": [
         "motion.css?v=6",
-        "motion-studio.css?v=14"
+        "motion-studio.css?v=15"
       ]
     },
     {
@@ -209,7 +209,7 @@
       "id": "updates",
       "name": "Tabbie updates (asks before downloading)",
       "scripts": [
-        "updates.js?v=4"
+        "updates.js?v=5"
       ],
       "stylesheets": [
         "updates.css?v=2"
@@ -237,7 +237,7 @@
       "id": "message-queue",
       "name": "Message queue & send now",
       "scripts": [
-        "message-queue.js?v=2"
+        "message-queue.js?v=4"
       ],
       "stylesheets": [
         "message-queue.css?v=2"

@@ -60,7 +60,7 @@
   }
   function finished(res) {
     const needs = res.needs || [];
-    const restart = needs.some((x) => x === 'gateway' || x === 'sidecar' || x === 'caddy');
+    const restart = needs.some((x) => x === 'gateway' || x === 'webui' || x === 'sidecar' || x === 'caddy');
     const setup = needs.includes('setup') ? '<p class="hx-up-note">This update changed setup steps: run <code>bin/setup</code> on the Mac when convenient.</p>' : '';
     if (restart) {
       show(`<div class="hx-up-head"><b>Update downloaded</b>${res.from ? `<span>${esc(res.from)} → ${esc(res.to)}</span>` : ''}</div>`
@@ -97,7 +97,12 @@
       try {
         const r = await call('/restart', 'POST');
         if (r && r.waiting) { waitingCard(); return; }
-        setTimeout(() => location.reload(), 4000);  // gateway + sidecar come back in a few seconds
+        // gateway, WebUI and sidecar come back in a few seconds: reload once the WebUI answers again
+        const back = async (n) => {
+          try { const x = await fetch('api/extensions/status', { credentials: 'same-origin', cache: 'no-store' }); if (x.ok || n > 20) return location.reload(); } catch (_) {}
+          setTimeout(() => back(n + 1), 2000);
+        };
+        setTimeout(() => back(0), 6000);
       } catch (err) { error(err.message || 'Try again later.', 'restart'); }
     }
   }

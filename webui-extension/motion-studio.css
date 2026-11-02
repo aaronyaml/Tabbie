@@ -589,3 +589,7 @@ html.hx-studio-open #hxStudio { display: block; position: fixed; top: 0; right: 
 .hxs-model .hxs-note { margin-top: 0; }
 .hxs-model-err { color: #d70015; } :root.dark .hxs-model-err { color: #ff6961; }
 @media (max-width: 520px) { .hxs-model-row { grid-template-columns: minmax(0, 1fr); } }
+.hxs-install .hxs-inst-go { margin-top: 24px; }
+.hxs-inst-steps { display: grid; gap: 8px; margin: 22px auto 0; padding: 0; list-style: none; text-align: left; }
+.hxs-inst-steps li { display: flex; align-items: center; gap: 8px; font-size: 14px; color: var(--hx-text-2, #8a8a8e); }
+.hxs-err-note { color: #FF3B30; max-width: 480px; }

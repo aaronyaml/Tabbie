@@ -11,6 +11,7 @@ Stdlib only (setup runs on the Mac's built-in Python 3.9).
 """
 from __future__ import annotations
 
+import json
 import os
 import re
 import shutil
@@ -120,6 +121,87 @@ def npm_install(p: Path | None = None, wait: bool = False) -> dict:
     return {"state": "installing"}
 
 
+# ── one-click install (Motion panel's Download button, or /motion when it isn't installed) ────
+# The panel (sidecar) and /motion (the WebUI's hub) run in different processes, so the progress lives
+# in state/motion-install.json with the installer's pid: whichever starts first runs it, both see it.
+_inst_lock = threading.Lock()
+
+
+def installed(p: Path | None = None) -> bool:
+    p = p or studio_dir()
+    return bool(_which("node")) and p.is_dir() and deps_ready(p)
+
+
+def _inst_file() -> Path:
+    return root() / "state" / "motion-install.json"
+
+
+def install_state() -> dict:
+    try:
+        d = json.loads(_inst_file().read_text())
+    except (OSError, ValueError):
+        d = {}
+    st = d.get("state", "")
+    if st == "running" and not _alive(d.get("pid")):
+        st, d["error"] = "failed", "The install stopped part-way (Tabbie restarted). Try again."
+    return {"state": st, "step": d.get("step", ""), "error": d.get("error", "")}
+
+
+def _alive(pid) -> bool:
+    try:
+        os.kill(int(pid), 0)
+        return True
+    except (TypeError, ValueError, OSError):
+        return False
+
+
+def _set(**kw) -> None:
+    f = _inst_file()
+    f.parent.mkdir(parents=True, exist_ok=True)
+    try:
+        d = json.loads(f.read_text())
+    except (OSError, ValueError):
+        d = {}
+    d.update(kw, pid=os.getpid(), at=int(time.time()))
+    tmp = f.with_suffix(f".{os.getpid()}.tmp")
+    tmp.write_text(json.dumps(d))
+    os.replace(tmp, f)
+
+
+def install() -> dict:
+    """Start installing whatever Motion is missing, in the background. {state: running|done|failed, step}."""
+    with _inst_lock:
+        if install_state()["state"] == "running":
+            return install_state()
+        if installed():
+            _set(state="done", step="", error="")
+            return install_state()
+        _set(state="running", step="", error="")
+
+    def run():
+        try:
+            if not _which("node"):
+                _set(step="node")
+                logs = root() / "state" / "logs"
+                logs.mkdir(parents=True, exist_ok=True)
+                with open(logs / "motion-node.log", "w") as f:
+                    rc = subprocess.run([str(root() / "bin" / "install-tool"), "node"], stdout=f, stderr=subprocess.STDOUT,
+                                        stdin=subprocess.DEVNULL, timeout=900).returncode
+                if rc or not _which("node"):
+                    raise RuntimeError("Node.js didn't install (state/logs/motion-node.log). Check the internet connection and try again.")
+            _set(step="studio")
+            p = ensure()["path"]
+            _set(step="packages")
+            if npm_install(Path(p), wait=True)["state"] != "ready":
+                raise RuntimeError("The studio's packages didn't install (state/logs/motion-npm.log). Try again.")
+            _set(state="done", step="")
+        except (OSError, RuntimeError, subprocess.TimeoutExpired) as exc:
+            _set(state="failed", error=str(exc)[:200])
+
+    threading.Thread(target=run, daemon=True, name="motion-install").start()
+    return install_state()
+
+
 # ── what's linked (for the Generate buttons) ──────────────────────────────────────────────────
 def _env_key(p: Path, name: str) -> bool:
     if os.environ.get(name, "").strip():
@@ -165,6 +247,7 @@ def status(create: bool = False) -> dict:
                                                        ("no-node" if not node else "missing")}
     out.update({
         "exists": exists, "node": bool(node), "deps": npm["state"],
+        "installed": bool(node) and exists and deps_ready(p), "install": install_state(),
         "template": (p / MARKER).exists(),
         "elevenlabs": {
             # Music generation calls ElevenLabs' Music API, which needs the account's API key in the

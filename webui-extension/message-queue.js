@@ -95,12 +95,12 @@
     if (!r.ok) throw new Error(String(r.status));
     return r.json();
   }
-  let liveCache = { sid: null, at: 0, open: false };
+  let liveCache = { sid: null, at: 0, open: false, reason: '' };
   async function workerOpen(sid) {
     if (liveCache.sid === sid && Date.now() - liveCache.at < 4000) return liveCache.open;
-    let open = false;
-    try { open = !!(await sideJSON(`${SIDE}?session=${encodeURIComponent(sid)}`)).open; } catch (_) {}
-    liveCache = { sid, at: Date.now(), open };
+    let open = false, reason = '';
+    try { const d = await sideJSON(`${SIDE}?session=${encodeURIComponent(sid)}`); open = !!d.open; reason = d.reason || ''; } catch (_) { reason = 'helper'; }
+    liveCache = { sid, at: Date.now(), open, reason };
     return open;
   }
   // true = Claude has it; false = no live worker (or it closed before reading it): use the old path
@@ -122,6 +122,7 @@
     if (!taken) return;
     const { entry, index } = taken;
     const text0 = entryText(entry);
+    if (runningFor(sid)) liveCache.at = 0;  // fresh state (and the reason for the toast)
     if (text0 && !realFiles(entry).length && runningFor(sid) && await workerOpen(sid)) {
       pushing.add(ts);
       const ok = await toWorker(sid, text0, mode === 'queue' ? 'queue' : 'now');
@@ -153,7 +154,10 @@
       if (res && res.accepted) {
         try { const acc = _steerAcceptedBySid.get(sid) || []; acc.push(text); _steerAcceptedBySid.set(sid, acc); } catch (_) {}
         if (curSid() === sid && has('_showSteerIndicator')) _showSteerIndicator(text0 || text);
-        toast('Sent into the current reply', 2200);
+        const why = { codex: 'Codex can’t take messages mid-run, so Tabbie reads it when Codex finishes',
+          older: 'This run started before the update, so it’s read when the run ends. New runs take messages straight away',
+          helper: 'Couldn’t reach Tabbie’s helper, so it’s read when this step ends' }[liveCache.sid === sid ? liveCache.reason : ''];
+        toast(why || 'Sent into the current reply', why ? 5000 : 2200);
         return;
       }
     } catch (e) {
@@ -180,12 +184,49 @@
   }
   window.hxQueuePushNow = pushNow;
 
+  // Upstream drains a queued message by writing it into the composer and sending it, which wiped
+  // whatever the user was typing. Keep that draft (and its files) and put it back after the send.
+  let draft = null;
+  function keepDrafts() {
+    const shift = window.shiftQueuedSessionMessage, send0 = window.send;
+    if (typeof shift !== 'function' || typeof send0 !== 'function' || shift.__hxDraft) return;
+    const wrappedShift = function () {
+      const next = shift.apply(this, arguments);
+      const box = document.getElementById('msg'), s = st();
+      const files = (s && s.pendingFiles) || [];
+      if (next && box && (box.value.trim() || files.length)) draft = { text: box.value, files: [...files], at: Date.now() };
+      return next;
+    };
+    wrappedShift.__hxDraft = true;
+    window.shiftQueuedSessionMessage = wrappedShift;
+    window.send = function () {
+      const d = draft && Date.now() - draft.at < 5000 ? draft : null;
+      draft = null;
+      const out = send0.apply(this, arguments);
+      if (d) {
+        const restore = () => {
+          const box = document.getElementById('msg'), s = st();
+          if (!box || box.value.trim()) return;  // the send didn't go out (upstream kept it) or the user typed again
+          box.value = d.text;
+          if (s) s.pendingFiles = d.files;
+          try { autoResize(); renderTray(); } catch (_) {}
+        };
+        setTimeout(restore, 250);
+        Promise.resolve(out).finally(() => setTimeout(restore, 0));
+      }
+      return out;
+    };
+  }
+  keepDrafts();
+  if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', keepDrafts);
+  window.addEventListener('load', keepDrafts);
+
   // Queued messages don't wait for the whole reply: while a Claude Code worker runs, each one is
   // handed to it (like typing ahead in Claude Code), oldest first. Ones with files keep waiting.
   let forwarding = false;
   setInterval(async () => {
     const sid = curSid();
-    if (forwarding || !sid || !runningFor(sid) || document.hidden) return;
+    if (forwarding || !sid || !runningFor(sid)) return;
     const next = liveQueue(sid).find((e) => e && entryText(e) && !realFiles(e).length && !pushing.has(e._queued_at));
     if (!next || !(await workerOpen(sid))) return;
     forwarding = true;

@@ -85,3 +85,13 @@ def test_takeover_needs_codex():
     out = str(cc._cmd_takeover("", session_id="agent-test"))
     assert "needs Codex" in out
     assert not st.session_state("agent-test").get("takeover")
+
+
+def test_motion_command_installs_motion_first(monkeypatch):
+    from hmem import motion
+    started = []
+    monkeypatch.setattr(motion, "installed", lambda p=None: False)
+    monkeypatch.setattr(motion, "install", lambda: started.append(1) or {"state": "running", "step": "node", "error": ""})
+    monkeypatch.setattr(cc, "log_decision", lambda **kw: None)
+    out = cc._route_motion("s1", "/motion advertise to students", "/motion advertise to students")
+    assert started and "isn't installed" in out and "installing Node.js" in out and "Do not call any tools" in out

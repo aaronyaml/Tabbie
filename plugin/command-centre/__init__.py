@@ -416,12 +416,24 @@ def _agent_events(run: AgentRun, kind: str):
 
 def _route_motion(session_id: str, user_message, text: str):
     """/motion <brief>: Claude Code in the Motion studio, current workspace = product source (read-only).
-    The studio folder (hmem/motion.py) is created from Tabbie's template if it's missing."""
+    Motion not installed yet (Node.js, studio folder, packages): starts that install instead and says so."""
     _hmem()  # puts hmem on sys.path
     from hmem import motion as motion_studio
     cfg = load_config()
     studio = motion_studio.studio_dir()
-    motion_studio.ensure(studio)
+    if not motion_studio.installed(studio):
+        st = motion_studio.install()
+        log_decision(event="motion_install", state=st["state"], step=st["step"])
+        if st["state"] == "failed":
+            what = f"The Motion install failed: {st['error']} Tell the user, and that they can retry with /motion again or the Download button in the Motion panel."
+        else:
+            step = {"node": "installing Node.js", "studio": "creating the studio folder",
+                    "packages": "installing the studio's Remotion packages"}.get(st["step"], "starting")
+            what = (f"Motion isn't installed on this Mac yet, so Tabbie has just started installing it in the background "
+                    f"(now: {step}). It downloads Node.js and the studio's packages, about 300 MB, a few minutes. Tell the "
+                    "user that in 2-3 short sentences: they can watch it in the Motion panel (rail, under Chat), and "
+                    "should send their /motion request again once it's done. Their brief was not started.")
+        return f"{TAG} {what} Do not call any tools and do not try to install anything yourself."
     brief = text[len("/motion"):].strip()
     project, source = projects.resolve(brief, _session_cwd())
     primary, extras = projects.folders_for(project)

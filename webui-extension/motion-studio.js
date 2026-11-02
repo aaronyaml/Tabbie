@@ -9,8 +9,8 @@
  *                revisions). Select clips/ranges and ask for those parts to be redone.
  *
  * The studio folder (HOME below) is a Remotion project: <tabbie>/motion by default, or the folder named in
- * config/motion.yaml. The sidecar creates it from templates/motion-studio when it's missing
- * (POST …/sidecar/motion/ensure, hmem/motion.py) and says whether ElevenLabs / Higgsfield are linked; the
+ * config/motion.yaml. Not installed yet (no Node.js, folder or packages): the home offers a Download button
+ * (POST …/sidecar/motion/install, hmem/motion.py). Status also says whether ElevenLabs / Higgsfield are linked; the
  * controls that need one are greyed out with a how-to-link tooltip until it is (data-needs="…", gate()).
  *
  * Backend: each project has its own chat session whose workspace is the studio folder, so the
@@ -115,16 +115,17 @@
   }
 
   // ── the studio folder + what's linked (sidecar, hmem/motion.py) ───────────────────────────────
-  // POST …/motion/ensure creates the folder from Tabbie's template when it's missing (and starts its
-  // npm install); the answer also says whether ElevenLabs (music) and Higgsfield (assets) are linked.
+  // GET …/motion/status says whether Motion is installed here (Node.js, the studio folder, its packages)
+  // and whether ElevenLabs (music) and Higgsfield (assets) are linked. Not installed: the home shows a
+  // Download button (POST …/motion/install runs it in the background; progress in status.install).
   // Booleans and how-to hints only. No answer (sidecar down, consent not given yet): nothing is greyed out.
   const SIDE = 'api/extensions/cc-agents/sidecar/motion/';
   let ST = null, stP = null, stT = 0;
-  function studioCheck(force) {
+  function studioCheck(force, install) {
     if (stP && !force) return stP;
     stP = (async () => {
       try {
-        const r = await fetchT(`${SIDE}ensure`, 9500, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: '{}' });
+        const r = await fetchT(`${SIDE}${install ? 'install' : 'status'}`, 9500, install ? { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: '{}' } : {});
         const d = r.ok ? await r.json() : null;
         if (d && d.path) {
           ST = d;
@@ -132,7 +133,7 @@
         }
       } catch (_) {}
       clearTimeout(stT);
-      if (ST && ST.deps === 'installing') stT = setTimeout(() => { if (isOpen()) studioCheck(true); }, 5000);
+      if (ST && ST.install && ST.install.state === 'running') stT = setTimeout(() => { if (isOpen()) studioCheck(true); }, 3000);
       if (root && isOpen()) render();
       return ST;
     })();
@@ -141,7 +142,7 @@
   async function studioOk() {
     await studioCheck();
     if (ST && ST.error) throw new Error(ST.error);
-    if (ST && !ST.exists) throw new Error(`The studio folder ${ST.path} couldn’t be created.`);
+    if (needsInstall()) throw new Error('Motion isn’t installed yet: press Download Motion studio first.');
   }
   const linked = (k) => !ST || !ST[k] || ST[k].linked !== false;
   const unlinkedNote = (k) => (linked(k) ? '' : `<p class="hxs-note hxs-unlinked-note">${icon('Link01Icon', 14)}<span>${esc(ST[k].hint)}</span></p>`);
@@ -153,11 +154,29 @@
       el.classList.toggle('is-unlinked', off);
     });
   }
+  // An older sidecar has no `installed`: treat it as installed (nothing to offer).
+  const needsInstall = () => !!ST && ST.installed === false;
+  function vInstall() {
+    const i = ST.install || {}, run = i.state === 'running', failed = i.state === 'failed';
+    const order = ['node', 'studio', 'packages'];
+    const at = order.indexOf(i.step);
+    const steps = [['node', 'Node.js', ST.node], ['studio', 'Studio folder', ST.exists], ['packages', 'Remotion packages', false]];
+    return `<section class="hxs-hero hxs-install">
+        <div class="hxs-buddy hxs-buddy-xl" data-buddy="zoetie" aria-hidden="true"></div>
+        <div class="hxs-eyebrow">${NAME} <span>· Motion studio</span></div>
+        <h1>Motion isn’t installed yet</h1>
+        <p>Motion makes product films on this Mac with Remotion. It needs Node.js and the studio’s packages: about 300 MB, a few minutes. Everything installs inside Tabbie.</p>
+        ${run ? `<ol class="hxs-jc-steps hxs-inst-steps">${steps.map(([k, l, have], n) => {
+          const done = have || (at > n), on = at === n;
+          return `<li class="${done ? 'is-done' : on ? 'is-on' : ''}">${done ? icon('Tick02Icon', 12) : '<i></i>'}<span>${l}</span></li>`;
+        }).join('')}</ol><p class="hxs-note">Installing… you can leave this open or come back later.</p>`
+        : `<button type="button" class="hxs-primary hxs-inst-go" data-act="mo-install">${icon('Download04Icon', 16)}<span>${failed ? 'Try again' : 'Download Motion studio'}</span></button>`}
+        ${failed ? `<p class="hxs-note hxs-err-note">${esc(i.error || 'The install didn’t finish.')}</p>` : ''}
+      </section>`;
+  }
   function studioNote() {
     const d = ST && ST.deps;
-    return d === 'installing' ? 'Setting up your studio: installing Remotion (about a minute). You can start a film meanwhile.'
-      : d === 'no-node' ? 'Films render with Node.js, which isn’t installed yet: run bin/install-tool node in Terminal (or bin/setup → Motion studio), then reopen Motion.'
-      : d === 'failed' ? 'Setting up the studio’s packages didn’t finish (state/logs/motion-npm.log). Reopen Motion to try again.' : '';
+    return d === 'failed' ? 'Setting up the studio’s packages didn’t finish (state/logs/motion-npm.log). Reopen Motion to try again.' : '';
   }
 
   // ── project index (this browser) + discovery from <studio>/studio ─────────────────────────────
@@ -1102,6 +1121,7 @@
 
   const vOpening = () => `<section class="hxs-hero hxs-opening"><div class="hxs-buddy hxs-buddy-xl" data-buddy="zoetie" aria-hidden="true"></div><p>Opening the film…</p></section>`;
   function vHome() {
+    if (needsInstall()) return vInstall();
     const list = loadIdx();
     return `<section class="hxs-hero">
         <div class="hxs-buddy hxs-buddy-xl" data-buddy="zoetie" aria-hidden="true"></div>
@@ -1679,6 +1699,11 @@
       if (swr && swr.classList.contains('is-swiped') && !t.closest('[data-del]')) { swr.classList.remove('is-swiped'); return; }
       const dl = t.closest('[data-del]');
       if (dl) { delAsk = dl.dataset.del; return render(); }
+      if (a && a.dataset.act === 'mo-install') {
+        a.disabled = true;
+        ST.install = { state: 'running', step: '' }; render();
+        return studioCheck(true, true);
+      }
       if (a && a.dataset.act === 'del-no') { delAsk = null; return render(); }
       if (a && a.dataset.act === 'del-yes') {
         if (delBusy) return;

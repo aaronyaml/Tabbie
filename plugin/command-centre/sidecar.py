@@ -21,6 +21,8 @@ GET|POST /projects/*, GET /fs/*      -> Projects UI (hmem/api.py): registry, mem
 GET /motion/status, POST /motion/ensure -> the Motion studio folder (created from the template when missing,
                                        npm install in the background) and whether ElevenLabs / Higgsfield are
                                        linked (booleans + how-to hints only; hmem/motion.py)
+POST /motion/install                 -> install what Motion is missing (Node.js, studio, packages) in the
+                                       background; progress in /motion/status "install"
 """
 
 from __future__ import annotations
@@ -135,7 +137,18 @@ def _live_request(sid: str):
 
 def worker_payload(sid: str) -> dict:
     rid, _ = _live_request(sid)
-    return {"open": bool(rid), "request_id": rid}
+    if rid:
+        return {"open": True, "request_id": rid}
+    # why not: so the WebUI can say what happened to a Send now instead of a silent steer
+    reason = "idle"
+    for row in reversed(agents.session_view(sid)["requests"]):
+        req = common.read_json(common.REQUESTS_DIR / row["id"] / "request.json", {}) or {}
+        if req.get("status") == "executing":
+            ex = req.get("executor") or {}
+            choice = executor_choice.get_choice(sid)
+            reason = "codex" if (ex.get("provider") or "").startswith("codex") or choice.get("provider") == "openai" else "older"
+            break
+    return {"open": False, "request_id": None, "reason": reason}
 
 
 def worker_message(body: dict) -> tuple[int, dict]:
@@ -372,6 +385,9 @@ class Handler(BaseHTTPRequestHandler):
                 return self._send(*worker_message(body))
             if u.path == "/motion/ensure":
                 return self._send(200, motion_studio.status(create=True))
+            if u.path == "/motion/install":
+                motion_studio.install()
+                return self._send(200, motion_studio.status())
             if u.path == "/update":
                 res = updates.apply()
                 return self._send(200 if res["ok"] else 409, res)

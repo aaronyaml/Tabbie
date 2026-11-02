@@ -13,6 +13,10 @@
   <img src="docs/images/project-home.png" alt="A project's home: linked folders, sessions, items to review, and New task / Run Dreamer buttons" width="900">
 </p>
 
+> **Having an AI agent install this?** Tell it: *"Install Tabbie by following the
+> [Installing with a coding agent](#installing-with-a-coding-agent-codex-claude-code-) section of
+> the README exactly."*
+
 ---
 
 A personal command centre for coding agents on your Mac. You type a request in a web app (desktop
@@ -94,23 +98,113 @@ Setup installs all of these for you.
 
 ### Installing with a coding agent (Codex, Claude Code …)
 
-If you ask an AI agent to install Tabbie for you, give it these rules. Agents: follow them exactly.
+Asking Claude Code, Codex or another agent to install Tabbie? Point it at this section. It's a
+runbook, written for the agent.
 
-1. Clone to **`~/hermes`** (no other path works yet). Then have the **user** run `bin/setup` in
-   the Terminal app: it opens the setup page, which needs them for the password and account
-   logins. An agent without an interactive terminal can run `bin/setup --yes` first for the
-   unattended parts, but the user must still finish with `bin/setup`. Don't hand-install pieces,
-   and don't stop at "the WebUI loads on port 8787": that is the bare upstream WebUI, not Tabbie.
-2. **Caddy is required.** If `command -v caddy` fails, run `bin/install-tool caddy`, then
-   `bin/setup --terminal --only services,cert --services` so the `ai.hermes.caddy` service starts
-   (the WebUI password must already be set).
-3. **The four Tabbie plugins must be enabled**, not just linked: `command-centre`,
-   `fragment-memory`, `limits`, `workboard` (`hermes plugins enable <name>`). Without them the hub
-   answers everything itself and never uses Claude Code / Codex, kanban or todos.
-4. **Sign-ins are the user's own account logins** (ChatGPT, Claude). Never create or paste API
-   keys. The browser login steps need the user at the Mac.
-5. Finish with **`bin/hub health`**. Every line must be ✓ except ones marked *optional*. Then open
-   **`https://hermes.local`** (or run `bin/hub`), never `http://127.0.0.1:8787`.
+> **Agent: follow these steps in order. Don't skip, reorder or improvise.**
+> The user has to be at the Mac for the steps marked 👤: the WebUI password and the account sign-ins
+> must come from them. Never invent, type or store a password, API key or token for them.
+
+#### Step 0: Ask the user these questions first, all in one message
+
+1. "What's your first name?" (used only for the greeting on the chat home)
+2. "Which coding agents do you pay for: **Claude** (Claude Code, Claude subscription), **OpenAI**
+   (Codex, ChatGPT subscription), or **both**?" Gives `--agents claude`, `codex` or `claude,codex`.
+3. Only if both: "Should the hub (the chat that routes your requests) use your **ChatGPT** login or
+   your **Claude** login?" Gives `--hub openai-codex` or `--hub anthropic`. With one agent, use the
+   matching hub (`claude` → `anthropic`, `codex` → `openai-codex`).
+4. "Do you want to use Tabbie from your phone **away from home** (mobile data, work)? That needs
+   **Tailscale**, a free private network between your own devices." (yes / no / later)
+5. "Do you want the **Motion studio** (makes product films; installs Node.js, about 300 MB)?" (yes / no)
+6. "Do you have **Higgsfield** (image/video generation) or **ElevenLabs** (voice/music) accounts to
+   link? Both are optional." (Motion greys out their buttons when they aren't linked.)
+
+#### Step 1: Clone and run the unattended parts (agent)
+
+```bash
+git clone https://github.com/aaronyaml/Tabbie.git ~/hermes   # must be exactly ~/hermes
+cd ~/hermes
+bin/setup --yes --name "<first name>" --agents <claude|codex|claude,codex> --hub <anthropic|openai-codex> \
+  --only name,agents,tools,files,motion     # leave out ",motion" if they said no to Motion
+```
+
+This installs Hermes Agent, Claude Code and/or Codex, and Caddy (official builds, no Homebrew, no
+Mac password). It also writes the local files and enables the plugins. Sign-ins, the password and
+phone setup are left for the user. On a brand-new Mac, macOS first asks to install Apple's developer
+tools (git, Python): tell the user to click **Install** and wait, then run the command again.
+They can add Motion later with `bin/setup --yes --only motion`.
+
+#### Step 2: 👤 The user finishes setup in the Terminal app
+
+Agents can't type the password or do browser logins. Tell the user, word for word if it helps:
+
+> Open the **Terminal** app on your Mac and paste:
+> `cd ~/hermes && bin/setup`
+> A setup page opens in your browser. Press each step's button. When it asks, sign in to your
+> ChatGPT / Claude accounts and choose a WebUI password. Tell me when the last step shows ✓.
+
+(No browser available, or the user prefers the Terminal: `cd ~/hermes && bin/setup --terminal`.)
+
+This does, with the user present: the account sign-ins, the WebUI password, the background services,
+the `https://hermes.local` certificate, and the phone step. Wait until they say it's done.
+
+#### Step 3: 👤 Tailscale, only if they answered yes in Step 0
+
+The phone step of `bin/setup` walks through it. If they skipped it, guide them step by step,
+waiting for an answer after each:
+
+1. "Install **Tailscale** from the Mac App Store, open it, and log in (Google, Apple or Microsoft
+   account). Tell me when the menu-bar icon says Connected." Then check:
+   `/Applications/Tailscale.app/Contents/MacOS/Tailscale status` (or `tailscale status`).
+2. "Open <https://login.tailscale.com/admin/dns>, turn on **MagicDNS**, then under
+   **HTTPS Certificates** click **Enable HTTPS**. Tell me when done."
+3. Agent runs: `/Applications/Tailscale.app/Contents/MacOS/Tailscale serve --bg 8788`
+   (`tailscale serve --bg 8788` for a Homebrew install). Port 8788 is Caddy, never 8787.
+   Use `serve` only. **Never use `tailscale funnel`**: that would put Tabbie on the public internet.
+4. Get the address: `… Tailscale status --json` → `Self.DNSName` (drop the trailing dot), giving
+   `https://<mac-name>.<tailnet>.ts.net`.
+5. "On your phone, install **Tailscale** (App Store / Google Play), log in with the **same
+   account**, allow the VPN, turn it on, then open `<that address>` and log in with your WebUI
+   password. Add it to your home screen from the Share menu."
+
+#### Step 4: Optional accounts (only the ones they said yes to in Step 0)
+
+- Higgsfield: the user runs `higgsfield auth login` in the Terminal (browser login).
+- ElevenLabs: see [Sign in](#sign-in-once-per-provider). The user signs in themselves.
+
+#### Step 5: Check (agent)
+
+```bash
+cd ~/hermes && bin/hub health
+```
+
+Every line must be ✓, except lines marked *optional*. Each ✗ line prints its fix command: run it
+(or, if it needs the user, ask them), then run `bin/hub health` again. Done when it's all ✓.
+
+Then tell the user:
+
+> Open **https://hermes.local** (or run `bin/hub`) and log in with your WebUI password. When an
+> **Allow Tabbie's helper** card appears bottom-right, press **Allow**. Updates show up as a card
+> in the page, and in Settings → System.
+
+#### Rules for agents (don't break these)
+
+- **Path:** always `~/hermes`.
+- **Caddy is required.** Tabbie is only ever opened through `https://hermes.local` (or the
+  Tailscale address). "The WebUI loads on `http://127.0.0.1:8787`" is **not** a working install:
+  that's the bare upstream WebUI, with the wrong icons and missing pages. If `command -v caddy`
+  fails: `bin/install-tool caddy`, then `bin/setup --terminal --only services,cert --services`
+  (the WebUI password must already be set).
+- **The four plugins must be enabled**, not just linked: `command-centre`, `fragment-memory`,
+  `limits`, `workboard` (`hermes plugins enable <name> --no-allow-tool-override`). Without them
+  the hub answers everything itself and ignores the model picker, Claude Code and Codex.
+- **Subscription logins only.** Never create, ask for or paste an API key. Never print or log
+  passwords or tokens.
+- **Don't hand-install pieces** or edit `~/.hermes/config.yaml` yourself. `bin/setup` backs up the
+  config and is safe to re-run: done steps are skipped.
+- **Never expose Tabbie publicly.** No port forwarding, no `tailscale funnel`, no binding 8787 or
+  8788 to `0.0.0.0`. The WebUI password always stays on.
+- **Don't restart services while a request is running** (`bin/hub health` / the WebUI shows it).
 
 ---
 
@@ -360,8 +454,9 @@ checker existed need one manual update first: `cd ~/hermes && git pull`, then `b
 After downloading:
 - **Restart now**, or answer yes in the Terminal, restarts the services that changed. Updating never
   interrupts work: downloading leaves running jobs (and the Motion studio folder) alone, and if a
-  request, worker or Motion render is running, the restart is scheduled instead and happens by itself
-  about a minute after everything finishes.
+  request, worker, Motion render or chat reply is running, the restart is scheduled instead and happens
+  by itself about a minute after everything finishes. Updates to the hub's plugins also restart the
+  WebUI (chats run them there), and the page reloads itself once it's back.
 - Interface-only updates just need a page reload.
 - If the update changed setup steps, it tells you to run `bin/setup` again.
 
@@ -497,9 +592,12 @@ the moments, approve a storyboard, and Claude Code (or Codex) builds and renders
 - **Model**: the Storyboard step has a model picker (e.g. Opus 5.5, Sonnet 5.5, GPT-6.1 Sol, plus
   effort). That model draws the storyboard and builds the film; it can be changed until you approve.
 
-- **The studio folder** is `motion/` inside Tabbie (git-ignored). The first time Motion opens (or setup
-  step 9 runs) Tabbie creates it from `templates/motion-studio/` and runs `npm install` there, so nothing
-  has to exist beforehand. To use a studio of your own instead, copy `config/motion.example.yaml` to
+- **Not installed yet?** Opening Motion shows a **Download Motion studio** button instead of the new-film
+  form. It installs whatever's missing in the background (Node.js, the studio folder, its packages; about
+  300 MB) and shows each step as it goes. Typing `/motion …` in a chat before then starts the same install
+  and tells you to send it again when it's done. Setup step 9 does the same.
+- **The studio folder** is `motion/` inside Tabbie (git-ignored), created from `templates/motion-studio/`
+  by that install, so nothing has to exist beforehand. To use a studio of your own instead, copy `config/motion.example.yaml` to
   `config/motion.yaml` and set `studio:`; a folder that already has files in it is used as it is, never changed.
 - **Node.js** renders the films: setup installs it (`bin/install-tool node`, nodejs.org's official build).
 - **Generate audio** uses ElevenLabs Music, which needs your ElevenLabs API key in the studio's `.env`

@@ -77,7 +77,7 @@ def test_check_offline_says_so(tmp_path, monkeypatch):
 
 def test_needs():
     assert up._needs(["webui-extension/x.js"]) == ["reload"]
-    assert up._needs(["plugin/command-centre/router.py"]) == ["gateway", "sidecar"]
+    assert up._needs(["plugin/command-centre/router.py"]) == ["gateway", "sidecar", "webui"]
     assert up._needs(["services/Caddyfile", "bin/setup", "README.md"]) == ["caddy", "setup"]
 
 
