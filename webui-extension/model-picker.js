@@ -13,7 +13,9 @@
  *   GET  api/extensions/cc-agents/sidecar/agents -> {dynamic, dynamic_available, linked}; POST {dynamic: bool}
  *        (Agents row "Hand-offs": Claude Code and Codex may pass part of a job to each other; "Takeover": a job
  *        at one agent's usage limit carries on in the other; both on by default,
- *        greyed out unless both are enabled and signed in)
+ *        greyed out unless both are enabled and signed in; "Small commits": a git job commits each working
+ *        step on its own; "Test before done": acceptance tests for every code change; both on by default,
+ *        and a request that says otherwise wins for that request)
  * A pick made before the chat exists is held and saved as soon as the session id appears (retried
  * while the sidecar catches up). If the computer can't be reached, the panel says so and offers Try again.
  */
@@ -112,10 +114,12 @@
       if (!r.ok) return;
       const j = await r.json();
       if (typeof j.dynamic !== 'boolean') return;  // older sidecar: no Hand-offs pill
-      handoffs = { dynamic: j.dynamic, available: !!j.dynamic_available, known: true, takeover: j.takeover !== false };
+      handoffs = fromApi(j);
     } catch (_) { /* keep the last known state */ }
     finally { if (open) paint(); }
   }
+  const fromApi = (j) => ({ dynamic: j.dynamic, available: !!j.dynamic_available, known: true, takeover: j.takeover !== false,
+    step_commits: j.step_commits !== false, uat: j.uat !== false });
   async function toggleHandoffs() {
     if (!handoffs.available) return;
     const next = !handoffs.dynamic;
@@ -123,7 +127,7 @@
     paint();
     try {
       const j = await post(AGENTS_API, { dynamic: next });
-      if (j && typeof j.dynamic === 'boolean') handoffs = { dynamic: j.dynamic, available: !!j.dynamic_available, known: true, takeover: j.takeover !== false };
+      if (j && typeof j.dynamic === 'boolean') handoffs = fromApi(j);
       notice = '';
     } catch (e) {
       handoffs = Object.assign({}, handoffs, { dynamic: !next });
@@ -132,17 +136,18 @@
     paint();
   }
 
-  // Takeover: a job at one agent's usage limit carries on in the other (same task). On by default.
-  async function toggleTakeover() {
-    const next = !handoffs.takeover;
-    handoffs = Object.assign({}, handoffs, { takeover: next });
+  // Takeover (a job at one agent's usage limit carries on in the other), Small commits and Test before
+  // done: plain on/off settings, all on by default.
+  async function toggleFlag(key) {
+    const next = handoffs[key] === false;
+    handoffs = Object.assign({}, handoffs, { [key]: next });
     paint();
     try {
-      const j = await post(AGENTS_API, { takeover: next });
-      if (j && typeof j.takeover === 'boolean') handoffs = Object.assign({}, handoffs, { takeover: j.takeover });
+      const j = await post(AGENTS_API, { [key]: next });
+      if (j && typeof j[key] === 'boolean') handoffs = Object.assign({}, handoffs, { [key]: j[key] });
       notice = '';
     } catch (e) {
-      handoffs = Object.assign({}, handoffs, { takeover: !next });
+      handoffs = Object.assign({}, handoffs, { [key]: !next });
       notice = statusOf(e) === 403 ? 'Allow “Agents & questions” in Settings › Extensions to change agents.' : 'Couldn’t save. Try again.';
     }
     paint();
@@ -287,7 +292,7 @@
         + `<span class="hx-mp-text"><span class="hx-mp-name">${esc(pv.name)}${badge}</span><span class="hx-mp-desc">${esc(sub)}</span></span>`
         + `<span class="hx-mp-go">${icon('ArrowRight01Icon', 16)}</span></button>`;
     }).join('');
-    // Agents: one card of switch rows (Claude Code, Codex, Hand-offs, Takeover). Same data attributes
+    // Agents: one card of switch rows (Claude Code, Codex, Hand-offs, Takeover, Small commits, Test before done). Same data attributes
     // and handlers as before; unavailable ones are dimmed with the reason as their subtitle.
     const on = catalog.agents || AGENTS.map((x) => x[0]);
     const bothOn = on.includes('claude') && on.includes('codex');
@@ -302,7 +307,9 @@
       + (!handoffs.known ? '' : tile('data-handoffs', 'ShuffleIcon', 'Hand-offs', unavail ? 'Needs Claude Code and Codex signed in' : 'Pass parts of a job along',
         handoffs.dynamic && !unavail, unavail))
       + (!handoffs.known ? '' : tile('data-takeover', 'RefreshIcon', 'Takeover', bothOn || extra ? 'Carry on elsewhere at a limit' : 'Needs a second agent or provider',
-        handoffs.takeover !== false && (bothOn || extra), !(bothOn || extra)));
+        handoffs.takeover !== false && (bothOn || extra), !(bothOn || extra)))
+      + (!handoffs.known ? '' : tile('data-flag="step_commits"', 'GitBranchIcon', 'Small commits', 'Commit each working step', handoffs.step_commits !== false, false))
+      + (!handoffs.known ? '' : tile('data-flag="uat"', 'CheckListIcon', 'Test before done', 'Test every code change', handoffs.uat !== false, false));
     return `<header class="hx-mp-head"><span class="hx-mp-title">Model</span></header>`
       + `<div class="hx-mp-list">${rows}`
       + `<button type="button" class="hx-mp-row hx-mp-add" data-manage><span class="hx-mp-tile">${icon('Add01Icon', 20)}</span>`
@@ -455,12 +462,15 @@
   }
   function fit() {
     const pane = track.querySelectorAll('.hx-mp-pane')[step - 1];
-    frame.style.height = pane.scrollHeight + 'px';
-    place(pane.scrollHeight + 24);
+    const h = pane.scrollHeight;
+    const room = place(h + 24) - 24;  // a short window: the pane scrolls inside the popover instead of running off-screen
+    frame.style.height = Math.min(h, Math.max(200, room)) + 'px';
+    frame.style.overflowY = h > room ? 'auto' : '';
   }
-  // Desktop popover: above the chip, or below it when the composer sits high (new-chat home).
+  // Desktop popover: above the chip, or below it when the composer sits high (new-chat home). Returns
+  // the room on that side.
   function place(h) {
-    if (phone()) { panel.style.left = panel.style.bottom = panel.style.top = panel.style.width = ''; return; }
+    if (phone()) { panel.style.left = panel.style.bottom = panel.style.top = panel.style.width = ''; return Infinity; }
     const r = chip.getBoundingClientRect();
     const w = 320;
     const need = h || panel.offsetHeight || 320;
@@ -470,6 +480,7 @@
     panel.classList.toggle('is-below', below);
     if (below) { panel.style.bottom = ''; panel.style.top = (r.bottom + 8) + 'px'; }
     else { panel.style.top = ''; panel.style.bottom = Math.max(12, window.innerHeight - r.top + 8) + 'px'; }
+    return below ? window.innerHeight - r.bottom - 20 : r.top - 20;  // height the popover has on that side
   }
 
   function go(n, focusSel) {
@@ -517,7 +528,8 @@
     if (t.hasAttribute('data-retry')) { notice = ''; offline = false; t.disabled = true; t.textContent = 'Trying…'; load(sid()); return; }
     if (t.dataset.agent) { toggleAgent(t.dataset.agent).then(loadHandoffs); return; }
     if (t.hasAttribute('data-handoffs')) { toggleHandoffs(); return; }
-    if (t.hasAttribute('data-takeover')) { toggleTakeover(); return; }
+    if (t.hasAttribute('data-takeover')) { toggleFlag('takeover'); return; }
+    if (t.dataset.flag) { toggleFlag(t.dataset.flag); return; }
     if (t.dataset.provider) { if (browsing !== t.dataset.provider) query = ''; browsing = t.dataset.provider; go(2); return; }
     if (t.hasAttribute('data-back')) { go(1, step === 3 ? '[data-manage]' : `[data-provider="${browsing}"]`); return; }
     if (t.hasAttribute('data-manage')) { loadProviders(); go(3, '[data-prov]'); return; }
