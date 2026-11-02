@@ -757,12 +757,14 @@ scan-flagged proposals; set it to `false` to review everything yourself.
   it to your LAN and Tailscale only. The extension's sidecar needs a token minted by the WebUI
   after a one-time consent, and it only accepts changes sent by the WebUI server process itself
   (checked per connection), so a worker that reads the token still can't use it.
+  Failed logins are rate-limited per client address (Caddy's `X-Forwarded-For`, trusted from
+  localhost only), so one device guessing passwords can't lock everyone else out.
 - **Workers can't rewrite memory or approve anything.** Their file tools are denied on `memory/`
   and the sidecar token. User-only `hmem` commands refuse to run inside a worker, and approving,
   rejecting or deprecating needs a real terminal (a worker's shell has none). Memory files
   edited outside the store are ignored until you review them (`hmem doctor`).
 - **Untrusted text stays data.** Repo files, web pages and tool output can't become standing
-  instructions: they are scanned for injection, kept `external`, and must be approved by you.
+  instructions: they are scanned for injection, kept `external`, and never auto-approved.
 
 Defence in depth, not a sandbox: a worker runs as your user with Claude Code's permission mode.
 Use Claude Code's own permission settings for hard limits.

@@ -20,6 +20,9 @@
 
 (hermes_site) {
 	encode zstd gzip
+	# The WebUI keys login rate limits on X-Forwarded-For (set by Caddy itself); a client-sent
+	# X-Real-IP that disagrees would drop it back to one shared bucket.
+	request_header -X-Real-IP
 
 	# Motion studio URLs. Upstream only routes /session/<id>, so:
 	#   /motion        -> the app shell for "/"             (studio home)
