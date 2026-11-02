@@ -189,10 +189,10 @@
       "id": "home",
       "name": "New-chat home",
       "scripts": [
-        "home.js?v=6"
+        "home.js?v=7"
       ],
       "stylesheets": [
-        "home.css?v=3"
+        "home.css?v=4"
       ]
     },
     {

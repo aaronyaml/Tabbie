@@ -86,6 +86,19 @@
     } catch (_) {}
   }
 
+  // Chats whose newest request asked a question or has a plan to approve (sidecar /inbox).
+  let waiting = [], waitingAt = 0;
+  async function loadInbox() {
+    if (Date.now() - waitingAt < 30000) return;
+    waitingAt = Date.now();
+    try {
+      const r = await fetch('api/extensions/cc-agents/sidecar/inbox', { credentials: 'same-origin' });
+      if (!r.ok) return;
+      waiting = ((await r.json()).items || []).slice(0, 3);
+      render();
+    } catch (_) {}
+  }
+
   let home = null;
   function render() {
     if (!home) return;
@@ -103,7 +116,15 @@
           <span class="hx-rec-tt">${esc(titleOf(s))}</span>
           <span class="hx-rec-when">${esc(ago(s.updated_at || s.last_message_at || 0))}</span>
         </button>`).join('')}</div>` : '';
-    const html = `<div class="hx-home-head"><span>${icon('BulbIcon', 16)} Try Tabbie</span></div><div class="hx-tries">${cards}</div>${rec}`;
+    const need = waiting.length ? `
+      <div class="hx-home-head hx-need-head"><span>${icon('Flag02Icon', 16)} Needs you</span></div>
+      <div class="hx-need">${waiting.map((w) => `
+        <button type="button" class="hx-need-row" data-sid="${esc(w.session)}">
+          <span class="hx-need-pill">${w.kind === 'plan' ? 'Plan' : 'Question'}</span>
+          <span class="hx-need-tt">${esc(w.title)}</span>
+          <span class="hx-need-tx">${esc(w.text)}</span>
+        </button>`).join('')}</div>` : '';
+    const html = `${need}<div class="hx-home-head"><span>${icon('BulbIcon', 16)} Try Tabbie</span></div><div class="hx-tries">${cards}</div>${rec}`;
     if (home.dataset.html !== html) { home.innerHTML = html; home.dataset.html = html; }
   }
 
@@ -117,7 +138,7 @@
       home.addEventListener('click', (e) => {
         const t = e.target.closest('.hx-try');
         if (t) return fillComposer(pick()[+t.dataset.i]);
-        const r = e.target.closest('.hx-rec');
+        const r = e.target.closest('.hx-rec, .hx-need-row');
         if (r && typeof loadSession === 'function') loadSession(r.dataset.sid);
       });
     }
@@ -134,11 +155,11 @@
 
   function tick() { setGreeting(); place(); syncTyping(); }
   function start() {
-    tick(); loadRecent();
+    tick(); loadRecent(); loadInbox();
     addEventListener('input', (e) => { if (e.target && e.target.id === 'msg') syncTyping(); }, true);
     addEventListener('resize', place);
     const es = document.getElementById('emptyState');
-    if (es) new MutationObserver(() => { tick(); loadRecent(); }).observe(es, { attributes: true, childList: true, subtree: true, characterData: true });
+    if (es) new MutationObserver(() => { tick(); loadRecent(); loadInbox(); }).observe(es, { attributes: true, childList: true, subtree: true, characterData: true });
     setInterval(tick, 1500); // composer cleared by sending, session switches, i18n re-renders
   }
   if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', start); else start();

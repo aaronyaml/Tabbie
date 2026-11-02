@@ -41,6 +41,18 @@ html.hx-typing #hxHome { opacity: 0; transform: translateY(6px); pointer-events:
 .hx-rec-tt { font-size: 13.5px; font-weight: 500; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .hx-rec-when { font-size: 12px; color: var(--hx-text-2, #8a8a8e); }
 
+/* Needs you: chats waiting on an answer or a plan approval */
+.hx-need-head { margin-top: 18px; }
+.hx-need { display: flex; flex-direction: column; gap: 4px; }
+.hx-need-row { display: grid; grid-template-columns: auto minmax(0, 1fr); column-gap: 10px; row-gap: 2px; align-items: center;
+  padding: 10px 12px; border-radius: 14px; border: 0; background: var(--hx-fill, rgba(127,127,127,.08)); text-align: left;
+  color: var(--hx-text, inherit); cursor: pointer; font: inherit; transition: background-color .15s ease; }
+.hx-need-row:hover { background: var(--hx-fill-2, rgba(127,127,127,.16)); }
+.hx-need-pill { grid-row: 1 / span 2; align-self: start; font-size: 11px; font-weight: 600; padding: 3px 8px; border-radius: 999px;
+  background: var(--accent, #d97757); color: #fff; }
+.hx-need-tt { font-size: 13.5px; font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.hx-need-tx { font-size: 12.5px; color: var(--hx-text-2, #8a8a8e); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+
 /* desktop: buddy beside the greeting, like Claude */
 @media (min-width: 641px) {
   /* upstream sometimes sets an inline display:block; keep the row layout regardless */
@@ -55,6 +67,8 @@ html.hx-typing #hxHome { opacity: 0; transform: translateY(6px); pointer-events:
 @media (max-width: 640px) {
   #hxHome { padding: 0; margin-bottom: 4px; }
   .hx-home-head { margin: 0 16px 8px; }
+  .hx-need { padding: 0 16px; margin-bottom: 12px; }
+  .hx-need-head { margin-top: 0; }
   .hx-tries { display: flex; overflow-x: auto; scroll-snap-type: x mandatory; gap: 10px; padding: 0 16px 4px; scrollbar-width: none;
     -webkit-mask-image: linear-gradient(90deg, transparent 0, #000 12px, #000 calc(100% - 24px), transparent 100%);
     mask-image: linear-gradient(90deg, transparent 0, #000 12px, #000 calc(100% - 24px), transparent 100%); }
