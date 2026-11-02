@@ -118,6 +118,7 @@ Before any worker, planner or hand-off starts, Tabbie checks the subscription's 
 route line says so (Opus 5.5 ↔ GPT-6.1 Sol, Fable 5.1 ↔ GPT-6-Astra, Sonnet 5.5 ↔ GPT-6.1 Terra,
 Haiku 5.5 ↔ GPT-6 Luna; the same pairs are used for hand-offs and when an agent is switched off). If the
 other agent is also at its limit or not signed in, nothing starts and Tabbie says when the limit resets.
+If Claude can't sign in (logged out, expired token), the job also goes to its GPT equivalent.
 A planner at its limit falls back to the other planner. Hand-offs to Codex stop at 90%, so they
 never use up the ChatGPT allowance the hub shares. If usage can't be read, it starts anyway (logged). `bin/limit-gate` runs the same check (it's also used as a hook).
 

@@ -943,6 +943,10 @@ def _learn(r: Request) -> None:
     threading.Thread(target=go, daemon=True, name=f"hmem-trace-{r.id}").start()
 
 
+_CLAUDE_AUTH_RX = re.compile(r"Claude auth check failed|authentication_error|OAuth token (has )?expired|"
+                             r"run /login|not logged in|Invalid API key", re.I)
+
+
 def _execute(r: Request, feed=None, force: dict | None = None) -> dict:
     """_run_request, but an unexpected error ends the request as failed instead of leaving it "executing"
     (shown as running and blocking updates until the reaper finds it)."""
@@ -1119,6 +1123,16 @@ def _run_request(r: Request, feed=None, force: dict | None = None) -> dict:
                            + "). Let Codex take over this session from where Claude stopped?' with choices "
                            "['Yes, Codex takes over', 'No']. Then call cc_takeover(request_id=\"" + r.id
                            + "\", accept=<true if Yes>). If clarify is unavailable, ask the same as plain text.")}
+    if (not res.get("ok") and not res.get("stopped_by_user") and not force and not answer
+            and _CLAUDE_AUTH_RX.search(str(res.get("error") or "")) and agents().has("codex")):
+        # Claude's sign-in is broken (logged out, expired token): the GPT equivalent does this one
+        peer = executor_choice.peer_model("anthropic", claude_model or ecfg.get("model") or executor_choice.DEFAULT["model"],
+                                          (cfg.get("dynamic_agents") or {}).get("models") or {}, _codex_models_safe())
+        log_decision(event="claude_auth_fallback", request=r.id, to=peer["model"])
+        r = Request(r.id); r["status"] = "executing"; r.save()
+        return _astra_takeover(r, reason=f"Claude couldn't sign in, so its equivalent took this one",
+                               choice={"provider": "openai", "model": peer["model"], "name": peer["name"],
+                                       "effort": claude_effort}, feed=feed, offer=False)
     out = {
         "request_id": r.id,
         "route": _route_line(r) if not force else f"Route: Claude {choice['name']} — {_WHO['codex']} is at its limit, so its equivalent took this one",

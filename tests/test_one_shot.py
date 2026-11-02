@@ -144,3 +144,16 @@ def test_a_huge_session_is_not_resumed(monkeypatch):
     key = next(iter(s)); s[key]["ctx"] = 150000; (d / "cs.json").write_text(json.dumps(s))
     cc._execute(_req("chatH", "now polish it"))
     assert calls[1]["resume_session"] is None  # over resume_max_context: fresh session, recent turns instead
+
+
+def test_claude_sign_in_failure_hands_the_job_to_its_gpt_equivalent(monkeypatch):
+    _setup(monkeypatch)
+    monkeypatch.setattr(cc, "run_claude", lambda prompt, **k: {
+        "ok": False, "error": "Claude auth check failed: Claude Code is not logged in", "billing": None})
+    monkeypatch.setattr(cc, "agents", lambda: type("A", (), {"has": staticmethod(lambda a: True)})())
+    monkeypatch.setattr(cc, "_codex_models_safe", lambda: [])
+    got = []
+    monkeypatch.setattr(cc, "_astra_takeover", lambda r, reason, choice=None, **k: got.append((reason, choice)) or {"ok": True})
+    assert cc._execute(_req("chatX", "fix the bug")) == {"ok": True}
+    reason, choice = got[0]
+    assert "couldn't sign in" in reason and choice["provider"] == "openai" and choice["effort"]
