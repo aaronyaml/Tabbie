@@ -27,6 +27,7 @@ def _wire(sc, tmp_path, monkeypatch, rid=RID):
     (reqs / rid).mkdir(parents=True)
     monkeypatch.setattr(sc.common, "REQUESTS_DIR", reqs)
     monkeypatch.setattr(sc.common, "LOCKS_DIR", tmp_path / "locks")
+    monkeypatch.setattr(sc, "_is_worker", lambda pid: True)  # the fake workers here are python, not claude/codex
     monkeypatch.setattr(sc.agents, "session_view", lambda sid: {"session_id": sid, "requests": [{"id": rid}] if sid == SID else []})
     return reqs / rid
 

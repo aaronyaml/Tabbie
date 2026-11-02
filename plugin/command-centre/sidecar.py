@@ -259,17 +259,25 @@ def shot_bytes(rid: str, img: str, size: str) -> tuple[bytes, str] | None:
     return (src.read_bytes(), _CTYPE[ext]) if n <= SHOT_LIMIT else None
 
 
+def _is_worker(pid: int) -> bool:
+    """The pid is still a Claude Code / Codex worker. After a crash a stale pid file can name a pid macOS
+    has since reused for something else: never signal (or report as live) an unrelated process."""
+    try:
+        os.kill(pid, 0)
+        cmd = subprocess.run(["ps", "-o", "command=", "-p", str(pid)], capture_output=True, text=True,
+                             timeout=5).stdout
+    except (OSError, subprocess.SubprocessError):
+        return False
+    return bool(re.search(r"(^|[/\s])(claude|codex)(\.js)?(\s|$)", cmd.strip().split("\n")[0]))
+
+
 # Chat -> running Claude Code worker (providers.LiveInput reads the request folder's inbox.jsonl).
 def _live_request(sid: str):
     for row in reversed(agents.session_view(sid)["requests"]):
         d = common.REQUESTS_DIR / row["id"]
         live = common.read_json(d / "live.json", {}) or {}
         pid = live.get("pid")
-        if live.get("open") and isinstance(pid, int):
-            try:
-                os.kill(pid, 0)
-            except OSError:
-                continue
+        if live.get("open") and isinstance(pid, int) and pid > 1 and _is_worker(pid):
             return row["id"], d
     return None, None
 
@@ -337,8 +345,9 @@ def _codex_running(sid: str):
     pid_file = common.LOCKS_DIR / f"takeover-{sid[:60]}.pid"
     try:
         pid = int(pid_file.read_text().strip())
-        os.kill(pid, 0)
     except (OSError, ValueError):
+        return None, None, None
+    if pid <= 1 or not _is_worker(pid):
         return None, None, None
     for row in reversed(agents.session_view(sid)["requests"]):
         d = common.REQUESTS_DIR / row["id"]
@@ -484,6 +493,7 @@ def clean_title(raw: str) -> str:
 # waits up to 7 s, and otherwise answers {"pending": true}; the browser asks again with the same text.
 _titles: dict[str, dict] = {}
 _titles_lock = threading.Lock()
+_title_slots = threading.BoundedSemaphore(2)  # each title is a CLI run; many new chats at once shouldn't spawn a crowd
 
 
 def title_for(text: str, wait: float = 7.0) -> dict:
@@ -497,7 +507,8 @@ def title_for(text: str, wait: float = 7.0) -> dict:
 
             def work():
                 try:
-                    job["title"] = make_title(text)
+                    with _title_slots:
+                        job["title"] = make_title(text)
                 except Exception as exc:
                     sys.stderr.write(f"cc-sidecar title error: {exc!r}\n")
                 job["done"].set()

@@ -283,7 +283,7 @@ def reap_orphans(min_age: float = 120.0) -> list[str]:
     if not rd.exists() or _workers_alive():
         return []
     now, done = time.time(), []
-    for d in sorted(rd.iterdir())[-60:]:
+    for d in sorted(x for x in rd.iterdir() if x.is_dir())[-60:]:
         rf = d / "request.json"
         try:
             req = json.loads(rf.read_text())
@@ -296,6 +296,9 @@ def reap_orphans(min_age: float = 120.0) -> list[str]:
             continue
         req["status"] = "failed"
         req["result"] = {**(req.get("result") or {}), "ok": False, "error": INTERRUPTED}
+        live = d / "live.json"
+        if live.exists():  # its worker is gone: Stop / Send now must not target its old pid
+            _write(live, {"open": False, "pid": None, "at": now})
         req["updated"] = time.strftime("%Y-%m-%dT%H:%M:%S")
         _write(rf, req)
         af = d / "agents.json"

@@ -944,6 +944,29 @@ def _learn(r: Request) -> None:
 
 
 def _execute(r: Request, feed=None, force: dict | None = None) -> dict:
+    """_run_request, but an unexpected error ends the request as failed instead of leaving it "executing"
+    (shown as running and blocking updates until the reaper finds it)."""
+    try:
+        return _run_request(r, feed=feed, force=force)
+    except Exception as exc:
+        log_decision(event="execute_crashed", request=r.id, error=repr(exc)[:300])
+        try:
+            r = Request(r.id)
+            if r["status"] in ("executing", "planning", "approved", "answered"):
+                r["status"] = "failed"
+                r["result"] = {"ok": False, "error": f"Tabbie hit an internal error: {exc!r}"[:300]}
+                r.save()
+            run = AgentRun.load(r.id, r["session_id"])
+            with run.lock:
+                run.finish_main(False, step="Tabbie hit an internal error")
+                run.save(force=True)
+        except Exception:
+            pass
+        return {"request_id": r.id, "ok": False, "error": f"Tabbie hit an internal error: {exc!r}"[:300],
+                "note": "Tell the user in one line that the run failed with an internal error and they can send it again."}
+
+
+def _run_request(r: Request, feed=None, force: dict | None = None) -> dict:
     """Run the request on the conversation's executor. feed: live-feed sink (early start), else this tool
     call's. force: {provider: anthropic|openai, model} to run this one request elsewhere (the user accepted
     a limit switch)."""
