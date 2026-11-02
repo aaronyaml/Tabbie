@@ -20,4 +20,4 @@ jobs:
           python-version: "3.12"
       - name: Tests
         shell: bash
-        run: uv run -q --no-project --with pytest --with ruamel.yaml python -m pytest tests -q -p no:cacheprovider
+        run: uv run -q --no-project --with pytest --with ruamel.yaml python -m pytest tests -q -p no:cacheprovider -rfE --tb=short

@@ -2,7 +2,7 @@
 tree, check a pid, read its command line, find processes, and see who owns a local TCP port.
 
 macOS / Linux: sessions + killpg, ps, pgrep, lsof (as before).
-Windows: CREATE_NEW_PROCESS_GROUP, Ctrl+Break then `taskkill /T /F`, the Win32 API and PowerShell
+Windows: CREATE_NEW_PROCESS_GROUP, `taskkill /T /F`, the Win32 API and PowerShell
 CIM queries, `netstat -ano`.
 """
 from __future__ import annotations
@@ -24,7 +24,7 @@ DETACHED: dict = ({"creationflags": subprocess.CREATE_NEW_PROCESS_GROUP | 0x0000
                   if WINDOWS else {"start_new_session": True})
 
 # Exit codes of a worker we stopped: killed by SIGTERM/SIGKILL (negative, or 128+n through a shell);
-# on Windows taskkill /F leaves 1 and Ctrl+Break 0xC000013A.
+# on Windows taskkill /F leaves 1.
 STOP_CODES = ((1, 0xC000013A, -1073741510) if WINDOWS
               else (-signal.SIGTERM, -signal.SIGKILL, 143, 137))
 
@@ -41,12 +41,9 @@ def stop(pid: int, force: bool = False) -> bool:
     if not isinstance(pid, int) or pid <= 1:
         return False
     if WINDOWS:
-        if not force:
-            try:
-                os.kill(pid, signal.CTRL_BREAK_EVENT)  # type: ignore[attr-defined]  # the group's Ctrl+C
-                return True
-            except OSError:
-                pass  # not a console group we started: fall through to taskkill
+        # No Ctrl+Break: for a pid that isn't a console group leader Windows sends it to every process
+        # on the console, this one included. taskkill /T walks the tree; without /F it asks windowed
+        # programs to close, so a console worker only stops with /F.
         try:
             r = subprocess.run(["taskkill", "/PID", str(pid), "/T", "/F"], capture_output=True, timeout=15)
         except (OSError, subprocess.SubprocessError):
