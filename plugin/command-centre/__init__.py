@@ -1531,6 +1531,10 @@ def register(ctx):
             reaped = updates.reap_orphans()
             if reaped:
                 log_decision(event="orphans_settled", requests=reaped)
+            _hmem()
+            from hmem import projects as hprojects
+            if hprojects.label_all_webui_workspaces():
+                log_decision(event="webui_workspaces_labelled")
         except Exception as exc:
             log_decision(event="services_check_failed", error=repr(exc)[:200])
     threading.Thread(target=_ensure_services, daemon=True, name="tabbie-ensure-services").start()

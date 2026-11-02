@@ -12,6 +12,7 @@ os.environ["HMEM_NO_LLM"] = "1"  # never a real `claude -p` call; tests stub the
 os.environ["TABBIE_LIMITS_GATE"] = "off"  # never a real usage-endpoint call (tests pass their own rows)
 os.environ["TABBIE_LINKED"] = ""  # no `claude auth` / `codex login` subprocess: nothing linked unless a test says so
 os.environ["TABBIE_NO_SERVICES"] = "1"  # never install or reload real LaunchAgents
+os.environ["HERMES_WEBUI_STATE_DIR"] = os.path.join(_TMP, "webui-state")  # never the real WebUI folder list
 
 
 @pytest.fixture(autouse=True)
@@ -19,6 +20,7 @@ def _isolated_memory(tmp_path, monkeypatch):
     monkeypatch.setenv("HMEM_ROOT", str(tmp_path / "memory"))
     monkeypatch.setenv("HMEM_WEBUI_SESSIONS", str(tmp_path / "webui" / "sessions"))
     monkeypatch.setenv("HMEM_NO_LLM", "1")
+    monkeypatch.setenv("HERMES_WEBUI_STATE_DIR", str(tmp_path / "webui-state"))
     import sys
     t = sys.modules.get("hmem.trace")
     if t is not None:

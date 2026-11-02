@@ -501,9 +501,53 @@ def workspace_path(pid: str) -> Path:
     return workspaces_dir() / pid
 
 
+def webui_workspaces_file() -> Path:
+    return Path(os.environ.get("HERMES_WEBUI_STATE_DIR") or Path.home() / ".hermes" / "webui") / "workspaces.json"
+
+
+def label_webui_workspace(p: dict) -> bool:
+    """The WebUI's folder picker lists this project's workspace under the project's name (not its id),
+    and drops it once the project is archived or deleted. Only renames/removes entries already there."""
+    f = webui_workspaces_file()
+    try:
+        ws = json.loads(f.read_text(encoding="utf-8"))
+    except (OSError, ValueError):
+        return False
+    if not isinstance(ws, list):
+        return False
+    path = str(workspaces_dir() / p["id"])
+    mine = [w for w in ws if isinstance(w, dict) and str(w.get("path", "")).rstrip("/") == path]
+    if not mine:
+        return False  # never adds entries: the WebUI registers a project's workspace when it's first used
+    if p.get("status") != "active":
+        out = [w for w in ws if w not in mine]
+    else:
+        out = [{**w, "name": p["name"]} if w in mine else w for w in ws]
+    if out == ws:
+        return False
+    tmp = f.with_suffix(f".{secrets.token_hex(4)}.tmp")
+    tmp.write_text(json.dumps(out, ensure_ascii=False, indent=2), encoding="utf-8")
+    os.replace(tmp, f)
+    return True
+
+
+def label_all_webui_workspaces() -> int:
+    n = 0
+    for p in all_projects(include_archived=True):
+        try:
+            n += label_webui_workspace(p)
+        except OSError:
+            pass
+    return n
+
+
 def sync_workspace(p: dict) -> None:
     """~/hermes/workspaces/<id>/<label> → each folder. Removed when the project is archived/deleted."""
     wdir = workspaces_dir() / p["id"]
+    try:
+        label_webui_workspace(p)
+    except OSError:
+        pass
     if p.get("status") != "active":
         if wdir.is_dir():
             for link in wdir.iterdir():
