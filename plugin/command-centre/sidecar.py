@@ -63,6 +63,7 @@ providers = importlib.import_module("cc_sidecar_pkg.providers")
 updates = importlib.import_module("cc_sidecar_pkg.updates")
 hub_setup = importlib.import_module("cc_sidecar_pkg.hub_setup")
 push = importlib.import_module("cc_sidecar_pkg.push")
+procutil = importlib.import_module("cc_sidecar_pkg.procutil").procutil
 _HERMES_HOME = str(PKG.parents[1])  # ~/hermes: hmem (memory + Projects) lives here
 if _HERMES_HOME not in sys.path:
     sys.path.insert(0, _HERMES_HOME)
@@ -87,15 +88,6 @@ def _token_ok(got: str | None) -> bool:
 
 
 WEBUI_PORT = int(os.environ.get("HERMES_WEBUI_PORT") or 8787)
-_LSOF = shutil.which("lsof") or "/usr/sbin/lsof"
-
-
-def _pids(*args: str) -> set[int]:
-    try:
-        out = subprocess.run([_LSOF, "-nP", *args], capture_output=True, text=True, timeout=5).stdout
-    except (OSError, subprocess.SubprocessError):
-        return set()
-    return {int(x) for x in re.findall(r"^p(\d+)$", out, re.M)}
 
 
 def _from_webui(peer_port: int) -> bool:
@@ -104,8 +96,8 @@ def _from_webui(peer_port: int) -> bool:
     other end of the connection can. TABBIE_SIDECAR_PEER_CHECK=off turns this off (tests)."""
     if os.environ.get("TABBIE_SIDECAR_PEER_CHECK") == "off":
         return True
-    webui = _pids(f"-iTCP:{WEBUI_PORT}", "-sTCP:LISTEN", "-Fp")
-    peer = _pids(f"-iTCP:{int(peer_port)}", "-sTCP:ESTABLISHED", "-Fp") - {os.getpid()}
+    webui = procutil.tcp_pids(WEBUI_PORT, listening=True)
+    peer = procutil.tcp_pids(int(peer_port), listening=False) - {os.getpid()}
     return bool(webui) and bool(peer) and peer <= webui
 
 
@@ -264,13 +256,8 @@ def shot_bytes(rid: str, img: str, size: str) -> tuple[bytes, str] | None:
 def _is_worker(pid: int) -> bool:
     """The pid is still a Claude Code / Codex worker. After a crash a stale pid file can name a pid macOS
     has since reused for something else: never signal (or report as live) an unrelated process."""
-    try:
-        os.kill(pid, 0)
-        cmd = subprocess.run(["ps", "-o", "command=", "-p", str(pid)], capture_output=True, text=True,
-                             timeout=5).stdout
-    except (OSError, subprocess.SubprocessError):
-        return False
-    return bool(re.search(r"(^|[/\s])(claude|codex)(\.js)?(\s|$)", cmd.strip().split("\n")[0]))
+    cmd = procutil.cmdline(pid)
+    return bool(re.search(r"(^|[/\\\s\"])(claude|codex)(\.js|\.exe|\.cmd)?(\"|\s|$)", cmd, re.I))
 
 
 # Chat -> running Claude Code worker (providers.LiveInput reads the request folder's inbox.jsonl).
@@ -326,19 +313,14 @@ STOP_MARKER = "stopped_by_user"  # providers.py reports "stopped by you" when th
 
 def _signal_group(pid: int) -> None:
     """SIGTERM the worker's process group (it runs in its own session), SIGKILL after 5 s if still there."""
-    import signal
     import time as _time
-    try:
-        os.killpg(pid, signal.SIGTERM)
-    except (ProcessLookupError, PermissionError):
+    if not procutil.stop(pid):
         return
 
     def later():
         _time.sleep(5)
-        try:
-            os.killpg(pid, signal.SIGKILL)
-        except (ProcessLookupError, PermissionError):
-            pass
+        if procutil.alive(pid):
+            procutil.stop(pid, force=True)
     threading.Thread(target=later, daemon=True).start()
 
 

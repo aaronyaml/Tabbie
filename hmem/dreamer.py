@@ -1222,6 +1222,8 @@ def maybe_trigger(kind: str, project: str | None = None) -> bool:
 
 def spawn(trigger: str, project: str | None = None) -> None:
     """Run a cycle in a detached low-priority process (never inside the request that triggered it)."""
-    subprocess.Popen(["nice", "-n", "15", sys.executable, "-m", "hmem.cli", "dream", "--trigger", trigger, "--quiet",
-                      *(["--project", project] if project else [])],
-                     cwd=str(HERMES), stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, start_new_session=True)
+    from . import procutil
+    low = {"creationflags": procutil.DETACHED["creationflags"] | 0x00004000} if procutil.WINDOWS else procutil.DETACHED
+    subprocess.Popen([*([] if procutil.WINDOWS else ["nice", "-n", "15"]), sys.executable, "-m", "hmem.cli", "dream",
+                      "--trigger", trigger, "--quiet", *(["--project", project] if project else [])],
+                     cwd=str(HERMES), stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, **low)  # 0x4000: below normal

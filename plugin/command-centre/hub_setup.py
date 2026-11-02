@@ -13,6 +13,7 @@ import subprocess
 import time
 from pathlib import Path
 
+from .procutil import procutil
 from .common import ROOT
 
 MODELS = {"openai-codex": "gpt-6.1-sol", "anthropic": "claude-sonnet-5-5"}
@@ -45,8 +46,8 @@ def use(provider: str) -> dict:
 def claude_login() -> dict:
     """Start Claude Code's own sign-in on this Mac (opens claude.ai in the Mac's browser)."""
     exe = shutil.which("claude") or str(Path.home() / ".local" / "bin" / "claude")
-    if not os.access(exe, os.X_OK):
+    if not shutil.which(exe) and not os.access(exe, os.X_OK):
         return {"ok": False, "error": "Claude Code isn't installed on this Mac. Run bin/setup there."}
     subprocess.Popen([exe, "auth", "login", "--claudeai"], stdin=subprocess.DEVNULL, stdout=subprocess.DEVNULL,
-                     stderr=subprocess.DEVNULL, start_new_session=True)
+                     stderr=subprocess.DEVNULL, **procutil.DETACHED)
     return {"ok": True}

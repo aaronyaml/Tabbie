@@ -269,8 +269,8 @@ def _reinstall_changed(labels: list[str]) -> list[str]:
 
 
 def _workers_alive() -> bool:
-    out = subprocess.run(["pgrep", "-f", r"claude -p|codex exec|remotion render"], capture_output=True, text=True)
-    return bool(out.stdout.strip())
+    from .procutil import procutil
+    return bool(procutil.find(r"claude(\.exe|\.cmd|\.js)?\"? -p|codex(\.exe|\.cmd|\.js)?\"? exec|remotion render"))
 
 
 INTERRUPTED = "Interrupted: Tabbie restarted while this was running. Send it again to retry."

@@ -17,6 +17,7 @@ from dataclasses import dataclass
 from pathlib import Path
 
 from .flockcompat import fcntl
+from .procutil import procutil
 from .common import LOCKS_DIR, read_json
 from .questions import QUESTION_ITEM_SCHEMA, QUESTION_RULES
 
@@ -122,16 +123,16 @@ def _clean_env(drop: tuple[str, ...]) -> dict:
 
 
 def _run(cmd: list[str], *, cwd: str, env: dict, timeout: int, stdin: str | None = None) -> tuple[int, str, str]:
-    proc = subprocess.Popen(cmd, cwd=cwd, env=env, stdin=subprocess.PIPE if stdin is not None else subprocess.DEVNULL,
-                            stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True, start_new_session=True)
+    proc = subprocess.Popen(procutil.argv(cmd), cwd=cwd, env=env, stdin=subprocess.PIPE if stdin is not None else subprocess.DEVNULL,
+                            stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True, **procutil.GROUP)
     try:
         out, err = proc.communicate(stdin, timeout=timeout)
     except subprocess.TimeoutExpired:
-        os.killpg(proc.pid, signal.SIGTERM)  # whole tree: no orphaned workers or dev servers
+        procutil.stop(proc.pid)  # whole tree: no orphaned workers or dev servers
         try:
             out, err = proc.communicate(timeout=10)
         except subprocess.TimeoutExpired:
-            os.killpg(proc.pid, signal.SIGKILL)
+            procutil.stop(proc.pid, force=True)
             out, err = proc.communicate()
         return 124, out or "", (err or "") + f"\nTIMEOUT after {timeout}s"
     return proc.returncode, out or "", err or ""
@@ -142,8 +143,8 @@ def _run_stream(cmd: list[str], *, cwd: str, env: dict, timeout: int, stdin: str
     """Like _run, but hands each stdout line to on_line as it arrives (stream-json workers).
     With live (a LiveInput), stdin stays open so the user's messages reach the worker mid-run."""
     import threading
-    proc = subprocess.Popen(cmd, cwd=cwd, env=env, stdin=subprocess.PIPE, stdout=subprocess.PIPE,
-                            stderr=subprocess.PIPE, text=True, bufsize=1, start_new_session=True)
+    proc = subprocess.Popen(procutil.argv(cmd), cwd=cwd, env=env, stdin=subprocess.PIPE, stdout=subprocess.PIPE,
+                            stderr=subprocess.PIPE, text=True, bufsize=1, **procutil.GROUP)
     if on_start:
         on_start(proc)
     err_buf: list[str] = []
@@ -152,10 +153,8 @@ def _run_stream(cmd: list[str], *, cwd: str, env: dict, timeout: int, stdin: str
 
     def _kill():
         timed_out.set()
-        for sig in (signal.SIGTERM, signal.SIGKILL):
-            try:
-                os.killpg(proc.pid, sig)  # whole tree: no orphaned workers or dev servers
-            except ProcessLookupError:
+        for force in (False, True):
+            if not procutil.stop(proc.pid, force=force):  # whole tree: no orphaned workers or dev servers
                 return
             time.sleep(10)
     timer = threading.Timer(timeout, _kill)
@@ -778,7 +777,7 @@ def build_claude_cmd(ecfg: dict, *, add_dirs: list[str], resume_session: str | N
 
 
 STOP_MARKER = "stopped_by_user"  # written by the sidecar's POST /worker/stop (Agents block Stop button)
-_STOP_CODES = (-signal.SIGTERM, -signal.SIGKILL, 143, 137)
+_STOP_CODES = procutil.STOP_CODES
 
 
 def _user_stopped(folder: Path | None, code: int) -> bool:

@@ -49,6 +49,7 @@ if "cc_delegate_pkg" not in sys.modules:
     _pkg.__path__ = [str(PKG)]  # submodules without running the plugin's __init__ (Hermes-only)
     sys.modules["cc_delegate_pkg"] = _pkg
 providers = importlib.import_module("cc_delegate_pkg.providers")
+procutil = importlib.import_module("cc_delegate_pkg.procutil").procutil
 agents_mod = importlib.import_module("cc_delegate_pkg.agents")
 common = importlib.import_module("cc_delegate_pkg.common")
 limits_gate = importlib.import_module("cc_delegate_pkg.limits_gate")
@@ -165,10 +166,7 @@ class Delegator:
 
     def kill_all(self) -> None:
         for p in list(self.procs):
-            try:
-                os.killpg(p.pid, signal.SIGTERM)
-            except (ProcessLookupError, PermissionError, OSError):
-                pass
+            procutil.stop(p.pid)
 
     # -- the tool ------------------------------------------------------------------------------
     def call(self, args: dict) -> tuple[bool, str]:

@@ -26,6 +26,7 @@ from .common import REQUESTS_DIR, STATE_DIR, load_config, log_decision, read_jso
 from .providers import (WORKER_RULES, claude_transcript_tail, codex_models, git_state, run_astra_executor, run_claude,
                         run_planner, usage_limit_info, worker_rules)
 from .common import LOCKS_DIR, agents
+from .procutil import procutil
 from .router import ASTRA, CLAUDE, classify, hub_tool_request, interpret_reply, looks_like_chat
 from .state import Request, active_planning_request, session_state, save_session_state, set_active
 
@@ -314,11 +315,7 @@ def _on_agent_loop_stopped(session_key: str = "", **kwargs):
                 pass
             pid = (read_json(d / "live.json", {}) or {}).get("pid")
             if isinstance(pid, int) and pid > 1:
-                import signal as _signal
-                try:
-                    os.killpg(pid, _signal.SIGTERM)
-                except (ProcessLookupError, PermissionError, OSError):
-                    pass
+                procutil.stop(pid)
             log_decision(event="early_start_cancelled", request=rid)
     except Exception:
         pass
@@ -1528,9 +1525,8 @@ def _cmd_takeover(raw_args: str = "", session_id: str = "", session_key: str = "
         stopped = ""
         if pid_file.exists():
             try:
-                import signal as _signal
-                os.killpg(int(pid_file.read_text()), _signal.SIGTERM)
-                stopped = " Stopped the running Codex job."
+                if procutil.stop(int(pid_file.read_text())):
+                    stopped = " Stopped the running Codex job."
             except Exception:
                 pass
         log_decision(event="takeover_disabled", session=sid)
