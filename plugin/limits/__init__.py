@@ -141,14 +141,17 @@ def parse_claude_usage(data: dict, label: str = "Claude Max") -> list[dict]:
 
 
 def _claude_credentials() -> dict:
-    out = subprocess.run(["security", "find-generic-password", "-s", "Claude Code-credentials", "-w"],
-                         capture_output=True, text=True, timeout=5)
-    if out.returncode != 0:
-        f = HOME / ".claude" / ".credentials.json"
-        if not f.exists():
-            raise RuntimeError("no Claude Code login in Keychain")
-        return json.loads(f.read_text()).get("claudeAiOauth") or {}
-    return json.loads(out.stdout).get("claudeAiOauth") or {}
+    """Claude Code's login: the macOS Keychain, else ~/.claude/.credentials.json (Windows, Linux)."""
+    import sys
+    if sys.platform == "darwin":
+        out = subprocess.run(["security", "find-generic-password", "-s", "Claude Code-credentials", "-w"],
+                             capture_output=True, text=True, timeout=5)
+        if out.returncode == 0:
+            return json.loads(out.stdout).get("claudeAiOauth") or {}
+    f = HOME / ".claude" / ".credentials.json"
+    if not f.exists():
+        raise RuntimeError("no Claude Code login found")
+    return json.loads(f.read_text()).get("claudeAiOauth") or {}
 
 
 def claude_rows() -> list[dict]:
