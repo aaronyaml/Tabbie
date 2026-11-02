@@ -38,7 +38,7 @@ On top of that:
 - **Live agent cards** show what every worker and subagent is doing.
 - **Attachments** are passed byte-exact.
 - **Usage limits** are shown for every subscription.
-- **Takeover**: when Claude hits its limit, the planner can continue the job.
+- **Takeover**: when Claude or Codex hits its limit mid-task, the other one carries on with the same task.
 - **Hand-offs**: with both agents linked, Claude can pass a task to Codex (or Codex to Claude), or
   to its own subagents, when it judges that's better. On by default.
 - **Fast and lean**: workers start with a slim profile and the reply is relayed verbatim, so a small
@@ -133,7 +133,11 @@ Before any worker, planner or hand-off starts, Tabbie checks the subscription's 
 60 s). At 95% or more the request runs on the other agent's equivalent model instead, and the reply's
 route line says so (Opus 5.5 ↔ GPT-6.1 Sol, Fable 5.1 ↔ GPT-6-Astra, Sonnet 5.5 ↔ GPT-6.1 Terra,
 Haiku 5.5 ↔ GPT-6 Luna; the same pairs are used for hand-offs and when an agent is switched off). If the
-other agent is also at its limit or not signed in, nothing starts and Tabbie says when the limit resets.
+other agent is also at its limit or not signed in, nothing starts and Tabbie says when each limit resets.
+
+The same happens mid-task, with no question asked: if Claude hits its limit while working, Codex carries
+on from where it stopped; if a Codex job hits its limit, its Claude equivalent picks up the same task (the
+work already done stays in the folder). If both are out, the reply says so with both reset times.
 If Claude can't sign in (logged out, expired token), or every Claude slot is busy with other chats
 (`busy_fallback`), the job also goes to its GPT equivalent instead of failing or queueing.
 A planner at its limit falls back to the other planner. Hand-offs to Codex stop at 90%, so they
@@ -654,8 +658,8 @@ Design notes: `docs/memory/ARCHITECTURE.md`, `docs/projects/ARCHITECTURE.md`.
 - **Plans**: a plan card has **Approve**, **Change** and **Cancel** buttons (typing `yes` still works).
 - **Questions**: when a worker needs a decision it asks a structured question card (number keys pick
   an option; a half-typed answer is kept), and your reply resumes the same session.
-- **Takeover**: if Claude hits its usage limit, Tabbie offers to let the planner continue from where
-  it stopped. `/takeover` toggles it.
+- **Takeover**: if Claude hits its usage limit mid-task, Codex continues from where it stopped (and a
+  Codex job at its limit moves to Claude). `/takeover` keeps a chat on Codex until you toggle it off.
 - **Limits**: `/limit` or `bin/hub limits` shows % used and reset times for each signed-in subscription.
 - **Messages while it works**: anything you send while Claude Code is working is queued and handed
   straight to Claude, which reads it at its next step (like typing ahead in Claude Code). **Send now**
@@ -670,7 +674,7 @@ Design notes: `docs/memory/ARCHITECTURE.md`, `docs/projects/ARCHITECTURE.md`.
 
 | Setup | Who executes | Who plans big jobs | Usage limit hit |
 |---|---|---|---|
-| **Both** (default) | Claude Code, or Codex if you pick an OpenAI model for the chat | Codex ("Astra") | Codex can take over (`/takeover`) |
+| **Both** (default) | Claude Code, or Codex if you pick an OpenAI model for the chat | Codex ("Astra") | the other one carries on automatically; both out: reset times |
 | **Claude Code only** | Claude Code | Claude Code (`claude-cli` planner) | Tabbie tells you; no takeover |
 | **Codex only** | Codex | Codex | no fallback agent |
 

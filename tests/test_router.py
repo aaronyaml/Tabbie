@@ -143,15 +143,25 @@ def test_takeover_flow(monkeypatch=None):
     proj = d / "proj"; proj.mkdir()
     r = st.Request.create(session_id="s1", route="claude", reason="x", forced=False, prompt="fix it",
                           raw_message="fix it", project=str(proj), project_source="t")
-    out = cc._execute(r)
-    assert out["claude_usage_limit"] and "clarify" in out["action"]
-    assert st.session_state("s1")["takeover_offer"] == r.id
-    # decline -> no offer next time
-    _j.loads(cc._tool_takeover({"request_id": r.id, "accept": False}))
-    r2 = st.Request.create(session_id="s1", route="claude", reason="x", forced=False, prompt="again",
-                           raw_message="again", project=str(proj), project_source="t")
-    out2 = cc._execute(r2)
-    assert "action" not in out2 and "/takeover" in out2["note"]
+    cc.agents = lambda: type("A", (), {"has": staticmethod(lambda a: True)})()
+    linked = prov.linked
+    cc.providers.linked = lambda a: True
+    cc._codex_models_safe = lambda: []
+    try:
+        # Claude hits its limit mid-task: Codex carries on with the same task, no question asked
+        out = cc._execute(r)
+        assert out["ok"] and "took over" in out["route"] and calls and "fix it" in calls[-1]
+        assert not st.session_state("s1").get("takeover_offer")
+        # both out: one line naming both limits, nothing hands over
+        cc.run_astra_executor = lambda prompt, **k: {"ok": False, "error": "You've hit your usage limit. Try again at 6pm.", "model": "gpt-6-astra"}
+        r2 = st.Request.create(session_id="s1", route="claude", reason="x", forced=False, prompt="again",
+                               raw_message="again", project=str(proj), project_source="t")
+        out2 = cc._execute(r2)
+        assert not out2["ok"] and "Claude hit its usage limit (resets 3pm)" in out2["usage_limit"]
+        assert "Codex hit its usage limit (resets 6pm)" in out2["usage_limit"] and "Both are at their limits" in out2["usage_limit"]
+        cc.run_astra_executor = lambda prompt, **k: calls.append(prompt) or {"ok": True, "result": "Done.", "model": "gpt-6-astra", "billing": "chatgpt"}
+    finally:
+        cc.providers.linked = linked
     # /takeover enables and later disables
     assert "Takeover on" in cc._cmd_takeover("", session_id="s1")
     r3 = st.Request.create(session_id="s1", route="claude", reason="x", forced=False, prompt="third",
@@ -189,3 +199,31 @@ def test_hub_tool_requests():
         assert router.hub_tool_request(t) == "schedule", t
     for t in work:
         assert router.hub_tool_request(t) is None, t
+
+
+def test_codex_limit_mid_task_hands_the_same_task_to_claude():
+    import tempfile
+    st = import_module("command_centre.state")
+    prov = import_module("command_centre.providers")
+    ag = import_module("command_centre.agents")
+    d = Path(tempfile.mkdtemp())
+    st.REQUESTS_DIR, st.SESSIONS_DIR = d / "req", d / "ses"
+    cc.REQUESTS_DIR, cc.LOCKS_DIR = d / "req", d / "locks"
+    ag.REQUESTS_DIR, ag.AGENTS_INDEX_DIR = d / "req", d / "agents"
+    cc.log_decision = lambda **k: None
+    cc.load_config = lambda: {"executor": {}}
+    cc._CLAUDE_SESSIONS = d / "cs.json"
+    cc.agents = lambda: type("A", (), {"has": staticmethod(lambda a: True)})()
+    cc._codex_models_safe = lambda: []
+    linked, prov.linked = prov.linked, (lambda a: True)
+    cc.run_astra_executor = lambda prompt, **k: {"ok": False, "error": "You've hit your usage limit. Try again at 6pm.", "model": "gpt-6-astra"}
+    got = []
+    cc.run_claude = lambda prompt, **k: got.append((prompt, k.get("model"))) or {"ok": True, "result": "Done.", "billing": "sub"}
+    proj = d / "proj"; proj.mkdir()
+    r = st.Request.create(session_id="s9", route="claude", reason="x", forced=False, prompt="build the page",
+                          raw_message="build the page", project=str(proj), project_source="t")
+    try:
+        out = cc._astra_takeover(r, reason="picked", choice={"provider": "openai", "model": "gpt-6-astra", "name": "GPT-6 Astra", "effort": "medium"})
+    finally:
+        prov.linked = linked
+    assert out["ok"] and got and "build the page" in got[0][0] and str(got[0][1]).startswith("claude-")

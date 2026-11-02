@@ -384,20 +384,42 @@ def _limit_block(r: Request, agent: str, model: str | None, *, offer: bool = Tru
         return None
     other = limits_gate.other(agent)
     log_decision(event="limit_blocked", request=r.id, agent=agent, model=model, pct=g.pct, window=g.window)
-    if offer and agents().has(other) and providers.linked(other):
+    og = None
+    if agents().has(other) and providers.linked(other):
         prov = "anthropic" if agent == "claude" else "openai"
         peer = executor_choice.peer_model(prov, model or (executor_choice.DEFAULT["model"] if agent == "claude"
                                                            else "gpt-6-astra"),
                                           (load_config().get("dynamic_agents") or {}).get("models") or {},
                                           _codex_models_safe())
-        if not limits_gate.check(other, peer["model"], purpose="work").blocked:
+        og = limits_gate.check(other, peer["model"], purpose="work")
+        if offer and not og.blocked:
             log_decision(event="limit_switch_auto", request=r.id, to=other, model=peer["model"])
             return {"switch": peer}
     r["status"] = "limit_blocked"
     r.save()
-    return {"request_id": r.id, "ok": False, "usage_limit": g.message,
-            "note": f"Nothing was started. Tell the user in one line: {g.message}."
-                    + ("" if agents().has(other) else "")}
+    msg = _out_of_limits(g.message, og.message if og is not None and og.blocked else None)
+    return {"request_id": r.id, "ok": False, "usage_limit": msg,
+            "note": f"Nothing was started. Tell the user in one line: {msg}."}
+
+
+def _out_of_limits(first: str, second: str | None) -> str:
+    """One line for the user when work can't run: the limit(s) hit and when each resets."""
+    if not second:
+        return first
+    return f"{first}, and {second}. Both are at their limits, so nothing can take over until one resets"
+
+
+def _limit_text(agent: str, text: str, model: str | None = None) -> str:
+    """A mid-run limit hit, worded with the gate's reset time when the usage data has it."""
+    try:
+        g = limits_gate.check(agent, model, purpose="work", refresh=True)
+    except Exception:
+        g = None
+    if g is not None and g.blocked:
+        return g.message
+    who = _WHO.get(agent, agent.title())
+    when = re.search(r"(?i)(?:resets?|try again)\s+(?:at\s+|in\s+)?([^.;|\n]{1,40})", text or "")
+    return f"{who} hit its usage limit" + (f" (resets {when.group(1).strip()})" if when else "")
 
 
 def _codex_models_safe() -> list[str]:
@@ -1175,21 +1197,26 @@ def _run_request(r: Request, feed=None, force: dict | None = None) -> dict:
         r["status"] = "claude_limited"
         r.save()
         log_decision(event="claude_limit", request=r.id, detail=limit)
+        mine = _limit_text("claude", limit, claude_model)
+        theirs = None
+        if not force and agents().has("codex") and providers.linked("codex"):
+            # the same task carries on in Codex from where Claude stopped (takeover prompt), no question asked
+            peer = executor_choice.peer_model("anthropic", claude_model or ecfg.get("model") or executor_choice.DEFAULT["model"],
+                                              (cfg.get("dynamic_agents") or {}).get("models") or {}, _codex_models_safe())
+            cg = limits_gate.check("codex", peer["model"], purpose="work", refresh=True)
+            if not cg.blocked:
+                log_decision(event="claude_limit_takeover", request=r.id, to=peer["model"])
+                (feed or (lambda _t: None))("Claude hit its usage limit, so Codex is taking over from where it stopped…")
+                r = Request(r.id); r["status"] = "executing"; r["claude_limit"] = mine; r.save()
+                return _astra_takeover(r, reason=f"{mine}, so Codex took over from where it stopped", feed=feed, offer=False)
+            theirs = cg.message
+        elif force:  # Claude was already standing in for Codex at its limit
+            theirs = _limit_text("codex", "")
+        msg = _out_of_limits(mine, theirs)
         if not agents().has("codex"):
-            return {"request_id": r.id, "ok": False, "claude_usage_limit": limit,
-                    "note": "Claude is at its usage limit and Codex isn't enabled on this Mac (Settings → Agents), "
-                            "so nothing can take over. Say when the limit resets, in one line."}
-        if st.get("takeover_declined"):
-            return {"request_id": r.id, "ok": False, "claude_usage_limit": limit,
-                    "note": "Claude is at its usage limit. Takeover was declined for this limit; the user can "
-                            "type /takeover to let Codex continue. Say this in one line."}
-        st["takeover_offer"] = r.id
-        save_session_state(r["session_id"], st)
-        return {"request_id": r.id, "ok": False, "claude_usage_limit": limit,
-                "action": ("Use the clarify tool with ONE question: 'Claude hit its usage limit (" + limit[:120]
-                           + "). Let Codex take over this session from where Claude stopped?' with choices "
-                           "['Yes, Codex takes over', 'No']. Then call cc_takeover(request_id=\"" + r.id
-                           + "\", accept=<true if Yes>). If clarify is unavailable, ask the same as plain text.")}
+            msg += ". Codex isn't enabled on this Mac (Settings → Agents), so nothing could take over"
+        return {"request_id": r.id, "ok": False, "claude_usage_limit": limit, "usage_limit": msg,
+                "note": f"Tell the user in one line: {msg}. What Claude finished before the limit is kept."}
     if (not res.get("ok") and not res.get("stopped_by_user") and not force and not answer
             and _CLAUDE_AUTH_RX.search(str(res.get("error") or "")) and agents().has("codex")):
         # Claude's sign-in is broken (logged out, expired token): the GPT equivalent does this one
@@ -1333,6 +1360,27 @@ def _astra_takeover(r: Request, reason: str, choice: dict | None = None, feed=No
         run.finish_main(bool(res.get("ok")), step=None if res.get("ok") else res.get("error"),
                         stopped=bool(res.get("stopped_by_user")))
         run.save(force=True)
+    limit = providers.usage_limit_info(res) if not res.get("stopped_by_user") else None
+    if limit:
+        log_decision(event="codex_limit", request=r.id, detail=limit[:200])
+        mine = _limit_text("codex", limit, res.get("model") or model)
+        theirs = None
+        if choice and agents().has("claude") and providers.linked("claude"):
+            peer = executor_choice.peer_model("openai", res.get("model") or model,
+                                              (cfg.get("dynamic_agents") or {}).get("models") or {}, _codex_models_safe())
+            cg = limits_gate.check("claude", peer["model"], purpose="work", refresh=True)
+            if not cg.blocked:
+                log_decision(event="codex_limit_switch", request=r.id, to=peer["model"])
+                (feed or (lambda _t: None))("Codex hit its usage limit, so Claude is carrying on with the task…")
+                r = Request(r.id); r["status"] = "executing"; r["pending_answer"] = None; r.save()
+                return _execute(r, force={"provider": "anthropic", "model": peer["model"], "effort": effort}, feed=feed)
+            theirs = cg.message
+        elif not choice:  # Codex was standing in for Claude, which is out too
+            theirs = r.data.get("claude_limit") or _limit_text("claude", "")
+        msg = _out_of_limits(mine, theirs)
+        r["status"] = "limit_blocked"; r.save()
+        return {"request_id": r.id, "ok": False, "usage_limit": msg,
+                "note": f"Tell the user in one line: {msg}. What was finished before the limit is kept."}
     log_decision(event="codex_executed" if choice else "takeover_executed", request=r.id, ok=res.get("ok"),
                  model=res.get("model"), reason=reason, dynamic=bool(delegate))
     _learn(r)
