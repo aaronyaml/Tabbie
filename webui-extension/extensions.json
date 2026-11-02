@@ -100,7 +100,7 @@
       "id": "workboard",
       "name": "Workboard embeds",
       "scripts": [
-        "workboard.js?v=5"
+        "workboard.js?v=6"
       ],
       "stylesheets": [
         "workboard.css?v=5"
@@ -301,7 +301,7 @@
       "id": "hub-signin",
       "name": "Hub sign-in card",
       "scripts": [
-        "hub-signin.js?v=1"
+        "hub-signin.js?v=2"
       ],
       "stylesheets": [
         "hub-signin.css?v=1"

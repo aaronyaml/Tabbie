@@ -68,6 +68,7 @@
     if (f.status === 'success') return finish(f.provider);
     if (f.status && f.status !== 'pending') return fail(f.error || `Sign-in ${f.status}.`, f.provider);
     if (f.provider === 'openai-codex' && f.user_code) {
+      if (!/^https:\/\//i.test(String(f.verification_uri || ''))) return fail('Sign-in returned an unexpected link.', f.provider);
       paint(`<h2 id="hxHsTitle">Sign in with ChatGPT</h2>
         <ol class="hx-hs-steps"><li>Open <a href="${esc(f.verification_uri)}" target="_blank" rel="noopener noreferrer">${esc(f.verification_uri.replace(/^https?:\/\//, ''))}</a> (on this device or any other)</li>
         <li>Sign in to ChatGPT and enter this code:</li></ol>

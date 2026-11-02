@@ -439,19 +439,34 @@
 
   // ── polling ──────────────────────────────────────────────────────────────
   const busy = { kanban: false, todo: false };
+  let quiet = 0;  // polls in a row with nothing new: the next one waits longer (up to 8x)
   async function refresh(kind, force) {
-    if (busy[kind]) return;
+    if (busy[kind]) return false;
     busy[kind] = true;
-    try { if (await loadBoard(kind, force)) repaintAll(); else document.querySelectorAll(`.hx-wb[data-kind="${kind}"]`).forEach(paint); }
+    let changed = false;
+    try { changed = !!(await loadBoard(kind, force)); if (changed) repaintAll(); else document.querySelectorAll(`.hx-wb[data-kind="${kind}"]`).forEach(paint); }
     catch (_) { /* offline / logged out: keep last state */ }
     finally { busy[kind] = false; }
     if (kind === 'todo') syncTodoPanel();
+    return changed;
   }
-  setInterval(() => {
-    if (document.visibilityState !== 'visible') return;
-    if (document.querySelector('.hx-wb[data-kind="kanban"]') || (E && !E.hidden && cur && cur.kind === 'kanban')) refresh('kanban');
-    refresh('todo');
-  }, POLL_MS);
+  let timer = 0;
+  function schedule() {
+    clearTimeout(timer);
+    timer = setTimeout(tick, POLL_MS * Math.min(2 ** quiet, 8));
+  }
+  async function tick() {
+    if (document.visibilityState === 'visible') {
+      const jobs = [refresh('todo')];
+      if (document.querySelector('.hx-wb[data-kind="kanban"]') || (E && !E.hidden && cur && cur.kind === 'kanban')) jobs.push(refresh('kanban'));
+      quiet = (await Promise.all(jobs)).some(Boolean) ? 0 : quiet + 1;
+    }
+    schedule();
+  }
+  const wake = () => { if (quiet) { quiet = 0; schedule(); } };
+  document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'visible') { quiet = 0; tick(); } });
+  document.addEventListener('pointerdown', wake, true);
+  schedule();
 
   // ── events ───────────────────────────────────────────────────────────────
   document.addEventListener('click', (e) => {
