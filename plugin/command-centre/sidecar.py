@@ -11,7 +11,10 @@ GET /request?id=<request id>        -> one request's agents + question rounds
 GET /plan?id=<request id>           -> the planner's final brief for that request (chat Plan chip)
 GET /worker?session=, POST /worker/message {session, text, mode}, GET /worker/ack?request=&id=
                                      -> chat messages to the running Claude Code worker (queue / Send now)
+POST /worker/stop {session}          -> stop this chat's running worker (Agents block Stop; "stopped by you")
+GET /request/files?id=<request id>   -> files the finished worker edited (paths only) + Claude resume command
 GET /executor?id=<webui session id> -> the conversation's executor choice + the picker catalog
+GET /executor (no id)               -> what a new chat will run (the default) + the catalog (new-chat home)
 POST /executor {id, provider, model, effort} -> set it (composer model picker)
 GET /agents, POST /agents {enabled}  -> which coding agents this install uses (Claude Code, Codex, both)
 GET /update[?force=1], POST /update, POST /update/restart -> Tabbie updates from GitHub (asked first;
@@ -21,6 +24,7 @@ GET|POST /projects/*, GET /fs/*      -> Projects UI (hmem/api.py): registry, mem
 GET /motion/status, POST /motion/ensure -> the Motion studio folder (created from the template when missing,
                                        npm install in the background) and whether ElevenLabs / Higgsfield are
                                        linked (booleans + how-to hints only; hmem/motion.py)
+GET /motion/films                    -> the films in <studio>/studio from their project.json (Motion panel home)
 POST /motion/install                 -> install what Motion is missing (Node.js, studio, packages) in the
                                        background; progress in /motion/status "install"
 """
@@ -110,8 +114,10 @@ def question_rounds(req: dict) -> list[dict]:
 def _request_row(rid: str) -> dict:
     req = common.read_json(common.REQUESTS_DIR / rid / "request.json", {}) or {}
     data = common.read_json(common.REQUESTS_DIR / rid / "agents.json", {}) or {}
-    ags = agents.supersede_waiting(data.get("agents", []))
+    ags = agents.merged_agents(rid, common.REQUESTS_DIR)
     summary = dict(data.get("summary") or {})
+    if summary and any(a.get("kind") in ("delegate", "background") or a.get("status") == "stopped" for a in ags):
+        summary = agents.merged_summary(ags, summary)
     if summary:
         summary["waiting"] = any(a.get("status") == "waiting" for a in ags)
     return {"id": rid, "status": req.get("status"), "route": req.get("route"), "created": req.get("created"),
@@ -172,6 +178,108 @@ def worker_ack(rid: str, mid: str) -> dict:
     return {"delivered": any(f'"id": "{mid}"' in ln for ln in lines)}
 
 
+STOP_MARKER = "stopped_by_user"  # providers.py reports "stopped by you" when the request folder has it
+
+
+def _signal_group(pid: int) -> None:
+    """SIGTERM the worker's process group (it runs in its own session), SIGKILL after 5 s if still there."""
+    import signal
+    import time as _time
+    try:
+        os.killpg(pid, signal.SIGTERM)
+    except (ProcessLookupError, PermissionError):
+        return
+
+    def later():
+        _time.sleep(5)
+        try:
+            os.killpg(pid, signal.SIGKILL)
+        except (ProcessLookupError, PermissionError):
+            pass
+    threading.Thread(target=later, daemon=True).start()
+
+
+def _codex_running(sid: str):
+    """The session's running Codex executor: (request id, folder, pid) from its takeover pid file."""
+    pid_file = common.LOCKS_DIR / f"takeover-{sid[:60]}.pid"
+    try:
+        pid = int(pid_file.read_text().strip())
+        os.kill(pid, 0)
+    except (OSError, ValueError):
+        return None, None, None
+    for row in reversed(agents.session_view(sid)["requests"]):
+        d = common.REQUESTS_DIR / row["id"]
+        req = common.read_json(d / "request.json", {}) or {}
+        if req.get("session_id") == sid and req.get("status") == "executing":
+            return row["id"], d, pid
+    return None, None, None
+
+
+def worker_stop(body: dict) -> tuple[int, dict]:
+    """Stop this chat's running worker (the live Agents block's Stop). Only the session's own live
+    request: the pid comes from its live.json (Claude) or its takeover pid file (Codex), never the body."""
+    sid = str(body.get("session") or "")
+    if not _SID.match(sid):
+        return 400, {"error": "bad session id"}
+    rid, d = _live_request(sid)
+    pid = None
+    if rid:
+        pid = (common.read_json(d / "live.json", {}) or {}).get("pid")
+    else:
+        rid, d, pid = _codex_running(sid)
+    if not rid or not isinstance(pid, int) or pid <= 1:
+        return 200, {"ok": False, "reason": "nothing running"}
+    try:
+        (d / STOP_MARKER).write_text(json.dumps({"at": __import__("time").time()}))
+    except OSError:
+        pass
+    _signal_group(pid)
+    return 200, {"ok": True, "request_id": rid}
+
+
+_files_cache: dict[str, tuple] = {}
+
+
+def request_files(rid: str) -> dict:
+    """Files a finished request's worker edited (paths only, never contents) + how to resume it in a
+    terminal (Claude Code). Read from the Claude transcript for that request's time window."""
+    from hmem import trace as hm_trace
+    d = common.REQUESTS_DIR / rid
+    req = common.read_json(d / "request.json", {}) or {}
+    ex = req.get("executor") or {}
+    cwd = req.get("project") or str((d / "work").resolve())
+    out = {"id": rid, "cwd": cwd, "files": [], "total": 0, "resume": None, "resume_cmd": None,
+           "provider": ex.get("provider")}
+    if req.get("status") in ("executing", "planning", None):
+        return {**out, "running": True}
+    sess = str(ex.get("session_id") or "")
+    if not str(ex.get("provider") or "").startswith("claude") or not re.match(r"^[0-9A-Za-z-]{8,80}$", sess):
+        return out
+    out["resume"] = sess
+    out["resume_cmd"] = f"cd {__import__('shlex').quote(cwd)} && claude --resume {sess}"
+    tp = hm_trace.transcript_path(cwd, sess)
+    try:
+        mtime = tp.stat().st_mtime
+    except OSError:
+        return out
+    hit = _files_cache.get(rid)
+    if hit and hit[0] == mtime:
+        files = hit[1]
+    else:
+        ag = (common.read_json(d / "agents.json", {}) or {}).get("agents", [])
+        mains = [a for a in ag if a.get("parent") is None]
+        t0 = min((a["started"] for a in mains if a.get("started")), default=None)
+        t1 = max((a["ended"] for a in mains if a.get("ended")), default=None)
+        parsed = hm_trace.parse_transcript(tp, t0, t1)
+        for sf in hm_trace._subagent_files(tp):
+            hm_trace._merge_side(parsed, hm_trace.parse_transcript(sf, t0, t1, sidechain=True))
+        files = list(parsed["files_modified"])
+        if len(_files_cache) > 200:
+            _files_cache.clear()
+        _files_cache[rid] = (mtime, files)
+    return {**out, "files": files[:50], "total": len(files)}
+
+
 def plan_payload(rid: str) -> dict:
     """The final brief the planner wrote for an approved request (the chat's collapsed Plan chip)."""
     req = common.read_json(common.REQUESTS_DIR / rid / "request.json", {}) or {}
@@ -198,17 +306,34 @@ TITLE_PROMPT = (
 )
 
 
+# Envelope text around the user's words: our own <message> wrapper, pasted-content tags and file
+# refs, Claude Code's slash-command and system tags. Titles should describe what the user typed.
+_DROP_BLOCKS = re.compile(r"<(system-reminder|command-message|local-command-stdout|local-command-stderr)\b[^>]*>"
+                          r".*?</\1>", re.S | re.I)
+_ENVELOPE_TAGS = re.compile(r"</?(message|user_message|pasted[_-]content|command-name|command-args|attachment)"
+                            r"\b[^>]*>", re.I)
+_ENVELOPE_TEXT = re.compile(r"@file:\S*pasted[_-]content\S*|\bpasted[_-]content(?:_\S+)?\s+id=[\"']?[\w-]*[\"']?"
+                            r"|\n--- Attached Context ---.*", re.S | re.I)
+
+
+def strip_envelope(text: str) -> str:
+    text = _DROP_BLOCKS.sub(" ", text or "")
+    text = _ENVELOPE_TEXT.sub(" ", _ENVELOPE_TAGS.sub(" ", text))
+    return "\n".join(" ".join(line.split()) for line in text.splitlines()).strip()
+
+
 def make_title(text: str) -> str:
     """Name a chat from its first prompt with Claude Haiku via the Claude Code CLI (the user's
     subscription login, no API key). No tools, MCP servers or settings: ~3 s. The prompt goes in on
-    stdin as quoted data, so a leading "/motion" is never run as a slash command."""
-    text = text.strip()[:2000]
+    stdin as quoted data, so a leading "/motion" is never run as a slash command. No session is
+    saved: the WebUI lists saved Claude Code sessions, titled by their first message (our wrapper)."""
+    text = strip_envelope(text.strip()[:2000])
     if not text or not agent_set.has("claude"):
         return ""  # Codex-only install: the WebUI keeps its own default title
     claude = shutil.which("claude") or str(Path.home() / ".local/bin/claude")
     with tempfile.TemporaryDirectory() as cwd:
         out = subprocess.run(
-            [claude, "-p", "--model", "haiku", "--tools", "", "--strict-mcp-config",
+            [claude, "-p", "--model", "haiku", "--tools", "", "--strict-mcp-config", "--no-session-persistence",
              "--setting-sources", "", "--system-prompt", TITLE_PROMPT],
             input=f"<message>\n{text}\n</message>", capture_output=True, text=True, timeout=30, cwd=cwd,
         ).stdout
@@ -216,7 +341,7 @@ def make_title(text: str) -> str:
 
 
 def clean_title(raw: str) -> str:
-    line = next((l.strip() for l in (raw or "").splitlines() if l.strip()), "")
+    line = next((l.strip() for l in strip_envelope(raw).splitlines() if l.strip()), "")
     line = re.sub(r"^(title:\s*)", "", line, flags=re.I).strip().strip('"\'`*').strip()
     line = re.sub(r"[.!?:;,]+$", "", line).strip()
     return line[:60]
@@ -259,14 +384,36 @@ def executor_payload(sid: str) -> dict:
             "catalog": executor_choice.public_catalog(available)}
 
 
+def new_chat_payload() -> dict:
+    """GET /executor with no id: the new-chat home has no session yet, so show the default it will get."""
+    try:
+        available = providers.codex_models()
+    except Exception:
+        available = []
+    return {"session_id": None, "choice": executor_choice.new_chat_choice(),
+            "catalog": executor_choice.public_catalog(available)}
+
+
 def agents_payload() -> dict:
+    """dynamic: the Hand-offs setting (default on). linked: each agent installed AND signed in to its
+    subscription (auth cached 10 min). The picker greys Hand-offs out unless both are linked + enabled."""
+    linked = {}
+    for a in agent_set.AGENTS:
+        try:
+            linked[a] = bool(providers.linked(a))
+        except Exception:
+            linked[a] = False
     return {"enabled": agent_set.enabled(), "labels": agent_set.LABEL,
-            "installed": {a: bool(shutil.which(a)) for a in agent_set.AGENTS}}
+            "installed": {a: bool(shutil.which(a)) for a in agent_set.AGENTS},
+            "dynamic": agent_set.dynamic_enabled(), "linked": linked,
+            "dynamic_available": agent_set.dynamic_allowed(linked)}
 
 
 def set_agents(body: dict) -> tuple[int, dict]:
     try:
-        agent_set.save(body.get("enabled") or [])
+        dyn = body.get("dynamic")
+        agent_set.save(body.get("enabled") if "enabled" in body else None,
+                       dynamic=None if dyn is None else bool(dyn))
     except (TypeError, ValueError) as exc:
         return 400, {"error": str(exc)}
     return 200, agents_payload()
@@ -328,6 +475,8 @@ class Handler(BaseHTTPRequestHandler):
                 return self._send(200, session_payload(sid))
             if u.path == "/executor":
                 sid = q.get("id", "")
+                if not sid:
+                    return self._send(200, new_chat_payload())
                 if not _SID.match(sid):
                     return self._send(400, {"error": "bad session id"})
                 return self._send(200, executor_payload(sid))
@@ -335,6 +484,8 @@ class Handler(BaseHTTPRequestHandler):
                 return self._send(200, agents_payload())
             if u.path == "/motion/status":
                 return self._send(200, motion_studio.status())
+            if u.path == "/motion/films":
+                return self._send(200, motion_studio.films())
             if u.path == "/update":
                 return self._send(200, update_payload(q.get("force") == "1"))
             if u.path == "/title":
@@ -349,6 +500,11 @@ class Handler(BaseHTTPRequestHandler):
                 if not _RID.match(rid) or not re.match(r"^[0-9a-f]{12}$", mid):
                     return self._send(400, {"error": "bad id"})
                 return self._send(200, worker_ack(rid, mid))
+            if u.path == "/request/files":
+                rid = q.get("id", "")
+                if not _RID.match(rid):
+                    return self._send(400, {"error": "bad request id"})
+                return self._send(200, request_files(rid))
             if u.path == "/plan":
                 rid = q.get("id", "")
                 if not _RID.match(rid):
@@ -383,11 +539,15 @@ class Handler(BaseHTTPRequestHandler):
                 return self._send(*set_agents(body))
             if u.path == "/worker/message" and isinstance(body, dict):
                 return self._send(*worker_message(body))
+            if u.path == "/worker/stop" and isinstance(body, dict):
+                return self._send(*worker_stop(body))
             if u.path == "/motion/ensure":
                 return self._send(200, motion_studio.status(create=True))
             if u.path == "/motion/install":
                 motion_studio.install()
                 return self._send(200, motion_studio.status())
+            if u.path == "/motion/films":
+                return self._send(200, motion_studio.films())
             if u.path == "/update":
                 res = updates.apply()
                 return self._send(200 if res["ok"] else 409, res)

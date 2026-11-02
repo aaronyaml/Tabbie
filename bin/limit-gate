@@ -1,0 +1,52 @@
+#!/usr/bin/env python3
+"""limit-gate: may a worker / delegate / subagent start on this account right now?
+
+  limit-gate claude [--model claude-opus-5-5] [--purpose work|delegate|subagent] [--json]
+  limit-gate codex  [--model gpt-6-astra] ...
+
+Exit 0 = go (below the limit, or usage unknown: fails open). Exit 2 = blocked; the reason is on
+stderr (a Claude Code PreToolUse hook shows it to Claude, which then works inline instead).
+Reads the shared 60s cache in state/limits_cache.json (plugin/command-centre/limits_gate.py).
+"""
+import importlib, json, sys, types
+from pathlib import Path
+
+PKG = Path(__file__).resolve().parents[1] / "plugin" / "command-centre"
+pkg = types.ModuleType("cc_gate_pkg")
+pkg.__path__ = [str(PKG)]
+sys.modules["cc_gate_pkg"] = pkg
+gate = importlib.import_module("cc_gate_pkg.limits_gate")
+
+
+def main(argv):
+    if not argv or argv[0] not in ("claude", "codex"):
+        print(__doc__.strip(), file=sys.stderr)
+        return 64
+    import os
+    agent, model, purpose = argv[0], os.environ.get("TABBIE_WORKER_MODEL") or None, "subagent"
+    if "--model" in argv:
+        model = argv[argv.index("--model") + 1]
+    if "--purpose" in argv:
+        purpose = argv[argv.index("--purpose") + 1]
+    if not sys.stdin.isatty():
+        try:  # a hook's JSON payload: not needed, but drain it; never wait on a pipe that stays open
+            import select
+            while select.select([sys.stdin], [], [], 0.2)[0] and sys.stdin.buffer.read1(65536):
+                pass
+        except Exception:
+            pass
+    try:
+        g = gate.check(agent, model, purpose=purpose)
+    except Exception as exc:  # the gate itself failing never blocks work
+        print(f"limit-gate: could not check ({type(exc).__name__}); allowing", file=sys.stderr)
+        return 0
+    if "--json" in argv:
+        print(json.dumps(g.as_dict()))
+    if g.blocked:
+        print(f"{g.message}. Not starting a new agent: do this part yourself, inline.", file=sys.stderr)
+        return 2
+    return 0
+
+
+if __name__ == "__main__":
+    sys.exit(main(sys.argv[1:]))

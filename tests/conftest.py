@@ -5,12 +5,23 @@ import tempfile
 
 import pytest
 
-os.environ["HMEM_ROOT"] = os.path.join(tempfile.mkdtemp(prefix="hmem-tests-"), "memory")  # import-time safety net
+_TMP = tempfile.mkdtemp(prefix="hmem-tests-")
+os.environ["HMEM_ROOT"] = os.path.join(_TMP, "memory")  # import-time safety net
+os.environ["HMEM_WEBUI_SESSIONS"] = os.path.join(_TMP, "webui", "sessions")  # never the real WebUI chats
+os.environ["HMEM_NO_LLM"] = "1"  # never a real `claude -p` call; tests stub the LLM where they need it
+os.environ["TABBIE_LIMITS_GATE"] = "off"  # never a real usage-endpoint call (tests pass their own rows)
+os.environ["TABBIE_LINKED"] = ""  # no `claude auth` / `codex login` subprocess: nothing linked unless a test says so
 
 
 @pytest.fixture(autouse=True)
 def _isolated_memory(tmp_path, monkeypatch):
     monkeypatch.setenv("HMEM_ROOT", str(tmp_path / "memory"))
+    monkeypatch.setenv("HMEM_WEBUI_SESSIONS", str(tmp_path / "webui" / "sessions"))
+    monkeypatch.setenv("HMEM_NO_LLM", "1")
+    import sys
+    t = sys.modules.get("hmem.trace")
+    if t is not None:
+        monkeypatch.setattr(t, "WEBUI_SESSIONS", tmp_path / "webui" / "sessions")
 
 
 @pytest.fixture(autouse=True)

@@ -191,30 +191,56 @@
     if (window.hxMotion) window.hxMotion.remember(p.sessionId);
   }
   let discovered = false;
+  // The film folders + a reader for each one's project.json. The sidecar's GET …/motion/films reads them
+  // server-side (hmem/motion.py); without it, the file API of a studio session that can serve it. The
+  // first session listed isn't always one: CLI sessions in the studio folder answer 404 there.
+  async function filmSource() {
+    try {
+      const r = await fetchT(`${SIDE}films`, 8000);
+      const d = r.ok ? await r.json() : null;
+      if (d && Array.isArray(d.films)) {
+        const by = new Map(d.films.map((f) => [f.project, f]));
+        return { dirs: [...by.keys()], server: true, get: async (name) => by.get(name) || null };
+      }
+    } catch (_) {}
+    const r = await fetch('api/sessions', { credentials: 'same-origin' });
+    const d = await r.json();
+    for (const s of (d.sessions || d || []).filter((x) => x && x.workspace === HOME)) {
+      const sid = s.session_id;
+      const lr = await fetch(`api/list?session_id=${encodeURIComponent(sid)}&path=studio`, { credentials: 'same-origin' });
+      if (!lr.ok) continue;
+      const ld = await lr.json();
+      const ents = ld.entries || ld.items || ld.files;
+      if (!Array.isArray(ents)) continue;
+      return { dirs: ents.filter((e) => e && (e.type === 'dir' || e.is_dir)).map((e) => e.name), get: (name) => readJSON(sid, `studio/${name}/project.json`) };
+    }
+    return null;
+  }
   async function discover() {
     if (discovered) return;
     discovered = true;
     try {
-      const r = await fetch('api/sessions', { credentials: 'same-origin' });
-      const d = await r.json();
-      const list = (d.sessions || d || []).filter((s) => s && s.workspace === HOME);
-      if (!list.length) return;
-      const sid = list[0].session_id;
-      const lr = await fetch(`api/list?session_id=${encodeURIComponent(sid)}&path=studio`, { credentials: 'same-origin' });
-      if (!lr.ok) return;
-      const ld = await lr.json();
-      const dirs = (ld.entries || ld.items || ld.files || []).filter((e) => e && (e.type === 'dir' || e.is_dir)).map((e) => e.name);
+      const src = await filmSource();
+      if (!src) return;
       // prune rows whose film is gone from <studio>/studio (deleted test films, other devices' leftovers)
-      if (Array.isArray(ld.entries || ld.items || ld.files)) {
-        const have = new Set(dirs), all = loadIdx(), keep = all.filter((x) => have.has(x.project));
-        if (keep.length !== all.length) saveIdx(keep);
+      const have = new Set(src.dirs), all = loadIdx();
+      let keep = all.filter((x) => have.has(x.project));
+      // the server's list is cheap: refresh known rows in place (a film reopened elsewhere has a new chat)
+      if (src.server) {
+        keep = await Promise.all(keep.map(async (x) => {
+          const f = await src.get(x.project);
+          if (!f || !f.sessionId) return x;
+          if (f.sessionId !== x.sid && window.hxMotion) window.hxMotion.remember(f.sessionId);
+          return { ...x, sid: f.sessionId, title: f.title || x.title, step: f.step || x.step };
+        }));
       }
-      const known = new Set(loadIdx().map((x) => x.project));
+      if (keep.length !== all.length || src.server) saveIdx(keep);
+      const known = new Set(keep.map((x) => x.project));
       const gone = delSet();
-      for (const name of dirs) {
+      for (const name of src.dirs) {
         if (known.has(name) || gone.has(name)) continue;
-        const pj = await readJSON(sid, `studio/${name}/project.json`);
-        if (pj && pj.sessionId) indexPut(pj);
+        const pj = await src.get(name);
+        if (pj && pj.sessionId) indexPut({ ...pj, project: name });
       }
       if (view === 'home') render();
     } catch (_) {}
@@ -229,6 +255,34 @@
   const pdir = () => `studio/${P.project}`;
   const savePending = {};
   function saveSoon(name, fn, ms = 500) { clearTimeout(savePending[name]); savePending[name] = setTimeout(fn, ms); }
+  // ── drafts: text typed but not sent yet survives re-renders and reloads (this browser, per film) ──
+  const DRAFTS = { gen: ['prompt', 'dur'], 'sb-rev': ['note'], redo: ['instruction', 'treatment'], chat: ['text'], reply: ['text'] };
+  const draftKey = (project, form, name) => `hxs-draft:${project}:${form}:${name}`;
+  function draftSave(el) {
+    const form = el.form && el.form.dataset.form;
+    if (!P || !DRAFTS[form] || !DRAFTS[form].includes(el.name)) return;
+    try { if (el.value) localStorage.setItem(draftKey(P.project, form, el.name), el.value); else localStorage.removeItem(draftKey(P.project, form, el.name)); } catch (_) {}
+  }
+  function draftClear(form) {
+    if (P) for (const n of DRAFTS[form] || []) { try { localStorage.removeItem(draftKey(P.project, form, n)); } catch (_) {} }
+  }
+  function draftDrop(project) {
+    try { for (let i = localStorage.length - 1; i >= 0; i--) { const k = localStorage.key(i); if (k && k.startsWith(`hxs-draft:${project}:`)) localStorage.removeItem(k); } } catch (_) {}
+  }
+  // Freshly painted fields take their draft; the chat box (one element for every film) only when the film changes.
+  function draftFill(scope) {
+    if (!P || !scope) return;
+    scope.querySelectorAll('form[data-form]').forEach((f) => {
+      for (const n of DRAFTS[f.dataset.form] || []) {
+        const el = f.elements[n];
+        if (!el || el.disabled || el.dataset.draftFor === P.project) continue;
+        el.dataset.draftFor = P.project;
+        let v = null;
+        try { v = localStorage.getItem(draftKey(P.project, f.dataset.form, n)); } catch (_) {}
+        el.value = v != null ? v : el.defaultValue;
+      }
+    });
+  }
   async function saveProject() {
     P.updatedAt = new Date().toISOString();
     indexPut(P);
@@ -282,6 +336,7 @@
     if (box.value.trim() === msg.trim()) { box.value = ''; box.dispatchEvent(new Event('input', { bubbles: true })); throw new Error('Could not reach the chat to start that step. Try again in a moment.'); }
     P.jobs = [...(P.jobs || []), { id, kind, at: Date.now(), status: 'running' }];
     await saveProject();
+    watchAdd(P, { id, kind });
     startPoll();
     render();
     return id;
@@ -298,12 +353,72 @@
       if (!done || !/^(done|failed)$/.test(done.status)) { if (root) paintJob(); return; }
       delete j.stage; delete j.progress;
       j.status = done.status; j.note = done.note || ''; j.endedAt = Date.now();
+      announce(P.project, j.id, done);
       await loadFiles();
       P.jobs = P.jobs.map((x) => (x.id === j.id ? j : x));
       if (j.kind === 'storyboard' && done.status === 'done') P.storyboard = { ...(P.storyboard || {}), status: 'ready' };
       await saveProject();
       render();
     }, 4000);
+  }
+  // ── finished-step alerts: a toast, plus a notification when the tab is hidden or the studio is closed.
+  // Every running step is remembered in localStorage (hxs-watch), so a reload, going back to the film list
+  // or switching films keeps watching it; a background poll (10 s) covers steps of films not open now.
+  const WATCH_KEY = 'hxs-watch';
+  const DONE_SAY = { analyze: 'Track analysed', 'generate-audio': 'Music ready', storyboard: 'Storyboard ready', render: 'Film rendered', revision: 'Changes ready' };
+  const watchList = () => { try { const l = JSON.parse(localStorage.getItem(WATCH_KEY) || '[]'); return Array.isArray(l) ? l : []; } catch (_) { return []; } };
+  const watchSave = (l) => { try { if (l.length) localStorage.setItem(WATCH_KEY, JSON.stringify(l)); else localStorage.removeItem(WATCH_KEY); } catch (_) {} };
+  let watchT = 0;
+  function watchAdd(p, j) {
+    if (!p || !j || !j.id) return;
+    const l = watchList().filter((x) => x.id !== j.id);
+    l.push({ id: j.id, kind: j.kind, project: p.project, sid: p.sessionId, title: p.title, at: j.at || Date.now() });
+    watchSave(l);
+    watchStart();
+  }
+  function announce(project, id, done) {
+    const l = watchList(), w = l.find((x) => x.id === id && x.project === project);
+    if (!w) return;  // already announced (the film poll and the background poll both see it)
+    watchSave(l.filter((x) => x !== w));
+    const ok = done.status === 'done';
+    const msg = ok ? (DONE_SAY[w.kind] || 'Step finished') : `${JOBNAME[w.kind] || 'Studio step'} failed${done.note ? `: ${done.note}` : ''}`;
+    try { if (typeof window.showToast === 'function') window.showToast(`${w.title ? `${w.title} · ` : ''}${msg}`, ok ? 4000 : 6000, ok ? undefined : 'error'); } catch (_) {}
+    if (document.hidden || !isOpen()) {
+      try { if (typeof window.sendBrowserNotification === 'function') window.sendBrowserNotification(`Motion · ${w.title || 'Film'}`, ok && w.kind === 'render' ? 'Your film is ready.' : msg, { sid: w.sid, forceHidden: true }); } catch (_) {}
+    }
+  }
+  function watchStart() {
+    if (watchT || !watchList().length) return;
+    watchT = setInterval(watchTick, 10000);
+  }
+  let watchBusy = false;
+  async function watchTick() {
+    if (watchBusy) return;
+    const l = watchList();
+    if (!l.length) { clearInterval(watchT); watchT = 0; return; }
+    watchBusy = true;
+    try {
+      for (const w of l) {
+        if (P && P.project === w.project && pollT) continue;  // the open film's own poll handles it (and updates its files)
+        if (Date.now() - (w.at || 0) > 6 * 3600000) { watchSave(watchList().filter((x) => x.id !== w.id)); continue; }  // a step that died long ago
+        const done = await readJSON(w.sid, `studio/${w.project}/jobs/${w.id}.json`).catch(() => null);
+        if (!done || !/^(done|failed)$/.test(done.status)) continue;
+        announce(w.project, w.id, done);
+        await markJobEnded(w, done);
+      }
+    } finally { watchBusy = false; }
+  }
+  // the film isn't open: write the result into its project.json so it shows when it's opened
+  async function markJobEnded(w, done) {
+    try {
+      const path = `studio/${w.project}/project.json`, pj = await readJSON(w.sid, path);
+      if (!pj || !(pj.jobs || []).some((x) => x.id === w.id && x.status === 'running')) return;
+      if (P && P.project === w.project) return;  // opened meanwhile: its own poll writes it
+      pj.jobs = pj.jobs.map((x) => (x.id === w.id ? { ...x, status: done.status, note: done.note || '', endedAt: Date.now(), stage: undefined, progress: undefined } : x));
+      if (w.kind === 'storyboard' && done.status === 'done') pj.storyboard = { ...(pj.storyboard || {}), status: 'ready' };
+      pj.updatedAt = new Date().toISOString();
+      await writeJSON(w.sid, path, pj);
+    } catch (_) {}
   }
   async function refreshEditorFiles() {
     const sid = P.sessionId, p = P.project;
@@ -966,6 +1081,7 @@
     const nearEnd = inner.scrollHeight - inner.scrollTop - inner.clientHeight < 80;
     chat.html = html; chat.dirty = false;
     inner.innerHTML = html;
+    draftFill(inner);
     if (nearEnd || force || chat.first) { inner.scrollTop = inner.scrollHeight; if (chat.loaded && !feed.hidden && inner.scrollHeight) chat.first = false; }
   }
   async function chatPoll(now) {
@@ -990,10 +1106,25 @@
     if (!P || P.sessionId !== sid) return;
     // sent but not in the transcript after a minute (and nothing running): call it failed, offer Retry
     chat.pending.forEach((p) => { if (p.state === 'sent' && Date.now() - p.sentAt > 60000 && !chat.streaming) p.state = 'failed'; });
+    adoptJob();
     paintFeed();
     paintJob();
     flushQueued();
     flushJob();
+  }
+  // A step whose /motion turn went out but whose job record never reached project.json (the page was
+  // reloaded mid-dispatch): the transcript names it, so it's tracked as running again. Recent or still
+  // streaming only, so a turn that died long ago can't lock the film.
+  function adoptJob() {
+    if (!P || !chat.loaded || running() || starting) return;
+    const jobs = parseFeed().filter((x) => x.type === 'job'), j = jobs[jobs.length - 1];
+    if (!j || j.reply || (P.jobs || []).some((x) => x.id === j.id)) return;
+    if (!chat.streaming && Date.now() - (j.at || 0) > 10 * 60000) return;
+    P.jobs = [...(P.jobs || []), { id: j.id, kind: j.kind, at: j.at || Date.now(), status: 'running' }];
+    saveProject();
+    watchAdd(P, j);
+    startPoll();
+    render();
   }
   // Everything typed here goes to the film's session as a /motion turn (Claude Code + the motion skill);
   // answers to a question card go back as typed ("Header: choice"), which resumes the waiting worker.
@@ -1305,7 +1436,7 @@
     root.innerHTML = shell(body);
     gate();
     mountScrub();
-    if (P) { root.appendChild(d); paintFeed(); if (keep && document.activeElement !== keep.el) { keep.el.focus({ preventScroll: true }); try { keep.el.setSelectionRange(keep.a, keep.b); } catch (_) {} } }
+    if (P) { root.appendChild(d); draftFill(root); paintFeed(); if (keep && document.activeElement !== keep.el) { keep.el.focus({ preventScroll: true }); try { keep.el.setSelectionRange(keep.a, keep.b); } catch (_) {} } }
     else d.remove();
     TW.paint();
     paintWave();
@@ -1389,7 +1520,7 @@
     await loadFiles();
     const want = Math.max(0, STEPS.findIndex((s) => s[0] === (P.step || 'audio')));
     view = STEPS[Math.min(reach(), want)][0];
-    if (running()) startPoll();
+    if (running()) { watchAdd(P, running()); startPoll(); }
     indexPut(P);
     render();
     chatPoll(true);
@@ -1399,6 +1530,19 @@
   let delAsk = null, delBusy = false;
   async function sessionInfo(sid) {
     try { const r = await fetchT(`api/session?session_id=${encodeURIComponent(sid)}&msg_limit=1`, 10000); if (r.status === 404) return null; if (!r.ok) return undefined; const d = await r.json(); return d.session || d; } catch (_) { return undefined; }
+  }
+  // Upstream reopens the session saved in localStorage ('hermes-webui-session') on the next load; ours
+  // went through the API directly, so it would still name the deleted chat ("Session not available in
+  // web UI." on the home screen). Clear it, and the open chat behind the studio if it's that one.
+  function forgetSession(sid) {
+    try { if (localStorage.getItem('hermes-webui-session') === sid) localStorage.removeItem('hermes-webui-session'); } catch (_) {}
+    try {
+      if (sidNow() !== sid) return;
+      S.session = null; S.messages = []; S.entries = []; S.toolCalls = []; S.activeStreamId = null; S.busy = false;
+      const inner = document.getElementById('msgInner'); if (inner) inner.innerHTML = '';
+      const empty = document.getElementById('emptyState'); if (empty) empty.style.display = '';
+      if (typeof syncTopbar === 'function') syncTopbar();
+    } catch (_) {}
   }
   async function deleteFilm(slug) {
     const x = loadIdx().find((i) => i.project === slug);
@@ -1415,7 +1559,9 @@
       filesGone = r.ok || r.status === 404;
     }
     if (info) await post('api/session/delete', { session_id: x.sid });
-    if (P && P.project === slug) P = null;
+    forgetSession(x.sid);
+    draftDrop(slug);
+    if (P && P.project === slug) { P = null; resetChat(); }
     saveIdx(loadIdx().filter((i) => i.project !== slug));
     if (!filesGone) { // keep it out of the list anyway, and say what is left
       const d = delSet(); d.add(slug); try { localStorage.setItem(DEL, JSON.stringify([...d])); } catch (_) {}
@@ -1726,7 +1872,7 @@
       if (fb && trimming()) { if (fb.dataset.fi != null) TR.fadeIn = +fb.dataset.fi; else TR.fadeOut = +fb.dataset.fo; return render(); }
       const am = t.closest('[data-audio-mode]');
       if (am && audioLocked()) return;
-      if (am) { P._audioMode = am.dataset.audioMode; if (P.audio && P.audio.mode !== P._audioMode && !running()) P.audio = null; return render(); }
+      if (am) { P._audioMode = am.dataset.audioMode; if (P.audio && P.audio.mode !== P._audioMode && !running()) P.audio = null; saveSoon('project', () => saveProject()); return render(); }
       const mp = t.closest('[data-map]');
       if (mp) { P.mapping = mp.dataset.map; saveSoon('project', () => saveProject()); return render(); }
       const pin = t.closest('[data-kp]');
@@ -1779,16 +1925,18 @@
         const inp = f.querySelector('[name="text"]'), text = inp.value.trim();
         if (!text) return;
         inp.value = ''; inp.style.height = '';
+        draftClear(f.dataset.form);
         return say(text);
       }
       if (f.dataset.form === 'new') navPush = true;
       if (f.dataset.form === 'new') return guard(() => createProject(String(fd.get('title')).trim(), String(fd.get('brief') || '').trim()));
-      if (f.dataset.form === 'gen') { if (audioLocked()) return; const pr = String(fd.get('prompt')).trim(), du = Math.max(5, Math.min(120, +fd.get('dur') || 20)); return startJob('generate-audio', () => onGenerate(pr, du)); }
-      if (f.dataset.form === 'sb-rev') { const note = String(fd.get('note') || '').trim(); if (note) startJob('storyboard', () => { P.storyboard.status = 'revise'; return genStoryboard(note); }); return; }
+      if (f.dataset.form === 'gen') { if (audioLocked()) return; const pr = String(fd.get('prompt')).trim(), du = Math.max(5, Math.min(120, +fd.get('dur') || 20)); return startJob('generate-audio', () => { draftClear('gen'); return onGenerate(pr, du); }); }
+      if (f.dataset.form === 'sb-rev') { const note = String(fd.get('note') || '').trim(); if (note) startJob('storyboard', () => { draftClear('sb-rev'); P.storyboard.status = 'revise'; return genStoryboard(note); }); return; }
       if (f.dataset.form === 'redo' && !canRedo()) return;
-      if (f.dataset.form === 'redo') { const ins = String(fd.get('instruction') || '').trim(), tr = String(fd.get('treatment') || ''); if (ins) startJob('revision', () => submitRedo(ins, tr)); }
+      if (f.dataset.form === 'redo') { const ins = String(fd.get('instruction') || '').trim(), tr = String(fd.get('treatment') || ''); if (ins) startJob('revision', () => { draftClear('redo'); return submitRedo(ins, tr); }); }
     });
     root.addEventListener('input', (e) => {
+      if (e.target.form) draftSave(e.target);
       if (e.target.matches && e.target.matches('textarea[data-brief]')) { if (P) { P.brief = e.target.value; saveSoon('project', () => saveProject()); } return; }
       const qo = e.target.closest('.hxs-qc-other');
       if (qo) {
@@ -2010,6 +2158,8 @@
   addEventListener('dragover', (e) => { if (isOpen()) e.preventDefault(); });
   addEventListener('drop', (e) => { if (isOpen()) e.preventDefault(); });
   setInterval(() => { if (isOpen()) { place(); paintJob(); tickTimers(); chatPoll(); } }, 1000);
+  watchStart();  // a step that was running before a reload is still watched
+  document.addEventListener('visibilitychange', () => { if (!document.hidden && watchList().length) { watchStart(); watchTick(); } });
   // landed on /motion or /motion/<sid> (motion-boot.js set the route): open straight away
   if (window.__hxMoRoute || MO_RE.test(location.pathname)) open();
 })();

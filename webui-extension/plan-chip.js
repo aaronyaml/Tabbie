@@ -20,6 +20,13 @@
     d.dataset.rid = rid;
     d.innerHTML = `<summary>${icon('CheckListIcon', 14)}<span>Plan</span><em>tap to read</em></summary><div class="hx-plan-body"></div>`;
     d.addEventListener('toggle', () => { if (d.open) load(d); });
+    d.addEventListener('click', (e) => {
+      const b = e.target.closest('[data-plan-retry], [data-plan-allow]');
+      if (!b) return;
+      e.preventDefault();
+      if (b.hasAttribute('data-plan-allow') && window.hxHelperConsent) window.hxHelperConsent.open();
+      else load(d);
+    });
     return d;
   }
 
@@ -31,7 +38,12 @@
       let p = cache.get(d.dataset.rid);
       if (!p) {
         const r = await fetch(API + encodeURIComponent(d.dataset.rid), { credentials: 'same-origin', cache: 'no-store' });
-        if (!r.ok) throw new Error(r.status === 401 || r.status === 403 ? 'Allow Tabbie\'s helper first' : String(r.status));
+        if (r.status === 401 || r.status === 403) {
+          if (window.hxHelperConsent) window.hxHelperConsent.open();
+          body.innerHTML = `<p class="hx-plan-dim">Allow Tabbie's helper on this Mac to read the plan.</p>${window.hxHelperConsent ? '<button type="button" class="hx-plan-retry" data-plan-allow>Allow</button>' : ''}`;
+          return;
+        }
+        if (!r.ok) throw new Error(String(r.status));
         p = await r.json();
         cache.set(d.dataset.rid, p);
       }
@@ -43,7 +55,8 @@
       const em = d.querySelector('summary em');
       if (em) em.textContent = p.planner ? p.planner.split(':').pop() : '';
     } catch (e) {
-      body.innerHTML = `<p class="hx-plan-dim">Couldn't load the plan (${esc((e && e.message) || e)}).</p>`;
+      const down = e instanceof TypeError || /^5\d\d$/.test(String(e && e.message));
+      body.innerHTML = `<p class="hx-plan-dim">${down ? "Can't reach Tabbie on your Mac right now." : `Couldn't load the plan (${esc((e && e.message) || e)}).`}</p><button type="button" class="hx-plan-retry" data-plan-retry>Try again</button>`;
     }
   }
 

@@ -204,6 +204,50 @@
     if (E && !E.hidden && E.dataset.id) fillHead();
   }
 
+  // ── phone: pull the editor down to dismiss it (the model picker's drag, copied). Only once the body is
+  // scrolled to the top, never from a field or the status buttons, and only on a mostly vertical pull.
+  // Wired once: the editor element is created a single time and reused.
+  const phoneW = () => window.matchMedia('(max-width: 640px)').matches;
+  const reduced = () => window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+  function swipeDown(panel, body, onClose) {
+    let y0 = null, x0 = 0, dy = 0, live = false;
+    const reset = () => { panel.style.transition = ''; panel.style.transform = ''; };
+    panel.addEventListener('touchstart', (e) => {
+      y0 = null; live = false; dy = 0;
+      if (!phoneW() || e.touches.length !== 1) return;
+      const t = e.target;
+      if (t.closest && t.closest('input, textarea, select, [contenteditable], .hx-wb-seg')) return;
+      if (body && body.contains(t) && body.scrollTop > 0) return;
+      y0 = e.touches[0].clientY; x0 = e.touches[0].clientX;
+    }, { passive: true });
+    panel.addEventListener('touchmove', (e) => {
+      if (y0 == null) return;
+      const t = e.touches[0];
+      dy = Math.max(0, t.clientY - y0);
+      if (!live) {
+        if (Math.abs(t.clientX - x0) > 12 && Math.abs(t.clientX - x0) > dy) { y0 = null; return; }
+        if (dy < 8) return;
+        if (body && body.scrollTop > 0) { y0 = null; return; }
+        live = true;
+      }
+      if (reduced()) return;
+      panel.style.transition = 'none';
+      panel.style.transform = `translateY(${dy}px)`;
+    }, { passive: true });
+    panel.addEventListener('touchend', () => {
+      if (y0 == null) return;
+      y0 = null;
+      const go = live && dy > 90;
+      live = false;
+      if (!go) { reset(); return; }
+      if (reduced()) { onClose(); reset(); return; }
+      panel.style.transition = 'transform .2s var(--hx-ease, ease)';
+      panel.style.transform = 'translateY(100%)';
+      setTimeout(() => { onClose(); reset(); }, 180);
+    });
+    panel.addEventListener('touchcancel', () => { y0 = null; live = false; reset(); });
+  }
+
   // ── editor sheet ─────────────────────────────────────────────────────────
   let E = null, cur = null; // cur = {kind, id}
   function sheet() {
@@ -246,6 +290,7 @@
     });
     E.querySelector('.hx-wb-addbtn').addEventListener('click', addNote);
     E.querySelector('input[name="note"]').addEventListener('keydown', (e) => { if (e.key === 'Enter') { e.preventDefault(); addNote(); } });
+    swipeDown(E.querySelector('.hx-wb-sheet'), E.querySelector('.hx-wb-body'), closeEd);
     E.addEventListener('keydown', (e) => {
       if (e.key === 'Escape') { e.preventDefault(); closeEd(); }
       if (e.key === 'Tab') {

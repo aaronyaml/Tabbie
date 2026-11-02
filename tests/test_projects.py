@@ -249,7 +249,7 @@ def test_proposal_keeps_evidence_approve_writes_reject_does_not(env):
     x = env.proposals.list_("pending")[0]
     assert len(x["source_sessions"]) == 4 and x["evidence"] and x["evidence"][0]["quote"]
     st, d = env.api.handle("GET", "/projects/proposal", {"id": p["id"], "pid": x["proposal_id"]})
-    assert st == 200 and d["diff"].startswith("--- current/") and "+title: Recurring Bash error" in d["diff"]
+    assert st == 200 and d["diff"].startswith("--- current/") and "+title: Bash error: (eval):1: command" in d["diff"]
     st, d = env.api.handle("POST", "/projects/proposal/approve", body={"id": p["id"], "pid": x["proposal_id"]})
     assert st == 200, d
     m = env.store.read(x["target"])

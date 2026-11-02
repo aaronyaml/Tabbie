@@ -7,6 +7,7 @@
  *     collapsed (once per group per page load, so a user's expand sticks).
  *  5. Phone composer: the workspace name inside the mobile config pill.
  *  6. Empty-state title: wraps "help" in .hx-wing-word for the gradient.
+ *  7. Composer focus glow: three blurred copies of the wing ring (.hx-neon, styled in apple-skin.css).
  */
 (() => {
   'use strict';
@@ -124,6 +125,7 @@
     document.querySelectorAll('meta[name="theme-color"]').forEach((m) => mo.observe(m, { attributes: true, attributeFilter: ['content'] }));
     sidebarScrim();
     sidebarSwipe();
+    neon();
     autoReconnect();
   }
   // Live stream dropped (phone locked, Wi-Fi/Tailscale blip, long tool call): upstream finalises
@@ -248,6 +250,21 @@
     new MutationObserver(sync).observe(sb, { attributes: true, attributeFilter: ['class'] });
     addEventListener('resize', sync);
     sync();
+  }
+  // The focus glow is the ring's own light falling off: tight, medium and wide blurs of the same
+  // gradient, so line and bloom read as one object. Pseudo-elements only give one blur, hence spans.
+  function neon() {
+    const box = document.querySelector('.composer-box');
+    if (!box) return;
+    const add = () => {
+      if (box.querySelector(':scope > .hx-neon')) return;
+      const n = document.createElement('span');
+      n.className = 'hx-neon'; n.setAttribute('aria-hidden', 'true');
+      n.innerHTML = '<i></i><i></i><i></i>';
+      box.prepend(n);
+    };
+    add();
+    new MutationObserver(add).observe(box, { childList: true });
   }
   if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', start); else start();
 })();

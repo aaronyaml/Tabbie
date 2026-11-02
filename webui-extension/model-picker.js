@@ -4,9 +4,14 @@
  * Phone: bottom sheet. Desktop: popover above the chip.
  * Data: cc-agents sidecar via the WebUI's authenticated, consent-gated proxy:
  *   GET  api/extensions/cc-agents/sidecar/executor?id=<session>  -> {choice, catalog}
+ *   GET  api/extensions/cc-agents/sidecar/executor  (no id: new-chat home) -> {choice: the default, catalog}
  *   POST api/extensions/cc-agents/sidecar/executor {id, provider, model, effort}
  *   POST api/extensions/cc-agents/sidecar/agents {enabled: ['claude', 'codex']}  (Agents row, step 1)
- * A pick made before the chat exists is held and saved as soon as the session id appears.
+ *   GET  api/extensions/cc-agents/sidecar/agents -> {dynamic, dynamic_available, linked}; POST {dynamic: bool}
+ *        (Agents row "Hand-offs": Claude Code and Codex may pass part of a job to each other; on by default,
+ *        greyed out unless both are enabled and signed in)
+ * A pick made before the chat exists is held and saved as soon as the session id appears (retried
+ * while the sidecar catches up). If the Mac can't be reached, the panel says so and offers Try again.
  */
 (() => {
   'use strict';
@@ -45,28 +50,70 @@
   let loadedSid = null;
   let pending = null;      // pick made while no session exists yet
   let notice = '';
+  let offline = false;     // last fetch failed (network / 5xx): notice + Try again, auto-retry in tick
+  let retryAt = 0;
+  let pendingTries = 0;
+  const OFFLINE = 'Can’t reach Tabbie on your Mac right now. Showing the last model.';
+  const NO_CONSENT = 'Allow “Agents & questions” in Settings › Extensions to switch models.';
+  let handoffs = { dynamic: true, available: null, known: false };  // GET /agents (known: answered once)
   let step = 1;
   let browsing = 'anthropic';
   let open = false;
 
   const modelOf = (p, m) => ((catalog.providers[p] || {}).models || []).find((x) => x.id === m);
-  const nameOf = (c) => (modelOf(c.provider, c.model) || {}).name || 'Opus 5.5';
+  const nameOf = (c) => (modelOf(c.provider, c.model) || {}).name || c.name || 'Model';
+  const pick = (c) => ({ provider: c.provider, model: c.model, effort: c.effort || null });
+  function setOffline(on) {
+    offline = on;
+    retryAt = on ? Date.now() + 10000 : 0;
+    if (on) notice = OFFLINE; else if (notice === OFFLINE) notice = '';
+  }
 
   // ── data ────────────────────────────────────────────────────────────────
+  // s = session id, or '' for the new-chat home (the server answers with the default a new chat gets).
   async function load(s) {
-    loadedSid = s;
+    loadedSid = s || null;
     try {
-      const r = await fetch(API + '?id=' + encodeURIComponent(s), { credentials: 'same-origin', cache: 'no-store' });
-      if (r.status === 403) { notice = 'Allow “Agents & questions” in Settings › Extensions to switch models.'; return; }
-      if (!r.ok) return;
+      const r = await fetch(s ? API + '?id=' + encodeURIComponent(s) : API, { credentials: 'same-origin', cache: 'no-store' });
+      if (r.status === 403 || r.status === 401) { setOffline(false); notice = NO_CONSENT; return; }
+      if (r.status >= 500) { setOffline(true); return; }
+      if (!r.ok) { if (s) setOffline(false); return; }  // 400 with no id = older sidecar: keep the fallback
       const j = await r.json();
       if (sid() !== s) return;
+      setOffline(false);
       if (j.catalog && j.catalog.providers) catalog = j.catalog;
-      choice = { provider: j.choice.provider, model: j.choice.model, effort: j.choice.effort || null };
+      if (j.choice && !(s === '' && pending)) choice = pick(j.choice);
+      if (notice === NO_CONSENT) notice = '';
+      if (pending && !modelOf(pending.provider, pending.model)) { pending = null; choice = pick(j.choice); }
+    } catch (_) { setOffline(true); /* sidecar down: keep showing the last known pick */ }
+    finally { paintChip(); if (open) paint(); }
+  }
+  const loadCatalog = () => load('');
+
+  async function loadHandoffs() {
+    try {
+      const r = await fetch(AGENTS_API, { credentials: 'same-origin', cache: 'no-store' });
+      if (!r.ok) return;
+      const j = await r.json();
+      if (typeof j.dynamic !== 'boolean') return;  // older sidecar: no Hand-offs pill
+      handoffs = { dynamic: j.dynamic, available: !!j.dynamic_available, known: true };
+    } catch (_) { /* keep the last known state */ }
+    finally { if (open) paint(); }
+  }
+  async function toggleHandoffs() {
+    if (!handoffs.available) return;
+    const next = !handoffs.dynamic;
+    handoffs = Object.assign({}, handoffs, { dynamic: next });
+    paint();
+    try {
+      const j = await post(AGENTS_API, { dynamic: next });
+      if (j && typeof j.dynamic === 'boolean') handoffs = { dynamic: j.dynamic, available: !!j.dynamic_available, known: true };
       notice = '';
-    } catch (_) { /* sidecar down: keep showing the last known pick */ }
-    paintChip();
-    if (open) paint();
+    } catch (e) {
+      handoffs = Object.assign({}, handoffs, { dynamic: !next });
+      notice = statusOf(e) === 403 ? 'Allow “Agents & questions” in Settings › Extensions to change agents.' : 'Couldn’t save. Try again.';
+    }
+    paint();
   }
 
   async function post(url, data) {
@@ -75,23 +122,31 @@
       return window.api('/' + url, { method: 'POST', body, headers: { 'Content-Type': 'application/json' }, retries: 0, timeoutToast: false });
     }
     const r = await fetch(url, { method: 'POST', credentials: 'same-origin', headers: { 'Content-Type': 'application/json' }, body });
-    if (!r.ok) throw new Error(String(r.status));
+    if (!r.ok) { const err = new Error(String(r.status)); err.status = r.status; throw err; }
     return r.json();
   }
+  // HTTP status of a failed post(): WebUI api() sets err.status (its message is the server's error text).
+  const statusOf = (e) => (e && Number(e.status)) || 0;
 
-  async function save(next) {
-    const prev = choice;
+  // flushing = this is the held new-chat pick being saved now that the chat exists: on a transient
+  // failure keep it held and retry from tick() instead of reverting it and showing "Couldn't save".
+  async function save(next, flushing) {
+    const prev = flushing ? next : choice;
     choice = next;
     paintChip();
     const s = sid();
     if (!s) { pending = next; return; }
     try {
       const j = await post(API, { id: s, provider: next.provider, model: next.model, effort: next.effort || '' });
-      if (j && j.choice && sid() === s) choice = { provider: j.choice.provider, model: j.choice.model, effort: j.choice.effort || null };
-      notice = '';
+      if (j && j.choice && sid() === s) choice = pick(j.choice);
+      if (j && j.catalog && j.catalog.providers) catalog = j.catalog;
+      notice = ''; setOffline(false); pendingTries = 0;
     } catch (e) {
-      choice = prev;
-      notice = /403/.test(String(e && e.message)) ? 'Allow “Agents & questions” in Settings › Extensions to switch models.' : 'Couldn’t save. Try again.';
+      const code = statusOf(e);
+      if (code === 401 || code === 403) { notice = NO_CONSENT; if (!flushing) choice = prev; }
+      else if (flushing && code !== 400 && ++pendingTries < 8 && sid() === s) { pending = next; return; }
+      else if (code === 400) { pendingTries = 0; notice = 'That model isn’t available any more. Pick another.'; await load(s); return; }
+      else { pendingTries = 0; choice = prev; setOffline(true); notice = 'Couldn’t save. Check the connection to your Mac.'; }
       if (open) paint();
     }
     paintChip();
@@ -107,21 +162,28 @@
       await post(AGENTS_API, { enabled: next });
       catalog = Object.assign({}, catalog, { agents: next });
       notice = '';
-      const s = sid();
-      if (s) await load(s); else paint();
+      await load(sid());
     } catch (e) {
-      notice = /403/.test(String(e && e.message)) ? 'Allow “Agents & questions” in Settings › Extensions to change agents.' : 'Couldn’t save. Try again.';
+      notice = statusOf(e) === 403 ? 'Allow “Agents & questions” in Settings › Extensions to change agents.' : 'Couldn’t save. Try again.';
       paint();
     }
   }
 
-  function tick() {
+  let busy = false;
+  async function tick() {
     ensureChip();
+    if (busy) return;
     const s = sid();
-    if (s && pending) { const p = pending; pending = null; loadedSid = s; save(p); return; }
-    if (s && s !== loadedSid) load(s);
-    if (!s && loadedSid) { loadedSid = null; choice = Object.assign({}, DEFAULT); paintChip(); }
+    if (!handoffs.known && !hoAsked) { hoAsked = true; loadHandoffs(); }  // so the first open already has the pill
+    busy = true;
+    try {
+      if (s && pending) { const p = pending; pending = null; loadedSid = s; await save(p, true); return; }
+      if (s && s !== loadedSid) { await load(s); return; }
+      if (!s && (loadedSid || first)) { first = false; pending = null; await loadCatalog(); return; }  // new-chat home: the real default
+      if (offline && Date.now() > retryAt) await load(s);  // recovers by itself once the sidecar is back
+    } finally { busy = false; }
   }
+  let first = true, hoAsked = false;
 
   // ── chip ────────────────────────────────────────────────────────────────
   let chip = null;
@@ -193,10 +255,18 @@
     }).join('');
     const on = catalog.agents || AGENTS.map((x) => x[0]);
     const agents = AGENTS.map(([a, label]) => `<button type="button" class="hx-mp-seg${on.includes(a) ? ' is-on' : ''}" data-agent="${a}" aria-pressed="${on.includes(a)}">${label}</button>`).join('');
+    // Hand-offs: same pill style. Unavailable (an agent off or signed out) = greyed, with a caption.
+    const unavail = handoffs.known && handoffs.available === false;
+    const hoOn = handoffs.dynamic && !unavail;
+    const ho = !handoffs.known ? ''
+      : `<button type="button" class="hx-mp-seg hx-mp-handoffs${hoOn ? ' is-on' : ''}${unavail ? ' is-unavail' : ''}" data-handoffs`
+        + ` aria-pressed="${hoOn}"${unavail ? ' aria-disabled="true" disabled' : ''}`
+        + ` title="${unavail ? 'Needs Claude Code and Codex signed in' : 'Claude Code and Codex may hand part of a job to each other'}">Hand-offs</button>`;
     return `<header class="hx-mp-head"><span class="hx-mp-title">Model</span></header>`
       + `<div class="hx-mp-list">${rows}</div>`
-      + `<div class="hx-mp-effort hx-mp-agents"><span class="hx-mp-effort-label">Agents</span><div class="hx-mp-segs" role="group" aria-label="Coding agents on this Mac">${agents}</div></div>`
-      + (notice ? `<p class="hx-mp-note" role="status">${esc(notice)}</p>` : `<p class="hx-mp-cap">For this conversation</p>`);
+      + `<div class="hx-mp-effort hx-mp-agents"><span class="hx-mp-effort-label">Agents</span><div class="hx-mp-segs" role="group" aria-label="Coding agents on this Mac">${agents}${ho}</div></div>`
+      + (unavail ? '<p class="hx-mp-cap hx-mp-ho-cap">Hand-offs: needs Claude Code and Codex signed in</p>' : '')
+      + (notice ? noteHtml() : `<p class="hx-mp-cap">${sid() ? 'For this conversation' : 'For this new chat'}</p>`);
   }
 
   function paneTwo() {
@@ -214,7 +284,11 @@
       + `<span class="hx-mp-title">${esc(pv.name || '')}</span><span class="hx-mp-spacer"></span></header>`
       + `<div class="hx-mp-list">${rows}</div>`
       + `<div class="hx-mp-effort"><span class="hx-mp-effort-label">Effort</span><div class="hx-mp-segs" role="group" aria-label="Effort">${seg}</div></div>`
-      + (notice ? `<p class="hx-mp-note" role="status">${esc(notice)}</p>` : '');
+      + (notice ? noteHtml() : '');
+  }
+  function noteHtml() {
+    return `<div class="hx-mp-note" role="status"><span>${esc(notice)}</span>`
+      + (offline ? '<button type="button" class="hx-mp-retry" data-retry>Try again</button>' : '') + '</div>';
   }
 
   function paint() {
@@ -255,7 +329,8 @@
   function show() {
     if (!chip) return;
     if (!root) build();
-    if (sid() && sid() !== loadedSid) load(sid());
+    if (sid() ? sid() !== loadedSid : !pending) load(sid());
+    loadHandoffs();
     browsing = choice.provider;
     step = 1;
     root.classList.toggle('is-sheet', phone());
@@ -285,7 +360,9 @@
   function onClick(e) {
     const t = e.target.closest('button');
     if (!t) return;
-    if (t.dataset.agent) { toggleAgent(t.dataset.agent); return; }
+    if (t.hasAttribute('data-retry')) { notice = ''; offline = false; t.disabled = true; t.textContent = 'Trying…'; load(sid()); return; }
+    if (t.dataset.agent) { toggleAgent(t.dataset.agent).then(loadHandoffs); return; }
+    if (t.hasAttribute('data-handoffs')) { toggleHandoffs(); return; }
     if (t.dataset.provider) { browsing = t.dataset.provider; go(2); return; }
     if (t.hasAttribute('data-back')) { go(1, `[data-provider="${browsing}"]`); return; }
     if (t.dataset.model) {
@@ -316,4 +393,5 @@
   window.hxModelPicker = { open: show, close, get: () => Object.assign({}, choice) };
   tick();
   setInterval(tick, 700);
+  setInterval(() => { if (pending && sid()) tick(); }, 150);  // save a held new-chat pick before the first request runs
 })();

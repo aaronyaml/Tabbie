@@ -34,15 +34,40 @@ def has(agent: str) -> bool:
     return agent in enabled()
 
 
-def save(agents: list[str]) -> list[str]:
-    picked = [a for a in AGENTS if a in {str(x).strip().lower() for x in agents or []}]
+def dynamic_enabled() -> bool:
+    """Dynamic agents (Claude Code and Codex may hand parts of a job to each other). Default ON: only an
+    explicit `dynamic: false` turns it off."""
+    try:
+        text = path().read_text()
+    except OSError:
+        return True
+    m = re.search(r"^dynamic:\s*(\S+)", text, re.M)
+    return not (m and m.group(1).strip().strip("'\"").lower() in ("false", "no", "off", "0"))
+
+
+def dynamic_allowed(linked: dict | None = None) -> bool:
+    """The setting is on, both agents are enabled, and (when given) both are signed in."""
+    on = enabled()
+    both = "claude" in on and "codex" in on
+    return dynamic_enabled() and both and (linked is None or all(linked.get(a) for a in AGENTS))
+
+
+def save(agents: list[str] | None = None, dynamic: bool | None = None) -> list[str]:
+    """Write config/agents.yaml. agents None keeps the enabled list; dynamic None keeps the current setting."""
+    if agents is None:
+        picked = enabled()
+    else:
+        picked = [a for a in AGENTS if a in {str(x).strip().lower() for x in agents or []}]
     if not picked:
         raise ValueError("pick at least one agent: claude, codex or both")
+    dyn = dynamic_enabled() if dynamic is None else bool(dynamic)
     p = path()
     p.parent.mkdir(parents=True, exist_ok=True)
     tmp = p.with_suffix(".tmp")
     tmp.write_text("# Which coding agents Tabbie uses on this Mac: claude, codex, or both.\n"
                    "# Change it in the WebUI (model picker → Agents) or with bin/setup. No restart needed.\n"
-                   f"enabled: [{', '.join(picked)}]\n")
+                   f"enabled: [{', '.join(picked)}]\n"
+                   "# Hand-offs: with both agents signed in, Claude Code and Codex may pass part of a job to each other.\n"
+                   f"dynamic: {'true' if dyn else 'false'}\n")
     os.replace(tmp, p)
     return picked

@@ -90,6 +90,10 @@ def _on_pre_llm_call(user_message=None, session_id: str = "", **kwargs):
     _last_user["_last"] = text or ""
     if not text or text.startswith("/"):
         return None
+    marks = getattr(retrieve, "WORKER_TURNS", None) or {}
+    at = marks.pop(session_id or "default", None)
+    if at and __import__("time").time() - at < 30:
+        return None  # command-centre routed this turn to a worker: the hub only dispatches (no recall)
     try:
         return recall_block(text)
     except Exception:

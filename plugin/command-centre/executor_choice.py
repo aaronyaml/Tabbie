@@ -90,6 +90,14 @@ def get_choice(session_id: str) -> dict:
             "worker": CATALOG[p]["worker"], "default": not raw}
 
 
+def new_chat_choice() -> dict:
+    """What a chat that does not exist yet will run: the default, in get_choice's shape."""
+    d = default_choice()
+    info = model_info(d["provider"], d["model"])
+    return {**d, "name": info["name"], "desc": info["desc"], "worker": CATALOG[d["provider"]]["worker"],
+            "default": True}
+
+
 def set_choice(session_id: str, provider: str, model: str, effort: str | None = None) -> dict:
     effort = (effort or "").strip().lower() or None
     if not valid(provider, model, effort) or provider not in providers_on():
@@ -121,3 +129,27 @@ def claude_args(model: str | None, effort: str | None) -> list[str]:
 
 def codex_effort_args(effort: str | None) -> list[str]:
     return ["-c", f'model_reasoning_effort="{effort}"'] if effort else []
+
+
+# Same-tier model on the other provider, for hand-offs and limit switches. Override per model in
+# router.yaml: dynamic_agents.models: {claude-opus-5-5: gpt-6-astra, ...}.
+PEER = {
+    "claude-opus-5-5": "gpt-6-astra", "claude-fable-5-1": "gpt-6-astra",
+    "claude-sonnet-5-5": "gpt-6.1-sol", "claude-haiku-5-5": "gpt-6-luna",
+    "gpt-6-astra": "claude-opus-5-5", "gpt-6.1-sol": "claude-sonnet-5-5",
+    "gpt-6.1-terra": "claude-sonnet-5-5", "gpt-6-luna": "claude-haiku-5-5",
+}
+
+
+def peer_model(provider: str, model: str | None, overrides: dict | None = None,
+               available_openai: list[str] | None = None) -> dict:
+    """{provider, model, name} of the other provider's same-tier model. An OpenAI peer the Codex login
+    does not expose falls back to the first catalog model it does."""
+    other = "openai" if provider == "anthropic" else "anthropic"
+    want = (overrides or {}).get(model or "") or PEER.get(model or "")
+    ids = [m["id"] for m in CATALOG[other]["models"]]
+    if other == "openai" and available_openai:
+        ids = [i for i in ids if i in available_openai] or ids
+    if want not in ids:
+        want = ids[0]
+    return {"provider": other, "model": want, "name": model_info(other, want)["name"] if model_info(other, want) else want}

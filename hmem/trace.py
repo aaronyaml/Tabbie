@@ -1,11 +1,15 @@
 """Session traces: the evidence the learning system works from.
 
-Two sources, one format (memory/sessions/YYYY/MM/<trace-id>/trace.json + summary.md):
+Three sources, one format (memory/sessions/YYYY/MM/<trace-id>/trace.json + summary.md):
 - "hermes": one trace per command-centre request (state/requests/<id>/), its Claude transcript
   slice ([started, ended] of the run, so resumed sessions don't bleed into each other), agents,
   outcome and the user's next message in that conversation.
 - "claude-code": one trace per direct Claude Code conversation (~/.claude/projects/*/<sid>.jsonl)
   that is not already covered by a Hermes request.
+- "webui": one trace per Hermes WebUI hub chat (~/.hermes/webui/sessions/<sid>.json): only the
+  user's own messages (the hub's replies and tool calls are not evidence of what the user wants).
+  Its conversation key is `hermes:<sid>`, the same as that chat's worker requests, so support
+  counts never double up.
 
 Safety: transcripts are streamed line by line; results from credential paths and env-dump commands
 are dropped entirely; everything is scrubbed (patterns + this machine's actual secret values) BEFORE
@@ -26,6 +30,9 @@ from . import security, store
 
 HERMES = Path(os.environ.get("COMMAND_CENTRE_HOME", Path.home() / "hermes")).expanduser()
 CLAUDE_PROJECTS = Path(os.environ.get("HMEM_CLAUDE_PROJECTS", Path.home() / ".claude" / "projects")).expanduser()
+# Hermes WebUI chats with the hub (one JSON file per session). Most hub turns never become a worker
+# request, so without this source the user's own words in a project chat are never seen.
+WEBUI_SESSIONS = Path(os.environ.get("HMEM_WEBUI_SESSIONS", Path.home() / ".hermes" / "webui" / "sessions")).expanduser()
 MAX_TRACE_BYTES = 200_000
 MAX_LINE = 1_500_000  # longer transcript lines are images/blobs: skipped
 RESULT_CHARS = 400
@@ -504,6 +511,100 @@ def build_claude_code(path: Path) -> dict | None:
     return trace
 
 
+_OOB = re.compile(r"^\[OUT-OF-BAND USER MESSAGE[^\]]*\]\s*(.*?)\s*\[/OUT-OF-BAND USER MESSAGE\]\s*$", re.S)
+_WEBUI_ATTACH = re.compile(r"\n*\[Attached files[^\]]*\][\s\S]*$")
+
+
+def _webui_user_text(m: dict) -> str | None:
+    """What the person typed in one WebUI message (None = not theirs / nothing to learn from)."""
+    if not isinstance(m, dict) or m.get("role") != "user":
+        return None
+    c = m.get("content")
+    if isinstance(c, list):
+        c = "\n".join(b.get("text", "") for b in c if isinstance(b, dict) and b.get("type") in (None, "text", "input_text"))
+    if not isinstance(c, str):
+        return None
+    txt = c.strip()
+    oob = _OOB.match(txt)
+    if oob:  # a steer delivered mid-turn: the user's words are inside the wrapper
+        txt = oob.group(1).strip()
+    txt = _studio_user_text(txt) or ""  # automated studio dispatches carry no user words
+    txt = _WEBUI_ATTACH.sub("", txt).strip()
+    if not txt or txt.startswith(_SYS_USER):
+        return None
+    return txt
+
+
+def _webui_project_spaces(sess: dict) -> list[str]:
+    """The workspaces of the session's WebUI project (WebUI's own grouping), if it has one."""
+    pid = sess.get("project_id")
+    if not pid:
+        return []
+    for p in _read_json(WEBUI_SESSIONS.parent / "projects.json") or []:
+        if isinstance(p, dict) and p.get("project_id") == pid:
+            return [str(w) for w in (p.get("workspaces") or [])] + ([str(p["workspace"])] if p.get("workspace") else [])
+    return []
+
+
+def build_webui(path: Path, request_projects: dict | None = None) -> dict | None:
+    """One WebUI hub chat → a trace of the user's messages. The project comes from the chat's workspace
+    (a linked folder or ~/hermes/workspaces/<id>), else its WebUI project's workspaces, else the single
+    project its worker requests ran in (a General chat that routed work to one project)."""
+    sess = _read_json(path)
+    if not isinstance(sess, dict) or not sess.get("session_id"):
+        return None
+    sid = str(sess["session_id"])
+    msgs = []
+    for m in sess.get("messages") or []:
+        txt = _webui_user_text(m)
+        if txt:
+            t = _ts(m.get("timestamp"))
+            msgs.append({"t": _iso(t), "text": clean(txt, 1200), "class": classify_feedback(txt), "_ts": t})
+    if not msgs:
+        return None
+    from . import projects
+    ws = str(sess.get("workspace") or "")
+    general = os.path.realpath(str(HERMES / "general"))
+    rws = os.path.realpath(os.path.expanduser(ws)) if ws else ""
+    in_general = not ws or rws == general or rws.startswith(general + os.sep)  # General = no project
+    pid = None if in_general else projects.project_for_path(ws)
+    for sp in ([] if pid else _webui_project_spaces(sess)):
+        pid = projects.project_for_path(sp)
+        if pid:
+            break
+    if not pid:
+        owners = {x for x in (request_projects or {}).get(sid, set()) if x}
+        pid = owners.pop() if len(owners) == 1 else None
+    project = pid or (None if in_general else project_name(ws))
+    stamps = [m["_ts"] for m in msgs if m["_ts"]]
+    first = min(stamps, default=None) or _ts(sess.get("created_at"))
+    last = max([*stamps, _ts(sess.get("last_message_at")) or 0], default=None) or _ts(sess.get("updated_at"))
+    for m in msgs:
+        m.pop("_ts", None)
+    corrections = sum(1 for m in msgs if m["class"] == "correction")
+    trace = {
+        "schema": "hmem.trace/1", "id": f"w-{sid[:24]}", "source": "webui", "conversation": f"hermes:{sid}",
+        "project": project, "cwd": None if in_general else ws, "started": _iso(first), "ended": _iso(last),
+        "duration_s": round(last - first, 1) if first and last else None,
+        "user_request": msgs[0]["text"], "user_messages": msgs[:200], "title": clean(str(sess.get("title") or ""), 120),
+        "models": [x for x in [sess.get("model")] if x], "output_tokens": 0,
+        "steps": [], "tools": {}, "files_read": [], "files_modified": [], "commands": [], "tests": [], "errors": [],
+        "retries": 0, "taint": [], "final_result": "", "ok": None,
+        "feedback": {"class": "correction" if corrections else "none", "corrections": corrections},
+    }
+    trace["outcome"] = outcome(None, "", trace["feedback"]["class"])
+    if pid:
+        trace["project"] = pid
+    return trace
+
+
+def webui_session_files() -> list[Path]:
+    if not WEBUI_SESSIONS.is_dir():
+        return []
+    return sorted(p for p in WEBUI_SESSIONS.glob("*.json") if re.fullmatch(r"[0-9a-zA-Z_-]{6,64}", p.stem)
+                  and not p.stem.startswith("_"))
+
+
 _PROJECTS: dict = {"map": None}
 
 
@@ -559,13 +660,13 @@ def _cursor() -> dict:
     return _read_json(store.root() / ".stats" / "trace_cursor.json") or {}
 
 
-def collect(*, hermes: bool = True, claude_code: bool = True, since_days: int | None = None,
+def collect(*, hermes: bool = True, claude_code: bool = True, webui: bool = True, since_days: int | None = None,
             limit: int | None = None, should_stop=None) -> dict:
     """Build/refresh traces for everything new or changed since the last run. Incremental via a cursor
     of (path → size, mtime). should_stop() lets the caller abort (e.g. a worker request started)."""
     store.init()
     cur = _cursor()
-    done = {"hermes": 0, "claude_code": 0, "skipped": 0}
+    done = {"hermes": 0, "claude_code": 0, "webui": 0, "skipped": 0}
     covered = set()
     reqs = []
     if (HERMES / "state" / "requests").exists():
@@ -613,6 +714,31 @@ def collect(*, hermes: bool = True, claude_code: bool = True, since_days: int | 
             if t:
                 save(t)
                 done["claude_code"] += 1
+            cur[str(f)] = stamp
+            n += 1
+            if limit and n >= limit:
+                break
+    if webui:
+        req_projects: dict[str, set] = {}
+        for r in reqs:
+            if r.get("session_id"):
+                req_projects.setdefault(str(r["session_id"]), set()).add(
+                    r.get("project_id") or (project_name(r.get("project")) if r.get("project") else None))
+        for f in webui_session_files():
+            try:
+                st = f.stat()
+            except OSError:
+                continue
+            stamp = [st.st_size, int(st.st_mtime)]
+            if cur.get(str(f)) == stamp or st.st_mtime < cutoff:
+                done["skipped"] += 1
+                continue
+            if should_stop and should_stop():
+                break
+            t = build_webui(f, req_projects)
+            if t:
+                save(t)
+                done["webui"] += 1
             cur[str(f)] = stamp
             n += 1
             if limit and n >= limit:

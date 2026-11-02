@@ -15,7 +15,10 @@
  *      A small "Send now" button beside the send button does the same.
  *   4. While a Claude Code worker runs, queued messages go straight to it (it reads them at its next
  *      step) and Send now interrupts its current step first. Without a live worker (Codex, or the
- *      hub replying by itself) both fall back to the steer above.
+ *      hub replying by itself) both fall back to the steer above. Each one Claude takes leaves a
+ *      "Sent to Claude" note under that turn's message, kept through re-renders.
+ *   5. Composer Enter fixes: no stray newline after Enter queues a message, and Enter on a
+ *      slash command that is already typed in full sends it instead of only closing the menu.
  * Never drops a message: if the push is refused the item stays queued (it drains when the turn
  * ends, as upstream does), and if the turn already ended it is sent as a normal message. A toast
  * says which happened.
@@ -114,6 +117,57 @@
     }
     return false;
   }
+  // The hint/toast wording: a live worker will take text-only queued messages within seconds.
+  const workerTakes = (sid) => liveCache.sid === sid && liveCache.open;
+
+  // ── 2b. "Sent to Claude" notes ─────────────────────────────────────────────
+  // Upstream's steer chip ("STEER", appended to #msgInner) is wiped by the next re-render, so a
+  // message Claude took vanished from the chat. Each note here is anchored after the user message
+  // of the turn it joined and put back whenever the transcript is rebuilt (memory only).
+  const notes = new Map(); // sid -> [{ el, idx, raw }]
+  const userRows = (inner) => Array.from(inner.querySelectorAll('.msg-row[data-role="user"]'));
+  function placeNotes() {
+    const inner = document.getElementById('msgInner');
+    if (!inner || !notes.size) return;
+    const list = notes.get(curSid()) || [];
+    const mine = new Set(list.map((n) => n.el));
+    inner.querySelectorAll('.hxq-sent').forEach((n) => { if (!mine.has(n)) n.remove(); }); // HTML-cache copies, other chats
+    const rows = userRows(inner);
+    let prev = null, prevRow = null;
+    for (const n of list) {
+      const row = rows.find((r) => r.dataset.sessionMsgIdx === n.idx && r.dataset.rawText === n.raw)
+        || rows.find((r) => n.idx != null && r.dataset.sessionMsgIdx === n.idx)
+        || rows.filter((r) => r.dataset.rawText === n.raw).pop();
+      if (!row) { n.el.remove(); continue; } // turn not rendered (windowed out, or edited away)
+      const after = row === prevRow && prev ? prev : row;
+      if (after.nextElementSibling !== n.el) after.after(n.el); // no-op once placed: no observer loop
+      prev = n.el; prevRow = row;
+    }
+  }
+  let observed = null;
+  const observer = typeof MutationObserver === 'function' ? new MutationObserver(placeNotes) : null;
+  function watchTranscript() {
+    const inner = document.getElementById('msgInner');
+    if (!observer || !inner || inner === observed) return;
+    observer.disconnect();
+    observer.observe(inner, { childList: true });
+    observed = inner;
+  }
+  function noteSent(sid, text) {
+    const inner = document.getElementById('msgInner');
+    const last = inner && userRows(inner).pop();
+    if (!last) return;
+    const el = document.createElement('div');
+    el.className = 'hxq-sent';
+    el.innerHTML = '<span class="hxq-sent-label">Sent to Claude</span><span class="hxq-sent-body"></span>';
+    el.lastChild.textContent = text.length > 300 ? text.slice(0, 297) + '…' : text;
+    const list = notes.get(sid) || [];
+    list.push({ el, idx: last.dataset.sessionMsgIdx, raw: last.dataset.rawText });
+    notes.set(sid, list.slice(-20));
+    watchTranscript();
+    placeNotes();
+    try { scrollIfPinned(); } catch (_) {}
+  }
 
   // ── 2. push one queued entry straight into the running turn ───────────────
   async function pushNow(sid, ts, mode) {
@@ -128,7 +182,7 @@
       const ok = await toWorker(sid, text0, mode === 'queue' ? 'queue' : 'now');
       pushing.delete(ts);
       if (ok) {
-        if (curSid() === sid && has('_showSteerIndicator')) _showSteerIndicator(text0);
+        if (curSid() === sid) noteSent(sid, text0);
         toast(mode === 'queue' ? 'Passed to Claude: it reads it at its next step' : 'Sent to Claude: it paused and is reading it now', 2600);
         return;
       }
@@ -180,7 +234,7 @@
     putBack(sid, entry, index);
     let why = '';
     try { why = t(_steerFailureMessageKey(fb)); } catch (_) {}
-    toast((why ? why + '. ' : 'Couldn’t push it in. ') + 'It stays queued and sends after this reply.', 4500, 'warning');
+    toast((why ? why + '. ' : 'Couldn’t push it in. ') + (workerTakes(sid) ? 'It stays queued and goes to Claude in a moment.' : 'It stays queued and sends after this reply.'), 4500, 'warning');
   }
   window.hxQueuePushNow = pushNow;
 
@@ -221,11 +275,95 @@
   if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', keepDrafts);
   window.addEventListener('load', keepDrafts);
 
+  // ── 2c. queued messages survive a reload ──────────────────────────────────
+  // The queue is persisted ('hermes-queue-<sid>') but upstream never rebuilds it on load: it only puts
+  // the first entry in an empty composer, and only if it's newer than the last assistant reply, which
+  // a run that finished after the reload always is. Otherwise the entry sat orphaned in storage.
+  // Snapshot it (at start-up, and before each loadSession, since upstream may clear it), then put it
+  // back in the in-memory queue once that chat's messages are loaded; the forwarder / drain take over.
+  const persisted = new Map(); // sid -> entries read from storage, not yet restored
+  const restoredTs = new Set(); // _queued_at of entries brought back (for the idle hint)
+  const PREFIX = 'hermes-queue-';
+  function snapshot(sid) {
+    const read = (store) => {
+      try {
+        for (let i = 0; i < store.length; i++) {
+          const k = store.key(i);
+          if (!k || !k.startsWith(PREFIX) || (sid && k !== PREFIX + sid)) continue;
+          const v = JSON.parse(store.getItem(k) || '[]');
+          if (Array.isArray(v) && v.length && !persisted.has(k.slice(PREFIX.length))) persisted.set(k.slice(PREFIX.length), v);
+        }
+      } catch (_) {}
+    };
+    read(window.sessionStorage); read(window.localStorage); // sessionStorage wins, as upstream reads it
+  }
+  snapshot(null);
+  const msgText = (m) => {
+    const c = m && m.content;
+    if (typeof c === 'string') return c;
+    return Array.isArray(c) ? c.map((p) => (p && (p.text || (typeof p === 'string' ? p : ''))) || '').join('\n') : '';
+  };
+  // Sent for real = its text is a user message from after it was queued (timestamps are seconds).
+  function alreadySent(e, msgs) {
+    const text = entryText(e);
+    return msgs.some((m) => {
+      if (!m || m.role !== 'user') return false;
+      const ts = (m.timestamp || m._ts || 0) * 1000;
+      if (ts && e._queued_at && ts < e._queued_at - 1000) return false;
+      const body = msgText(m).trim();
+      return body === text || (text.length > 8 && body.includes(text));
+    });
+  }
+  function tryRestore(sid) {
+    const pending = sid && persisted.get(sid);
+    if (!pending) return;
+    try { if (_loadingSessionId === sid) return; } catch (_) {} // messages not in yet
+    const s = st();
+    if (!s || curSid() !== sid || !Array.isArray(s.messages)) return;
+    persisted.delete(sid);
+    const q = liveQueue(sid);
+    const have = new Set(q.map((e) => e && e._queued_at));
+    const back = pending.filter((e) => e && entryText(e) && !have.has(e._queued_at) && !alreadySent(e, s.messages));
+    if (!back.length) return;
+    // Upstream may have put the first one in the composer as a draft: it's queued again, so clear it.
+    const box = document.getElementById('msg');
+    if (box && back.some((e) => entryText(e) === box.value.trim())) {
+      const text = box.value;
+      box.value = '';
+      try { _clearRestoredGoalContinuationDraft(); } catch (_) {}
+      try { _clearComposerDraft(sid, text, []); } catch (_) {}
+      try { autoResize(); } catch (_) {}
+    }
+    try {
+      const live = _getSessionQueue(sid, true);
+      back.forEach((e) => { live.push(Object.assign({}, e, { files: realFiles(e) })); restoredTs.add(e._queued_at); }); // stored Files are {} by now
+      live.sort((a, b) => (a._queued_at || 0) - (b._queued_at || 0));
+      _persistSessionQueueStorage(sid, live);
+      delete _queueRenderKeys[sid];
+    } catch (_) { return; }
+    try { updateQueueBadge(sid); } catch (_) {}
+    const n = back.length === 1 ? 'Your queued message is' : `${back.length} queued messages are`;
+    toast(runningFor(sid) ? `${n} still queued` : `${n} still queued: use Send now to send`, 4000);
+  }
+  function hookLoadSession() {
+    const orig = window.loadSession;
+    if (typeof orig !== 'function' || orig.__hxqRestore) return false;
+    const w = async function (sid) {
+      if (sid) snapshot(String(sid));
+      try { return await orig.apply(this, arguments); } finally { tryRestore(curSid()); }
+    };
+    w.__hxqRestore = true;
+    window.loadSession = w;
+    return true;
+  }
+
   // Queued messages don't wait for the whole reply: while a Claude Code worker runs, each one is
   // handed to it (like typing ahead in Claude Code), oldest first. Ones with files keep waiting.
   let forwarding = false;
   setInterval(async () => {
     const sid = curSid();
+    hookLoadSession(); // no-op once hooked
+    tryRestore(sid); // start-up load that ran before this file was hooked in
     if (forwarding || !sid || !runningFor(sid)) return;
     const next = liveQueue(sid).find((e) => e && entryText(e) && !realFiles(e).length && !pushing.has(e._queued_at));
     if (!next || !(await workerOpen(sid))) return;
@@ -274,7 +412,14 @@
       hint.className = 'hxq-hint';
       header.firstChild.after(hint);
     }
-    hint.textContent = running ? 'sends after this reply' : 'sends next';
+    // Text-only items go to a live Claude worker within seconds (the forwarder below), not after the reply.
+    const toClaude = () => running && workerTakes(sid) && liveQueue(sid).some((e) => entryText(e) && !realFiles(e).length);
+    const said = toClaude();
+    hint.textContent = said ? 'goes to Claude in a moment' : running ? 'sends after this reply'
+      : q.some((e) => e && restoredTs.has(e._queued_at)) ? 'kept from before the reload' : 'sends next';
+    if (running && (liveCache.sid !== sid || Date.now() - liveCache.at >= 4000)) {
+      workerOpen(sid).then(() => { if (hint.isConnected && toClaude() !== said) decorate(sid); });
+    }
 
     const rows = inner.querySelectorAll('.queue-card-row');
     rows.forEach((row, i) => {
@@ -361,6 +506,62 @@
     e.preventDefault();
     e.stopImmediatePropagation();
     composerPushNow();
+    armSwallow(e.target);
+  }
+
+  // ── 5. composer Enter fixes ────────────────────────────────────────────────
+  // Queueing clears #msg synchronously inside upstream's keydown (a normal send clears it only after
+  // an await), so a line break that still arrives for that Enter (a separate keypress/char event, as
+  // CDP-driven input sends) lands in the now-empty box. Drop a bare newline right after such an Enter.
+  let swallowUntil = 0;
+  function armSwallow(box) { if (box && !box.value) swallowUntil = Date.now() + 400; }
+  function onKeyAfter(e) { // bubble phase on document: after upstream's #msg handler
+    if (e.key === 'Enter' && e.defaultPrevented && e.target && e.target.id === 'msg') armSwallow(e.target);
+  }
+  const isBreak = (e) => e.inputType === 'insertLineBreak' || e.inputType === 'insertParagraph'
+    || (e.inputType === 'insertText' && /^[\r\n]+$/.test(e.data || ''));
+  function onBeforeInput(e) {
+    if (!e.target || e.target.id !== 'msg' || Date.now() > swallowUntil || e.target.value || !isBreak(e)) return;
+    e.preventDefault();
+    swallowUntil = 0;
+  }
+  function onInput(e) { // backstop when no cancelable beforeinput came first
+    const box = e.target;
+    if (!box || box.id !== 'msg' || Date.now() > swallowUntil || !box.value || box.value.trim()) return;
+    box.value = '';
+    swallowUntil = 0;
+    try { autoResize(); } catch (_) {}
+  }
+
+  // Slash menu: Enter picks the highlighted command, so with "/limit" already typed it only closed
+  // the menu and a 2nd Enter sent. When the text already is that command exactly, close the menu
+  // (marked dismissed so a late refresh can't reopen it) and let upstream's handler send as usual.
+  function itemCommand(item) {
+    if (!item || item.classList.contains('cmd-item-path')) return null;
+    const parent = item.querySelector('.cmd-item-parent'), sub = item.querySelector('.cmd-item-subarg');
+    if (parent && sub) return `${parent.textContent.trim()} ${sub.textContent.trim()}`;
+    const name = item.querySelector('.cmd-item-name');
+    const first = name && name.firstChild;
+    return first && first.nodeType === 3 ? first.textContent.trim() : null; // "/name" before the arg/badge spans
+  }
+  function onSlashEnter(e) {
+    if (e.key !== 'Enter' || e.shiftKey || e.altKey || e.isComposing || e.keyCode === 229) return;
+    const box = e.target;
+    if (!box || box.id !== 'msg') return;
+    const dd = document.getElementById('cmdDropdown');
+    if (!dd || !dd.classList.contains('open')) return;
+    const sendKey = window._sendKey || 'enter';
+    if (sendKey === 'shift+enter') return;
+    // Only where upstream's plain path would send this Enter (phones keep Enter = newline).
+    const touch = has('_isTouchOnlyDevice') && _isTouchOnlyDevice();
+    if ((sendKey === 'ctrl+enter' || touch) && !(e.ctrlKey || e.metaKey)) return;
+    const items = dd.querySelectorAll('.cmd-item');
+    const item = dd.querySelector('.cmd-item.selected') || (items.length === 1 ? items[0] : null);
+    const cmd = itemCommand(item);
+    const text = box.value || '';
+    const at = has('_activeSlashCommandOffset') ? _activeSlashCommandOffset(text) : (text.startsWith('/') ? 0 : -1);
+    if (!cmd || at < 0 || text.slice(at).trim() !== cmd) return;
+    try { hideCmdDropdown(); markSlashDropdownDismissed(); } catch (_) { return; }
   }
 
   let tries = 0;
@@ -370,7 +571,21 @@
     wrap('_renderQueueChips', (sid) => decorate(sid));
     wrap('updateSendBtn', () => { syncNowBtn(); busyPlaceholder(); });
     wrap('_applyBusyComposerPlaceholder', busyPlaceholder);
+    // Upstream's own steer chip (Codex / hub path): plainer label than "Steer".
+    wrap('_showSteerIndicator', () => {
+      const b = document.querySelector('#msgInner .steer-indicator .steer-badge') // upstream keeps only one;
+      if (b) b.textContent = 'Sent';
+    });
     document.addEventListener('keydown', onKey, true);
+    document.addEventListener('keydown', onSlashEnter, true);
+    document.addEventListener('keydown', onKeyAfter);
+    document.addEventListener('beforeinput', onBeforeInput, true);
+    document.addEventListener('input', onInput, true);
+    watchTranscript();
+    hookLoadSession();
+    // The start-up load may already be under way (unhooked): retry briefly until its messages land.
+    const t0 = Date.now();
+    const early = setInterval(() => { tryRestore(curSid()); if (!persisted.has(curSid()) || Date.now() - t0 > 15000) clearInterval(early); }, 250);
     const msg = document.getElementById('msg');
     if (msg) msg.addEventListener('input', syncNowBtn);
     syncNowBtn();

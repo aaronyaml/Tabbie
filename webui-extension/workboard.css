@@ -151,3 +151,10 @@ html.hx-wb-open, html.hx-wb-open body { overflow: hidden; }
   .hx-wb-ghost span { display: none; }
   .hx-wb-done span { display: inline; }
 }
+
+/* Phone: a grabber on the editor, which pulls down to dismiss (workboard.js swipeDown). */
+@media (max-width: 640px) {
+  .hx-wb-head { position: relative; }
+  .hx-wb-head::before { content: ''; position: absolute; top: calc(3px + env(safe-area-inset-top)); left: 50%; width: 36px; height: 5px; margin-left: -18px;
+    border-radius: 3px; background: var(--hx-fill-2, rgba(127,127,127,.28)); }
+}

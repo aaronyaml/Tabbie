@@ -7,6 +7,7 @@ A different folder (e.g. an existing studio of your own) can be named in config/
 (`studio: ~/my-studio`, per machine, git-ignored); an existing folder is never changed.
 
 status() is what the sidecar's /motion/status serves: booleans and hints only, never a key or token.
+films() is /motion/films: the films in <studio>/studio, so any browser finds them without a file-API session.
 Stdlib only (setup runs on the Mac's built-in Python 3.9).
 """
 from __future__ import annotations
@@ -200,6 +201,32 @@ def install() -> dict:
 
     threading.Thread(target=run, daemon=True, name="motion-install").start()
     return install_state()
+
+
+# ── the films in <studio>/studio (the panel's home list) ──────────────────────────────────────
+def films(p: Path | None = None) -> dict:
+    """{films: [{project, title, step, updatedAt, sessionId?}]}, newest first, read from each film's
+    project.json (written by the Motion panel). The folder name is the project; unreadable ones are skipped."""
+    d = (p or studio_dir()) / "studio"
+    out = []
+    try:
+        dirs = sorted(x for x in d.iterdir() if x.is_dir() and not x.name.startswith("."))
+    except OSError:
+        dirs = []
+    for x in dirs:
+        try:
+            pj = json.loads((x / "project.json").read_text())
+        except (OSError, ValueError):
+            continue
+        if not isinstance(pj, dict):
+            continue
+        f = {"project": x.name, "title": str(pj.get("title") or x.name), "step": str(pj.get("step") or "audio"),
+             "updatedAt": str(pj.get("updatedAt") or pj.get("createdAt") or "")}
+        if isinstance(pj.get("sessionId"), str) and pj["sessionId"]:
+            f["sessionId"] = pj["sessionId"]
+        out.append(f)
+    out.sort(key=lambda f: f["updatedAt"], reverse=True)
+    return {"films": out}
 
 
 # ── what's linked (for the Generate buttons) ──────────────────────────────────────────────────

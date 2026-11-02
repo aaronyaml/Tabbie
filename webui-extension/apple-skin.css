@@ -362,12 +362,33 @@ body { -webkit-font-smoothing: antialiased; text-rendering: optimizeLegibility; 
   background: rgba(29,31,37,.82) !important; border-color: #2C2F37 !important;
   box-shadow: inset 0 1px 0 rgba(255,255,255,.05), 0 12px 32px -8px rgba(0,0,0,.6) !important;
 }
-/* focus: the wing gradient as a 1px ring (hero moment) */
-.composer-box:focus-within, :root.dark .composer-box:focus-within {
-  border-color: transparent !important;
-  background: linear-gradient(var(--hx-raised), var(--hx-raised)) padding-box, var(--hx-wing) border-box !important;
+/* focus: the wing gradient lights up as one neon object. ::after is the tube (a gradient ring around an
+   opaque fill); .hx-neon (apple-skin.js) is the same ring shape blurred three times right behind it,
+   tight to wide, so the light falls off smoothly from the line itself. Everything fades in by opacity
+   (a gradient can't transition) and the wide bloom breathes while focused. */
+.composer-box { transition: border-color .4s ease !important; }
+.composer-box::after {
+  content: ""; position: absolute; inset: -1px; border-radius: inherit; pointer-events: none;
+  z-index: -1; border: 1px solid transparent; opacity: 0; transition: opacity .22s ease .12s;
+  background: linear-gradient(var(--hx-raised), var(--hx-raised)) padding-box, var(--hx-wing) border-box;
 }
-:root.dark .composer-box:focus-within { background: linear-gradient(#1D1F25, #1D1F25) padding-box, var(--hx-wing) border-box !important; }
+:root.dark .composer-box::after { background: linear-gradient(#1D1F25, #1D1F25) padding-box, var(--hx-wing) border-box; }
+.hx-neon { position: absolute; inset: -1px; border-radius: inherit; pointer-events: none; z-index: -2;
+  opacity: 0; transition: opacity .2s ease; }
+.hx-neon i { position: absolute; inset: 0; border-radius: inherit; background: var(--hx-wing); }
+.hx-neon i:nth-child(1) { filter: blur(2px); opacity: .85; }
+.hx-neon i:nth-child(2) { filter: blur(6px); opacity: .55; }
+.hx-neon i:nth-child(3) { filter: blur(16px); opacity: .45; }
+.composer-box:focus-within::after { opacity: 1; transition-delay: 0s; }
+.composer-box:focus-within > .hx-neon { opacity: .6; transition: opacity .5s ease .1s; }
+:root.dark .composer-box:focus-within > .hx-neon { opacity: .9; }
+.composer-box:focus-within > .hx-neon i:nth-child(3) { animation: hx-neon 3.6s ease-in-out .6s infinite; }
+.composer-box:focus-within, :root.dark .composer-box:focus-within { border-color: transparent !important; }
+@keyframes hx-neon { 50% { opacity: .25; filter: blur(20px); } }
+@media (prefers-reduced-motion: reduce) {
+  .composer-box, .composer-box::after, .hx-neon { transition: none !important; }
+  .composer-box:focus-within > .hx-neon i { animation: none; }
+}
 #msg { font-size: 16px; line-height: 1.5; }
 /* workspace / project + profile live inside the composer as soft pills */
 .composer-workspace-group, .composer-profile-chip {
@@ -467,8 +488,6 @@ input[type="checkbox"], input[type="radio"] { accent-color: var(--hx-accent); }
 }
 
 /* ── fixes round 3 ── */
-.composer-box:focus-within { box-shadow: inset 0 1px 0 rgba(255,255,255,.6), 0 1px 2px rgba(20,20,40,.05), 0 12px 32px -8px rgba(20,20,60,.16) !important; }
-:root.dark .composer-box:focus-within { box-shadow: 0 12px 32px -8px rgba(0,0,0,.6) !important; }
 .tool-card.open .tool-card-detail { padding: 0 12px 12px !important; }
 .tool-card-args { padding: 2px 0 8px !important; }
 .app-titlebar-sub { background: var(--hx-fill) !important; color: var(--hx-text-2) !important; border: 0 !important; font-family: var(--font-ui) !important; border-radius: 6px !important; }
@@ -606,3 +625,21 @@ input[type="checkbox"], input[type="radio"] { accent-color: var(--hx-accent); }
 /* Select chevron: upstream draws it as the select's background-image with no-repeat, but some later
  * panel rules (Kanban filters, bulk bar…) re-set `background`, and the arrow tiled across the field. */
 select { background-repeat: no-repeat !important; background-position: right 10px center !important; padding-right: 28px !important; }
+
+/* Insights: the "LLM Wiki" status card is for Hermes Agent's optional wiki skill, which Tabbie doesn't use. */
+#llmWikiStatusCard { display: none !important; }
+
+/* Page headers (Board, Skills, Memory, Spaces, Profiles, Insights, Logs, …) start right where the floating
+ * sidebar toggle sits (sidebar-toggle.js: 32px button, 10px from the main area's left edge), so it drew on
+ * top of the title. Start the header after it with a normal gap. Settings centres its column, so it only
+ * needs the extra room when that column is near the left edge. */
+@media (min-width: 641px) {
+  main.main > .main-view .main-view-header { padding-left: 56px; }
+  main.main > #mainSettings .settings-main { padding-left: clamp(24px, calc(56px - (100% - 768px) / 2), 56px); }
+}
+
+/* Touch: the session row's ⋯ button is always visible and absolutely placed over the row's right
+   edge, where the time label sits. Reserve its width so the time stays readable beside it. */
+@media (hover: none), (max-width: 640px) {
+  .session-item .session-title-row { padding-right: 28px; }
+}

@@ -1,6 +1,7 @@
 /* Tabbie — page routes: every page has its own address, so a refresh lands back on it.
  *   /kanban, /tasks, /skills, /memory, /workspaces, /profiles, /todos, /insights, /logs, /settings
  *   /projects   the Projects overlay        /motion   the studio (motion-boot.js + motion-studio.js)
+ *   /projects#<project>[/<tab>]   an open project (projects.js owns the hash; it's kept here)
  *   /session/<id> or /   the chat (upstream)
  * motion-boot.js (first script) turns a page address into the page to open on load; Caddy serves the
  * app shell for these paths. Here: keep the address bar on the page that's showing. Panel switches

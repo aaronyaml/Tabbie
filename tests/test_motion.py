@@ -91,3 +91,19 @@ def test_install_from_the_panel(monkeypatch):
         time.sleep(0.05)
     s = motion.status()
     assert s["install"]["state"] == "done" and s["installed"] and s["exists"]
+
+
+def test_films_lists_the_studio_folder(tmp_path):
+    assert motion.films() == {"films": []}  # no studio yet
+    st = tmp_path / "tabbie" / "motion" / "studio"
+    for name, pj in {"old": {"title": "Old", "step": "editor", "sessionId": "abc123", "updatedAt": "2026-01-01T00:00:00Z"},
+                     "new": {"title": "New", "updatedAt": "2026-02-01T00:00:00Z"}}.items():
+        (st / name).mkdir(parents=True)
+        (st / name / "project.json").write_text(json.dumps({"schema": "tabbie.motion-studio/1", "project": "x", **pj}))
+    (st / "broken").mkdir()
+    (st / "broken" / "project.json").write_text("{")
+    (st / "empty").mkdir()
+    assert motion.films()["films"] == [
+        {"project": "new", "title": "New", "step": "audio", "updatedAt": "2026-02-01T00:00:00Z"},
+        {"project": "old", "title": "Old", "step": "editor", "updatedAt": "2026-01-01T00:00:00Z", "sessionId": "abc123"},
+    ]

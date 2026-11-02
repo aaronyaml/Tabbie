@@ -13,15 +13,18 @@ from __future__ import annotations
 
 import json
 import os
+import re
+import secrets
+import threading
 import time
 from pathlib import Path
 
-from . import executor_choice, projects, providers, questions
+from . import executor_choice, limits_gate, projects, providers, questions, worker_profile
 from .agents import AgentRun
 from .attachments import Manifest
 from .common import REQUESTS_DIR, STATE_DIR, load_config, log_decision, read_json, write_json
 from .providers import (WORKER_RULES, claude_transcript_tail, codex_models, git_state, run_astra_executor, run_claude,
-                        run_planner, usage_limit_info)
+                        run_planner, usage_limit_info, worker_rules)
 from .common import LOCKS_DIR, agents
 from .router import ASTRA, CLAUDE, classify, hub_tool_request, interpret_reply, looks_like_chat
 from .state import Request, active_planning_request, session_state, save_session_state, set_active
@@ -102,7 +105,7 @@ def _route_line(r: Request) -> str:
     who = _worker_label(r["session_id"])
     if r["route"] == CLAUDE:
         return f"Route: {who} — {r['route_reason']}"
-    return f"Route: Astra → approval → {who} — {r['route_reason']}"
+    return f"Route: Codex → approval → {who} — {r['route_reason']}"
 
 
 def _known_projects_hint() -> str:
@@ -110,11 +113,309 @@ def _known_projects_hint() -> str:
     return ", ".join(names) or "(none discovered)"
 
 
+# --------------------------------------------------------------------------- verbatim relay (P4)
+# The worker's own reply reaches the user unchanged: the tool writes it to requests/<id>/reply-<tok>.md
+# and hands the hub only a placeholder line; transform_llm_output (registered with hold_stream, so the
+# placeholder never streams) swaps it for the file before the reply is shown and stored. Older Hermes
+# without hold_stream, or executor.relay: hub, keeps the old behaviour (the hub rewrites the result).
+
+_RELAY = {"on": False}
+_REPLY_RX = re.compile(r"\[\[cc:reply (\d{8}-\d{6}-[0-9a-f]{6}):([0-9a-f]{6,16})\]\]")
+_PENDING: dict[str, list[tuple[str, str]]] = {}   # session id -> replies the hub was handed this turn
+_PENDING_LOCK = threading.Lock()
+
+
+def _relay_on(cfg: dict | None = None) -> bool:
+    if not _RELAY["on"]:
+        return False
+    try:
+        cfg = cfg if cfg is not None else load_config()
+    except Exception:
+        cfg = {}
+    return str((cfg.get("executor", {}) or {}).get("relay", "verbatim")).lower() != "hub"
+
+
+def _note_lines(r: Request, since: float = 0.0) -> list[str]:
+    """One Note line per hand-off the delegate server had to refuse (limit, busy) during this run."""
+    out = []
+    for ln in (r.dir / "notes.jsonl").read_text().splitlines() if (r.dir / "notes.jsonl").exists() else []:
+        try:
+            n = json.loads(ln)
+        except json.JSONDecodeError:
+            continue
+        if n.get("at", 0) >= since and n.get("kind") == "delegate_refused" and n.get("reason") in ("limit", "busy"):
+            line = f"Note: hand-off skipped: {n.get('note')}"
+            if line not in out:
+                out.append(line)
+    return out
+
+
+def _relay(r: Request, out: dict, body: str, *, keep: tuple[str, ...] = ()) -> dict:
+    """Swap the tool result's long text for a reply placeholder (see above). keep: extra keys the hub
+    still needs (e.g. action for a clarify offer)."""
+    if not _relay_on() or not (body or "").strip():
+        return out
+    tok = secrets.token_hex(4)
+    r.write_text(f"reply-{tok}.md", body.strip() + "\n")
+    with _PENDING_LOCK:
+        _PENDING.setdefault(r["session_id"] or "", []).append((r.id, tok))
+    slim = {"request_id": r.id, "ok": out.get("ok"), "route": out.get("route"), "reply": f"[[cc:reply {r.id}:{tok}]]",
+            "note": "Reply with the `route` line (if given), a blank line, then the `reply` line EXACTLY as written, "
+                    "alone on its line. The app replaces it with the worker's own reply. Write nothing else."}
+    for k in ("awaiting_answer", "stopped", *keep):
+        if k in out:
+            slim[k] = out[k]
+    return slim
+
+
+def _reply_body(r: Request, res: dict, *, clean: str | None = None, started: float = 0.0) -> str:
+    """What the user reads under the route line: the worker's own text, or a short failure."""
+    if res.get("stopped_by_user"):
+        body = "Stopped by you. The work done so far stays in the project."
+    elif res.get("ok"):
+        body = (clean if clean is not None else (res.get("result") or "")).strip() or "Done."
+    else:
+        text = (res.get("result") or "").strip()
+        body = text or f"Problem: {str(res.get('error') or 'the worker failed')[:600]}"
+    lines = _note_lines(r, started)
+    denials = res.get("permission_denials") or []
+    if denials:
+        names = sorted({str(d.get("tool_name") or d.get("tool") or "a tool") for d in denials if isinstance(d, dict)})
+        lines.append(f"Note: {len(denials)} tool call(s) were blocked by permissions ({', '.join(names)[:120]}).")
+    return body + ("\n\n" + "\n".join(lines) if lines else "")
+
+
+def _on_transform_llm_output(response_text=None, session_id: str = "", **kwargs):
+    """Replace [[cc:reply …]] placeholders with the saved worker reply. Never raises: a held transform that
+    fails would withhold the reply."""
+    try:
+        if not isinstance(response_text, str):
+            return None
+        with _PENDING_LOCK:
+            pending = _PENDING.pop(session_id or "", [])
+        used: set[tuple[str, str]] = set()
+
+        def sub(m):
+            f = REQUESTS_DIR / m.group(1) / f"reply-{m.group(2)}.md"
+            try:
+                body = f.read_text().rstrip()
+            except OSError:
+                return m.group(0)
+            used.add((m.group(1), m.group(2)))
+            return body
+        new = _REPLY_RX.sub(sub, response_text)
+        for rid, tok in pending:  # the hub dropped the placeholder: the reply is still shown
+            if (rid, tok) in used:
+                continue
+            try:
+                new = new.rstrip() + "\n\n" + (REQUESTS_DIR / rid / f"reply-{tok}.md").read_text().rstrip()
+            except OSError:
+                pass
+        return new if new != response_text else None
+    except Exception:
+        return None
+
+
+# --------------------------------------------------------------------------- early start (P3)
+# On the direct route the worker starts from the routing hook, so the hub's first LLM call (~5s) runs
+# alongside it. cc_claude_execute then attaches to the running job (live feed + result) instead of
+# starting a second one.
+
+_JOBS: dict[str, dict] = {}
+_JOBS_LOCK = threading.Lock()
+
+
+class _FeedHolder:
+    """Live-feed lines from a job that started before its tool call: buffered until the tool attaches."""
+
+    def __init__(self):
+        self.lock = threading.Lock()
+        self.buf: list[str] = []
+        self.target = None
+
+    def __call__(self, text: str) -> None:
+        with self.lock:
+            if self.target:
+                try:
+                    self.target(text)
+                except Exception:
+                    pass
+            else:
+                self.buf.append(text)
+
+    def attach(self, feed) -> None:
+        with self.lock:
+            for t in self.buf:
+                try:
+                    feed(t)
+                except Exception:
+                    pass
+            self.buf.clear()
+            self.target = feed
+
+
+def _early_start(r: Request, cfg: dict) -> None:
+    if not (cfg.get("executor", {}) or {}).get("early_start", False):
+        return
+    with _JOBS_LOCK:
+        if r.id in _JOBS:
+            return
+        job = {"done": threading.Event(), "result": None, "feed": _FeedHolder(), "session_id": r["session_id"],
+               "started": time.time(), "attached": False}
+        _JOBS[r.id] = job
+
+    def go():
+        try:
+            job["result"] = _execute(Request(r.id), feed=job["feed"])
+        except Exception as exc:
+            log_decision(event="early_start_failed", request=r.id, error=repr(exc)[:300])
+            job["result"] = {"request_id": r.id, "ok": False, "error": f"worker failed to start: {exc!r}"}
+        finally:
+            job["done"].set()
+    threading.Thread(target=go, daemon=True, name=f"cc-early-{r.id}").start()
+    log_decision(event="early_start", request=r.id)
+
+
+def _attach_job(rid: str):
+    """The early-started job's result, waiting for it with this tool call's live feed. None = no job."""
+    with _JOBS_LOCK:
+        job = _JOBS.get(rid)
+        if job:
+            job["attached"] = True
+    if not job:
+        return None
+    feed = _live_feed()
+    if feed:
+        job["feed"].attach(feed)
+    job["done"].wait()
+    with _JOBS_LOCK:
+        _JOBS.pop(rid, None)
+    return job["result"]
+
+
+def _on_agent_loop_stopped(session_key: str = "", **kwargs):
+    """The hub turn was stopped before it reached the tool: stop that turn's early-started worker."""
+    try:
+        with _JOBS_LOCK:
+            jobs = [(rid, j) for rid, j in _JOBS.items() if not j["attached"] and not j["done"].is_set()
+                    and j["session_id"] and (j["session_id"] == session_key or j["session_id"] in str(session_key))]
+        for rid, j in jobs:
+            d = REQUESTS_DIR / rid
+            try:
+                (d / providers.STOP_MARKER).write_text(json.dumps({"at": time.time(), "by": "hub stop"}))
+            except OSError:
+                pass
+            pid = (read_json(d / "live.json", {}) or {}).get("pid")
+            if isinstance(pid, int) and pid > 1:
+                import signal as _signal
+                try:
+                    os.killpg(pid, _signal.SIGTERM)
+                except (ProcessLookupError, PermissionError, OSError):
+                    pass
+            log_decision(event="early_start_cancelled", request=rid)
+    except Exception:
+        pass
+
+
+def _on_api_request(**kw):
+    """P0 observer: the hub's own calls (size, tools, latency, usage) into decisions.jsonl."""
+    try:
+        log_decision(event="hub_api", model=kw.get("model"), call=kw.get("api_call_count"),
+                     tools=kw.get("tool_count"), approx_in=kw.get("approx_input_tokens"),
+                     chars=kw.get("request_char_count"), session=str(kw.get("session_id") or "")[:60])
+    except Exception:
+        pass
+
+
+def _on_api_response(**kw):
+    try:
+        u = kw.get("usage") or {}
+        log_decision(event="hub_api_done", model=kw.get("model"), call=kw.get("api_call_count"),
+                     duration=round(float(kw.get("api_duration") or 0), 2),
+                     first_chunk=round(float(kw["first_chunk_at"]) - float(kw["started_at"]), 2)
+                     if kw.get("first_chunk_at") and kw.get("started_at") else None,
+                     usage={k: u.get(k) for k in ("input_tokens", "output_tokens", "cache_read_input_tokens",
+                                                   "cached_tokens", "prompt_tokens", "completion_tokens") if k in u},
+                     session=str(kw.get("session_id") or "")[:60])
+    except Exception:
+        pass
+
+
+# --------------------------------------------------------------------------- limits gate
+
+_WHO = {"claude": "Claude", "codex": "Codex"}
+_OTHER_NAME = {"claude": "Claude", "codex": "GPT"}
+
+
+def _limit_block(r: Request, agent: str, model: str | None, *, offer: bool = True) -> dict | None:
+    """Before spawning: None = go. Blocked: nothing starts; offer the other provider (when linked, enabled
+    and itself below the limit) through the clarify flow, else one line with the reset time."""
+    try:
+        g = limits_gate.check(agent, model, purpose="work")
+    except Exception as exc:  # the gate itself must never stop work
+        log_decision(event="limits_gate_error", request=r.id, error=repr(exc)[:200])
+        return None
+    r["limits"] = g.as_dict()
+    if not g.blocked:
+        r.save()
+        return None
+    other = limits_gate.other(agent)
+    r["status"] = "limit_blocked"
+    r.save()
+    log_decision(event="limit_blocked", request=r.id, agent=agent, model=model, pct=g.pct, window=g.window)
+    if offer and agents().has(other) and providers.linked(other):
+        prov = "anthropic" if agent == "claude" else "openai"
+        peer = executor_choice.peer_model(prov, model or (executor_choice.DEFAULT["model"] if agent == "claude"
+                                                           else "gpt-6-astra"),
+                                          (load_config().get("dynamic_agents") or {}).get("models") or {},
+                                          _codex_models_safe())
+        if not limits_gate.check(other, peer["model"], purpose="work").blocked:
+            st = session_state(r["session_id"])
+            st["takeover_offer"] = {"rid": r.id, "to": other, "kind": "switch", "model": peer["model"]}
+            save_session_state(r["session_id"], st)
+            when = limits_gate.clock(g.resets_at)
+            q = (f"{_WHO[agent]} is at {g.pct:g}%" + (f" (resets {when})" if when else "")
+                 + f". Let {_OTHER_NAME[other]} do this one?")
+            return {"request_id": r.id, "ok": False, "usage_limit": g.message, "route": _route_line(r),
+                    "action": (f"Nothing has started. Use the clarify tool with ONE question: '{q}' with choices "
+                               f"['Yes', 'No']. Then call cc_takeover(request_id=\"{r.id}\", accept=<true if Yes>). "
+                               "If clarify is unavailable, ask the same as plain text.")}
+    return {"request_id": r.id, "ok": False, "usage_limit": g.message,
+            "note": f"Nothing was started. Tell the user in one line: {g.message}."
+                    + ("" if agents().has(other) else "")}
+
+
+def _codex_models_safe() -> list[str]:
+    try:
+        return codex_models()
+    except Exception:
+        return []
+
+
+def _delegate_env(r: Request, run: AgentRun, *, parent: str, cwd: str, add_dirs: list[str], model, effort,
+                  profile: str = "lean") -> dict | None:
+    """Delegate-server env when dynamic agents are allowed for this run, else None."""
+    if parent == "claude" and profile != "lean":
+        return None
+    try:
+        ok, why = providers.dynamic_gate()
+    except Exception:
+        ok, why = False, "gate error"
+    if not ok:
+        return None
+    main = run.main() or {}
+    return providers.delegate_env(request_dir=r.dir.resolve(), parent_agent=main.get("id") or "", parent=parent,
+                                  cwd=cwd, add_dirs=add_dirs, model=model, effort=effort, session_id=r["session_id"])
+
+
 # --------------------------------------------------------------------------- directives
 
 _DISPLAY_RULE = ("If the tool result has `display`, output it EXACTLY as-is after the route line and a blank line (it may end "
                  "with a ```hermes-question block that the app renders as a question card): never answer, "
                  "summarise or reformat the questions yourself.")
+# With the verbatim relay the tool hands back a `reply` placeholder line instead of the worker's text.
+_REPLY_RULE = ("If the tool result has `reply`, write ONLY the route line, a blank line, and the `reply` line exactly as "
+               "given (the app swaps it for the worker's own reply). If it has `action`, do that instead. Otherwise: ")
 
 # Plugin tools sit behind Hermes' tool-search bridge; spelling out the call saves the model a
 # tool_describe round trip (~5s) on every request.
@@ -129,7 +430,7 @@ def _directive_execute(r: Request) -> str:
         f"request_id={r.id} project={r['project'] or 'none'} attachments={len(Manifest(r.dir).items)}\n"
         f"ACTION: call cc_claude_execute(request_id=\"{r.id}\") now." + _DIRECT + f" Do not plan, rewrite the prompt, "
         f"ask questions, or do the work yourself — the tool sends the user's original words and "
-        f"original attachments to Claude Code. Reply starting with the line `{_route_line(r)}`, then "
+        f"original attachments to Claude Code. {_REPLY_RULE}Reply starting with the line `{_route_line(r)}`, then "
         f"relay Claude's result as short bullets (Done / Verified / Note; failures as Problem / "
         f"Cause / Required action). No narration, no restating the request. {_DISPLAY_RULE}"
     )
@@ -139,7 +440,7 @@ def _directive_plan(r: Request, cfg: dict) -> str:
     return (
         f"{TAG} {_route_line(r)}\n"
         f"request_id={r.id} planner={_planner_label(cfg)} attachments={len(Manifest(r.dir).items)}\n"
-        f"ACTION: call cc_astra_plan(request_id=\"{r.id}\") now." + _DIRECT + f" Reply starting with the line "
+        f"ACTION: call cc_astra_plan(request_id=\"{r.id}\") now." + _DIRECT + f" {_REPLY_RULE}Reply starting with the line "
         f"`{_route_line(r)}`, then show the tool's `display` text EXACTLY as-is (the planner's proposal, or a "
         f"```hermes-question block the app renders as a question card). Do NOT execute anything "
         f"and do NOT call cc_claude_execute — execution waits for the user's approval."
@@ -150,8 +451,8 @@ def _directive_execute_approved(r: Request) -> str:
     return (
         f"{TAG} User approved request {r.id}"
         + (f" with modifications: {r['modifications'][-1]!r}" if r["modifications"] else "")
-        + f".\nACTION: call cc_execute_approved(request_id=\"{r.id}\") now." + _DIRECT + f" Reply starting with "
-        f"`Route: Astra → approval → {_worker_label(r['session_id'])} — executing approved brief`, then the line "
+        + f".\nACTION: call cc_execute_approved(request_id=\"{r.id}\") now." + _DIRECT + f" {_REPLY_RULE}Reply starting with "
+        f"`Route: Codex → approval → {_worker_label(r['session_id'])} — executing approved brief`, then the line "
         f"`[[plan:{r.id}]]` exactly as written, on its own (the app shows the planner's brief there, collapsed; "
         f"never paste the brief yourself), show any changed points the tool reports (one bullet each), then relay "
         f"Claude's result as short Done / Verified / Note bullets."
@@ -186,9 +487,27 @@ def _tiebreak(text: str) -> bool:
         return False
 
 
+def _mark_worker_turn(session_id: str, directive) -> None:
+    """Tell fragment-memory (next pre_llm_call hook, same process) this turn goes to a worker: the hub
+    only dispatches, so its memory recall (and the git work behind it) is skipped. The worker gets its
+    own memory titles."""
+    if isinstance(directive, str) and "ACTION: call cc_" in directive:
+        try:
+            ret = _hmem().retrieve
+            marks = getattr(ret, "WORKER_TURNS", None)
+            if marks is None:
+                marks = {}
+                setattr(ret, "WORKER_TURNS", marks)
+            marks[session_id] = time.time()
+        except Exception:
+            pass
+
+
 def _on_pre_llm_call(session_id: str = "", user_message=None, **kwargs):
     try:
-        return _route_turn(session_id or "default", user_message, kwargs.get("conversation_history"))
+        out = _route_turn(session_id or "default", user_message, kwargs.get("conversation_history"))
+        _mark_worker_turn(session_id or "default", out)
+        return out
     except Exception as exc:  # never break the chat; surface the failure instead
         log_decision(event="hook_error", error=repr(exc))
         return f"{TAG} routing error: {exc!r}. Tell the user routing failed and why; do not pretend it worked."
@@ -221,13 +540,14 @@ def _route_turn(session_id: str, user_message, history=None):
                    if d and d.get("session_id") == session_id and d.get("status") == "claude_limited"]
         if limited:
             rid = limited[-1]["id"]
-            return (f"{TAG} Route: Astra (takeover) — resuming {rid}.\nACTION: call "
+            return (f"{TAG} Route: Codex (takeover) — resuming {rid}.\nACTION: call "
                     f"cc_takeover(request_id=\"{rid}\", accept=true) now and relay the result as short bullets.")
     if st0.get("takeover_offer"):
         kind, _ = interpret_reply(text)
         no = text.strip().lower().rstrip(".!") in ("no", "nope", "no thanks", "nah", "decline")
         if kind in ("approve", "approve_with_changes") or no:
-            rid = st0["takeover_offer"]
+            offer = st0["takeover_offer"]
+            rid = offer.get("rid") if isinstance(offer, dict) else offer
             return (f"{TAG} User answered the takeover offer for {rid}: {'NO' if no else 'YES'}.\nACTION: call "
                     f"cc_takeover(request_id=\"{rid}\", accept={'false' if no else 'true'}) now.")
     if text.lower().startswith("/motion"):
@@ -254,7 +574,10 @@ def _route_turn(session_id: str, user_message, history=None):
             r["project"], r["extra_dirs"] = projects.folders_for(path)
             r["project_source"] = "user choice"
             r.save()
-            return _directive_execute(r) if r["route"] == CLAUDE else _directive_plan(r, cfg)
+            if r["route"] == CLAUDE:
+                _early_start(r, cfg)
+                return _directive_execute(r)
+            return _directive_plan(r, cfg)
         # not a project answer: fall through and treat as a fresh request
 
     # 2) an open planning conversation
@@ -345,6 +668,7 @@ def _route_turn(session_id: str, user_message, history=None):
         st["needs_project"] = r.id
         save_session_state(session_id, st)
         return _directive_ask_project(r)
+    _early_start(r, cfg)
     return _directive_execute(r)
 
 
@@ -372,10 +696,11 @@ def _route_answer(session_id: str, st: dict, text: str, overridden: bool):
     r["status"] = "answered"
     r.save()
     log_decision(event="question_answered", request=r.id, source=q.get("source"))
-    who = "Astra" if q.get("source") == "astra" else "Claude"
+    _early_start(r, load_config())
+    who = "Codex" if q.get("source") == "astra" else "Claude"
     return (f"{TAG} The user answered {who}'s question for request {r.id}.\nACTION: call "
             f"cc_claude_execute(request_id=\"{r.id}\") now;" + _DIRECT + f" it resumes the same {who} session with the answers. "
-            f"Reply starting with `Route: {who} — resumed with your answers`, then relay the result as short "
+            f"{_REPLY_RULE}Reply starting with `Route: {who} — resumed with your answers`, then relay the result as short "
             f"Done / Verified / Note bullets. {_DISPLAY_RULE}")
 
 
@@ -397,14 +722,15 @@ def _ask_user(r: Request, source: str, data: dict, clean: str, res: dict, run: A
     st["awaiting_question"] = r.id
     save_session_state(r["session_id"], st)
     log_decision(event="question_asked", request=r.id, source=source, n=len(data["questions"]))
-    who = "Astra" if source == "astra" else "Claude"
-    return {"request_id": r.id, "ok": True, "awaiting_answer": True,
-            "duration_s": res.get("duration_s"),
-            "display": ((clean + "\n\n") if clean else "")
-            + questions.block(data, request_id=r.id, source=source, round=rnd),
-            "plain_questions": questions.as_text(data),
-            "note": f"{who} needs the user's decision before continuing. Output `display` exactly; the user's "
-                    f"next message is the answer and resumes the same {who} session."}
+    who = "Codex" if source == "astra" else "Claude"
+    display = ((clean + "\n\n") if clean else "") + questions.block(data, request_id=r.id, source=source, round=rnd)
+    out = {"request_id": r.id, "ok": True, "awaiting_answer": True,
+           "duration_s": res.get("duration_s"),
+           "display": display,
+           "plain_questions": questions.as_text(data),
+           "note": f"{who} needs the user's decision before continuing. Output `display` exactly; the user's "
+                   f"next message is the answer and resumes the same {who} session."}
+    return _relay(r, out, display)
 
 
 def _agent_events(run: AgentRun, kind: str):
@@ -452,6 +778,7 @@ def _route_motion(session_id: str, user_message, text: str):
     r.save()
     Manifest(r.dir).ingest(user_message, cfg.get("attachments", {}) or {})
     log_decision(event="routed", request=r.id, route="claude", reason="/motion", product=product, source=source)
+    _early_start(r, cfg)
     return _directive_execute(r)
 
 
@@ -523,7 +850,10 @@ def _learn(r: Request) -> None:
     threading.Thread(target=go, daemon=True, name=f"hmem-trace-{r.id}").start()
 
 
-def _execute(r: Request) -> dict:
+def _execute(r: Request, feed=None, force: dict | None = None) -> dict:
+    """Run the request on the conversation's executor. feed: live-feed sink (early start), else this tool
+    call's. force: {provider: anthropic|openai, model} to run this one request elsewhere (the user accepted
+    a limit switch)."""
     cfg = load_config()
     manifest = Manifest(r.dir)
     cwd = r["project"] or str((r.dir / "work").resolve())
@@ -531,19 +861,26 @@ def _execute(r: Request) -> dict:
     answer = r.data.get("pending_answer")
     q = r.data.get("question") or {}
     choice = executor_choice.get_choice(r["session_id"])
+    if force:
+        info = executor_choice.model_info(force["provider"], force["model"]) or {"name": force["model"]}
+        choice = {**choice, "provider": force["provider"], "model": force["model"], "name": info["name"],
+                  "worker": executor_choice.CATALOG[force["provider"]]["worker"]}
     picked = choice if choice["provider"] == "openai" else None
     if answer and q.get("source") == "astra":
         chosen_run = (r.data.get("executor") or {}).get("chosen")
-        return _astra_takeover(r, reason="resumed with your answers", choice=picked if chosen_run else None)
-    if session_state(r["session_id"]).get("takeover") and not answer and agents().has("codex"):
-        return _astra_takeover(r, reason="takeover mode is on for this session")
+        return _astra_takeover(r, reason="resumed with your answers", choice=picked if chosen_run else None, feed=feed)
+    if session_state(r["session_id"]).get("takeover") and not answer and agents().has("codex") and not force:
+        return _astra_takeover(r, reason="takeover mode is on for this session", feed=feed)
     if picked and not answer:  # the user picked an OpenAI model for this conversation: Codex executes
-        return _astra_takeover(r, reason=r["route_reason"], choice=picked)
+        return _astra_takeover(r, reason=r["route_reason"], choice=picked, feed=feed, offer=not force)
     claude_model = choice["model"] if choice["provider"] == "anthropic" else None
     claude_effort = choice["effort"] if choice["provider"] == "anthropic" else None
+    ecfg = dict(cfg.get("executor", {}) or {})
+    blocked = _limit_block(r, "claude", claude_model or ecfg.get("model"), offer=not force)
+    if blocked:
+        return blocked
     resume = None
     sessions = read_json(_CLAUDE_SESSIONS, {}) or {}
-    ecfg = cfg.get("executor", {}) or {}
     if answer:  # the worker asked; continue exactly that Claude session with the answers
         resume = (r.data.get("executor") or {}).get("session_id")
         prompt = questions.answer_prompt(q, answer)
@@ -557,6 +894,7 @@ def _execute(r: Request) -> dict:
         r.write_text("claude_prompt.md", prompt)
     r["status"] = "executing"
     r.save()
+    feed = feed or _live_feed()
     running = [d for d in (read_json(f, {}) for f in sorted(REQUESTS_DIR.glob("*/request.json"))[-60:])
                if d and d.get("status") == "executing" and d.get("id") != r.id]
     # Each conversation has its own queue; only wait behind this conversation's job (or a full machine).
@@ -567,35 +905,48 @@ def _execute(r: Request) -> dict:
         msg = (f"Queued: Claude is still working on {busy[-1]['id']} "
                f"({(busy[-1].get('raw_message') or '')[:60]}). Starts when that finishes.")
         _notify(msg)
-        (_live_feed() or (lambda _t: None))(msg)
+        (feed or (lambda _t: None))(msg)
     _notify(f"Using Claude Code: {'continuing session in ' if resume else ''}{cwd}")
     add_dirs = ([str(manifest.dir)] if manifest.items else []) + list(r.data.get("extra_dirs") or [])
-    feed = _live_feed()
     run = AgentRun.load(r.id, r["session_id"])
     run.start_main("Claude Code" + (" · answered" if answer else ""), "claude",
                    description="resumed with your answers" if answer else "main worker")
     run.save(force=True)
+    profile = worker_profile.profile_for(ecfg, r.data.get("raw_message") or r["original_prompt"] or "")
+    ecfg["_dynamic_hints"] = (cfg.get("dynamic_agents", {}) or {}).get("hints") or []
+    cfg = {**cfg, "executor": ecfg}
+    delegate = _delegate_env(r, run, parent="claude", cwd=cwd, add_dirs=add_dirs, model=claude_model,
+                             effort=claude_effort, profile=profile)
+    timings: dict = {}
+    started = time.time()
     res = run_claude(prompt, cwd=cwd, add_dirs=add_dirs, cfg=cfg, resume_session=resume, on_progress=feed,
                      session_key=r["session_id"], on_event=_agent_events(run, "claude"),
-                     model=claude_model, effort=claude_effort, inbox=r.dir)
+                     model=claude_model, effort=claude_effort, inbox=r.dir, profile=profile, delegate=delegate,
+                     timings=timings)
     if not res.get("ok") and resume and not answer and "session" in str(res.get("error", "")).lower():
+        sent = res.get("live_messages") or []
         res = run_claude(prompt, cwd=cwd, add_dirs=add_dirs, cfg=cfg, resume_session=None, on_progress=feed,
                          session_key=r["session_id"], on_event=_agent_events(run, "claude"),
-                         model=claude_model, effort=claude_effort, inbox=r.dir)
+                         model=claude_model, effort=claude_effort, inbox=r.dir, profile=profile, delegate=delegate,
+                         timings=timings)
+        res["live_messages"] = sent + (res.get("live_messages") or [])
     r["pending_answer"] = None
     r["executor"] = {"provider": "claude-cli", "billing": res.get("billing"), "model": claude_model,
-                     "effort": claude_effort, "session_id": res.get("session_id") or resume, "resumed": bool(resume)}
+                     "effort": claude_effort, "session_id": res.get("session_id") or resume, "resumed": bool(resume),
+                     "profile": res.get("profile") or profile, "dynamic": bool(delegate)}
+    r["timings"] = {**(r.data.get("timings") or {}), **{k: round(v, 3) for k, v in timings.items()}}
     r["result"] = res
-    r["status"] = "done" if res.get("ok") else "failed"
+    r["status"] = "done" if res.get("ok") else ("stopped" if res.get("stopped_by_user") else "failed")
     r.save()
     clean, asked = questions.extract(res.get("result") or "") if res.get("ok") else ("", None)
-    run.finish_main(bool(res.get("ok")), step=None if res.get("ok") else res.get("error"))
+    run.finish_main(bool(res.get("ok")), step=None if res.get("ok") else res.get("error"),
+                    stopped=bool(res.get("stopped_by_user")))
     run.save(force=True)
     if res.get("session_id") and r["project"]:
         sessions[r.data.get("project_id") or r["project"]] = {"session_id": res["session_id"], "at": time.time()}
         write_json(_CLAUDE_SESSIONS, sessions)
     log_decision(event="executed", request=r.id, ok=res.get("ok"), billing=res.get("billing"),
-                 duration_s=res.get("duration_s"))
+                 duration_s=res.get("duration_s"), profile=res.get("profile"), dynamic=bool(delegate))
     _learn(r)
     if asked:
         out = _ask_user(r, "claude", asked, clean, res, run)
@@ -617,17 +968,17 @@ def _execute(r: Request) -> dict:
         if st.get("takeover_declined"):
             return {"request_id": r.id, "ok": False, "claude_usage_limit": limit,
                     "note": "Claude is at its usage limit. Takeover was declined for this limit; the user can "
-                            "type /takeover to let Astra continue. Say this in one line."}
+                            "type /takeover to let Codex continue. Say this in one line."}
         st["takeover_offer"] = r.id
         save_session_state(r["session_id"], st)
         return {"request_id": r.id, "ok": False, "claude_usage_limit": limit,
                 "action": ("Use the clarify tool with ONE question: 'Claude hit its usage limit (" + limit[:120]
-                           + "). Let Astra take over this session from where Claude stopped?' with choices "
-                           "['Yes, Astra takes over', 'No']. Then call cc_takeover(request_id=\"" + r.id
+                           + "). Let Codex take over this session from where Claude stopped?' with choices "
+                           "['Yes, Codex takes over', 'No']. Then call cc_takeover(request_id=\"" + r.id
                            + "\", accept=<true if Yes>). If clarify is unavailable, ask the same as plain text.")}
-    return {
+    out = {
         "request_id": r.id,
-        "route": _route_line(r),
+        "route": _route_line(r) if not force else f"Route: Claude {choice['name']} — {_WHO['codex']} was near its limit",
         "ok": res.get("ok"),
         "executor": f"Claude Code (claude -p --model {claude_model})" if claude_model else "Claude Code (claude -p)",
         "billing": res.get("billing"),
@@ -637,7 +988,32 @@ def _execute(r: Request) -> dict:
         "error": res.get("error"),
         "permission_denials": res.get("permission_denials"),
         "duration_s": res.get("duration_s"),
+        **_live_messages_note(res),
+        **_stopped_note(res),
     }
+    return _relay(r, out, _reply_body(r, res, clean=clean, started=started))
+
+
+def _stopped_note(res: dict) -> dict:
+    """The user pressed Stop on the live Agents block (sidecar POST /worker/stop)."""
+    if not res.get("stopped_by_user"):
+        return {}
+    return {"stopped": "stopped by you",
+            "note": "The user stopped this run with the Stop button. Say in one line that it was stopped by "
+                    "you (the user) and that the work done so far stays in the project; don't retry it."}
+
+
+def _live_messages_note(res: dict) -> dict:
+    """The user's chat messages that reached the running worker (LiveInput). The hub only saw the first
+    prompt, so without this its reply follows that alone (e.g. "reply with just the number")."""
+    msgs = [m for m in (res.get("live_messages") or []) if m]
+    if not msgs:
+        return {}
+    quoted = "; ".join(json.dumps(m, ensure_ascii=False) for m in msgs)
+    return {"user_messages_during_run": msgs,
+            "note": f"While Claude worked, the user added these messages (Claude received them): {quoted}. Your "
+                    f"reply must cover them as well as the original request; where they conflict, the later "
+                    f"messages take priority."}
 
 
 def _takeover_prompt(r: Request) -> str:
@@ -659,75 +1035,118 @@ def _takeover_prompt(r: Request) -> str:
     return "\n".join(parts)
 
 
-def _codex_worker_prompt(r: Request) -> str:
-    """Codex as the conversation's chosen executor: the same worker rules + request Claude would get."""
-    ecfg = load_config().get("executor", {}) or {}
-    rules = WORKER_RULES.format(max_subagents=ecfg.get("max_subagents", 2))
+def _codex_worker_prompt(r: Request, dynamic: bool = False) -> str:
+    """Codex as the conversation's chosen executor: the same worker rules + request Claude would get
+    (+ the hand-off rules when the delegate server is attached)."""
+    cfg = load_config()
+    ecfg = cfg.get("executor", {}) or {}
+    rules = worker_rules("codex", dynamic=dynamic, max_subagents=ecfg.get("max_subagents", 2),
+                         hints=(cfg.get("dynamic_agents", {}) or {}).get("hints"))
     return rules + "\n\n" + _claude_prompt(r, Manifest(r.dir))
 
 
-def _astra_takeover(r: Request, reason: str, choice: dict | None = None) -> dict:
+def _astra_takeover(r: Request, reason: str, choice: dict | None = None, feed=None, offer: bool = True) -> dict:
     """Codex executes the request: Astra takeover, or (choice) the OpenAI model the user picked."""
     cfg = load_config()
     cwd = r["project"] or str((r.dir / "work").resolve())
     answer = r.data.get("pending_answer")
     thread = (r.data.get("executor") or {}).get("thread_id") if answer else None
+    model = choice["model"] if choice else ((cfg.get("takeover", {}) or {}).get("model")
+                                            or (cfg.get("planner", {}) or {}).get("model"))
+    # a takeover exists because Claude is out: only a picked-Codex run may offer Claude instead
+    blocked = _limit_block(r, "codex", model, offer=bool(choice) and offer)
+    if blocked:
+        return blocked
+    manifest = Manifest(r.dir)
+    add_dirs = ([str(manifest.dir)] if manifest.items else []) + list(r.data.get("extra_dirs") or [])
+    run = AgentRun.load(r.id, r["session_id"])
+    who = (f"Codex {choice['name']}" + (f" ({choice['effort']})" if choice.get("effort") else "")) if choice else "Codex"
+    run.start_main(who + (" · answered" if answer else ("" if choice else " · takeover")), "astra",
+                   description="executor (Codex)", model=model)
+    run.save(force=True)
+    delegate = _delegate_env(r, run, parent="codex", cwd=cwd, add_dirs=add_dirs, model=model,
+                             effort=choice.get("effort") if choice else None) if choice else None
     if answer and thread:
         prompt = questions.answer_prompt(r.data.get("question") or {}, answer)
         r.write_text(f"answer-{len(r.data.get('question_log') or [])}.md", prompt)
     elif choice:
-        prompt = _codex_worker_prompt(r) + (f"\n\nTHE USER ANSWERED YOUR QUESTIONS:\n{answer}" if answer else "")
+        prompt = _codex_worker_prompt(r, dynamic=bool(delegate)) + (
+            f"\n\nTHE USER ANSWERED YOUR QUESTIONS:\n{answer}" if answer else "")
         r.write_text("codex_prompt.md", prompt)
     else:
         prompt = _takeover_prompt(r) + (f"\n\nTHE USER ANSWERED YOUR QUESTIONS:\n{answer}" if answer else "")
         r.write_text("takeover_prompt.md", prompt)
     r["status"] = "executing"
     r.save()
-    who = (f"Codex {choice['name']}" + (f" ({choice['effort']})" if choice.get("effort") else "")) if choice else "Astra"
     _notify(f"Using {who}{'' if choice else ' (takeover)'}: {cwd}")
-    manifest = Manifest(r.dir)
-    add_dirs = ([str(manifest.dir)] if manifest.items else []) + list(r.data.get("extra_dirs") or [])
-    run = AgentRun.load(r.id, r["session_id"])
-    run.start_main(who + (" · answered" if answer else ("" if choice else " · takeover")), "astra",
-                   description="executor (Codex)",
-                   model=choice["model"] if choice else ((cfg.get("takeover", {}) or {}).get("model")
-                                                         or (cfg.get("planner", {}) or {}).get("model")))
-    run.save(force=True)
+    timings: dict = {}
+    started = time.time()
     res = run_astra_executor(prompt, cwd=cwd, add_dirs=add_dirs, cfg=cfg,
                              pid_file=LOCKS_DIR / f"takeover-{r['session_id'][:60]}.pid",
                              on_event=_agent_events(run, "codex"), resume_thread=thread,
                              model=choice["model"] if choice else None,
-                             effort=choice["effort"] if choice else None)
+                             effort=choice["effort"] if choice else None,
+                             stop_marker=r.dir / "stopped_by_user", delegate=delegate, timings=timings)
     r["pending_answer"] = None
-    r["executor"] = {"provider": "codex-cli" if choice else "codex-cli (Astra takeover)", "model": res.get("model"),
+    r["executor"] = {"provider": "codex-cli" if choice else "codex-cli (takeover)", "model": res.get("model"),
                      "effort": choice["effort"] if choice else None, "chosen": bool(choice),
-                     "billing": res.get("billing"), "thread_id": res.get("thread_id")}
+                     "billing": res.get("billing"), "thread_id": res.get("thread_id"), "dynamic": bool(delegate)}
+    r["timings"] = {**(r.data.get("timings") or {}), **{k: round(v, 3) for k, v in timings.items()}}
     r["result"] = res
-    r["status"] = "done" if res.get("ok") else "failed"
+    r["status"] = "done" if res.get("ok") else ("stopped" if res.get("stopped_by_user") else "failed")
     r.save()
-    run.finish_main(bool(res.get("ok")), step=None if res.get("ok") else res.get("error"))
+    run.finish_main(bool(res.get("ok")), step=None if res.get("ok") else res.get("error"),
+                    stopped=bool(res.get("stopped_by_user")))
     run.save(force=True)
     log_decision(event="codex_executed" if choice else "takeover_executed", request=r.id, ok=res.get("ok"),
-                 model=res.get("model"), reason=reason)
+                 model=res.get("model"), reason=reason, dynamic=bool(delegate))
     _learn(r)
-    route = f"Route: {who} — {reason}" if choice else f"Route: Astra (takeover) — {reason}"
+    route = f"Route: {who} — {reason}" if choice else f"Route: Codex (takeover) — {reason}"
     clean, asked = questions.extract(res.get("result") or "") if res.get("ok") else ("", None)
     if asked:
         out = _ask_user(r, "astra", asked, clean, res, run)
         out["route"] = route
         return out
-    return {"request_id": r.id, "route": route, "ok": res.get("ok"),
-            "executor": f"{'Codex' if choice else 'Astra via Codex'} ({res.get('model')})", "billing": res.get("billing"),
-            "project": cwd, "result": res.get("result"), "error": res.get("error"),
-            "note": "Start the reply with the route line." + ("" if choice else " Type /takeover to switch back to Claude.")}
+    out = {"request_id": r.id, "route": route, "ok": res.get("ok"),
+           "executor": f"{'Codex' if choice else 'Codex'} ({res.get('model')})", "billing": res.get("billing"),
+           "project": cwd, "result": res.get("result"), "error": res.get("error"),
+           "note": "Start the reply with the route line." + ("" if choice else " Type /takeover to switch back to Claude."),
+           **({"stopped": "stopped by you", "note": "Start the reply with the route line. " + _stopped_note(res)["note"]}
+              if res.get("stopped_by_user") else {})}
+    body = _reply_body(r, res, clean=clean, started=started)
+    if not choice and res.get("ok"):
+        body += "\n\n_Type /takeover to switch back to Claude._"
+    return _relay(r, out, body)
 
 
 def _tool_takeover(params, **kwargs):
+    """Answer a limit offer. Old shape (a request id): Claude hit its limit mid-run, Codex takes over the
+    session. New shape {rid, to, kind: switch, model}: the selected executor was at its limit before the
+    task started; accept runs THIS request on the other provider (same-tier model)."""
     r = Request(str(params.get("request_id", "")))
     if not r.exists:
         return json.dumps({"ok": False, "error": "unknown request_id"})
     st = session_state(r["session_id"])
+    offer = st.get("takeover_offer")
     st["takeover_offer"] = None
+    if isinstance(offer, dict) and offer.get("kind") == "switch" and offer.get("rid") == r.id:
+        save_session_state(r["session_id"], st)
+        to = offer.get("to") or "codex"
+        if not params.get("accept"):
+            log_decision(event="limit_switch_declined", request=r.id, to=to)
+            msg = (r.data.get("limits") or {}).get("message") or "the limit"
+            return json.dumps({"ok": True, "message": f"OK, nothing was started ({msg}). Send it again after the reset."})
+        if not agents().has(to):
+            return json.dumps({"ok": False, "error": f"{_WHO[to]} isn't enabled on this Mac (Settings → Agents)."})
+        log_decision(event="limit_switch_accepted", request=r.id, to=to, model=offer.get("model"))
+        if to == "codex":
+            ch = executor_choice.get_choice(r["session_id"])
+            info = executor_choice.model_info("openai", offer.get("model") or "gpt-6-astra") or {"name": offer.get("model")}
+            pick = {"provider": "openai", "model": offer.get("model") or "gpt-6-astra", "name": info["name"],
+                    "effort": ch.get("effort")}
+            return json.dumps(_astra_takeover(r, reason="Claude was near its limit; you chose GPT", choice=pick,
+                                              offer=False))
+        return json.dumps(_execute(r, force={"provider": "anthropic", "model": offer.get("model") or "claude-opus-5-5"}))
     if params.get("accept") and not agents().has("codex"):
         save_session_state(r["session_id"], st)
         return json.dumps({"ok": False, "error": "Codex isn't enabled on this Mac (Settings → Agents)."})
@@ -743,7 +1162,11 @@ def _tool_takeover(params, **kwargs):
 
 
 def _tool_claude_execute(params, **kwargs):
-    r = Request(str(params.get("request_id", "")))
+    rid = str(params.get("request_id", ""))
+    early = _attach_job(rid)  # started from the routing hook: one run, this call just waits for it
+    if early is not None:
+        return json.dumps(early)
+    r = Request(rid)
     if not r.exists:
         return json.dumps({"ok": False, "error": "unknown request_id"})
     if r["status"] == "answered":
@@ -769,7 +1192,7 @@ def _cmd_takeover(raw_args: str = "", session_id: str = "", session_key: str = "
             try:
                 import signal as _signal
                 os.killpg(int(pid_file.read_text()), _signal.SIGTERM)
-                stopped = " Stopped the running Astra job."
+                stopped = " Stopped the running Codex job."
             except Exception:
                 pass
         log_decision(event="takeover_disabled", session=sid)
@@ -785,12 +1208,12 @@ def _cmd_takeover(raw_args: str = "", session_id: str = "", session_key: str = "
         rid = limited[-1]["id"]
         try:
             if _CTX is not None and _CTX.inject_message(
-                    f"{TAG}-resume Continue request {rid} with Astra (takeover).", session_key=session_key or None):
-                return f"Takeover on — Astra is continuing {rid}."
+                    f"{TAG}-resume Continue request {rid} with Codex (takeover).", session_key=session_key or None):
+                return f"Takeover on — Codex is continuing {rid}."
         except Exception:
             pass
-        return f"Takeover on. Say 'continue' to have Astra resume {rid}."
-    return "Takeover on — Astra executes in this session until you type /takeover again."
+        return f"Takeover on. Say 'continue' to have Codex resume {rid}."
+    return "Takeover on — Codex executes in this session until you type /takeover again."
 
 
 def _plan_display(r: Request, data: dict, cfg: dict) -> str:
@@ -813,13 +1236,40 @@ def _plan_display(r: Request, data: dict, cfg: dict) -> str:
     return "\n".join(body)
 
 
+def _planner_cfg(r: Request, cfg: dict) -> tuple[dict, str, str | None]:
+    """(cfg to plan with, note, refusal). The configured planner near its limit: plan with the other CLI
+    (one Note line says so). Both near their limits (or the other not linked): refusal = one line."""
+    pcfg = providers.planner_config(cfg)
+    agent = limits_gate.agent_of(pcfg.get("provider", "codex-cli"))
+    try:
+        g = limits_gate.check(agent, pcfg.get("model"), purpose="work")
+    except Exception:
+        return cfg, "", None
+    if not g.blocked:
+        return cfg, "", None
+    other = limits_gate.other(agent)
+    log_decision(event="planner_limit", request=r.id, agent=agent, pct=g.pct)
+    if agents().has(other) and providers.linked(other):
+        planner = dict(cfg.get("planner", {}) or {})
+        if other == "claude":
+            planner.update(provider="claude-cli", model=planner.get("claude_model") or None, label="Claude")
+        else:
+            planner.update(provider="codex-cli", model=planner.get("codex_model") or "gpt-6-astra", label="GPT-6 Astra")
+        if not limits_gate.check(other, planner.get("model"), purpose="work").blocked:
+            return {**cfg, "planner": planner}, f"Note: planned with {planner['label']} because {g.message}.", None
+    return cfg, "", f"{g.message}. Planning was not started."
+
+
 def _planner_run(r: Request, cfg: dict, phase: str, manifest: Manifest):
-    """run_planner with an agent record (Astra · discover / revise / finalize)."""
+    """run_planner with an agent record (Astra · discover / revise / finalize). Checks the limits first."""
+    cfg, note, refusal = _planner_cfg(r, cfg)
+    if refusal:
+        return providers.PlanResult(False, None, "limits", "", refusal)
     run = AgentRun.load(r.id, r.data.get("session_id") or "")
     pcfg = providers.planner_config(cfg)
     kind = "codex" if pcfg.get("provider", "codex-cli") == "codex-cli" else "claude"
     names = {"discover": "planning", "revise": "revising the plan", "finalize": "writing the brief"}
-    run.start_main(f"{pcfg.get('label') or 'Astra'} · {names.get(phase, phase)}",
+    run.start_main(f"{pcfg.get('label') or 'Codex'} · {names.get(phase, phase)}",
                    "astra" if kind == "codex" else "claude", description="planner", model=pcfg.get("model"))
     run.save(force=True)
     res = run_planner(phase, r.data, manifest.render(), manifest.images(), cfg, r.dir / "planner",
@@ -831,6 +1281,8 @@ def _planner_run(r: Request, cfg: dict, phase: str, manifest: Manifest):
     run.finish_main(res.ok, waiting=bool(res.ok and res.data and res.data.get("kind") == "questions"),
                     step=step if res.ok else res.error)
     run.save(force=True)
+    res.note = note
+    res.cfg = cfg
     return res
 
 
@@ -865,9 +1317,12 @@ def _tool_astra_plan(params, **kwargs):
         r.write_text("proposal.md", data.get("proposal_markdown", ""))
     r.save()
     log_decision(event="planned", request=r.id, kind=data["kind"], planner=r["planner"])
-    return json.dumps({"ok": True, "planner": r["planner"], "status": r["status"],
-                       "images_sent_to_planner": manifest.images(),
-                       "display": _plan_display(r, data, cfg)})
+    display = _plan_display(r, data, getattr(res, "cfg", cfg))
+    if res.note:
+        display += "\n\n" + res.note
+    out = {"ok": True, "planner": r["planner"], "status": r["status"],
+           "images_sent_to_planner": manifest.images(), "display": display}
+    return json.dumps(_relay(r, out, display))
 
 
 def _tool_execute_approved(params, **kwargs):
@@ -878,21 +1333,38 @@ def _tool_execute_approved(params, **kwargs):
         return json.dumps({"ok": False, "error": f"not approved (status={r['status']}). Refused."})
     cfg = load_config()
     manifest = Manifest(r.dir)
-    _notify(f"Using planner {_planner_label(cfg)}: final execution brief")
-    res = _planner_run(r, cfg, "finalize", manifest)
-    if not res.ok or res.data.get("kind") != "brief" or not res.data.get("brief_markdown"):
-        log_decision(event="brief_failed", request=r.id, error=res.error)
-        return json.dumps({"ok": False, "error": f"final brief failed: {res.error or 'no brief returned'}",
-                           "note": "Execution NOT started. Report this; the approval is kept so the user can retry."})
-    r["brief"] = res.data["brief_markdown"]
-    r["planner"] = f"{res.provider}:{res.model}"
+    proposal = r.data.get("proposal") or {}
+    mode = str((cfg.get("planner", {}) or {}).get("finalize", "auto")).lower()
+    note = ""
+    if mode != "always" and not r["modifications"] and (proposal.get("brief_markdown") or "").strip():
+        # approved unchanged: the proposal already carries the brief (P6), no second planner call
+        data = {"kind": "brief", "brief_markdown": proposal["brief_markdown"], "changed_points": [],
+                "specialists": proposal.get("specialists") or []}
+        log_decision(event="finalize_skipped", request=r.id)
+    else:
+        _notify(f"Using planner {_planner_label(cfg)}: final execution brief")
+        res = _planner_run(r, cfg, "finalize", manifest)
+        if not res.ok or res.data.get("kind") != "brief" or not res.data.get("brief_markdown"):
+            log_decision(event="brief_failed", request=r.id, error=res.error)
+            return json.dumps({"ok": False, "error": f"final brief failed: {res.error or 'no brief returned'}",
+                               "note": "Execution NOT started. Report this; the approval is kept so the user can retry."})
+        data, note = res.data, res.note
+        r["planner"] = f"{res.provider}:{res.model}"
+    r["brief"] = data["brief_markdown"]
     r.write_text("brief.md", r["brief"])
     r.save()
     out = _execute(r)
-    out["changed_points"] = res.data.get("changed_points", [])
-    out["specialists_planned"] = res.data.get("specialists", [])
+    out["changed_points"] = data.get("changed_points", [])
+    out["specialists_planned"] = data.get("specialists", [])
     out["brief_path"] = str(r.dir / "brief.md")
     out["plan_embed"] = f"[[plan:{r.id}]]"  # the reply shows the brief behind this, collapsed (plan-chip.js)
+    if out.get("reply"):  # verbatim relay: the brief chip and changed points go into the shown reply
+        tok = _REPLY_RX.search(out["reply"]).group(2)
+        f = r.dir / f"reply-{tok}.md"
+        extra = [f"[[plan:{r.id}]]", ""] + [f"- Changed: {c}" for c in data.get("changed_points") or []]
+        if note:
+            extra += [note]
+        f.write_text("\n".join(extra).strip() + "\n\n" + f.read_text())
     if r.data.get("session_id"):
         set_active(r["session_id"], None)
     return json.dumps(out)
@@ -962,6 +1434,20 @@ def register(ctx):
     global _CTX
     _CTX = ctx
     ctx.register_hook("pre_llm_call", _on_pre_llm_call)
+    # Verbatim relay needs a Hermes that can hold the stream until the rewrite (hold_stream). Older ones
+    # (TypeError / unknown hook) keep today's relay: the hub rewrites the worker's result.
+    try:
+        ctx.register_hook("transform_llm_output", _on_transform_llm_output, hold_stream=True)
+        _RELAY["on"] = True
+    except Exception as exc:
+        _RELAY["on"] = False
+        log_decision(event="relay_unavailable", error=repr(exc)[:200])
+    for hook, fn in (("agent_loop_stopped", _on_agent_loop_stopped), ("pre_api_request", _on_api_request),
+                     ("post_api_request", _on_api_response)):
+        try:
+            ctx.register_hook(hook, fn)
+        except Exception:
+            pass
 
     def tool(name, desc, props, required, handler, emoji):
         ctx.register_tool(
@@ -976,7 +1462,7 @@ def register(ctx):
          "user's verbatim prompt and ORIGINAL attachments. Use only when a [command-centre] directive says so.",
          rid, ["request_id"], _tool_claude_execute, "")
     tool("cc_astra_plan",
-         "Run the planner (Astra) for a planning-route request: returns material questions or a proposal to show "
+         "Run the planner (Codex) for a planning-route request: returns material questions or a proposal to show "
          "the user. Never executes anything.", rid, ["request_id"], _tool_astra_plan, "")
     tool("cc_execute_approved",
          "After the user approved a plan: get the final brief from the planner, then run Claude Code with the brief "
@@ -994,13 +1480,13 @@ def register(ctx):
              str(params.get("name", "")), list(params.get("folders") or []), params.get("primary") or None)))),
          "")
     tool("cc_takeover",
-         "Answer the Claude-usage-limit takeover offer. accept=true: Astra (Codex, ChatGPT subscription) continues the "
+         "Answer the Claude-usage-limit takeover offer. accept=true: Codex (ChatGPT subscription) continues the "
          "request from where Claude stopped and stays the executor for this session until /takeover. accept=false: decline "
          "(no more offers until the next limit).",
          {"request_id": {"type": "string"}, "accept": {"type": "boolean"}}, ["request_id", "accept"],
          _tool_takeover, "")
     tool("cc_status", "Show command-centre status: project, planner, recent requests.", {}, [], _tool_status, "")
     ctx.register_command("takeover", _cmd_takeover,
-                         description="Toggle Astra takeover (executes instead of Claude) for this session")
+                         description="Toggle Codex takeover (executes instead of Claude) for this session")
     ctx.register_command("cc", _cmd_cc, description="Command Centre: status, project, cancel, route, planner",
                          args_hint="[status|project <name>|projects|cancel|route <text>|planner]")

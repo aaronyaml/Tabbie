@@ -354,6 +354,39 @@ def test_dreamer_reports_but_never_proposes_generic_errors(hm, fleet):
     assert "no such file" in (hm.store.root() / "dreams" / r["cycle"] / "report.md").read_text().lower()
 
 
+def test_failure_titles_keep_raw_wording_not_the_signature(hm, fleet):
+    err = ("Exit code 1\nError: Supabase migration failed at /Users/x/acme/supabase/migrations/0042_profiles.sql: "
+           "relation \"Profiles\" does not exist while applying the remote schema diff for the staging project")
+    for i, day in enumerate(["2026-10-20", "2026-10-21", "2026-10-22", "2026-10-23"]):
+        _cc_session(fleet, f"r{i}-aaaa-bbbb", day, ["apply the migration"], error=err)
+    r = hm.dreamer.run_cycle(trigger="manual")
+    fs = json.loads((hm.store.root() / "dreams" / r["cycle"] / "findings.json").read_text())["findings"]
+    f = next(f for f in fs if f["specialist"] == "failures")
+    assert f["title"].startswith("Bash failed 4 times in 4 conversations")
+    assert "Error: Supabase migration failed at …/0042_profiles.sql" in f["title"]  # original casing, short path
+    assert "<path>" not in f["title"] and "<n>" not in f["title"] and f["title"].endswith("…")
+    assert not f["title"][:-1].endswith(" ") and len(f["title"].split(": ", 1)[1]) <= 70  # cut on a word boundary
+    assert f["signature"].startswith("err:")  # grouping still uses the normalised signature
+    p = next(p for p in hm.proposals.list_("pending") if p["signature"] == f["signature"])
+    meta = p["proposed_change"]["meta"]
+    assert meta["title"].startswith("Bash error: Error: Supabase") and "<path>" not in meta["title"]
+    assert "4 times in 4 conversations" in meta["description"]
+
+
+def test_agent_tooling_failures_are_findings_not_lessons(hm, fleet):
+    err = "Exit code 1\nRuntimeError: fatal: BU_CDP_URL=http://127.0.0.1:9222 unreachable (connection refused)"
+    for i, day in enumerate(["2026-10-20", "2026-10-21", "2026-10-22", "2026-10-23"]):
+        _cc_session(fleet, f"b{i}-aaaa-bbbb", day, ["check the page"], error=err)
+    r = hm.dreamer.run_cycle(trigger="manual")
+    fs = json.loads((hm.store.root() / "dreams" / r["cycle"] / "findings.json").read_text())["findings"]
+    f = next(f for f in fs if f["specialist"] == "failures")
+    assert f["report_only"] and f["proposal"] is None and "tooling" in f["detail"]
+    assert "BU_CDP_URL" in f["title"]
+    assert not any("cdp" in json.dumps(p).lower() for p in hm.proposals.list_("pending"))
+    assert hm.dreamer._TOOLING_ERR.search("WebSocket connect to ws://localhost:9222/devtools/browser refused")
+    assert not hm.dreamer._TOOLING_ERR.search("Error: supabase migration 0042 failed: relation profiles missing")
+
+
 def test_after_session_trigger_counts_trace_events(hm, monkeypatch):
     spawned = []
     monkeypatch.setattr(hm.dreamer, "spawn", lambda kind, project=None: spawned.append(kind))
@@ -451,3 +484,18 @@ def test_stats_summary_counts(hm, fleet):
     hm.retrieve.search("supabase", project="acme")
     s = hm.stats.summary()
     assert s["memories"]["active"] == len(CORPUS) and s["retrievals"] >= 1 and s["memories_created"] == len(CORPUS)
+
+
+def test_search_runs_one_git_head_lookup(hm, monkeypatch):
+    """P1: trusted_memories() reads HEAD once per call, not once per memory (was ~79 subprocesses)."""
+    for i in range(6):
+        mem(hm, f"Fact {i}", f"Body {i}")
+    calls = []
+    real = hm.store._git
+    monkeypatch.setattr(hm.store, "_git", lambda *a, **k: (calls.append(a), real(*a, **k))[1])
+    got = hm.store.trusted_memories()
+    assert len(got) >= 6
+    assert sum(1 for a in calls if a[:1] == ("rev-parse",)) == 1
+    # integrity behaviour unchanged: a tampered file still drops out
+    got[0].path.write_text(got[0].path.read_text() + "\ntampered")
+    assert got[0].id not in [m.id for m in hm.store.trusted_memories()]

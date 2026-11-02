@@ -14,8 +14,27 @@ html.hx-mo .hx-ls-buddy, html.hx-mo #hxFlyer .hx-fl-still { background-image: ur
 /* ── motion sessions are studio-only: never a chat row, never a raw transcript ── */
 .session-item.hx-mo-row { display: none !important; }
 html.hx-mo-raw #messages, html.hx-mo-raw #msgInner { visibility: hidden !important; }
-/* upstream mirrors id'd rail buttons into the drawer's nav; ours already has its own entry under Chat */
-#hxMotionRailMobile { display: none !important; }
+/* upstream mirrors id'd rail buttons into the drawer's nav; ours (Motion, Projects) already have their own entries under Chat */
+#hxMotionRailMobile, #hxProjRailMobile { display: none !important; }
 /* /motion URLs: motion-boot.js sets this before the page paints; the studio clears it once it renders */
 html.hx-mo-boot .layout > .main, html.hx-mo-boot .layout > .rightpanel { visibility: hidden !important; }
 @media (min-width: 641px) { html.hx-mo-boot .layout > .sidebar { visibility: hidden !important; } }
+
+/* Projects / Motion take the whole screen, so the phone drawer only carries the nav: show it as a labelled list,
+ * not a lone icon column beside an empty panel. The label is upstream's own tooltip text (::after = data-label). */
+@media (max-width: 640px) {
+  html:is(.hx-proj-open, .hx-studio-open) .sidebar .sidebar-nav {
+    position: static; width: auto; flex: 1; align-items: stretch; gap: 2px; border-right: 0;
+    padding: calc(env(safe-area-inset-top) + 56px) 12px calc(env(safe-area-inset-bottom) + 12px); overflow-y: auto;
+  }
+  html:is(.hx-proj-open, .hx-studio-open) .sidebar .sidebar-nav .nav-tab {
+    width: 100%; height: 48px; justify-content: flex-start; gap: 14px; padding: 0 14px; border-radius: 12px; flex-shrink: 0;
+  }
+  html:is(.hx-proj-open, .hx-studio-open) .sidebar .sidebar-nav .nav-tab::after {
+    content: attr(data-label); position: static; inset: auto; transform: none !important; opacity: 1 !important; visibility: visible !important;
+    background: none !important; box-shadow: none !important; border: 0 !important; padding: 0 !important; margin: 0; pointer-events: none;
+    color: inherit; font: 500 16px/1.2 var(--font-ui); letter-spacing: -.01em; white-space: nowrap; width: auto; height: auto; max-width: none;
+  }
+  html:is(.hx-proj-open, .hx-studio-open) .sidebar .sidebar-nav .nav-tab:not([data-label])::after { content: attr(data-tooltip); }
+  html:is(.hx-proj-open, .hx-studio-open) .sidebar .sidebar-nav .nav-tab::before { display: none !important; }
+}

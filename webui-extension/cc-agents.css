@@ -9,6 +9,17 @@
 .hx-ag[data-status="done"] .hx-ag-dot { background: var(--hx-green, #1E7D3A); }
 .hx-ag[data-status="failed"] .hx-ag-dot { background: var(--hx-red, #C4161C); }
 .hx-ag[data-status="waiting"] .hx-ag-dot { background: var(--hx-orange, #B54708); }
+/* stopped by the user: neutral (the default grey dot), never the failed red */
+.hx-ag[data-status="stopped"] .hx-ag-dot { background: var(--hx-line, #8E8E93); }
+/* a delegate's own subagents sit one level under the hand-off row */
+.hx-ag-sub2 { padding-left: 44px; }
+.hx-ag-badge { display: inline-block; margin-left: 6px; padding: 1px 6px; border-radius: 999px; vertical-align: 1px;
+  font-size: 11px; font-weight: 500; line-height: 16px; color: var(--hx-text-2, #6B6B70);
+  box-shadow: inset 0 0 0 1px var(--hx-hair, #E6E5E1); }
+.hx-ag-delegate .hx-ag-badge { color: var(--hx-ink, #3054FD); background: var(--hx-tint, rgba(48,84,253,.08)); box-shadow: none; }
+/* background shell tasks: muted, not an agent */
+.hx-ag-bg { opacity: .62; }
+.hx-ag-bg .hx-ag-nm { font-weight: 400; }
 @keyframes hx-ag-pulse { 50% { opacity: .35; transform: scale(.8); } }
 @media (prefers-reduced-motion: reduce) { .hx-ag[data-status="running"] .hx-ag-dot { animation: none; } }
 .hx-ag-tx { flex: 1; min-width: 0; }
@@ -71,6 +82,7 @@
 .hx-as-chip[data-s="executing"], .hx-as-chip[data-s="planning"], .hx-as-chip[data-s="answered"] { background: var(--hx-tint, rgba(48,84,253,.1)); color: var(--hx-ink, #3054FD); }
 .hx-as-chip[data-s="awaiting_answer"], .hx-as-chip[data-s="awaiting_answers"], .hx-as-chip[data-s="awaiting_approval"] { color: var(--hx-orange, #B54708); }
 .hx-as-chip[data-s="failed"], .hx-as-chip[data-s="claude_limited"] { color: var(--hx-red, #C4161C); }
+.hx-as-chip[data-s="stopped"] { color: var(--hx-text-2, #6B6B70); }
 .hx-as-empty { padding: 40px 16px; text-align: center; font-size: 14px; color: var(--hx-text-2, #6B6B70); }
 .hx-as-allow { margin-top: 8px; height: 34px; padding: 0 16px; border: 0; border-radius: 17px; font: inherit; font-weight: 500;
   background: var(--hx-fill-text, #3054FD); color: var(--hx-on-accent, #fff); cursor: pointer; }
@@ -120,3 +132,75 @@
 
 /* A card's answer is shown inside the card; hide the matching user bubble so it reads as one exchange. */
 #messages .msg-row.hx-q-ans-row { display: none !important; }
+
+/* ── 1b. block: Stop (live), files changed + resume (settled) ─────────── */
+.hx-agents-bar { display: flex; align-items: center; flex-wrap: wrap; gap: 6px 10px; min-height: 28px; }
+.hx-agents-btn { display: inline-flex; align-items: center; gap: 5px; height: 28px; padding: 0 11px; border-radius: 14px;
+  border: 1px solid var(--hx-hair, #E6E5E1); background: var(--hx-raised, #fff); color: var(--hx-text, #141413);
+  font: inherit; font-size: 12.5px; font-weight: 500; line-height: 1; cursor: pointer; white-space: nowrap;
+  transition: background-color .15s ease-out, border-color .15s ease-out; -webkit-tap-highlight-color: transparent; }
+.hx-agents-btn:hover:not(:disabled) { background: var(--hx-bg-2, #F6F6F4); }
+.hx-agents-btn:disabled { opacity: .55; cursor: default; }
+.hx-agents-btn:focus-visible, .hx-agents-file:focus-visible, .hx-as-req-head:focus-visible, .hx-as-retry:focus-visible,
+.hx-pa-btn:focus-visible { outline: 2px solid var(--focus-ring-strong, #3054FD); outline-offset: 2px; }
+.hx-agents-stop { color: var(--hx-red, #C4161C); }
+.hx-agents-btn.is-danger { border-color: transparent; background: var(--hx-red, #C4161C); color: #fff; }
+.hx-agents-btn.is-danger:hover:not(:disabled) { background: color-mix(in srgb, var(--hx-red, #C4161C) 88%, #000); }
+.hx-agents-confirm { display: inline-flex; align-items: center; flex-wrap: wrap; gap: 6px; }
+.hx-agents-ask { font-size: 12.5px; color: var(--hx-text-2, #6B6B70); }
+.hx-agents-extra { margin-top: 8px; display: flex; flex-direction: column; align-items: flex-start; gap: 8px; }
+.hx-agents-fh { font-size: 12px; font-weight: 500; color: var(--hx-text-2, #6B6B70); }
+.hx-agents-files { display: flex; flex-wrap: wrap; gap: 6px; max-width: 100%; }
+.hx-agents-file { display: inline-flex; align-items: center; gap: 5px; max-width: 100%; height: 26px; padding: 0 10px;
+  box-sizing: border-box; border: 0; border-radius: 13px; background: var(--hx-fill, #F1F1EF); color: var(--hx-text, #141413);
+  font: inherit; font-size: 12.5px; cursor: pointer; -webkit-tap-highlight-color: transparent; }
+.hx-agents-file span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; min-width: 0; }
+.hx-agents-file svg { flex: none; color: var(--hx-text-2, #6B6B70); }
+.hx-agents-file:hover { background: var(--hx-tint, rgba(48,84,253,.1)); color: var(--hx-ink, #3054FD); }
+.hx-agents-more { align-self: center; font-size: 12px; color: var(--hx-text-2, #6B6B70); }
+@media (hover: none) and (pointer: coarse) { .hx-agents-resume { display: none; } } /* a terminal command: Mac only */
+@media (max-width: 640px) {
+  .hx-agents-bar { min-height: 40px; }
+  .hx-agents-head { min-height: 40px; }
+  .hx-agents-btn { height: 36px; padding: 0 14px; border-radius: 18px; font-size: 13.5px; }
+  .hx-agents-file { height: 34px; border-radius: 17px; padding: 0 12px; font-size: 13px; }
+}
+
+/* ── 2b. sheet: request rows jump to their reply; helper-down state ───── */
+.hx-as-req-head { width: 100%; box-sizing: border-box; border: 0; border-radius: 10px; background: none; color: inherit;
+  font: inherit; text-align: left; cursor: pointer; padding: 6px 6px 6px 4px; margin-bottom: 2px; -webkit-tap-highlight-color: transparent; }
+.hx-as-req-head > svg { flex: none; color: var(--hx-text-2, #6B6B70); opacity: .6; }
+.hx-as-req-head:hover { background: var(--hx-bg-2, #F6F6F4); }
+.hx-as-req-head:hover .hx-as-req-p { color: var(--hx-text, #141413); }
+@media (max-width: 640px) { .hx-as-req-head { min-height: 44px; } }
+.hx-as-down { margin: 0 0 6px; color: var(--hx-text, #141413); font-weight: 500; }
+.hx-as-hint { margin: 0 0 12px; font-size: 12.5px; line-height: 1.45; }
+.hx-as-hint code { font-size: 12px; padding: 1px 5px; border-radius: 5px; background: var(--hx-fill, #F1F1EF); white-space: nowrap; }
+.hx-as-retry:disabled { opacity: .6; cursor: default; }
+@media (max-width: 640px) { .hx-as-retry { height: 44px; padding: 0 22px; border-radius: 22px; } }
+#messages .msg-row.hx-flash { scroll-margin-top: 16px; border-radius: 14px; animation: hx-flash 1.5s ease-out; }
+@keyframes hx-flash { 0%, 35% { box-shadow: 0 0 0 2px var(--hx-accent, #3054FD); background: var(--hx-tint, rgba(48,84,253,.1)); } 100% { box-shadow: 0 0 0 2px transparent; background: transparent; } }
+@media (prefers-reduced-motion: reduce) {
+  #messages .msg-row.hx-flash { animation: none; box-shadow: 0 0 0 2px var(--hx-accent, #3054FD); }
+  .hx-agents-btn, .hx-agents-caret { transition: none; }
+}
+
+/* ── 3b. question card keyboard hint (desktop pointers only) ──────────── */
+.hx-q-keys { display: none; }
+@media (hover: hover) and (pointer: fine) { .hx-q-keys { display: inline; } }
+@media (max-width: 640px) { .hx-q-send { height: 44px; padding: 0 20px; border-radius: 22px; } }
+
+/* ── 4. plan approval buttons ──────────────────────────────────────────── */
+.hx-plan-act { display: flex; flex-wrap: wrap; gap: 8px; margin: 10px 0 6px; max-width: 640px; }
+.hx-pa-btn { display: inline-flex; align-items: center; justify-content: center; gap: 6px; height: 34px; padding: 0 16px;
+  border-radius: 17px; border: 1px solid var(--hx-hair, #E6E5E1); background: var(--hx-raised, #fff); color: var(--hx-text, #141413);
+  font: inherit; font-size: 14px; font-weight: 500; cursor: pointer; transition: background-color .15s ease-out, opacity .15s ease-out;
+  -webkit-tap-highlight-color: transparent; }
+.hx-pa-btn:hover:not(:disabled) { background: var(--hx-bg-2, #F6F6F4); }
+.hx-pa-btn.is-go { border-color: transparent; background: var(--hx-fill-text, #3054FD); color: var(--hx-on-accent, #fff); }
+.hx-pa-btn.is-go:hover:not(:disabled) { background: color-mix(in srgb, var(--hx-fill-text, #3054FD) 88%, #000); }
+.hx-pa-btn.is-quiet { border-color: transparent; background: none; color: var(--hx-text-2, #6B6B70); }
+.hx-pa-btn:disabled { opacity: .5; cursor: default; }
+.hx-pa-btn.is-busy { opacity: .8; }
+@media (max-width: 640px) { .hx-pa-btn { flex: 1 1 0; min-width: 0; height: 44px; border-radius: 22px; padding: 0 10px; } }
+@media (prefers-reduced-motion: reduce) { .hx-pa-btn { transition: none; } }

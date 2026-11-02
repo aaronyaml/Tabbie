@@ -83,6 +83,10 @@ html.hx-proj-open #hxProjects { display: block; position: fixed; top: 0; right: 
 .hxp-pdesc { margin: 0; color: var(--hx-text-2, #6B6B70); line-height: 1.4; font-size: 14px; }
 .hxp-chips { display: flex; flex-wrap: wrap; gap: 6px; }
 .hxp-chip-s { font-size: 12px; padding: 3px 9px; border-radius: 999px; background: var(--hx-fill, rgba(127,127,127,.1)); color: var(--hx-text-2, #6B6B70); }
+/* project cards grow to fit their folder chips (the picker's scrolling .hxp-chips below would shrink and clip them) */
+.hxp-pcard { height: auto; overflow: visible; }
+.hxp-pcard .hxp-chips { flex: none; max-height: none; overflow: visible; }
+.hxp-pcard .hxp-chip-s { max-width: 100%; box-sizing: border-box; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .hxp-empty { text-align: center; max-width: 440px; margin: 48px auto 0; }
 .hxp-empty h2 { margin: 12px 0 6px; font-size: 20px; letter-spacing: -0.02em; }
 .hxp-empty p { color: var(--hx-text-2, #6B6B70); line-height: 1.5; margin: 0 0 18px; }
@@ -205,3 +209,18 @@ html.hx-proj-open .sidebar-nav .nav-tab.active:not(.hxp-nav) { background: trans
 html.hx-proj-open .rail .rail-btn.nav-tab.active:not(.hxp-nav):hover { background: var(--hover-bg) !important; color: var(--hx-text) !important; }
 html.hx-proj-open .nav-tab.active:not(.hxp-nav) svg[data-hi] { stroke-width: 1.5 !important; }
 .rail-btn.hxp-nav.hxp-on, .sidebar-nav .nav-tab.hxp-nav.hxp-on { background: var(--hx-fill-2) !important; color: var(--hx-text) !important; }
+
+/* "to review" count on the Projects nav entries (projects.js paintBadge) */
+.hxp-nav { position: relative; }
+.hxp-count { position: absolute; top: 3px; right: 3px; min-width: 16px; height: 16px; padding: 0 4px; box-sizing: border-box;
+  border-radius: 999px; font: 600 10px/16px var(--font-ui, -apple-system, system-ui, sans-serif); text-align: center; letter-spacing: 0;
+  background: var(--hx-fill-text, #3054FD); color: var(--hx-on-accent, #fff); box-shadow: 0 0 0 2px var(--hx-bg, #fff); pointer-events: none; }
+.sidebar-nav .hxp-nav .hxp-count { top: 2px; right: calc(50% - 20px); }
+
+/* phone: a grabber on sheets, which pull down to dismiss */
+@media (max-width: 640px) {
+  .hxp-sheet { touch-action: pan-y; }
+  .hxp-sheet-h { padding-top: 18px; }
+  .hxp-sheet-h::before { content: ''; position: absolute; top: 6px; left: 50%; width: 36px; height: 5px; margin-left: -18px;
+    border-radius: 3px; background: var(--hx-fill-2, rgba(127,127,127,.28)); }
+}

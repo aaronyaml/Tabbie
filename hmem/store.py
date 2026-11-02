@@ -279,16 +279,18 @@ def committed_blobs() -> dict[str, str]:
     return _HEAD_CACHE["blobs"]
 
 
-def is_committed(m: "Memory") -> bool:
+def is_committed(m: "Memory", blobs: dict[str, str] | None = None) -> bool:
+    """blobs: a committed_blobs() result to reuse (one HEAD lookup for a whole batch of memories)."""
     rel = str(m.path.resolve().relative_to(root().resolve()))
-    return committed_blobs().get(rel) == _blob_sha(m.text_raw)
+    return (committed_blobs() if blobs is None else blobs).get(rel) == _blob_sha(m.text_raw)
 
 
 def trusted_memories() -> list["Memory"]:
     """Active memories whose on-disk content is exactly what the store committed."""
     out, bad = [], []
+    blobs = committed_blobs()  # one `git rev-parse` per search, not one per memory
     for m in all_memories():
-        (out if is_committed(m) else bad).append(m)
+        (out if is_committed(m, blobs) else bad).append(m)
     if bad:
         append_event("integrity_mismatch", ids=[m.id for m in bad][:20])
     return out

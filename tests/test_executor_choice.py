@@ -125,3 +125,65 @@ def test_execute_dispatches_by_choice():
     ec.set_choice("s9", "anthropic", "claude-opus-5-5", "high")
     cc._execute(req("three"))
     assert claude_calls[-1]["model"] == "claude-opus-5-5" and claude_calls[-1]["effort"] == "high"
+
+
+def test_hub_is_told_about_messages_added_mid_run(monkeypatch):
+    d = _tmp_state(); _wire(d)
+    monkeypatch.setattr(cc, "_learn", lambda r: None)  # its background thread would race later memory tests
+    cc.run_claude = lambda prompt, **k: {"ok": True, "result": "13\n\nAlso, 36 .js files.", "billing": "sub",
+                                         "live_messages": ["Also tell me how many .js files there are."]}
+    proj = d / "proj"; proj.mkdir()
+    r = st.Request.create(session_id="s10", route="claude", reason="scoped", forced=False,
+                          prompt="count the .py files, reply with just the number", raw_message="x",
+                          project=str(proj), project_source="t")
+    out = cc._execute(r)
+    assert out["user_messages_during_run"] == ["Also tell me how many .js files there are."]
+    assert '"Also tell me how many .js files there are."' in out["note"]
+    assert "original request" in out["note"] and "priority" in out["note"]
+    assert st.Request(r.id).data["result"]["live_messages"]  # kept on the request too
+
+    cc.run_claude = lambda prompt, **k: {"ok": True, "result": "13", "billing": "sub", "live_messages": []}
+    out = cc._execute(st.Request.create(session_id="s11", route="claude", reason="scoped", forced=False,
+                                        prompt="p", raw_message="p", project=str(proj), project_source="t"))
+    assert "note" not in out and "user_messages_during_run" not in out
+
+
+def test_new_chat_choice_follows_enabled_agents(monkeypatch):
+    _tmp_state()
+    d = ec.new_chat_choice()
+    assert (d["provider"], d["model"], d["name"], d["worker"], d["default"]) == (
+        "anthropic", "claude-opus-5-5", "Opus 5.5", "Claude Code", True)
+    monkeypatch.setattr(ec, "providers_on", lambda: ["openai"])  # Claude agent switched off
+    d = ec.new_chat_choice()
+    assert (d["provider"], d["model"], d["name"], d["worker"]) == ("openai", "gpt-6-astra", "GPT-6 Astra", "Codex")
+    assert d == {**ec.get_choice("never-saved"), "default": True}
+
+
+def _sidecar():
+    spec = importlib.util.spec_from_file_location("cc_sidecar_x", PKG / "sidecar.py")
+    m = importlib.util.module_from_spec(spec); spec.loader.exec_module(m)
+    return m
+
+
+def _get(sc, path, monkeypatch):
+    """Drive Handler.do_GET without a socket; returns (status, body)."""
+    monkeypatch.setattr(sc, "_token_ok", lambda _t: True)
+    h = sc.Handler.__new__(sc.Handler)
+    h.path, h.headers, out = path, {}, {}
+    h._send = lambda code, body: out.update(code=code, body=body)
+    h.do_GET()
+    return out["code"], out["body"]
+
+
+def test_sidecar_executor_without_id_returns_new_chat_default(monkeypatch):
+    sc = _sidecar()
+    monkeypatch.setattr(sc.providers, "codex_models", lambda: ["gpt-6.1-sol"])
+    monkeypatch.setattr(sc.executor_choice, "providers_on", lambda: ["openai"])
+    for path in ("/executor", "/executor?id="):
+        code, body = _get(sc, path, monkeypatch)
+        assert code == 200 and body["session_id"] is None
+        assert (body["choice"]["provider"], body["choice"]["default"]) == ("openai", True)
+        assert list(body["catalog"]["providers"]) == ["openai"]
+        assert [m["id"] for m in body["catalog"]["providers"]["openai"]["models"]] == ["gpt-6.1-sol"]
+    code, _ = _get(sc, "/executor?id=bad%20id!", monkeypatch)
+    assert code == 400

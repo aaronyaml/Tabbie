@@ -252,7 +252,7 @@ def _get(path: str, q: dict) -> dict:
         return {"sessions": [_session_row(t) for t in _traces(p["id"], limit=int(q.get("limit") or 60))]}
     if path == "/projects/session":
         p = _project(q)
-        tid = _need(q, "trace", re.compile(r"^[hc]-[\w-]{6,40}$"))
+        tid = _need(q, "trace", re.compile(r"^[hcw]-[\w-]{6,40}$"))
         t = next((t for t in _traces(p["id"], limit=10_000) if t["id"] == tid), None)
         if not t:
             raise BadRequest("no such session in this project")

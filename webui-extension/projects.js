@@ -47,7 +47,9 @@
     if (s < 86400 * 30) return `${Math.round(s / 86400)} d ago`;
     return new Date(iso).toLocaleDateString();
   };
-  const plural = (n, w) => `${n} ${w}${n === 1 ? '' : 's'}`;
+  const many = (w) => (/[^aeiou]y$/.test(w) ? w.slice(0, -1) + 'ies' : w + 's');  // memory → memories
+  const word = (n, w) => (n === 1 ? w : many(w));
+  const plural = (n, w) => `${n} ${word(n, w)}`;
   function toast(msg, kind) { try { if (typeof showToast === 'function') return showToast(msg, kind); } catch (_) {} console.log('[projects]', msg); }
 
   async function call(path, body) {
@@ -95,6 +97,8 @@
     document.documentElement.classList.add('hx-proj-open');
     place();
     if (opts && opts.pid) { S.view = 'project'; S.pid = opts.pid; }
+    else if (bootRoute) { S.view = 'project'; S.pid = bootRoute.pid; S.tab = bootRoute.tab; }
+    bootRoute = null;
     syncNav();
     S.view === 'project' && S.pid ? loadProject(S.pid) : loadList();
   }
@@ -118,18 +122,22 @@
 
   // ── nav entries (rail + drawer), right under Motion / Chat ──
   function navButtons() {
+    let made = false;
     const anchorRail = document.getElementById('hxMotionRail') || document.querySelector('.rail .rail-btn.nav-tab[data-panel="chat"]');
     if (anchorRail && !document.getElementById('hxProjRail')) {
       const b = h('button', { id: 'hxProjRail', type: 'button', class: 'rail-btn nav-tab has-tooltip hxp-nav', 'data-tooltip': 'Projects', 'aria-label': 'Projects' });
       b.innerHTML = icon('Briefcase01Icon', 20);
       anchorRail.after(b);
+      made = true;
     }
     const anchorSide = document.getElementById('hxMotionTab') || document.querySelector('.sidebar-nav .nav-tab[data-panel="chat"]');
     if (anchorSide && !document.getElementById('hxProjTab')) {
       const b = h('button', { id: 'hxProjTab', type: 'button', class: 'nav-tab has-tooltip has-tooltip--bottom hxp-nav', 'data-label': 'Projects', 'data-tooltip': 'Projects', 'aria-label': 'Projects' });
       b.innerHTML = icon('Briefcase01Icon', 18);
       anchorSide.after(b);
+      made = true;
     }
+    if (made && typeof paintBadge === 'function') paintBadge();  // a re-created entry gets its count back
   }
   function syncNav() {
     navButtons();
@@ -137,7 +145,39 @@
       b.classList.toggle('hxp-on', isOpen());
       b.setAttribute('aria-current', isOpen() ? 'page' : 'false');
     });
+    paintBadge();
   }
+
+  // ── "to review" badge on the nav entries: Dreamer proposals waiting across active projects ──
+  // Every 5 min, on coming back to the tab, and straight after anything done in the panel. Quiet:
+  // a 401 here never opens the helper-consent card (only the panel itself asks).
+  let toReview = 0, badgeT = 0, badgeAt = 0;
+  function paintBadge() {
+    document.querySelectorAll('.hxp-nav').forEach((b) => {
+      let c = b.querySelector('.hxp-count');
+      if (toReview > 0) {
+        if (!c) { c = h('span', { class: 'hxp-count', 'aria-hidden': 'true' }); b.append(c); }
+        const t = toReview > 99 ? '99+' : String(toReview);
+        if (c.textContent !== t) c.textContent = t;  // unchanged: no DOM write (the nav MutationObserver watches the body)
+        b.setAttribute('aria-label', `Projects, ${toReview} to review`);
+      } else {
+        if (c) c.remove();
+        b.setAttribute('aria-label', 'Projects');
+      }
+    });
+  }
+  const sumPending = (list) => (list || []).reduce((n, p) => n + (Number((p.summary || {}).pending) || 0), 0);
+  async function refreshBadge() {
+    badgeAt = Date.now();
+    try {
+      const r = await fetch(`${API}/projects`, { credentials: 'same-origin', cache: 'no-store' });
+      if (!r.ok) return;
+      const j = await r.json();
+      toReview = sumPending(j.projects);
+      paintBadge();
+    } catch (_) {}
+  }
+  const badgeSoon = () => { clearTimeout(badgeT); badgeT = setTimeout(refreshBadge, 400); };
 
   document.addEventListener('click', (e) => {
     const t = e.target;
@@ -157,20 +197,62 @@
   }, true);
   document.addEventListener('keydown', (e) => {
     if (e.key !== 'Escape' || !isOpen()) return;
-    if (S.sheet) { S.sheet = null; render(); } else if (S.view === 'project') { S.view = 'list'; loadList(); } else close();
+    if (S.sheet) { S.sheet = null; render(); } else if (S.view === 'project') toList(); else close();
   });
   addEventListener('resize', place);
+
+  // ── address: /projects#<project id>[/<tab>], so a reload (or a pasted link) reopens the same view ──
+  // A hash rather than /projects/<id>: Caddy serves the app shell for /projects itself, and routes.js
+  // keeps the hash while Projects is open. Opening a project adds a history entry (Back returns to the
+  // list); switching tabs replaces it.
+  let bootRoute = null;  // read once at boot, applied by the first open()
+  function fromHash(hash) {
+    const m = /^#([^/]+)(?:\/([a-z]+))?$/.exec(hash || '');
+    if (!m) return null;
+    let pid;
+    try { pid = decodeURIComponent(m[1]); } catch (_) { return null; }
+    return { pid, tab: TABS.some((t) => t[0] === m[2]) ? m[2] : 'folders' };
+  }
+  const hashNow = () => (S.view === 'project' && S.pid ? `#${encodeURIComponent(S.pid)}${S.tab !== 'folders' ? '/' + S.tab : ''}` : '');
+  const onPage = () => isOpen() && /^\/projects\/?$/.test(location.pathname);
+  function addr() {
+    if (!onPage()) return;  // still on the chat's address: routes.js moves to /projects and keeps the hash
+    const want = hashNow();
+    if (location.hash === want) return;
+    const url = location.pathname + location.search + want;
+    const wasProject = !!fromHash(location.hash);
+    const H = window.__hxMoHist;  // motion-boot.js's unwrapped history calls (its wrapper may turn a push into a replace)
+    if (want && !wasProject) H ? H.push({ hxProj: true }, url) : history.pushState({ hxProj: true }, '', url);
+    else H ? H.replace(history.state, url) : history.replaceState(history.state, '', url);
+  }
+  function toList() {
+    S.sheet = null;
+    if (onPage() && fromHash(location.hash) && history.state && history.state.hxProj) history.back();  // popstate loads the list
+    else { S.p = null; loadList(); }
+  }
+  addEventListener('popstate', () => {
+    if (!onPage()) return;
+    const r = fromHash(location.hash);
+    if (r && S.view === 'project' && S.pid === r.pid) { if (S.tab !== r.tab) tab(r.tab); }
+    else if (r) { S.sheet = null; S.tab = r.tab; loadProject(r.pid); }
+    else if (S.view === 'project') { S.sheet = null; S.p = null; loadList(); }
+  });
 
   // ── data ──
   async function loadList() {
     S.view = 'list'; S.err = '';
+    addr();
     render();
-    try { S.list = (await get('/projects', S.archived ? { archived: '1' } : null)).projects; }
+    try {
+      S.list = (await get('/projects', S.archived ? { archived: '1' } : null)).projects;
+      if (!S.archived) { toReview = sumPending(S.list); badgeAt = Date.now(); paintBadge(); }
+    }
     catch (e) { S.err = e.message; }
     render();
   }
   async function loadProject(pid, quiet) {
     S.view = 'project'; S.pid = pid; if (!quiet) S.err = '';
+    addr();
     if (!quiet) render();
     try { S.p = await get('/projects/get', { id: pid }); S.cache = {}; }
     catch (e) { S.err = e.message; }
@@ -217,7 +299,7 @@
     catch (e) {
       toast(e.message, 'error');
       if (e.conflict && S.pid) loadProject(S.pid, true);
-    } finally { S.busy = false; render(); }
+    } finally { S.busy = false; render(); badgeSoon(); }
   }
 
   // WebUI native project bound to the workspace: sidebar grouping + chats that start in it
@@ -321,7 +403,7 @@
   function viewProject() {
     const p = S.p;
     const wrap = h('div', { class: 'hxp-page' });
-    const back = btn('hxp-ib', '', () => { S.p = null; loadList(); }, 'ArrowLeft01Icon', { 'aria-label': 'All projects', title: 'All projects' });
+    const back = btn('hxp-ib', '', toList, 'ArrowLeft01Icon', { 'aria-label': 'All projects', title: 'All projects' });
     if (!p) {
       wrap.append(top('Project', '', back), h('main', { class: 'hxp-main' }, h('p', { class: S.err ? 'hxp-err' : 'hxp-muted', text: S.err || 'Loading…' })));
       return wrap;
@@ -336,11 +418,11 @@
     main.append(h('section', { class: 'hxp-hero' },
       p.description ? h('p', { class: 'hxp-pdesc', text: p.description }) : null,
       h('div', { class: 'hxp-stats' },
-        stat(s.folders, 'linked folders', () => tab('folders')),
-        stat(s.recent_sessions, 'sessions (30 d)', () => tab('sessions')),
+        stat(s.folders, `linked ${word(s.folders, 'folder')}`, () => tab('folders')),
+        stat(s.recent_sessions, `${word(s.recent_sessions, 'session')} (30 d)`, () => tab('sessions')),
         stat(s.pending, 'to review', () => tab('dreamer'), s.pending ? 'is-hot' : ''),
-        stat(s.skills_proposed, 'skills proposed', () => tab('skills')),
-        stat(s.memories, 'memories', () => tab('memory'))),
+        stat(s.skills_proposed, `${word(s.skills_proposed, 'skill')} proposed`, () => tab('skills')),
+        stat(s.memories, word(s.memories, 'memory'), () => tab('memory'))),
       h('div', { class: 'hxp-meta' },
         h('span', { text: prim ? `Primary: ${prim.label}` : 'No folders yet' }),
         h('span', { text: `Last dream: ${ago(s.last_dream)}` })),
@@ -367,7 +449,7 @@
   function stat(n, label, on, cls) {
     return h('button', { type: 'button', class: `hxp-stat ${cls || ''}`, onclick: on }, h('strong', { text: String(n == null ? '–' : n) }), h('span', { text: label }));
   }
-  function tab(id) { S.tab = id; render(); loadTab(); }
+  function tab(id) { S.tab = id; addr(); render(); loadTab(); }
   const loading = () => h('p', { class: 'hxp-muted', text: 'Loading…' });
 
   async function runDream(p) {
@@ -376,7 +458,7 @@
       if (!r.started) throw new Error(r.why || 'Dreamer did not start');
       S.dreamAt = Date.now();
       S.dreamFrom = (S.cache.dreamer && S.cache.dreamer.last && S.cache.dreamer.last.at) || null;
-      S.tab = 'dreamer';
+      S.tab = 'dreamer'; addr();
       startPoll();
       loadTab(true);
     }, 'Dreamer started. It reads this project’s sessions in the background.');
@@ -457,7 +539,7 @@
     const groups = {};
     for (const m of rows) (groups[m.type || 'fact'] = groups[m.type || 'fact'] || []).push(m);
     for (const [type, ms] of Object.entries(groups)) {
-      out.append(h('h3', { class: 'hxp-h3', text: `${type[0].toUpperCase()}${type.slice(1)}s` }));
+      out.append(h('h3', { class: 'hxp-h3', text: many(`${type[0].toUpperCase()}${type.slice(1)}`) }));
       const list = h('div', { class: 'hxp-list' });
       for (const m of ms) list.append(memRow(p, m));
       out.append(list);
@@ -517,7 +599,7 @@
           h('div', { class: 'hxp-item-b' },
             h('div', { class: 'hxp-item-t' }, h('span', { class: 'hxp-clip', text: f.title }), f.report_only ? h('span', { class: 'hxp-tag', text: 'for review' }) : null),
             h('div', { class: 'hxp-meta' }, h('span', { text: SPEC_NAME[f.specialist] || f.specialist }),
-              f.conversations ? h('span', { text: `${f.affected_sessions || f.conversations} of ${f.relevant_sessions || '?'} sessions` }) : null,
+              f.conversations ? h('span', { text: `${f.affected_sessions || f.conversations} of ${f.relevant_sessions || '?'} ${f.relevant_sessions === 1 ? 'session' : 'sessions'}` }) : null,
               f.confidence ? h('span', { text: `confidence ${Math.round(f.confidence * 100)}%` }) : null,
               f.folders.length ? h('span', { text: f.folders.join(' + ') }) : null)),
           h('span', { class: 'hxp-i', icon: 'ArrowRight01Icon', size: 16 })));
@@ -656,6 +738,52 @@
     return out;
   }
 
+  // ── phone: pull a sheet down to dismiss it (the model picker's drag, copied). Starts only when the
+  // sheet (and the inner list under the finger) is scrolled to the top, never from a field, and only on
+  // a mostly vertical pull. Each render builds a new sheet element, so listeners never pile up.
+  const reduced = () => window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+  function swipeDown(panel, onClose) {
+    let y0 = null, x0 = 0, dy = 0, live = false;
+    const reset = () => { panel.style.transition = ''; panel.style.transform = ''; const s = panel.parentElement; if (s) s.style.opacity = ''; };
+    panel.addEventListener('touchstart', (e) => {
+      y0 = null; live = false; dy = 0;
+      if (!phone() || e.touches.length !== 1) return;
+      const t = e.target;
+      if (t.closest && t.closest('input, textarea, select, [contenteditable], .hxp-chips')) return;
+      if (panel.scrollTop > 0) return;
+      for (let n = t; n && n !== panel; n = n.parentElement) if (n.scrollTop > 0) return;  // an inner list that's scrolled
+      y0 = e.touches[0].clientY; x0 = e.touches[0].clientX;
+    }, { passive: true });
+    panel.addEventListener('touchmove', (e) => {
+      if (y0 == null) return;
+      const t = e.touches[0];
+      dy = Math.max(0, t.clientY - y0);
+      if (!live) {
+        if (Math.abs(t.clientX - x0) > 12 && Math.abs(t.clientX - x0) > dy) { y0 = null; return; }  // sideways: not a dismiss
+        if (dy < 8) return;
+        if (panel.scrollTop > 0) { y0 = null; return; }
+        live = true;
+      }
+      if (reduced()) return;
+      panel.style.transition = 'none';
+      panel.style.transform = `translateY(${dy}px)`;
+      const s = panel.parentElement; if (s) s.style.opacity = String(Math.max(0.35, 1 - dy / 600));
+    }, { passive: true });
+    const end = () => {
+      if (y0 == null) return;
+      y0 = null;
+      const go = live && dy > 90;
+      live = false;
+      if (!go) { reset(); return; }
+      if (reduced()) { onClose(); return; }
+      panel.style.transition = 'transform .2s var(--hx-ease, ease)';
+      panel.style.transform = 'translateY(100%)';
+      setTimeout(onClose, 180);
+    };
+    panel.addEventListener('touchend', end);
+    panel.addEventListener('touchcancel', () => { y0 = null; live = false; reset(); });
+  }
+
   // ── sheets ──
   function sheet(sh) {
     const shut = () => { S.sheet = null; render(); };
@@ -677,6 +805,7 @@
     else if (sh.kind === 'finding') box.append(head(sh.f.title, SPEC_NAME[sh.f.specialist] || sh.f.specialist), sheetFinding(sh.f));
     else if (sh.kind === 'run') box.append(head('Dream run', sh.row.at ? new Date(sh.row.at).toLocaleString() : ''), err || sheetRun(sh));
     else if (sh.kind === 'file') box.append(head(sh.title), err || (sh.data ? h('pre', { class: 'hxp-pre', text: sh.data.text + (sh.data.truncated ? '\n…(truncated)' : '') }) : loading()));
+    swipeDown(box, () => { if (S.sheet === sh) shut(); });
     return scrim;
   }
 
@@ -837,7 +966,7 @@
         btn('hxp-primary is-danger', 'Delete project', () => act(async () => {
           await call('/projects/delete', { id: sh.p.id, confirm_name: inp.value });
           if (sh.p.webui_project_id) webui('/api/projects/delete', { project_id: sh.p.webui_project_id }).catch(() => {});
-          S.sheet = null; S.p = null; await loadList();
+          S.sheet = null; toList();
         }, 'Deleted'), 'Delete02Icon')));
   }
   function kv(label, value) { return value == null || value === '' ? null : h('div', { class: 'hxp-kv' }, h('span', { text: label }), h('strong', { text: String(value) })); }
@@ -938,11 +1067,15 @@
 
   // ── boot ──
   window.hxProjects = { open, close, isOpen };
+  if (window.__hxBootPanel === 'projects') bootRoute = fromHash(location.hash);  // landed on /projects#<id>[/<tab>]
   function start() {
     syncNav();
     new MutationObserver(() => { if (!document.getElementById('hxProjRail') || !document.getElementById('hxProjTab')) navButtons(); })
       .observe(document.body, { childList: true, subtree: true });
     setInterval(() => { if (isOpen()) place(); }, 1000);
+    setTimeout(refreshBadge, 3000);  // after the app has settled
+    setInterval(() => { if (!document.hidden) refreshBadge(); }, 5 * 60 * 1000);
+    document.addEventListener('visibilitychange', () => { if (!document.hidden && Date.now() - badgeAt > 60 * 1000) refreshBadge(); });
   }
   if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', start); else start();
 })();

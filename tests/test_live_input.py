@@ -62,3 +62,24 @@ def test_messages_before_the_run_are_not_replayed(tmp_path):
     (tmp_path / "inbox.jsonl").write_text(json.dumps({"id": "old", "text": "stale", "mode": "queue"}) + "\n")
     code, results, acks = _run(tmp_path, lambda: None)
     assert code == 0 and all("stale" not in r for r in results) and '"old"' not in acks
+
+
+def test_delivered_messages_reach_run_claudes_result(tmp_path, monkeypatch):
+    """Issue: the hub relayed only the first answer; run_claude must say what the user added mid-run."""
+    fake = tmp_path / "fake.py"; fake.write_text(FAKE)
+    monkeypatch.setattr(pv, "claude_auth", lambda: (True, "sub"))
+    monkeypatch.setattr(pv, "build_claude_cmd", lambda *a, **k: [sys.executable, str(fake)])
+    monkeypatch.setattr(pv, "LOCKS_DIR", tmp_path / "locks")
+    inbox = tmp_path / "inbox.jsonl"
+    import threading
+    threading.Timer(0.3, lambda: inbox.write_text(json.dumps({"id": "c3", "text": "  also count .js  ", "mode": "queue"})
+                                                  + "\n")).start()
+    res = pv.run_claude("do the task", cwd=str(tmp_path), add_dirs=[], cfg={}, resume_session=None,
+                        on_progress=lambda _t: None, inbox=tmp_path)
+    assert res["ok"] and res["live_messages"] == ["also count .js"]
+    assert "also count .js" in res["result"]
+
+
+def test_no_live_messages_without_an_inbox(tmp_path):
+    live = pv.LiveInput(tmp_path)
+    assert live.delivered == []

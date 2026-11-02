@@ -1,7 +1,7 @@
 """Usage limits — Hermes plugin.
 
 /limit shows how much of each subscription the command centre has used: Claude Max (Claude Code),
-ChatGPT via Codex (Astra) and the Hermes hub (openai-codex OAuth), Higgsfield credits, ElevenLabs.
+ChatGPT via Codex and the Hermes hub (openai-codex OAuth), Higgsfield credits, ElevenLabs.
 Everything is read-only and uses the existing subscription/OAuth logins; no API keys, no token
 refreshes, and tokens are never logged or returned. Each source runs in its own try/except with a
 short timeout, and results are cached for CACHE_TTL seconds.
@@ -264,9 +264,12 @@ def _codex_rows_from(label: str, info: dict, stale=None, source="") -> list[dict
                  note=note, stale=stale, source=source) for w in info["windows"]]
 
 
+CODEX_LABEL = "Codex gpt-6-astra"  # row label for Codex-as-worker; collect() filters on it
+
+
 def codex_rows() -> list[dict]:
     hub = _hub_model()
-    labels = {"codex": "Astra gpt-6-astra", "hermes": f"Hub {hub}"}
+    labels = {"codex": CODEX_LABEL, "hermes": f"Hub {hub}"}
     creds = _codex_creds()
     live: dict[str, dict] = {}
     errors = []
@@ -289,7 +292,7 @@ def codex_rows() -> list[dict]:
     for info in live.values():
         label = " + ".join(labels[w] for w in info["_who"])
         if len(info["_who"]) > 1:
-            label = "Astra + Hub (shared pool)"
+            label = "Codex + Hub (shared pool)"
         rows += _codex_rows_from(label, info, source="chatgpt wham/usage")
     covered = {w for i in live.values() for w in i["_who"]}
     if "codex" not in covered:  # fall back to the last Codex session's recorded numbers
@@ -415,8 +418,8 @@ def collect(refresh: bool = False) -> list[dict]:
                 rows += f.result(timeout=CLI_TIMEOUT + TIMEOUT)
             except Exception as e:
                 rows.append(_row(fn.__name__.replace("_rows", "").capitalize(), "—", note=f"error ({_err(e)})"))
-    if "codex" not in on:  # the hub's own ChatGPT login stays; only Codex-as-worker (Astra) goes
-        rows = [r for r in rows if not str(r.get("service", "")).startswith("Astra")]
+    if "codex" not in on:  # the hub's own ChatGPT login stays; only Codex-as-worker goes
+        rows = [r for r in rows if not str(r.get("service", "")).split(" · ", 1)[-1].startswith(CODEX_LABEL)]
     rows = [r for r in rows if connected(r)]
     _cache.update(at=_now(), rows=rows)
     return rows
@@ -564,12 +567,12 @@ def _tool_usage_limits(params=None, **kwargs):
 
 def register(ctx):
     ctx.register_command("limit", _cmd_limit,
-                         description="Usage limits: Claude Max, ChatGPT (Astra + hub), Higgsfield, ElevenLabs",
+                         description="Usage limits: Claude Max, ChatGPT (Codex + hub), Higgsfield, ElevenLabs",
                          args_hint="[refresh]")
     ctx.register_tool(name="usage_limits", toolset="limits", emoji="", handler=_tool_usage_limits,
                       schema={"name": "usage_limits",
                               "description": "How much subscription usage is left: Claude Max 5h/7d %, ChatGPT/Codex "
-                                             "(Astra + Hermes hub) 5h/7d %, Higgsfield credits, ElevenLabs credits, "
+                                             "(Codex + Hermes hub) 5h/7d %, Higgsfield credits, ElevenLabs credits, "
                                              "with reset times. Use for 'how much usage do I have left'.",
                               "parameters": {"type": "object",
                                              "properties": {"refresh": {"type": "boolean",

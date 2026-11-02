@@ -68,7 +68,7 @@ def test_claude_usage_legacy_shape():
 
 
 def test_format_and_stale_marker():
-    rows = L.parse_claude_usage(CLAUDE) + [L._row("ChatGPT · Astra", "5h", pct=8.0, resets_at=1000 + 3600, stale=7200)]
+    rows = L.parse_claude_usage(CLAUDE) + [L._row("ChatGPT · Codex", "5h", pct=8.0, resets_at=1000 + 3600, stale=7200)]
     md = L.format_markdown(rows, now=1000)
     assert "| Claude Max | 5h session | 2% |" in md
     assert "stale 2h 0m" in md and "1h 0m" in md
@@ -107,3 +107,15 @@ def test_limit_shows_connected_accounts_only():
             {"note": "no data — fix: `codex login`"}, {"note": "unavailable (not logged in) — fix: `higgsfield auth login`"}]
     assert all(L.connected(r) for r in keep)
     assert not any(L.connected(r) for r in drop)
+
+
+def test_codex_worker_rows_hidden_when_codex_off(monkeypatch):
+    rows = [L._row(f"ChatGPT Plus · {L.CODEX_LABEL}", "5h", pct=8.0),
+            L._row("ChatGPT Plus · Hub gpt-6.1-sol", "5h", pct=3.0),
+            L._row("ChatGPT Plus · Codex + Hub (shared pool)", "7d", pct=5.0)]
+    monkeypatch.setattr(L, "SOURCES", (lambda: rows,))
+    monkeypatch.setattr(L, "_enabled_agents", lambda: ["claude"])
+    monkeypatch.setitem(L._cache, "rows", None)
+    monkeypatch.setitem(L._cache, "at", 0)
+    services = [r["service"] for r in L.collect(refresh=True)]
+    assert services == ["ChatGPT Plus · Hub gpt-6.1-sol", "ChatGPT Plus · Codex + Hub (shared pool)"]

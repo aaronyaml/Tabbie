@@ -111,10 +111,53 @@
 .hx-mp-seg:hover { color: var(--hx-text); }
 .hx-mp-seg.is-on { background: var(--hx-raised); color: var(--hx-text); box-shadow: 0 1px 2px rgba(0,0,0,.08), 0 0 0 0.5px var(--hx-hair); }
 :root.dark .hx-mp-seg.is-on { background: var(--hx-fill-2); box-shadow: none; }
+/* Agents is an on/off toggle per agent (both can be on), so "on" needs to read at a glance:
+ * accent tint + ring + ink text; off stays flat and dimmer. Doubled class beats upstream button fills. */
+.hx-mp-segs .hx-mp-seg:not(.is-on) { background: transparent; box-shadow: none; }
+/* Agents: separate compact pills (not a full-width segmented bar), right-aligned with a gap.
+ * On = accent tint + check; off = hairline ring, dimmer text. Doubled classes beat upstream button styles. */
+.hx-mp-agents .hx-mp-segs { flex: 1; justify-content: flex-end; gap: 8px; padding: 0; background: transparent; }
+.hx-mp-agents .hx-mp-segs .hx-mp-seg {
+  flex: 0 0 auto; display: inline-flex; align-items: center; gap: 6px; height: 30px; padding: 0 14px; margin: 0;
+  border: 0; border-radius: 999px; font: 500 13px/1 var(--font-ui); min-width: 0;
+}
+.hx-mp-agents .hx-mp-segs .hx-mp-seg:not(.is-on) {
+  background: transparent; color: var(--hx-text-2); box-shadow: inset 0 0 0 1px var(--hx-hair); opacity: 1;
+}
+.hx-mp-agents .hx-mp-segs .hx-mp-seg:not(.is-on):hover { color: var(--hx-text); background: var(--hover-bg); }
+.hx-mp-agents .hx-mp-segs .hx-mp-seg.is-on, :root.dark .hx-mp-agents .hx-mp-segs .hx-mp-seg.is-on {
+  background: var(--hx-tint); color: var(--hx-ink); font-weight: 600;
+  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--hx-ink) 35%, transparent);
+}
+.hx-mp-agents .hx-mp-segs .hx-mp-seg.is-on::before {
+  content: ""; width: 10px; height: 6px; margin-top: -3px; border: solid currentColor; border-width: 0 0 2px 2px;
+  transform: rotate(-45deg); flex-shrink: 0;
+}
+.hx-mp-agents .hx-mp-segs .hx-mp-seg { transition: background-color .15s var(--hx-ease), color .15s var(--hx-ease), box-shadow .15s var(--hx-ease); }
 .is-sheet .hx-mp-seg { height: 32px; font-size: 13px; }
+.is-sheet .hx-mp-agents .hx-mp-segs .hx-mp-seg { height: 34px; padding: 0 16px; }
+/* Hand-offs (third Agents pill): same pill; greyed out when Claude Code or Codex isn't signed in. Three
+ * pills may not fit a narrow popover/sheet beside the label: they wrap, still right-aligned. */
+.hx-mp-agents .hx-mp-segs { flex-wrap: wrap; row-gap: 8px; }
+.hx-mp-agents .hx-mp-segs .hx-mp-seg.is-unavail, .hx-mp-agents .hx-mp-segs .hx-mp-seg.is-unavail:hover {
+  opacity: .45; cursor: not-allowed; color: var(--hx-text-2); background: transparent;
+  box-shadow: inset 0 0 0 1px var(--hx-hair);
+}
+.hx-mp-ho-cap { margin-top: 2px; text-align: right; }
+.is-sheet .hx-mp-ho-cap { text-align: center; }
 
 .hx-mp-cap, .hx-mp-note { margin: 6px 10px 2px; font-size: 12px; color: var(--hx-text-2); }
-.hx-mp-note { color: var(--hx-orange); }
+.hx-mp-note { color: var(--hx-orange); display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+.hx-mp-note > span { flex: 1 1 160px; min-width: 0; line-height: 1.35; }
+.hx-mp-retry {
+  flex: 0 0 auto; height: 28px; padding: 0 12px; border: 0; border-radius: 999px; cursor: pointer;
+  background: var(--hx-fill); color: var(--hx-text); font: 500 12px/1 var(--font-ui);
+  box-shadow: inset 0 0 0 1px var(--hx-hair); transition: background-color .15s var(--hx-ease);
+}
+.hx-mp-retry:hover { background: var(--hover-bg); }
+.hx-mp-retry:focus-visible { outline: 2px solid var(--focus-ring); outline-offset: 2px; }
+.hx-mp-retry:disabled { opacity: .6; cursor: default; }
+.is-sheet .hx-mp-retry { height: 36px; padding: 0 16px; font-size: 13px; }
 .is-sheet .hx-mp-cap { text-align: center; }
 
 @media (prefers-reduced-motion: reduce) {

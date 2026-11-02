@@ -1,7 +1,7 @@
 /* Tabbie — /limit as native cards (plain JS, no build step). Pairs with limits-view.css.
  * The limits plugin (~/hermes/plugin/limits) answers /limit in the WebUI with a ```tabbie-limits
  * JSON block followed by a readable markdown fallback. This turns that reply into one card per
- * service: plain-language rows, slim meters that warm up near the limit, the binding limit marked,
+ * service: plain-language rows, slim meters that warm up near the limit, the closest-to-limit window marked,
  * credits as a number, and not-connected services as a quiet line with the fix. The raw block and
  * fallback stay in the message (copy still gets them) but are hidden.
  * Also understands the older table-only reply ("| Service | Window | Used | Resets in |"), so it
@@ -89,7 +89,8 @@
       let s = out.find((x) => x.key === r.service);
       if (!s) {
         const [name, ...rest] = r.service.split(' · ');
-        s = { key: r.service, name, detail: rest.join(' · ').replace(/\s*\((.+)\)$/, ' · $1'), rows: [] };
+        // older replies still say "Astra" (internal name) for Codex
+        s = { key: r.service, name, detail: rest.join(' · ').replace(/\s*\((.+)\)$/, ' · $1').replace(/\bAstra\b/g, 'Codex'), rows: [] };
         out.push(s);
       }
       s.rows.push(r);
@@ -162,7 +163,7 @@
     if (r.stale != null) sub.push(`as of your last Codex session, ${rel(r.stale * 1000)} ago`);
     extra.forEach((x) => sub.push(x));
     const chip = reached ? '<span class="hx-lim-chip is-crit">Limit reached</span>'
-      : binding ? '<span class="hx-lim-chip" title="This is the limit that applies to you right now">Binding limit</span>' : '';
+      : binding ? '<span class="hx-lim-chip" title="Of this service’s limits, this is the one you’ll hit first">Closest to its limit</span>' : '';
     return `<div class="hx-lim-row${binding ? ' is-binding' : ''}" data-level="${lv}">
       <div class="hx-lim-line"><span class="hx-lim-lbl">${esc(label)}</span>${chip}<span class="hx-lim-pct"><b>${esc(pctTxt(p))}</b> used</span></div>
       <div class="hx-lim-bar" role="meter" aria-valuemin="0" aria-valuemax="100" aria-valuenow="${Math.round(p)}" aria-label="${esc(label)}: ${esc(pctTxt(p))} used"><i style="width:${p > 0 ? Math.max(p, 1.5) : 0}%"></i></div>

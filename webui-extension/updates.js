@@ -3,7 +3,9 @@
  *   GET  …/sidecar/update          -> {available, ahead_by, commits, remote, pending_restart}
  *   POST …/sidecar/update          -> download it (fast-forward; local edits are never overwritten)
  *   POST …/sidecar/update/restart  -> restart what it touched now, or once nothing is running ({waiting: true})
- * "Later" snoozes the card for a day (or until GitHub has something newer). Settings → System has a
+ * "Later" snoozes the card for a day (or until GitHub has something newer); "Later" on a downloaded update
+ * that still needs a restart snoozes it for 4 h. A scheduled restart is watched (30 s poll) until it has
+ * happened, then a "Tabbie restarted · Reload" card appears. Settings → System has a
  * "Tabbie" row with the version and a Check for updates button, any time.
  */
 (() => {
@@ -16,11 +18,18 @@
   const EVERY = 30 * 60 * 1000;
   const SOON = 10 * 60 * 1000;
   const SNOOZE = 24 * 3600 * 1000;
+  const RKEY = 'hx-update-restart-later';   // {sig, until}: "Later" on the restart card
+  const WKEY = 'hx-update-restart-watch';   // set while a scheduled restart is pending (survives a reload)
+  const RSNOOZE = 4 * 3600 * 1000;
+  const WATCH = 30 * 1000;
   // dismissed this exact version within the last day (older builds stored just the commit: not snoozed)
   const snoozed = (remote) => { try { const d = JSON.parse(get(KEY) || 'null'); return !!d && d.remote === remote && Date.now() < d.until; } catch (_) { return false; } };
   const esc = (s) => String(s == null ? '' : s).replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
   const get = (k) => { try { return localStorage.getItem(k); } catch (_) { return null; } };
   const set = (k, v) => { try { localStorage.setItem(k, v); } catch (_) {} };
+  const del = (k) => { try { localStorage.removeItem(k); } catch (_) {} };
+  const sigOf = (needs) => (needs || []).slice().sort().join(',');
+  const restartSnoozed = (needs) => { try { const d = JSON.parse(get(RKEY) || 'null'); return !!d && d.sig === sigOf(needs) && Date.now() < d.until; } catch (_) { return false; } };
 
   async function call(path, method) {
     const url = API + path;
@@ -52,14 +61,19 @@
   function offer(j) {
     info = j;
     const n = j.ahead_by || (j.commits || []).length;
-    const list = (j.commits || []).slice(0, 6).map((c) => `<li>${esc(c.title)}</li>`).join('');
+    const all = j.commits || [];
+    const more = Math.max(0, n - 6, all.length - 6);
+    const list = all.slice(0, 6).map((c) => `<li>${esc(c.title)}</li>`).join('')
+      + (more ? `<li class="hx-up-more">+${more} more</li>` : '');
     show(`<div class="hx-up-head"><b>Tabbie update available</b><span>${n ? `${n} change${n === 1 ? '' : 's'}` : 'New version'}</span></div>`
       + (list ? `<ul class="hx-up-list">${list}</ul>` : '')
       + `<p class="hx-up-note">Your settings and any files you've edited stay as they are.</p>`
       + `<div class="hx-up-btns"><button type="button" data-later>Later</button><button type="button" class="hx-up-go" data-update>Update</button></div>`);
   }
+  let lastNeeds = [];
   function finished(res) {
     const needs = res.needs || [];
+    lastNeeds = needs;
     const restart = needs.some((x) => x === 'gateway' || x === 'webui' || x === 'sidecar' || x === 'caddy');
     const setup = needs.includes('setup') ? '<p class="hx-up-note">This update changed setup steps: run <code>bin/setup</code> on the Mac when convenient.</p>' : '';
     if (restart) {
@@ -74,7 +88,36 @@
   function waitingCard() {
     show(`<div class="hx-up-head"><b>Restart scheduled</b></div><p class="hx-up-note">Tabbie is busy (a request, a worker or a Motion render), so nothing is restarted now. It restarts by itself a minute or so after everything finishes. Keep working.</p>`
       + `<div class="hx-up-btns"><button type="button" data-close>OK</button></div>`);
+    watchRestart();
   }
+
+  // ---- a scheduled restart: poll until it has happened, then offer a reload ----
+  let watchT = null, sawDown = false;
+  function watchRestart() {
+    set(WKEY, String(Date.now()));
+    sawDown = false;
+    clearTimeout(watchT);
+    watchT = setTimeout(pollRestart, WATCH);
+  }
+  async function pollRestart() {
+    watchT = null;
+    // a stale flag (over a day old) is dropped rather than watched forever
+    const since = Number(get(WKEY) || 0);
+    if (!since || Date.now() - since > 24 * 3600 * 1000) { del(WKEY); return; }
+    let j = null;
+    try { j = await call('', 'GET'); } catch (_) { sawDown = true; }  // services restarting: keep polling
+    if (j && (!(j.pending_restart && j.pending_restart.length) || sawDown)) { del(WKEY); restarted(); return; }
+    watchT = setTimeout(pollRestart, WATCH);
+  }
+  const composerEmpty = () => { const m = document.getElementById('msg'); return !m || !m.value.trim(); };
+  const pageBusy = () => { try { return !!(window.S && window.S.busy); } catch (_) { return false; } };
+  function restarted() {
+    if (document.hidden && composerEmpty() && !pageBusy()) { location.reload(); return; }
+    if (card) { card.remove(); card = null; }
+    show(`<div class="hx-up-head"><b>Tabbie restarted</b></div><p class="hx-up-note">The update is finished. Reload to use the new version.</p>`
+      + `<div class="hx-up-btns"><button type="button" data-close>Not now</button><button type="button" class="hx-up-go" data-reload>Reload</button></div>`);
+  }
+
   function error(msg, retry) {
     show(`<div class="hx-up-head"><b>Couldn't update</b></div><p class="hx-up-note hx-up-err">${esc(msg)}</p>`
       + `<div class="hx-up-btns"><button type="button" data-close>Close</button>${retry ? `<button type="button" class="hx-up-go" data-${retry}>Try again</button>` : ''}</div>`);
@@ -85,7 +128,8 @@
     const t = e.target.closest('button');
     if (!t) return;
     if (t.hasAttribute('data-later')) { if (info) set(KEY, JSON.stringify({ remote: info.remote, until: Date.now() + SNOOZE })); hide(); return; }
-    if (t.hasAttribute('data-close') || t.hasAttribute('data-later-restart')) { hide(); return; }
+    if (t.hasAttribute('data-later-restart')) { set(RKEY, JSON.stringify({ sig: sigOf(lastNeeds), until: Date.now() + RSNOOZE })); hide(); return; }
+    if (t.hasAttribute('data-close')) { hide(); return; }
     if (t.hasAttribute('data-reload')) { location.reload(); return; }
     if (t.hasAttribute('data-update')) {
       busy('Downloading…');
@@ -115,7 +159,16 @@
     try { j = await call(force ? '?force=1' : '', 'GET'); }
     catch (err) { console.warn('[Tabbie updates] check failed:', err && err.message); return; }  // sidecar down / not allowed yet
     if (j.note) console.info('[Tabbie updates]', j.note);
-    if (j.pending_restart && j.pending_restart.length) { if (!j.restart_waiting) finished({ needs: j.pending_restart }); return; }
+    if (j.pending_restart && j.pending_restart.length) {
+      if (j.restart_waiting) { if (!watchT) watchRestart(); return; }  // scheduled: watch quietly (also after a reload)
+      if (force || !restartSnoozed(j.pending_restart)) finished({ needs: j.pending_restart });
+      return;
+    }
+    if (get(WKEY)) {  // the scheduled restart happened before this page loaded: it already runs the new version
+      del(WKEY);
+      if (typeof window.showToast === 'function') window.showToast('Tabbie restarted · update finished', 3500);
+      return;
+    }
     if (!j.available) {
       // A copy that can't fast-forward says so once per GitHub version, so it isn't silently stuck.
       if (j.note && j.remote && /can't update automatically/.test(j.note) && !snoozed(j.remote)) {

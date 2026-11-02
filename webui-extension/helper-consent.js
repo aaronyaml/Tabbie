@@ -13,6 +13,23 @@
   const PATH = `/api/extensions/${EXT}/sidecar/`;
   let card = null;
 
+  // Settings → Extensions checks the helper by fetching its health_url (127.0.0.1:8794/health)
+  // straight from the browser: blocked by CORS on the Mac and pointing at the phone itself on a
+  // phone, so it always said "unreachable". Send that one request through the same proxy instead
+  // (it forwards /health; before consent it answers 403, shown as "unhealthy").
+  const HEALTH = 'http://127.0.0.1:8794/health';
+  const fetch0 = window.fetch;
+  if (typeof fetch0 === 'function' && !fetch0.__hxHealth) {
+    const wrapped = function (input, init) {
+      const url = typeof input === 'string' ? input : (input && typeof input.url === 'string' ? input.url : String(input || ''));
+      if (url !== HEALTH) return fetch0.apply(this, arguments);
+      const opts = Object.assign({}, init || {}, { credentials: 'same-origin' }); // upstream says 'omit'; the proxy needs the session
+      return fetch0.call(this, `api/extensions/${EXT}/sidecar/health`, opts);
+    };
+    wrapped.__hxHealth = true;
+    window.fetch = wrapped;
+  }
+
   async function needed() {
     try {
       const r = await fetch('api/extensions/status', { credentials: 'same-origin', cache: 'no-store' });

@@ -77,11 +77,11 @@ Rules:
 
 PHASE_INSTRUCTIONS = {
     "discover": "PHASE: discovery. Return kind='questions' (material questions only) or, if intent is "
-                "clear enough, kind='proposal' with proposal_markdown + decisions.",
+                "clear enough, kind='proposal' with proposal_markdown + decisions." + "{prebrief}",
     "revise": "PHASE: revision. The user replied (latest user turn). Incorporate it. Return "
               "kind='proposal' (preferred) or, only if something critical is still unknown, "
               "kind='questions'. If this revises an earlier proposal, list materially changed points "
-              "in changed_points.",
+              "in changed_points." + "{prebrief}",
     "finalize": "PHASE: final execution brief. The user APPROVED the latest proposal (with any "
                 "modifications shown in the transcript — apply them; do not reopen discovery). "
                 "Return kind='brief' with brief_markdown: a complete, self-contained execution "
@@ -104,6 +104,7 @@ class PlanResult:
     model: str
     error: str | None = None
     raw: str = ""
+    note: str = ""          # e.g. the planner moved to the other CLI because its own was near its limit
 
 
 def _clean_env(drop: tuple[str, ...]) -> dict:
@@ -183,7 +184,8 @@ class LiveInput:
 
     The request folder is the channel: the sidecar appends {id, text, mode} lines to inbox.jsonl
     (WebUI queue / Send now), this writes them to the worker's stdin and records each id in
-    inbox-acks.jsonl, and live.json says whether the channel is still open.
+    inbox-acks.jsonl, and live.json says whether the channel is still open. `delivered` keeps the
+    messages that reached Claude, so the hub's reply can cover them too.
       mode "queue": Claude reads it at its next step, in the same turn (as in interactive Claude Code).
       mode "now":   interrupt the current step first, then the message runs straight away.
     stdin closes at the first result that isn't the end of an interrupted step; anything already
@@ -200,6 +202,7 @@ class LiveInput:
         self.open = False
         self.interrupts = 0
         self.offset = 0
+        self.delivered: list[dict] = []
 
     @staticmethod
     def user_line(text: str) -> str:
@@ -257,6 +260,7 @@ class LiveInput:
                         self.proc.stdin.flush()
                     except (OSError, ValueError):
                         return
+                    self.delivered.append({"id": m.get("id"), "text": text, "mode": m.get("mode") or "queue"})
                     with (self.dir / "inbox-acks.jsonl").open("a") as a:
                         a.write(json.dumps({"id": m.get("id"), "at": time.time()}) + "\n")
 
@@ -366,15 +370,51 @@ def claude_auth() -> tuple[bool, str]:
     return True, "Claude subscription (claude.ai OAuth)"
 
 
+_CODEX_AUTH_OK = {"at": 0.0}
+
+
 def codex_auth() -> tuple[bool, str]:
     if not shutil.which("codex"):
         return False, "codex CLI not found on PATH"
+    if time.time() - _CODEX_AUTH_OK["at"] < _AUTH_FRESH_S:  # confirmed recently: skip the subprocess
+        return True, "ChatGPT subscription (Codex OAuth)"
     code, out, err = _run(["codex", "login", "status"], cwd=str(Path.home()),
                           env=_clean_env(_OPENAI_BILLING_VARS), timeout=30)
     text = (out + err).strip()
     if "ChatGPT" in text:
+        _CODEX_AUTH_OK["at"] = time.time()
         return True, "ChatGPT subscription (Codex OAuth)"
     return False, f"Codex is not on ChatGPT login: {text[:200]}"
+
+
+def linked(agent: str) -> bool:
+    """Is this coding agent installed AND signed in to its subscription (auth cached 10 min)?
+    TABBIE_LINKED=claude,codex (or empty = none) overrides the check (tests, bench)."""
+    forced = os.environ.get("TABBIE_LINKED")
+    if forced is not None:
+        return agent in {x.strip() for x in forced.split(",") if x.strip()}
+    try:
+        return (claude_auth() if agent == "claude" else codex_auth())[0]
+    except Exception:
+        return False
+
+
+def dynamic_gate(cfg: dict | None = None) -> tuple[bool, str]:
+    """Dynamic agents (hand-offs between Claude Code and Codex) are allowed only when: the setting is on
+    (config/agents.yaml `dynamic`, default on), both agents are enabled AND signed in, and this process
+    is not itself a delegate (depth limit 1)."""
+    from .common import agents
+    a = agents()
+    if int(os.environ.get("TABBIE_DELEGATE_DEPTH") or 0) >= 1:
+        return False, "this run is itself a delegate"
+    if not a.dynamic_enabled():
+        return False, "hand-offs are switched off"
+    on = a.enabled()
+    if not ("claude" in on and "codex" in on):
+        return False, "needs both Claude Code and Codex enabled"
+    if not (linked("claude") and linked("codex")):
+        return False, "needs Claude Code and Codex signed in"
+    return True, "ok"
 
 
 def codex_models() -> list[str]:
@@ -384,10 +424,22 @@ def codex_models() -> list[str]:
 
 # --- planner --------------------------------------------------------------------------------
 
-def _planner_prompt(phase: str, request: dict, manifest_text: str) -> str:
+# With a proposal, the planner also writes the execution brief it would hand over if the user approves
+# as-is: an unchanged approval then skips the separate finalize call (planner.finalize: auto).
+PREBRIEF = (" With kind='proposal', ALSO fill brief_markdown with the complete execution brief you would give "
+            "Claude Code if the user approves this proposal unchanged (same rules as a final brief: goal, scope, "
+            "decisions, file/area targets, attachment [index] use, specialist steps, acceptance criteria, "
+            "verification; no conversational filler; do not restate the original request) and fill specialists.")
+
+
+def phase_instructions(phase: str, prebrief: bool = True) -> str:
+    return PHASE_INSTRUCTIONS[phase].replace("{prebrief}", PREBRIEF if prebrief else "")
+
+
+def _planner_prompt(phase: str, request: dict, manifest_text: str, prebrief: bool = True) -> str:
     transcript = "\n\n".join(f"### {t['role'].upper()}\n{t['content']}" for t in request["planning_transcript"])
     return (
-        f"{PLANNER_ROLE}\n\n{PHASE_INSTRUCTIONS[phase]}\n\n"
+        f"{PLANNER_ROLE}\n\n{phase_instructions(phase, prebrief)}\n\n"
         f"PROJECT: {request.get('project') or '(none — not code-bound or not yet chosen)'}\n"
         + (f"ALSO IN THIS WORKSPACE: {', '.join(request.get('extra_dirs') or [])}\n" if request.get('extra_dirs') else "")
         + "\n"
@@ -428,7 +480,8 @@ def run_planner(phase: str, request: dict, manifest_text: str, images: list[str]
     provider = pcfg.get("provider", "codex-cli")
     model = pcfg.get("model")
     timeout = int(pcfg.get("timeout_seconds", 900))
-    prompt = _planner_prompt(phase, request, manifest_text)
+    prompt = _planner_prompt(phase, request, manifest_text,
+                             prebrief=str(pcfg.get("finalize", "auto")).lower() != "always")
     cwd = request.get("project") or str(work_dir)
     work_dir.mkdir(parents=True, exist_ok=True)
 
@@ -444,7 +497,7 @@ def run_planner(phase: str, request: dict, manifest_text: str, images: list[str]
         schema_file = work_dir / "plan.schema.json"
         schema_file.write_text(json.dumps(PLAN_SCHEMA))
         out_file = work_dir / f"plan-{phase}-{int(time.time())}.json"
-        cmd = ["codex", "exec", "--skip-git-repo-check", "-m", model, "-s", "read-only", "-C", cwd,
+        cmd = ["codex", "exec", "--skip-git-repo-check", "--ephemeral", "-m", model, "-s", "read-only", "-C", cwd,
                "--output-schema", str(schema_file), "-o", str(out_file),
                "-c", f'model_reasoning_effort="{pcfg.get("reasoning_effort", "high")}"']
         if on_event:
@@ -469,7 +522,8 @@ def run_planner(phase: str, request: dict, manifest_text: str, images: list[str]
         ok, why = claude_auth()
         if not ok:
             return PlanResult(False, None, provider, model, f"planner auth check failed: {why}")
-        cmd = ["claude", "-p", "--output-format", "json", "--permission-mode", "plan",
+        # Never resumed: --no-session-persistence keeps it out of the WebUI's Claude Code session list.
+        cmd = ["claude", "-p", "--output-format", "json", "--permission-mode", "plan", "--no-session-persistence",
                "--json-schema", json.dumps(PLAN_SCHEMA)]
         if model:
             cmd += ["--model", model]
@@ -512,6 +566,70 @@ WORKER_RULES = """You are the execution worker of the user's command centre (dis
   On failure: Problem / Cause / Required action. If nothing to add beyond success: "Done."
   Never claim success you did not verify.
 """ + QUESTION_RULES.replace("{", "{{").replace("}", "}}")
+
+
+DYNAMIC_RULES = """DYNAMIC AGENTS — your judgement:
+- You choose how to do this job: alone, with your own subagents ({own_subagents}), or by handing a
+  self-contained part to {other} through the `delegate` tool (MCP server "tabbie"). None of these is
+  the default.
+- Hand off only where you judge {other} will clearly do that part better, or where an independent
+  implementation or review helps. Never for trivial steps, the whole request, or to avoid work.
+- Brief it like a colleague who has seen nothing: goal, acceptance criteria, decisions already made,
+  file paths, what to return. (It is given the user's original request and the project folders.)
+- mode="write" only for files you will not touch until it returns; otherwise mode="read".
+- Check its result; you own the final answer. Name a hand-off in one Note line.
+- If it says unavailable, busy or near its limit, do that part yourself and add one Note line saying so.
+{extra}"""
+
+_DYN = {
+    "claude": {"own_subagents": "Agent/Task", "other": "Codex (OpenAI GPT)", "extra": ""},
+    "codex": {"own_subagents": "spawn_agent", "other": "Claude Code (Anthropic Claude)",
+              "extra": "- Before spawn_agent, run `~/hermes/bin/limit-gate codex`; if it exits 2, work inline instead.\n"},
+}
+
+
+def worker_rules(provider: str = "claude", *, dynamic: bool = False, max_subagents=2,
+                 hints: list[str] | None = None) -> str:
+    """The worker system rules. Two static variants per provider (dynamic on/off) keep the prompt
+    prefix byte-identical across requests, so it caches. hints: router.yaml dynamic_agents.hints."""
+    base = WORKER_RULES.format(max_subagents=max_subagents)
+    if not dynamic:
+        return base
+    extra = "".join(f"- Hint: {str(h).strip()}\n" for h in (hints or []) if str(h).strip())
+    d = dict(_DYN["codex" if provider == "codex" else "claude"])
+    d["extra"] += extra
+    return base + "\n" + DYNAMIC_RULES.format(**d)
+
+
+DELEGATE_SERVER = Path(__file__).resolve().parent / "delegate_mcp.py"
+DELEGATE_TIMEOUT_S = 10800
+
+
+def delegate_server_spec(env: dict) -> dict:
+    """The `tabbie` stdio MCP server (delegate_mcp.py), run by this same Python."""
+    import sys
+    return {"type": "stdio", "command": sys.executable, "args": [str(DELEGATE_SERVER)], "env": dict(env)}
+
+
+def codex_mcp_overrides(env: dict) -> list[str]:
+    """`codex exec -c` overrides that attach the same `tabbie` server to a Codex worker."""
+    import sys
+    env = {"PATH": os.environ.get("PATH", ""), "HOME": str(Path.home()), **env}  # it runs claude/codex itself
+    toml_env = "{" + ", ".join(f"{k} = {json.dumps(str(v))}" for k, v in sorted(env.items())) + "}"
+    return ["-c", f"mcp_servers.tabbie.command={json.dumps(sys.executable)}",
+            "-c", f"mcp_servers.tabbie.args={json.dumps([str(DELEGATE_SERVER)])}",
+            "-c", f"mcp_servers.tabbie.env={toml_env}",
+            "-c", f"mcp_servers.tabbie.tool_timeout_sec={DELEGATE_TIMEOUT_S}",
+            "-c", "mcp_servers.tabbie.startup_timeout_sec=30"]
+
+
+def delegate_env(*, request_dir: Path | str, parent_agent: str, parent: str, cwd: str, add_dirs: list[str],
+                 model: str | None, effort: str | None, session_id: str = "") -> dict:
+    """What the delegate server needs to know about the run that may hand work off."""
+    return {"TABBIE_REQUEST_DIR": str(request_dir), "TABBIE_PARENT_AGENT": parent_agent,
+            "TABBIE_DELEGATE_FROM": parent, "TABBIE_CWD": cwd, "TABBIE_ADD_DIRS": json.dumps(list(add_dirs)),
+            "TABBIE_PARENT_MODEL": model or "", "TABBIE_PARENT_EFFORT": effort or "",
+            "TABBIE_SESSION_ID": session_id, "COMMAND_CENTRE_HOME": str(Path(__file__).resolve().parents[2])}
 
 
 class WorkerSlot:
@@ -566,18 +684,36 @@ class WorkerSlot:
 
 
 def build_claude_cmd(ecfg: dict, *, add_dirs: list[str], resume_session: str | None, stream: bool,
-                     model: str | None = None, effort: str | None = None, live: bool = False) -> list[str]:
+                     model: str | None = None, effort: str | None = None, live: bool = False,
+                     profile: str | None = None, mcp_config: str | None = None, dynamic: bool = False,
+                     extra_disallowed: list[str] | None = None) -> list[str]:
     """`claude -p` argv. model/effort (the conversation's picker choice) win over executor.model.
-    live: the prompt (and later chat messages) arrive as stream-json on stdin (LiveInput)."""
+    live: the prompt (and later chat messages) arrive as stream-json on stdin (LiveInput).
+    profile: lean | full (default executor.worker_profile, else full = the user's whole ~/.claude).
+    mcp_config: lean only, the --mcp-config file (empty, or the `tabbie` delegate server).
+    dynamic: the worker rules include the hand-off rules (only when the delegate server is attached)."""
     from .executor_choice import claude_args
+    profile = (profile or str(ecfg.get("worker_profile", "full"))).lower()
     fmt = ["stream-json", "--verbose"] if stream else ["json"]
     cmd = ["claude", "-p", "--output-format", *fmt, *(["--input-format", "stream-json"] if live and stream else []),
            "--permission-mode", str(ecfg.get("permission_mode", "auto")),
-           "--append-system-prompt", WORKER_RULES.format(max_subagents=ecfg.get("max_subagents", 2))]
+           "--append-system-prompt", worker_rules("claude", dynamic=dynamic, max_subagents=ecfg.get("max_subagents", 2),
+                                                   hints=ecfg.get("_dynamic_hints"))]
+    lean_tools: list[str] = []
+    if profile == "lean":
+        from . import worker_profile
+        files = worker_profile.ensure(ecfg)
+        cmd += ["--setting-sources", "project,local", "--settings", files["settings"], "--strict-mcp-config",
+                "--mcp-config", mcp_config or worker_profile.mcp_config(worker_profile.WORKER_DIR / "mcp-empty.json"),
+                "--exclude-dynamic-system-prompt-sections"]
+        if files.get("plugin_dir"):
+            cmd += ["--plugin-dir", files["plugin_dir"]]
+        lean_tools = list(worker_profile.LEAN_DISALLOWED)
     # Shared memory changes only through hmem proposals; file tools can't edit the store directly (Bash
     # edits are caught by hmem's integrity check: uncommitted memory files are ignored).
     cmd += ["--disallowedTools", *[f"{t}(~/hermes/memory/**)" for t in ("Edit", "Write", "MultiEdit", "NotebookEdit")],
-            "Read(~/.hermes/webui/sidecar-auth/**)"]  # sidecar token: a worker must not drive the Projects API
+            "Read(~/.hermes/webui/sidecar-auth/**)",  # sidecar token: a worker must not drive the Projects API
+            *lean_tools, *(extra_disallowed or [])]
     for d in add_dirs:
         cmd += ["--add-dir", d]
     cmd += claude_args(model or (str(ecfg["model"]) if ecfg.get("model") else None), effort)
@@ -586,25 +722,70 @@ def build_claude_cmd(ecfg: dict, *, add_dirs: list[str], resume_session: str | N
     return cmd
 
 
+STOP_MARKER = "stopped_by_user"  # written by the sidecar's POST /worker/stop (Agents block Stop button)
+_STOP_CODES = (-signal.SIGTERM, -signal.SIGKILL, 143, 137)
+
+
+def _user_stopped(folder: Path | None, code: int) -> bool:
+    return bool(folder) and code in _STOP_CODES and (Path(folder) / STOP_MARKER).exists()
+
+
+def _clear_stop(folder: Path | None) -> None:
+    if folder:
+        (Path(folder) / STOP_MARKER).unlink(missing_ok=True)  # an old Stop never labels a later run
+
+
+def _stream_session_id(out: str) -> str | None:
+    """The Claude session id from a stream that was cut off before its result (init/assistant events)."""
+    for line in out.splitlines():
+        if '"session_id"' in line:
+            try:
+                sid = json.loads(line).get("session_id")
+            except json.JSONDecodeError:
+                continue
+            if sid:
+                return sid
+    return None
+
+
 def run_claude(prompt: str, *, cwd: str, add_dirs: list[str], cfg: dict, resume_session: str | None,
                on_progress=None, session_key: str | None = None, on_event=None,
-               model: str | None = None, effort: str | None = None, inbox: Path | None = None) -> dict:
+               model: str | None = None, effort: str | None = None, inbox: Path | None = None,
+               profile: str | None = None, delegate: dict | None = None, timings: dict | None = None) -> dict:
     """Run Claude Code headless. With on_progress, streams (stream-json) and calls on_progress(line)
     for each step (thinking, text, tool calls, errors) as it happens. With inbox (the request
-    folder), the user's chat messages reach Claude while it works (LiveInput)."""
+    folder), the user's chat messages reach Claude while it works (LiveInput).
+    profile: lean | full (see worker_profile). delegate: delegate_env() when dynamic agents are allowed:
+    the `tabbie` delegate server is attached and the hand-off rules are added (lean profile only).
+    timings: filled with phase timestamps (slot, spawn, init, first_reply, done)."""
     ecfg = cfg.get("executor", {}) or {}
+    timings = timings if timings is not None else {}
     ok, why = claude_auth()
     if not ok:
         return {"ok": False, "error": f"Claude auth check failed: {why}", "billing": None}
     if on_event and not on_progress:
         on_progress = lambda _t: None  # noqa: E731 - events need the stream format
     live = LiveInput(inbox) if (inbox and on_progress) else None
+    profile = (profile or str(ecfg.get("worker_profile", "full"))).lower()
+    mcp_file = None
+    if profile == "lean":
+        from . import worker_profile
+        name = f"mcp-{Path(inbox).name}.json" if inbox else f"mcp-{os.getpid()}-{int(time.time())}.json"
+        mcp_file = worker_profile.mcp_config(worker_profile.WORKER_DIR / name,
+                                             {"tabbie": delegate_server_spec(delegate)} if delegate else None)
     cmd = build_claude_cmd(ecfg, add_dirs=add_dirs, resume_session=resume_session, stream=bool(on_progress),
-                           model=model, effort=effort, live=bool(live))
+                           model=model, effort=effort, live=bool(live), profile=profile, mcp_config=mcp_file,
+                           dynamic=bool(delegate and profile == "lean"))
     started = time.time()
+    timings.setdefault("run_start", started)
+    _clear_stop(inbox)
     try:
         with WorkerSlot(ecfg.get("max_parallel", 1), int(ecfg.get("queue_wait_seconds", 1800)), session_key):
+            timings["slot"] = time.time()
             run_env, run_timeout = _clean_env(_ANTHROPIC_BILLING_VARS), int(ecfg.get("timeout_seconds", 3600))
+            run_env["TABBIE_WORKER_MODEL"] = model or str(ecfg.get("model") or "")
+            if delegate:
+                run_env["MCP_TOOL_TIMEOUT"] = str(DELEGATE_TIMEOUT_S * 1000)  # a hand-off may run long
             if on_progress:
                 import threading
                 last = {"at": time.time(), "step": "the task"}
@@ -615,6 +796,10 @@ def run_claude(prompt: str, *, cwd: str, add_dirs: list[str], cfg: dict, resume_
                         ev = json.loads(line)
                     except json.JSONDecodeError:
                         return
+                    if ev.get("type") == "system" and ev.get("subtype") == "init":
+                        timings.setdefault("init", time.time())
+                    elif ev.get("type") == "assistant":
+                        timings.setdefault("first_reply", time.time())
                     if on_event:
                         try:
                             on_event(ev)
@@ -633,13 +818,24 @@ def run_claude(prompt: str, *, cwd: str, add_dirs: list[str], cfg: dict, resume_
                 threading.Thread(target=heartbeat, daemon=True).start()
                 try:
                     code, out, err = _run_stream(cmd, cwd=cwd, env=run_env, timeout=run_timeout, stdin=prompt,
-                                                 on_line=on_line, live=live)
+                                                 on_line=on_line, live=live,
+                                                 on_start=lambda _p: timings.setdefault("spawn", time.time()))
                 finally:
                     stop.set()
             else:
+                timings["spawn"] = time.time()
                 code, out, err = _run(cmd, cwd=cwd, env=run_env, timeout=run_timeout, stdin=prompt)
+            timings["done"] = time.time()
     except TimeoutError as exc:
         return {"ok": False, "error": str(exc), "billing": why}
+    finally:
+        if mcp_file:
+            Path(mcp_file).unlink(missing_ok=True)
+    if _user_stopped(inbox, code):
+        return {"ok": False, "error": "stopped by you", "stopped_by_user": True, "result": "",
+                "session_id": _stream_session_id(out) or resume_session, "billing": why,
+                "duration_s": round(time.time() - started, 1),
+                "live_messages": [m["text"] for m in live.delivered] if live else []}
     env = None
     for line in reversed(out.strip().splitlines()):  # json: one object; stream-json: last is the result
         try:
@@ -660,6 +856,9 @@ def run_claude(prompt: str, *, cwd: str, add_dirs: list[str], cfg: dict, resume_
         "error": None if code == 0 and not env.get("is_error") else (env.get("result") or err[-800:]),
         "billing": why,
         "permission_denials": env.get("permission_denials") or [],
+        "live_messages": [m["text"] for m in live.delivered] if live else [],
+        "profile": profile,
+        "usage": env.get("usage") or {},
     }
 
 
@@ -717,17 +916,20 @@ def git_state(cwd: str) -> str:
 
 
 def build_codex_exec_cmd(*, model: str, effort: str | None, out_file: Path, cwd: str, add_dirs: list[str],
-                         resume_thread: str | None = None) -> list[str]:
-    """`codex exec` argv for a workspace-write executor run (new thread or `exec resume`)."""
+                         resume_thread: str | None = None, sandbox: str = "workspace-write", ephemeral: bool = False,
+                         extra: list[str] | None = None) -> list[str]:
+    """`codex exec` argv for an executor run (new thread or `exec resume`). sandbox read-only for a
+    read-mode delegate; ephemeral (no saved session) for delegates; extra: e.g. codex_mcp_overrides()."""
     from .executor_choice import codex_effort_args
     common = ["--skip-git-repo-check", "--json", "-m", model, "-o", str(out_file),
-              *codex_effort_args(effort), "-c", "sandbox_workspace_write.network_access=true"]
+              *codex_effort_args(effort), "-c", "sandbox_workspace_write.network_access=true",
+              *(["--ephemeral"] if ephemeral else []), *(extra or [])]
     if resume_thread:  # `exec resume` takes no -s/-C/--add-dir: same settings via config overrides
-        cmd = ["codex", "exec", "resume", resume_thread, *common, "-c", 'sandbox_mode="workspace-write"']
+        cmd = ["codex", "exec", "resume", resume_thread, *common, "-c", f'sandbox_mode="{sandbox}"']
         if add_dirs:
             cmd += ["-c", "sandbox_workspace_write.writable_roots=" + json.dumps(list(add_dirs))]
     else:
-        cmd = ["codex", "exec", *common, "-s", "workspace-write", "-C", cwd]
+        cmd = ["codex", "exec", *common, "-s", sandbox, "-C", cwd]
         for d in add_dirs:
             cmd += ["--add-dir", d]
     return cmd + ["-"]
@@ -735,7 +937,9 @@ def build_codex_exec_cmd(*, model: str, effort: str | None, out_file: Path, cwd:
 
 def run_astra_executor(prompt: str, *, cwd: str, add_dirs: list[str], cfg: dict, pid_file: Path,
                        on_event=None, resume_thread: str | None = None,
-                       model: str | None = None, effort: str | None = None) -> dict:
+                       model: str | None = None, effort: str | None = None,
+                       stop_marker: Path | None = None, delegate: dict | None = None,
+                       timings: dict | None = None) -> dict:
     """Codex executing work (ChatGPT subscription): Astra takeover when Claude is unavailable, or the
     OpenAI model the user picked for this conversation (model/effort given; effort None = Codex default).
     resume_thread continues an earlier run (e.g. after the user answered its questions)."""
@@ -750,12 +954,20 @@ def run_astra_executor(prompt: str, *, cwd: str, add_dirs: list[str], cfg: dict,
         return {"ok": False, "error": f"model '{model}' not exposed to this Codex login", "billing": why}
     out_file = pid_file.with_suffix(".last.txt")
     out_file.unlink(missing_ok=True)
+    if stop_marker:
+        Path(stop_marker).unlink(missing_ok=True)
     cmd = build_codex_exec_cmd(model=model, effort=effort, out_file=out_file, cwd=cwd, add_dirs=add_dirs,
-                               resume_thread=resume_thread)
+                               resume_thread=resume_thread, extra=codex_mcp_overrides(delegate) if delegate else None)
     started = time.time()
+    timings = timings if timings is not None else {}
+    timings.setdefault("run_start", started)
     thread = {"id": resume_thread}
 
     def on_ev(ev):
+        if ev.get("type") == "thread.started":
+            timings.setdefault("init", time.time())
+        elif ev.get("type") == "item.completed":
+            timings.setdefault("first_reply", time.time())
         if ev.get("type") == "thread.started" and ev.get("thread_id"):
             thread["id"] = ev["thread_id"]
         if on_event:
@@ -765,6 +977,7 @@ def run_astra_executor(prompt: str, *, cwd: str, add_dirs: list[str], cfg: dict,
                 pass
 
     def on_start(proc):
+        timings.setdefault("spawn", time.time())
         pid_file.parent.mkdir(parents=True, exist_ok=True)
         pid_file.write_text(str(proc.pid))
     try:
@@ -773,8 +986,12 @@ def run_astra_executor(prompt: str, *, cwd: str, add_dirs: list[str], cfg: dict,
                                       stdin=prompt, on_line=_json_lines(on_ev), on_start=on_start)
     finally:
         pid_file.unlink(missing_ok=True)
+        timings["done"] = time.time()
     result = out_file.read_text() if out_file.exists() else ""
-    stopped = code in (-signal.SIGTERM, -signal.SIGKILL, 143, 137)
+    stopped = code in _STOP_CODES
+    by_user = stopped and bool(stop_marker) and Path(stop_marker).exists()
     return {"ok": code == 0 and bool(result), "result": result, "thread_id": thread["id"],
-            "error": "stopped by /takeover" if stopped else (None if code == 0 else (err or "")[-800:]),
+            "error": ("stopped by you" if by_user else "stopped by /takeover") if stopped
+            else (None if code == 0 else (err or "")[-800:]),
+            **({"stopped_by_user": True} if by_user else {}),
             "billing": why, "model": model, "duration_s": round(time.time() - started, 1)}

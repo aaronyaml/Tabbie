@@ -5,8 +5,12 @@ system task_* events) and Codex `--json` events (Astra). Persisted per request a
 state/requests/<id>/agents.json, with a per-session index at state/agents/<session>.json that the
 WebUI sidecar serves.
 
-Record: {id, parent, name, description, provider, model, status (running|done|failed|waiting),
-step, started, ended, duration_s, tokens, output_tokens, tool_uses}
+Record: {id, parent, name, description, provider, model, status (running|done|failed|waiting|stopped),
+step, started, ended, duration_s, tokens, output_tokens, tool_uses, kind}
+kind: None for a main worker, "subagent" (Claude Agent/Task with task_type local_agent, Codex
+spawn_agent), "delegate" (a dynamic-agent hand-off to the other provider, written by delegate_mcp.py
+into its own file agents-<id>.json and merged at read time) or "background" (a background shell task:
+shown muted, never counted as an agent).
 `tokens` follows Claude Code's own subagent figure (totalTokens): the agent's context at its latest
 call (input + cache write + cache read + output). `output_tokens` is cumulative.
 """
@@ -43,7 +47,7 @@ def new_agent(agent_id: str, name: str, *, parent: str | None = None, provider: 
     return {"id": agent_id, "parent": parent, "name": name, "description": description,
             "provider": provider, "model": None, "status": "running", "step": "Starting",
             "started": now if now is not None else time.time(), "ended": None, "duration_s": None,
-            "tokens": 0, "output_tokens": 0, "tool_uses": 0}
+            "tokens": 0, "output_tokens": 0, "tool_uses": 0, "kind": "subagent" if parent else None}
 
 
 def _finish(a: dict, status: str, now: float, duration_s: float | None = None) -> None:
@@ -82,6 +86,8 @@ class AgentRun:
         self._msgs: dict[str, dict] = {}      # message id -> {agent, out}
         self._main: str | None = None
         self._saved = 0.0
+        self.file_name = "agents.json"   # a delegate's rows live in agents-<id>.json (no write race)
+        self.index = True                 # update the session index on save (main runs only)
 
     # -- lookup ---------------------------------------------------------------------------
     @property
@@ -120,7 +126,23 @@ class AgentRun:
             tid = ev.get("tool_use_id")
             if not tid:
                 return False
-            a = self._sub(tid, ev.get("description") or ev.get("subagent_type") or "Subagent", now)
+            existing = self.get(tid)
+            background = (ev.get("task_type") not in (None, "local_agent") if st == "task_started"
+                          else (existing is None and not ev.get("subagent_type")))
+            if existing is None and background:
+                # a background shell task (e.g. "sleep 50" in the background): a muted row, not an agent
+                a = self._sub(tid, ev.get("description") or "Background task", now)
+                a["kind"], a["description"] = "background", "background task"
+            else:
+                a = self._sub(tid, ev.get("description") or ev.get("subagent_type") or "Subagent", now)
+            if a.get("kind") == "background":
+                if ev.get("description"):
+                    a["name"] = _short(ev["description"], 80)
+                if st == "task_notification":
+                    ok = ev.get("status") in ("completed", "done", "success")
+                    _finish(a, "done" if ok else "failed", now)
+                    a["step"] = "Done" if ok else "Failed"
+                return True
             if ev.get("subagent_type"):
                 a["description"] = ev["subagent_type"]
             if ev.get("description"):
@@ -235,6 +257,10 @@ class AgentRun:
                     main["tool_uses"] += 1
             elif k == "mcp_tool_call":
                 step = f"Using {it.get('tool') or 'a tool'}"
+                if it.get("server") == "tabbie" and it.get("tool") == "delegate":
+                    step = "Handing off to Claude Code"
+            elif k == "collab_tool_call":
+                return self._codex_collab(main, t, it, now)
             if step:
                 main["step"] = step
                 return True
@@ -250,17 +276,52 @@ class AgentRun:
             return True
         return False
 
+    def _codex_collab(self, main: dict, t: str, it: dict, now: float) -> bool:
+        """Codex native sub-agents (`collab_tool_call` items: spawn / wait / send / close). Shape from a
+        captured fixture (tests/fixtures/codex-collab-wait.jsonl): tool, receiver_thread_ids, prompt,
+        agents_states {thread_id: {status}}, status."""
+        tool = str(it.get("tool") or "")
+        changed = False
+        if tool.startswith("spawn"):
+            for tid in it.get("receiver_thread_ids") or []:
+                if self.get(tid) is None:
+                    a = new_agent(tid, _short(it.get("prompt") or "Sub-agent", 80), parent=main["id"],
+                                  provider=main.get("provider") or "astra", now=now)
+                    a["description"] = "sub-agent"
+                    self.agents.append(a)
+                    changed = True
+            if t == "item.started":
+                main["step"] = "Starting a sub-agent"
+                changed = True
+        states = it.get("agents_states") or {}
+        for tid, stt in states.items():
+            a = self.get(tid)
+            status = str((stt or {}).get("status") if isinstance(stt, dict) else stt or "").lower()
+            if a and status in ("completed", "done", "shutdown", "closed", "errored", "failed", "error"):
+                _finish(a, "failed" if status in ("errored", "failed", "error") else "done", now)
+                a["step"] = "Failed" if a["status"] == "failed" else "Done"
+                changed = True
+        if tool == "wait" and t == "item.started":
+            main["step"] = "Waiting for sub-agents"
+            changed = True
+        return changed
+
     def finish_main(self, ok: bool, *, waiting: bool = False, step: str | None = None,
-                    now: float | None = None) -> None:
+                    now: float | None = None, stopped: bool = False) -> None:
+        """stopped: the user pressed Stop. Shown as "stopped" (neutral), never as a failure."""
         now = time.time() if now is None else now
         m = self.main()
         if not m:
             return
+        end = "stopped" if stopped else ("done" if ok else "failed")
         for a in self.agents:
             if a["parent"] == m["id"] and a["status"] == "running":
-                _finish(a, "done" if ok else "failed", now)
+                _finish(a, end, now)
         if m["status"] == "running":
-            _finish(m, "done" if ok else "failed", now)
+            _finish(m, end, now)
+        if stopped:
+            m["step"] = "Stopped by you"
+            return
         if waiting:
             m["status"], m["step"] = "waiting", step or "Waiting for your answer"
         elif step:
@@ -272,8 +333,10 @@ class AgentRun:
         ends = [a["ended"] for a in ags if a["ended"]]
         starts = [a["started"] for a in ags if a["started"]]
         running = sum(1 for a in ags if a["status"] == "running")
-        return {"agents": len(ags), "running": running,
-                "failed": sum(1 for a in ags if a["status"] == "failed"),
+        real = [a for a in ags if a.get("kind") != "background"]
+        return {"agents": len(real), "running": sum(1 for a in real if a["status"] == "running"),
+                "failed": sum(1 for a in real if a["status"] == "failed"),
+                "stopped": sum(1 for a in real if a["status"] == "stopped"),
                 "waiting": any(a["status"] == "waiting" for a in ags),
                 "tokens": sum(a["tokens"] for a in ags),
                 "started": min(starts) if starts else None,
@@ -289,8 +352,8 @@ class AgentRun:
         self.data["summary"] = self.summary()
         if meta:
             self.data.update(meta)
-        write_json(REQUESTS_DIR / self.request_id / "agents.json", self.data)
-        if self.session_id:
+        write_json(REQUESTS_DIR / self.request_id / self.file_name, self.data)
+        if self.session_id and self.index:
             update_index(self.session_id, self.request_id, self.data)
 
     @classmethod
@@ -316,16 +379,34 @@ def update_index(session_id: str, request_id: str, data: dict) -> None:
         write_json(path, idx)
 
 
+def merged_agents(rid: str, base: Path | None = None) -> list[dict]:
+    """A request's rows: agents.json plus every delegate's agents-<id>.json (hand-offs), oldest first."""
+    d = (base or REQUESTS_DIR) / rid
+    data = read_json(d / "agents.json", {}) or {}
+    rows = list(data.get("agents", []))
+    for f in sorted(d.glob("agents-*.json")):
+        extra = read_json(f, {}) or {}
+        rows += [a for a in extra.get("agents", []) if isinstance(a, dict)]
+    return supersede_waiting(rows)
+
+
+def merged_summary(rows: list[dict], base: dict | None = None) -> dict:
+    """The index summary, recomputed when delegate rows exist (their tokens and agents count too)."""
+    run = AgentRun("x", data={"agents": rows})
+    return {**(base or {}), **run.summary()}
+
+
 def session_view(session_id: str) -> dict:
     """Everything the agents panel shows for one session: requests (oldest first) with their agents."""
     idx = read_json(AGENTS_INDEX_DIR / f"{_safe(session_id)}.json", None) or {"requests": {}}
     out = []
     for rid in sorted(idx["requests"]):
-        data = read_json(REQUESTS_DIR / rid / "agents.json", {}) or {}
         req = read_json(REQUESTS_DIR / rid / "request.json", {}) or {}
         row = dict(idx["requests"][rid])
         row["status"] = req.get("status", row.get("status"))
-        row["agents_list"] = supersede_waiting(data.get("agents", []))
+        row["agents_list"] = merged_agents(rid)
+        if any(a.get("kind") in ("delegate", "background") or a.get("status") == "stopped" for a in row["agents_list"]):
+            row.update(merged_summary(row["agents_list"]))
         row["waiting"] = any(a.get("status") == "waiting" for a in row["agents_list"])
         out.append(row)
     return {"session_id": session_id, "requests": out}

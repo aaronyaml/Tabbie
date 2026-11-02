@@ -39,6 +39,10 @@ On top of that:
 - **Attachments** are passed byte-exact.
 - **Usage limits** are shown for every subscription.
 - **Takeover**: when Claude hits its limit, the planner can continue the job.
+- **Hand-offs**: with both agents linked, Claude can pass a task to Codex (or Codex to Claude), or
+  to its own subagents, when it judges that's better. On by default.
+- **Fast and lean**: workers start with a slim profile and the reply is relayed verbatim, so a small
+  job finishes in about 10–15 s.
 
 Tabbie is built on two open-source projects and runs entirely on your machine:
 
@@ -75,6 +79,53 @@ flowchart LR
 2. Workers read your **verbatim** prompt and the original files from disk, never a paraphrase.
 3. After each request a sanitised trace is saved (secrets scrubbed). The Dreamer learns from these
    traces, and nothing becomes memory until you approve it.
+
+### Speed and tokens
+
+Each request passes through the hub, a worker and back. To cut both time and tokens:
+
+- **Lean workers** (`executor.worker_profile: lean`): Claude Code starts with project settings only and no
+  stray MCP servers, but keeps your user skills and the plugins in `plugins_keep` (the design
+  plugins by default). `worker_profile: full` loads everything, as before.
+- **Early start**: a clear request starts its worker while the hub is still replying.
+- **Verbatim relay** (`relay: verbatim`): the worker's answer is passed through as-is, instead of
+  the hub model re-typing it. `relay: hub` lets the hub rewrite it, as before.
+- **Planner finalize skip** (`planner.finalize: auto`): an approved plan goes straight to Claude
+  when the brief is already complete.
+
+Measured with `bin/bench-latency` (3 runs each, Opus 5.5):
+
+| Request | Time |
+|---|---|
+| Overhead around a job (R1: `sleep 45`, minus the 45 s) | 10–12 s (was 28–42 s) |
+| Small real job (R2: count files) | 10–14 s |
+| Long answer (R3: explain a file) | 12–17 s |
+| Worker's first call | about 21k tokens, half cached (was 35–48k) |
+
+`bin/bench-latency --label NAME [--runs 3] [--only R1,R2]` runs it again; results go to `state/bench/`.
+
+### Hand-offs (dynamic agents)
+
+With **both** Claude Code and Codex linked, each worker gets a `delegate` tool and uses its own
+judgement: do the job alone, use its own subagents, or hand a self-contained piece to the other
+agent with the context it needs (Claude → Codex for some tasks, Codex → Claude for others). A
+hand-off shows as a nested row in the reply's Agents block (e.g. "hand-off from Claude Code").
+Hand-offs go one level deep; the helper can't hand off again.
+
+<p align="center">
+  <img src="docs/images/handoff.png" alt="A reply's Agents block: Claude Code as the main worker and a nested Codex GPT-6 Astra row, hand-off from Claude Code" width="560">
+  <img src="docs/images/model-picker.png" alt="The model picker's Agents row: Claude, OpenAI and Hand-offs pills, all on" width="280">
+</p>
+
+On by default. Turn it off with the **Hand-offs** pill in the model picker's Agents row, or
+`dynamic: false` in `config/agents.yaml`. With one agent off, there is nothing to hand off to.
+
+### Usage limits gate
+
+Before any worker, planner or hand-off starts, Tabbie checks the subscription's usage (cached for
+60 s). At 95% or more it doesn't start: it offers to switch the request to the other agent instead,
+and a planner at its limit falls back to the other planner. Hand-offs to Codex stop at 90%, so they
+never use up the ChatGPT allowance the hub shares. If usage can't be read, it starts anyway (logged). `bin/limit-gate` runs the same check (it's also used as a hook).
 
 ---
 
@@ -533,9 +584,11 @@ For lighter routing, `config/projects.yaml` names folders the router can target,
   - Workers can't edit it.
   - They file proposals (`hmem propose …`), which you approve in the WebUI or with `hmem approve <id>`.
   - Content from web pages or tools stays marked `external` and is never injected into a prompt as fact.
-- **The Dreamer** (`hmem dream`, nightly, or after N sessions) looks for repeated failures and the
-  rules you stated across several conversations. It files a few proposals, each with evidence. In a
-  project it only reads that project's sessions.
+- **The Dreamer** (`hmem dream`, nightly, or after N sessions) looks for repeated failures, and
+  for preferences and rules you state in chats ("I like…", "always use…", "never…"), from the WebUI
+  as well as the CLI. A preference stated once is enough. It files a few proposals, each with the
+  quote as evidence, and never approves them itself. In a project it only reads that project's
+  sessions; the Projects rail shows a "to review" badge when proposals are waiting.
 - CLI reference: `hmem search|read|proposals|show|approve|reject|history|rollback|stats|doctor`, and
   `hmem project …`.
 
@@ -552,9 +605,12 @@ Design notes: `docs/memory/ARCHITECTURE.md`, `docs/projects/ARCHITECTURE.md`.
   - a manifest records each file's name, type, size and sha256;
   - derived files (extracted ZIPs, PDF text, media info) sit beside the originals.
 - **Agents panel**: each reply shows a live block of the worker and its subagents (status, latest
-  step, tokens, time). The Agents pill opens the whole session.
-- **Questions**: when a worker needs a decision it asks a structured question card, and your reply
-  resumes the same session.
+  step, tokens, time). The Agents pill opens the whole session; tap a request there to jump to its
+  reply. **Stop** ends a running worker and keeps the work so far. Finished jobs list the files they
+  changed and a command to resume the session in a terminal.
+- **Plans**: a plan card has **Approve**, **Change** and **Cancel** buttons (typing `yes` still works).
+- **Questions**: when a worker needs a decision it asks a structured question card (number keys pick
+  an option; a half-typed answer is kept), and your reply resumes the same session.
 - **Takeover**: if Claude hits its usage limit, Tabbie offers to let the planner continue from where
   it stopped. `/takeover` toggles it.
 - **Limits**: `/limit` or `bin/hub limits` shows % used and reset times for each signed-in subscription.
@@ -562,6 +618,10 @@ Design notes: `docs/memory/ARCHITECTURE.md`, `docs/projects/ARCHITECTURE.md`.
   straight to Claude, which reads it at its next step (like typing ahead in Claude Code). **Send now**
   (or ⌘/Ctrl+Enter) stops Claude's current step so it reads your message right away. Codex runs can't
   take messages mid-run, so for those the queue sends after the reply.
+- **Little things**: a "New" dot when a reply arrives while you're scrolled up; a notification
+  named after the chat when a reply lands in a background tab; swipe to dismiss sheets and cards on
+  a phone; **?** opens the keyboard shortcuts; the update banner watches a restart through and can
+  be snoozed. Settings › **Having an issue?** opens [Tabbie's issues](https://github.com/aaronyaml/Tabbie/issues).
 
 ### Choosing Claude Code, Codex or both
 
@@ -572,11 +632,12 @@ Design notes: `docs/memory/ARCHITECTURE.md`, `docs/projects/ARCHITECTURE.md`.
 | **Codex only** | Codex | Codex | no fallback agent |
 
 Change it any time from the composer's **model picker → Agents** (Claude Code / Codex toggles; at
-least one stays on). It applies on the next request with no restart. It's stored in
+least one stays on; **Hand-offs** sits beside them). It applies on the next request with no restart. It's stored in
 `config/agents.yaml`:
 
 ```yaml
 enabled: [claude, codex]   # or [claude], or [codex]
+dynamic: true              # hand-offs between them (needs both)
 ```
 
 With one agent off, its models disappear from the picker, the planner switches to the agent you
@@ -630,7 +691,25 @@ planner:
 ```
 
 If the model isn't available to your login, planning fails with a clear error and never swaps in
-another model. Auto-approval of Dreamer proposals is off (`memory.auto_approve`); it never covers
+another model (except the limits gate's fallback, which tells you).
+
+Speed and limits settings, also in `config/router.yaml`:
+
+```yaml
+planner:
+  finalize: auto             # or always (a separate finalize call after every approval)
+executor:
+  worker_profile: lean       # or full
+  plugins_keep: [frontend-design, impeccable, ui-ux-pro-max, taste-skill, stop-slop]
+  early_start: true
+  relay: verbatim            # or hub (the hub model rewrites the answer)
+limits:
+  block_at_pct: 95
+  reserve_for_hub_pct: 90
+dynamic_agents:
+  models: {}                 # override the same-tier peer, e.g. {claude-opus-5-5: gpt-6-astra}
+  hints: []                  # optional strength hints; none = pure judgement
+``` Auto-approval of Dreamer proposals is off (`memory.auto_approve`); it never covers
 global memory, skills or deletions.
 
 ---
@@ -669,9 +748,9 @@ Use Claude Code's own permission settings for hard limits.
 | `brand/` | Icons, mascot animation frames, login skin |
 | `services/` | LaunchAgent templates and the Caddyfile |
 | `templates/motion-studio/` | The Motion studio's starting point (Remotion project, audio analysis, music and edit-map scripts) |
-| `bin/` | `setup`, `hub` (open, cli, health, restart, logs, import, limits), service entrypoints |
+| `bin/` | `setup`, `hub` (open, cli, health, restart, logs, import, limits), `limit-gate`, `bench-latency`, service entrypoints |
 | `config/` | Router defaults and the `*.example` files |
-| `docs/` | Architecture notes |
+| `docs/` | Architecture notes; `docs/testing/UI_TESTING.md` is the end-to-end UI test process |
 | `tests/` | Test suite |
 
 ## Tests

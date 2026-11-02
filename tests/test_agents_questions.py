@@ -222,6 +222,38 @@ def test_clean_title():
     assert m.clean_title("\n\n**Fix Greeting Size**") == "Fix Greeting Size"
     assert m.clean_title("") == ""
     assert len(m.clean_title("x" * 200)) == 60
+    # Haiku echoing our wrapper, or a title built from envelope text, keeps only the user's words
+    assert m.clean_title("<message>\n/limit\n</message>") == "/limit"
+    assert m.clean_title('<pasted_content id="90a5"> Web3 Audit Leads') == "Web3 Audit Leads"
+
+
+def test_title_input_strips_envelope_markup():
+    import importlib.util, pathlib
+    spec = importlib.util.spec_from_file_location("cc_sidecar_e", pathlib.Path(__file__).parent.parent / "plugin/command-centre/sidecar.py")
+    m = importlib.util.module_from_spec(spec); spec.loader.exec_module(m)
+    se = m.strip_envelope
+    assert se("<message> /limit </message>") == "/limit"
+    assert se('<pasted_content id="2e84">\nBuild my command centre\n</pasted_content>') == "Build my command centre"
+    assert se("pasted_content id=f0d2 Plan the campaign") == "Plan the campaign"
+    assert se("<command-message>motion</command-message>\n<command-name>/motion</command-name>\n"
+              "<command-args>apple style NBA promo</command-args>") == "/motion\napple style NBA promo"
+    assert se("Summarise this @file:/tmp/composer-pastes/pasted_content_1.txt\n\n--- Attached Context ---\n"
+              "### file: pasted_content.txt\nlots of text") == "Summarise this"
+    assert se("<system-reminder>ignore me</system-reminder>fix the <div> layout") == "fix the <div> layout"
+
+
+def test_make_title_sends_clean_text_and_saves_no_session(monkeypatch):
+    import importlib.util, pathlib, subprocess, types
+    spec = importlib.util.spec_from_file_location("cc_sidecar_m", pathlib.Path(__file__).parent.parent / "plugin/command-centre/sidecar.py")
+    m = importlib.util.module_from_spec(spec); spec.loader.exec_module(m)
+    calls = []
+    monkeypatch.setattr(m.agent_set, "has", lambda _a: True)
+    monkeypatch.setattr(subprocess, "run", lambda cmd, **k: calls.append((cmd, k["input"])) or
+                        types.SimpleNamespace(stdout="Check Usage Limits\n"))
+    assert m.make_title('<pasted_content id="ab12">check my limits</pasted_content>') == "Check Usage Limits"
+    cmd, sent = calls[-1]
+    assert "--no-session-persistence" in cmd
+    assert sent == "<message>\ncheck my limits\n</message>"
 
 
 def test_supersede_waiting_marks_older_asking_run_answered():
@@ -233,3 +265,70 @@ def test_supersede_waiting_marks_older_asking_run_answered():
     one = [agents.new_agent("claude-1", "Claude Code")]
     one[0]["status"] = "waiting"
     assert agents.supersede_waiting(one)[0]["status"] == "waiting"  # still the latest run: keep waiting
+
+
+# ---- speed plan: background tasks, hand-off rows, Codex sub-agents, stopped ----------------------
+
+def test_background_task_is_not_a_subagent():
+    run = _replay([
+        {"type": "system", "subtype": "task_started", "tool_use_id": "bg1", "task_id": "b1",
+         "description": "Wait 50 seconds in background", "task_type": "local_bash"},
+        {"type": "system", "subtype": "task_notification", "tool_use_id": "bg1", "task_id": "b1", "status": "completed"},
+        {"type": "result", "subtype": "success", "duration_ms": 5000, "num_turns": 2}])
+    main, bg = run.agents
+    assert bg["kind"] == "background" and bg["status"] == "done" and bg["name"] == "Wait 50 seconds in background"
+    s = run.summary()
+    assert s["agents"] == 1 and s["running"] == 0  # a background shell task is not an agent
+
+
+def test_real_subagents_keep_kind_subagent():
+    run = _replay(agents.load_events(FIX))
+    assert [a.get("kind") for a in run.agents] == [None, "subagent", "subagent"]
+
+
+def test_delegate_rows_merge_into_the_session_view(tmp_path, monkeypatch):
+    monkeypatch.setattr(agents, "REQUESTS_DIR", tmp_path / "req")
+    monkeypatch.setattr(agents, "AGENTS_INDEX_DIR", tmp_path / "idx")
+    rid = "20261102-120000-abc123"
+    (tmp_path / "req" / rid).mkdir(parents=True)
+    run = agents.AgentRun(rid, "sess-9")
+    run.start_main("Claude Code", "claude", now=1.0)
+    run.save(force=True)
+    d = agents.AgentRun(rid, "sess-9")
+    d.file_name, d.index = "agents-1200-ab12.json", False
+    row = d.start_main("Codex GPT-6 Astra · review", "astra", now=2.0)
+    row.update(id="delegate-1200-ab12", parent="claude-1", kind="delegate", to="codex", tokens=1500)
+    d._main = row["id"]
+    d.apply_codex({"type": "item.started", "item": {"type": "collab_tool_call", "tool": "spawn_agent",
+                                                    "receiver_thread_ids": ["th-sub"], "prompt": "check tests"}}, now=3.0)
+    d.save(force=True)
+    view = agents.session_view("sess-9")["requests"][0]
+    ids = [(a["id"], a["parent"]) for a in view["agents_list"]]
+    assert ids == [("claude-1", None), ("delegate-1200-ab12", "claude-1"), ("th-sub", "delegate-1200-ab12")]
+    assert view["agents"] == 3 and view["tokens"] >= 1500
+
+
+def test_codex_collab_fixture_and_spawn_rows():
+    run = agents.AgentRun("r", "s")
+    run.start_main("Codex", "astra", now=0.0)
+    for ev in agents.load_events(Path(__file__).parent / "fixtures" / "codex-collab-wait.jsonl"):
+        run.apply_codex(ev, now=1.0)
+    assert len(run.agents) == 1 and run.agents[0]["tokens"] > 0  # a wait with no agents adds no row
+    run.apply_codex({"type": "item.completed", "item": {"type": "collab_tool_call", "tool": "spawn_agent",
+                                                        "receiver_thread_ids": ["t2"], "prompt": "reply PONG",
+                                                        "status": "completed"}}, now=2.0)
+    run.apply_codex({"type": "item.completed", "item": {"type": "collab_tool_call", "tool": "wait",
+                                                        "agents_states": {"t2": {"status": "completed"}}}}, now=5.0)
+    sub = run.get("t2")
+    assert sub["parent"] == run.agents[0]["id"] and sub["kind"] == "subagent" and sub["status"] == "done"
+    assert sub["name"] == "reply PONG"
+
+
+def test_stopped_is_not_failed():
+    run = agents.AgentRun("r", "s")
+    run.start_main("Claude Code", "claude", now=0.0)
+    run.finish_main(False, stopped=True, now=3.0)
+    a = run.agents[0]
+    assert a["status"] == "stopped" and a["step"] == "Stopped by you"
+    s = run.summary()
+    assert s["failed"] == 0 and s["stopped"] == 1

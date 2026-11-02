@@ -1,4 +1,7 @@
 /* Tabbie — update card (updates.js). Bottom-right on desktop, a sheet above the composer on phones. */
+/* The WebUI's own "N updates available · Update Now" banner updates the pinned agent/WebUI behind
+ * Tabbie's back; this card is the only updater. (#staleClientBanner, the hard-refresh notice, stays.) */
+#updateBanner, #updateBanner.visible { display: none !important; }
 #hxUpdate {
   position: fixed; right: 16px; bottom: 16px; z-index: 900; width: 340px; max-width: calc(100vw - 32px);
   padding: 14px 14px 12px; border-radius: 14px; background: var(--hx-raised, var(--bg)); color: var(--hx-text, var(--text));
@@ -33,3 +36,4 @@
 #hxUpdSettings b { font-size: 14px; font-weight: 600; }
 #hxUpdSettings span { font-size: 12.5px; color: var(--hx-text-2, var(--muted)); overflow-wrap: anywhere; }
 #hxUpdSettings button { flex: none; }
+.hx-up-list .hx-up-more { list-style: none; margin-left: -18px; color: var(--hx-text-2, var(--muted)); opacity: .8; }

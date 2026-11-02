@@ -1,0 +1,134 @@
+/* Tabbie — custom checkboxes, radios and dropdowns everywhere (pairs with custom-controls.js).
+ * Tokens: apple-skin.css --hx-*, light + dark (:root.dark), phone-first.
+ * Checkboxes/radios: pure CSS (appearance:none + drawn box/tick/dot). The base selector sits in
+ * :where() so it has zero specificity: every panel rule still wins for size/margin/layout, and only
+ * the look (border, fill, tick) is forced with !important. Excluded: upstream's toggle switches
+ * (.plugin-toggle-switch hides its input and draws a slider), visually hidden file inputs, and
+ * anything inside [data-hx-native] (opt-out).
+ * Dropdowns: the closed <select> keeps its place and upstream styles but always gets the same
+ * chevron; the open list is .hx-cc-pop (popover on desktop, bottom sheet on phones).
+ */
+
+/* ── checkbox + radio ─────────────────────────────────────────────────── */
+:where(input[type="checkbox"], input[type="radio"]):not(:where(.plugin-toggle-switch input, .file-input-visually-hidden, [data-hx-native] input)) {
+  -webkit-appearance: none !important; -moz-appearance: none !important; appearance: none !important;
+  box-sizing: border-box !important; flex-shrink: 0; width: 18px; height: 18px;
+  min-width: 16px !important; min-height: 16px !important; /* beats upstream's inline 14–15px */
+  margin: 0 2px; padding: 0 !important; vertical-align: -4px; cursor: pointer;
+  border: 1.5px solid var(--hx-line, #8E8E93) !important; border-radius: 5px !important;
+  background: var(--hx-raised, #fff) none center / 12px 12px no-repeat !important;
+  color: var(--hx-on-accent, #fff); -webkit-tap-highlight-color: transparent;
+  transition: background-color .15s var(--hx-ease, ease), border-color .15s var(--hx-ease, ease), box-shadow .15s var(--hx-ease, ease);
+}
+:where(input[type="radio"]):not(:where(.plugin-toggle-switch input, .file-input-visually-hidden, [data-hx-native] input)) {
+  border-radius: 50% !important;
+}
+:root.dark :where(input[type="checkbox"], input[type="radio"]):not(:where(.plugin-toggle-switch input, .file-input-visually-hidden, [data-hx-native] input)):not(:checked):not([type="checkbox"]:indeterminate) {
+  background-color: var(--hx-fill, #1D1F25) !important;
+}
+
+/* hover: the boundary firms up */
+:where(input[type="checkbox"], input[type="radio"]):not(:where(.plugin-toggle-switch input, .file-input-visually-hidden, [data-hx-native] input)):not(:disabled):not(:checked):not([type="checkbox"]:indeterminate):hover {
+  border-color: var(--hx-text-2, #6B6B70) !important;
+}
+
+/* checked: accent fill + white tick */
+:where(input[type="checkbox"]):not(:where(.plugin-toggle-switch input, .file-input-visually-hidden, [data-hx-native] input)):checked {
+  border-color: var(--hx-fill-text, #3054FD) !important;
+  background-color: var(--hx-fill-text, #3054FD) !important;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 12 12' fill='none' stroke='%23fff' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M2.5 6.3l2.3 2.3 4.7-5'/%3E%3C/svg%3E") !important;
+}
+/* indeterminate (set from JS: el.indeterminate = true): accent fill + dash */
+:where(input[type="checkbox"]):not(:where(.plugin-toggle-switch input, .file-input-visually-hidden, [data-hx-native] input)):indeterminate {
+  border-color: var(--hx-fill-text, #3054FD) !important;
+  background-color: var(--hx-fill-text, #3054FD) !important;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 12 12' fill='none' stroke='%23fff' stroke-width='2' stroke-linecap='round'%3E%3Cpath d='M3 6h6'/%3E%3C/svg%3E") !important;
+}
+/* radio checked: accent ring + white centre dot */
+:where(input[type="radio"]):not(:where(.plugin-toggle-switch input, .file-input-visually-hidden, [data-hx-native] input)):checked {
+  border-color: var(--hx-fill-text, #3054FD) !important;
+  background: radial-gradient(circle, #fff 0 3px, var(--hx-fill-text, #3054FD) 3.5px) !important;
+}
+
+/* keyboard focus */
+:where(input[type="checkbox"], input[type="radio"]):not(:where(.plugin-toggle-switch input, .file-input-visually-hidden, [data-hx-native] input)):focus { outline: none; }
+:where(input[type="checkbox"], input[type="radio"]):not(:where(.plugin-toggle-switch input, .file-input-visually-hidden, [data-hx-native] input)):focus-visible {
+  outline: 2px solid var(--focus-ring-strong, var(--hx-ink, #3054FD)) !important; outline-offset: 2px !important;
+}
+
+/* disabled (read-only ticks in the cron/agent lists too) */
+:where(input[type="checkbox"], input[type="radio"]):not(:where(.plugin-toggle-switch input, .file-input-visually-hidden, [data-hx-native] input)):disabled {
+  cursor: default; opacity: .45;
+}
+
+/* ── select: closed state ─────────────────────────────────────────────── */
+:where(select:not([multiple]):not([size]), select[size="1"]):not(:where([data-hx-native] select)) {
+  -webkit-appearance: none !important; -moz-appearance: none !important; appearance: none !important;
+  padding-right: 28px !important; cursor: pointer; -webkit-tap-highlight-color: transparent;
+}
+/* One chevron for every closed select, same size/weight everywhere (matches the 12px stroke-2 chevron
+ * on buttons like Kanban's board picker). Specificity (0,5,1) on purpose: it has to beat
+ * hugeicons.css's 14px `select {…!important}`, `.kanban-modal-row select:focus` and
+ * `.hx-wb-ed select`, but stay below `#hxStudio select { background-image: none !important }` (1,0,1). */
+:root select:not([multiple]):not([size]:not([size="1"])):not([data-hx-native] *) {
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='6' viewBox='0 0 10 6'%3E%3Cpath d='M1 1l4 4 4-4' stroke='%236B6B70' stroke-width='1.5' fill='none' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E") !important;
+  background-repeat: no-repeat !important; background-position: right 10px center !important; background-size: 10px 6px !important;
+}
+:root.dark select:not([multiple]):not([size]:not([size="1"])):not([data-hx-native] *) {
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='6' viewBox='0 0 10 6'%3E%3Cpath d='M1 1l4 4 4-4' stroke='%239A9BA3' stroke-width='1.5' fill='none' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E") !important;
+}
+:where(select:not([multiple]):not([size]), select[size="1"]):not(:where([data-hx-native] select)):disabled { cursor: default; opacity: .55; }
+select[aria-expanded="true"]:not([multiple]) { border-color: var(--hx-ink, #3054FD) !important; }
+
+/* ── select: open list ────────────────────────────────────────────────── */
+.hx-cc-pop {
+  position: fixed; z-index: 10100; box-sizing: border-box; margin: 0; padding: 4px;
+  overflow-x: hidden; overflow-y: auto; overscroll-behavior: contain; -webkit-overflow-scrolling: touch;
+  background: var(--hx-raised, #fff); color: var(--hx-text, #141413);
+  border: 0.5px solid var(--hx-hair, #E6E5E1); border-radius: 12px; box-shadow: var(--hx-shadow, 0 8px 24px rgba(0,0,0,.12));
+  font-family: var(--font-ui, inherit); font-size: 13.5px; line-height: 1.3; letter-spacing: -0.005em; text-align: left;
+  opacity: 0; transform: translateY(-4px) scale(.98); transform-origin: top left;
+  transition: opacity .14s var(--hx-ease, ease), transform .18s var(--hx-ease, ease);
+}
+:root.dark .hx-cc-pop { background: #1C1D23; border-color: var(--hx-fill-2, #262830); }
+.hx-cc-pop.is-up { transform: translateY(4px) scale(.98); transform-origin: bottom left; }
+.hx-cc-pop.is-open { opacity: 1; transform: none; }
+.hx-cc-pop:focus { outline: none; }
+
+.hx-cc-title { display: none; }
+.hx-cc-group { padding: 8px 10px 3px 30px; font-size: 11.5px; font-weight: 600; color: var(--hx-text-2, #6B6B70);
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis; cursor: default; }
+.hx-cc-group:first-child { padding-top: 4px; }
+
+.hx-cc-opt { position: relative; display: flex; align-items: center; min-height: 32px; padding: 6px 12px 6px 30px; border-radius: 8px;
+  cursor: pointer; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; -webkit-tap-highlight-color: transparent; }
+.hx-cc-opt > span { min-width: 0; overflow: hidden; text-overflow: ellipsis; }
+.hx-cc-opt.is-active { background: var(--hx-fill, #F1F1EF); }
+:root.dark .hx-cc-opt.is-active { background: var(--hx-fill-2, #262830); }
+.hx-cc-opt[aria-selected="true"] { font-weight: 600; }
+.hx-cc-opt svg { position: absolute; left: 9px; top: 50%; width: 14px; height: 14px; margin-top: -7px; color: var(--hx-ink, #3054FD); }
+.hx-cc-opt[aria-disabled="true"] { cursor: default; color: var(--hx-text-2, #6B6B70); opacity: .55; }
+.hx-cc-opt[aria-disabled="true"].is-active { background: transparent; }
+.hx-cc-empty { padding: 8px 12px; color: var(--hx-text-2, #6B6B70); }
+
+/* ── phone: bottom sheet ──────────────────────────────────────────────── */
+.hx-cc-scrim { position: fixed; inset: 0; z-index: 10099; background: var(--hx-scrim, rgba(0,0,0,.32));
+  opacity: 0; transition: opacity .22s var(--hx-ease, ease); -webkit-tap-highlight-color: transparent; }
+.hx-cc-scrim.is-open { opacity: 1; }
+.hx-cc-pop.is-sheet {
+  left: 0 !important; right: 0; bottom: 0; top: auto !important; width: auto !important; min-width: 0 !important; max-width: none !important;
+  max-height: min(70vh, 560px) !important; padding: 4px 10px calc(10px + env(safe-area-inset-bottom, 0px));
+  border-radius: 20px 20px 0 0; border-width: 0.5px 0 0; font-size: 16px;
+  opacity: 1; transform: translateY(100%); transition: transform .3s cubic-bezier(.32,.72,0,1);
+}
+.hx-cc-pop.is-sheet.is-open { transform: none; }
+.hx-cc-pop.is-sheet::before { content: ''; display: block; width: 36px; height: 5px; margin: 4px auto 6px; border-radius: 3px; background: var(--hx-fill-2, #E9E9E6); }
+.hx-cc-pop.is-sheet .hx-cc-title { display: block; padding: 2px 12px 8px; font-size: 13px; font-weight: 600; color: var(--hx-text-2, #6B6B70);
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.hx-cc-pop.is-sheet .hx-cc-opt { min-height: 44px; padding-left: 36px; border-radius: 10px; }
+.hx-cc-pop.is-sheet .hx-cc-opt svg { left: 12px; width: 16px; height: 16px; margin-top: -8px; }
+.hx-cc-pop.is-sheet .hx-cc-group { padding-left: 36px; font-size: 12.5px; }
+
+@media (prefers-reduced-motion: reduce) {
+  .hx-cc-pop, .hx-cc-pop.is-sheet, .hx-cc-scrim { transition: none; }
+}

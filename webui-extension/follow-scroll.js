@@ -5,13 +5,16 @@
  * Scrolling up stops following; coming back to the bottom (or sending a message) resumes it.
  * Jump button: once the reader is well above the bottom, a round button floats centred just above
  * the message bar; tapping it glides to the bottom and resumes following. It replaces upstream's
- * corner arrow and the inline "↑ to response" buttons.
+ * corner arrow and the inline "↑ to response" buttons. If the transcript grows while a turn is live
+ * and the reader is scrolled up, the button gains an accent dot and a "New" label until they return.
  */
 (function () {
   'use strict';
   const LIVE = '[data-live-assistant="1"], [data-live-tool-call-group="1"], '
     + '[data-live-tool-worklog-group="1"], [data-tool-worklog-running="1"], #hxLiveStatus';
   let following = true, ours = 0, touchY = null;
+  // "New" dot: the transcript height when the reader stopped following, and the chat it belongs to.
+  let baseH = 0, baseSid = null;
 
   const scroller = () => document.getElementById('messages');
   const gap = (el) => el.scrollHeight - el.scrollTop - el.clientHeight;
@@ -27,13 +30,40 @@
     el.scrollTop = el.scrollHeight;
   }
 
+  function curSid() {
+    try { return (S.session && S.session.session_id) || null; } catch (_) { return null; }
+  }
+  function unfollow() {
+    following = false;
+    const el = scroller();
+    if (el && !baseH) { baseH = el.scrollHeight; baseSid = curSid(); }
+  }
+
   let btn = null;
+  function setNew(on) {
+    if (!btn || btn.classList.contains('hx-jump-new') === on) return;
+    btn.classList.toggle('hx-jump-new', on);
+    const label = on ? 'New activity below, scroll to bottom' : 'Scroll to bottom';
+    btn.setAttribute('aria-label', label);
+    btn.title = label;
+  }
+  function clearNew() { baseH = 0; baseSid = null; setNew(false); }
+  // Called on every transcript resize: flag growth that arrived while the reader was scrolled up.
+  function checkNew() {
+    const el = scroller();
+    if (!btn || !el) return;
+    if (baseH && baseSid !== curSid()) { clearNew(); return; }  // switched chats: the old height means nothing
+    if (!following && !baseH && gap(el) > 200) { baseH = el.scrollHeight; baseSid = curSid(); }
+    if (!following && baseH && live() && el.scrollHeight > baseH + 4) setNew(true);
+  }
   function syncBtn() {
     const el = scroller();
     if (!btn || !el) return;
-    const show = gap(el) > 200;
+    const g = gap(el);
+    const show = g > 200;
     btn.classList.toggle('hx-jump-show', show);
     btn.tabIndex = show ? 0 : -1;
+    if (g < 60) clearNew();
   }
   function makeBtn() {
     const shell = document.querySelector('.messages-shell');
@@ -44,11 +74,13 @@
     btn.setAttribute('aria-label', 'Scroll to bottom');
     btn.title = 'Scroll to bottom';
     btn.tabIndex = -1;
-    btn.innerHTML = typeof window.hxIcon === 'function' ? window.hxIcon('ArrowDown01Icon', 20) : '';
+    btn.innerHTML = (typeof window.hxIcon === 'function' ? window.hxIcon('ArrowDown01Icon', 20) : '')
+      + '<span class="hx-jump-dot" aria-hidden="true"></span><span class="hx-jump-tx" aria-hidden="true">New</span>';
     btn.addEventListener('click', () => {
       const el = scroller();
       if (!el) return;
       following = true;
+      clearNew();
       el.scrollTo({ top: el.scrollHeight, behavior: matchMedia('(prefers-reduced-motion: reduce)').matches ? 'auto' : 'smooth' });
     });
     shell.appendChild(btn);
@@ -67,17 +99,28 @@
       transition: opacity .2s ease, transform .25s cubic-bezier(.34,1.56,.64,1); }
     #hxJumpBottom.hx-jump-show { opacity: 1; pointer-events: auto; transform: translate(-50%, 0) scale(1); }
     #hxJumpBottom:active { transform: translate(-50%, 0) scale(.94); }
-    #hxJumpBottom svg { width: 20px; height: 20px; }`;
+    #hxJumpBottom svg { width: 20px; height: 20px; flex: none; }
+    #hxJumpBottom .hx-jump-dot, #hxJumpBottom .hx-jump-tx { display: none; }
+    #hxJumpBottom.hx-jump-new { width: auto; gap: 6px; padding: 0 14px 0 10px; }
+    #hxJumpBottom.hx-jump-new .hx-jump-dot { display: block; flex: none; width: 7px; height: 7px; border-radius: 50%;
+      background: var(--hx-accent, #3054FD); order: -1; animation: hxJumpDot .3s cubic-bezier(.34,1.56,.64,1); }
+    #hxJumpBottom.hx-jump-new .hx-jump-tx { display: block; font: 600 13px/1 var(--font-ui, system-ui); letter-spacing: -.01em; }
+    @keyframes hxJumpDot { from { transform: scale(0); } to { transform: none; } }
+    @media (prefers-reduced-motion: reduce) {
+      #hxJumpBottom { transition: opacity .15s linear; transform: translate(-50%, 0); }
+      #hxJumpBottom.hx-jump-show, #hxJumpBottom:active { transform: translate(-50%, 0); }
+      #hxJumpBottom.hx-jump-new .hx-jump-dot { animation: none; }
+    }`;
   document.head.appendChild(css);
 
   function bind(el) {
     if (!el || el.dataset.hxFollow) return;
     el.dataset.hxFollow = '1';
-    el.addEventListener('wheel', (e) => { if (e.deltaY < -2) following = false; }, { passive: true });
+    el.addEventListener('wheel', (e) => { if (e.deltaY < -2) unfollow(); }, { passive: true });
     el.addEventListener('touchstart', (e) => { touchY = e.touches[0] ? e.touches[0].clientY : null; }, { passive: true });
     el.addEventListener('touchmove', (e) => {
       // finger moving down = reading earlier content
-      if (touchY !== null && e.touches[0] && e.touches[0].clientY - touchY > 24) following = false;
+      if (touchY !== null && e.touches[0] && e.touches[0].clientY - touchY > 24) unfollow();
     }, { passive: true });
     el.addEventListener('scroll', () => {
       syncBtn();
@@ -85,7 +128,7 @@
       if (gap(el) < 60) following = true;
     }, { passive: true });
     const inner = document.getElementById('msgInner');
-    if (inner && 'ResizeObserver' in window) new ResizeObserver(() => requestAnimationFrame(() => { stick(); syncBtn(); })).observe(inner);
+    if (inner && 'ResizeObserver' in window) new ResizeObserver(() => requestAnimationFrame(() => { stick(); checkNew(); syncBtn(); })).observe(inner);
     new MutationObserver(() => requestAnimationFrame(stick)).observe(el, { childList: true, subtree: true, characterData: true });
   }
 
@@ -94,7 +137,7 @@
     setInterval(() => { bind(scroller()); makeBtn(); syncBtn(); }, 2000);
     try {
       const ext = window.hermesExt && window.hermesExt.register('follow-scroll');
-      if (ext && ext.events) ext.events.on('turn:start', () => { following = true; stick(); });
+      if (ext && ext.events) ext.events.on('turn:start', () => { following = true; clearNew(); stick(); });
     } catch (_) {}
     // Sending (Enter or the send button) always resumes following.
     addEventListener('keydown', (e) => { if (e.key === 'Enter' && !e.shiftKey && e.target && e.target.id === 'msg') following = true; }, true);

@@ -108,6 +108,17 @@
   :root:root #queueCard { padding: 0 10px; }
   .hxq-now span { display: none; }
   .hxq-now { padding: 6px; }
+  /* thumb-sized hit areas (40px); the icons keep their size, padding grows the target */
+  :root:root #queueCard .queue-card-inner { max-height: min(340px, 45vh); padding: 4px 0 6px; }
+  :root:root #queueCard .queue-card-header { padding: 4px 4px 2px 16px; gap: 2px; }
+  :root:root #queueCard .queue-card-icon-btn { width: 40px; height: 40px; flex-shrink: 0; }
+  :root:root #queueCard .queue-card-btn { min-height: 40px; padding: 0 12px; }
+  :root:root #queueCard .queue-card-row { padding: 2px 2px 2px 10px; gap: 2px; min-height: 44px; }
+  :root:root #queueCard .queue-card-row + .queue-card-row { margin-top: 4px; }
+  :root:root #queueCard .queue-card-text { padding: 9px 6px; }
+  .hxq-now { min-width: 40px; min-height: 40px; justify-content: center; }
+  :root:root .queue-pill { min-height: 40px; padding: 0 16px; align-items: center; }
+  :root:root #queueCard .queue-card-icon-btn, :root:root #queueCard .queue-card-btn, .hxq-now { -webkit-tap-highlight-color: transparent; touch-action: manipulation; }
   .hxq-composer-now span { display: none; }
   .hxq-composer-now { width: 32px; padding: 0; justify-content: center; }
 }
@@ -116,3 +127,15 @@
 }
 /* the per-row model label is noise here; keep the attachment count */
 :root:root #queueCard .queue-card-badges > span:not(.queue-card-file-badge) { display: none; }
+
+/* "Sent to Claude" note under the turn's message (message-queue.js noteSent) */
+.hxq-sent {
+  display: flex; align-items: baseline; gap: 8px;
+  margin: 2px 0 10px auto; max-width: min(560px, 85%);
+  justify-content: flex-end;
+  font-size: 13px; line-height: 1.45;
+  color: var(--hx-text-2, var(--muted));
+}
+.hxq-sent-label { flex-shrink: 0; font-weight: 600; }
+.hxq-sent-label::after { content: ":"; }
+.hxq-sent-body { white-space: pre-wrap; word-break: break-word; }

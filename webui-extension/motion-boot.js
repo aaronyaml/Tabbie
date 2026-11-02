@@ -78,7 +78,8 @@
     if (window.__hxMoRoute) return window.__hxMoRoute;
     var u;
     try { u = new URL(String(url), D.baseURI); } catch (_) { return url; }
-    if (window.__hxPanelRoute && (u.pathname === '/' || SESS.test(u.pathname))) return window.__hxPanelRoute;
+    // (Projects keeps its #<project>[/<tab>] hash: projects.js puts the open project there)
+    if (window.__hxPanelRoute && (u.pathname === '/' || SESS.test(u.pathname))) return window.__hxPanelRoute + (window.__hxPanelRoute === '/projects' ? L.hash : '');
     var k = u.pathname.match(SESS);
     if (k && known(dec(k[1]))) return '/motion/' + k[1] + u.hash;
     return url;

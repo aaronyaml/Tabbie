@@ -128,7 +128,9 @@ Claude's transcript slice for that run (tool calls, results truncated, errors, r
 read/modified, commands, test runs), git diff stat, outcome, user feedback (the next user message
 in the same conversation, classified), tokens/cost/latency when present. Everything passes the
 secret scrubber first. A backfill command builds traces for historical requests and for direct
-Claude Code sessions (interactive work counts as fleet history too).
+Claude Code sessions (interactive work counts as fleet history too). WebUI hub chats are a third
+source (`trace.build_webui`): the user's own messages, attributed to a project by the chat's
+workspace, its WebUI project, or the one project its worker requests ran in.
 
 ## 8. Learning loop
 
@@ -142,7 +144,13 @@ Claude Code sessions (interactive work counts as fleet history too).
   candidates), 6. memory hygiene (duplicates/conflicts/staleness vs code), 7. security (poison
   scan of memory + pending proposals). Each emits findings with support counts and evidence.
   The synthesiser keeps only findings with support ≥ `min_support` sessions across ≥ 2 distinct
-  days (configurable) and turns them into proposals. An optional LLM pass (claude -p on the
+  days (configurable) and turns them into proposals.
+  8. stated (`spec_stated`): things the user tells an agent outright ("I like…", "we deploy on…",
+  "always…/never…"). One statement is enough; support counts don't apply. A regex prefilter picks
+  candidate sentences; a Haiku pass (`dream_stated_llm`, subscription only, cached per sentence,
+  capped per cycle) classifies them as preference / fact / rule and titles them; `verify_stated`
+  rejects any title whose words don't come from the sentence, and anything sensitive or flagged by
+  the poison scan. Each becomes a proposal with the quote as evidence. Never auto-approved. An optional LLM pass (claude -p on the
   subscription, never an API key) only *phrases* proposals from the evidence; it cannot add
   findings.
 - Triggers: manual (`hmem dream`), after N new traces, nightly LaunchAgent. Dreaming never runs

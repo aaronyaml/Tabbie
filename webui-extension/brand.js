@@ -4,6 +4,8 @@
  * This file only covers what upstream hard-codes before/around that setting: the iOS home-screen
  * title meta, the boot-time titlebar/tab title, the "Latest … response" landmark and a few status
  * banners. It swaps text on those known nodes only; message bodies are never touched.
+ * It also names the "Tasks" rail/tab button after the panel it opens ("Scheduled jobs"), and points
+ * Settings › Help › "Having an issue?" at Tabbie's own GitHub issues.
  */
 (() => {
   'use strict';
@@ -29,7 +31,22 @@
     ['#settingsBotName', 'placeholder'],
     ['#agentHealthDismiss', 'aria-label'],
   ];
+  // link swaps: [upstream href, Tabbie href]
+  const LINKS = [['https://github.com/nesquena/hermes-webui/issues', 'https://github.com/aaronyaml/Tabbie/issues']];
   const swap = (s) => s.replace(/\bHermes\b/g, NAME);
+  // rail/tab buttons whose upstream label doesn't match the panel they open: [data-panel, label]
+  const PANEL_LABEL = [['tasks', 'Scheduled jobs']];
+  function relabel() {
+    for (const [panel, label] of PANEL_LABEL) {
+      document.querySelectorAll(`.nav-tab[data-panel="${panel}"]`).forEach((el) => {
+        el.removeAttribute('data-i18n-title'); // so a locale re-stamp doesn't put "Tasks" back
+        for (const a of ['data-tooltip', 'aria-label', 'data-label']) {
+          if (el.hasAttribute(a) && el.getAttribute(a) !== label) el.setAttribute(a, label);
+        }
+        if (!el.hasAttribute('aria-label')) el.setAttribute('aria-label', label);
+      });
+    }
+  }
 
   function apply() {
     // upstream's fallback when settings haven't loaded (or bot_name is unset)
@@ -51,6 +68,8 @@
     document.querySelectorAll('.msg-role.assistant .msg-role-name').forEach((el) => {
       if (el.textContent === OLD) el.textContent = NAME;
     });
+    for (const [from, to] of LINKS) document.querySelectorAll(`a[href="${from}"]`).forEach((a) => { a.href = to; });
+    relabel();
   }
 
   let queued = false;
@@ -58,7 +77,7 @@
   function start() {
     apply();
     new MutationObserver(later).observe(document.documentElement, { childList: true, subtree: true, attributes: true,
-      attributeFilter: ['aria-label', 'placeholder', 'content'] });
+      attributeFilter: ['aria-label', 'placeholder', 'content', 'data-tooltip'] });
     new MutationObserver(later).observe(document.head, { childList: true, subtree: true, characterData: true });
   }
   // The bare WebUI (port 8787) skips Caddy, so it has upstream's icons and no page addresses: point to the real door.

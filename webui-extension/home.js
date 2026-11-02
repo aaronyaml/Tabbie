@@ -9,7 +9,7 @@
   const NAME = (window.HX_LOCAL || {}).name || '';  // your first name, from local.js
   const CARDS = [
     { icon: 'Video01Icon', title: 'Make a product film', sub: 'An Apple-style motion ad for one of your apps', fill: '/motion ' },
-    { icon: 'Brain01Icon', title: 'Plan a big change', sub: 'Astra plans it, you approve, Claude builds it', fill: '@astra ' },
+    { icon: 'Brain01Icon', title: 'Plan a big change', sub: 'Codex plans it, you approve, Claude builds it', fill: '@plan ' },
     { icon: 'CodeIcon', title: 'Build with Claude', sub: 'Edit code in any of your projects', fill: '@claude ' },
     { icon: 'Analytics01Icon', title: 'Check my limits', sub: 'Claude, ChatGPT and credits left', fill: '/limit', send: true },
     { icon: 'KanbanIcon', title: 'Show my board', sub: 'Cards and todos you can edit in chat', fill: '/board', send: true },
@@ -66,6 +66,12 @@
     if (d < 172800) return 'yesterday';
     return `${Math.round(d / 86400)}d ago`;
   };
+  // Hub worker transcripts ("COMMAND CENTRE REQUEST …") are plumbing; pasted-text envelopes get readable
+  // titles. session-titles.js owns the rules; the fallback keeps workers out if it isn't loaded.
+  const ST = () => window.hxSessionTitles || null;
+  const isWorker = (s) => (ST() ? ST().isWorker(s) : /^(COMMAND CENTRE REQUEST\b|You are (the execution worker of the user's command centre|taking over from Claude Code|the PLANNER in a personal AI command centre))/.test(String(s.title || '').trim()));
+  const titleOf = (s) => (ST() ? ST().title(s) : String(s.title || ''));
+  const hidden = (s) => isWorker(s) || !!(window.hxMotion && window.hxMotion.hides && window.hxMotion.hides(s)); // Motion studio sessions live in the studio
   let recent = [], recentAt = 0;
   async function loadRecent() {
     if (Date.now() - recentAt < 30000) return;
@@ -73,8 +79,7 @@
     try {
       const r = await fetch('api/sessions', { credentials: 'same-origin' });
       const d = await r.json();
-      const list = (d.sessions || d || []).filter((s) => s && s.title && (s.message_count || 0) > 0 && !s.archived
-        && !(window.hxMotion && window.hxMotion.hides && window.hxMotion.hides(s))); // Motion studio sessions live in the studio
+      const list = (d.sessions || d || []).filter((s) => s && s.title && (s.message_count || 0) > 0 && !s.archived && !hidden(s));
       list.sort((a, b) => (b.updated_at || b.last_message_at || 0) - (a.updated_at || a.last_message_at || 0));
       recent = list.slice(0, 12);
       render();
@@ -89,13 +94,13 @@
         <span class="hx-try-top"><span class="hx-try-ic">${icon(c.icon, 20)}</span><span class="hx-try-pill">Try</span></span>
         <span class="hx-try-tt">${esc(c.title)}</span><span class="hx-try-sub">${esc(c.sub)}</span>
       </button>`).join('');
-    const shown = recent.filter((s) => !(window.hxMotion && window.hxMotion.hides && window.hxMotion.hides(s))).slice(0, 3);
+    const shown = recent.filter((s) => !hidden(s)).slice(0, 3);
     const rec = !phone() && shown.length ? `
       <div class="hx-home-head"><span>Jump back in</span></div>
       <div class="hx-recent">${shown.map((s) => `
         <button type="button" class="hx-rec" data-sid="${esc(s.session_id)}">
           <span class="hx-rec-ic">${icon('BubbleChatIcon', 16)}</span>
-          <span class="hx-rec-tt">${esc(s.title)}</span>
+          <span class="hx-rec-tt">${esc(titleOf(s))}</span>
           <span class="hx-rec-when">${esc(ago(s.updated_at || s.last_message_at || 0))}</span>
         </button>`).join('')}</div>` : '';
     const html = `<div class="hx-home-head"><span>${icon('BulbIcon', 16)} Try Tabbie</span></div><div class="hx-tries">${cards}</div>${rec}`;

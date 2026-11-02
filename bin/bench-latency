@@ -1,0 +1,246 @@
+#!/usr/bin/env python3
+"""bench-latency: time and token benchmark for Tabbie's request path (speed plan, section 6).
+
+  bin/bench-latency [--label NAME] [--runs 3] [--only R1,R2,R3]    run the benchmark
+  bin/bench-latency --compare before.json after.json               print the deltas
+
+Each run sends one request through `hermes chat -q "<text>" --oneshot -Q` (a fresh hub session each time),
+from ~/hermes/sandbox/test-project, and records:
+  wall time and pass/fail of the answer;
+  phases from the request record: routed (decisions.jsonl), slot / spawn / init / first_reply / done
+  (request.json "timings", written by the worker runners);
+  the hub's API calls in that window (~/.hermes/logs/agent.log "API call #": latency, in/out, cache %);
+  hub tokens (~/.hermes/state.db session_model_usage rows first seen in the window);
+  the worker's first-call cache_creation / cache_read (its Claude Code transcript).
+Results: state/bench/<label>-<ts>.json, with the median of the warm runs and the first (cold) run apart.
+
+Usage cost: about 270k tokens per full pass (3 requests x 3 runs) on the subscriptions; no API keys
+(the environment's API-key variables are removed for every child). It checks the limits first and
+refuses to start when Claude or Codex is at its limit (limit-gate). Never run it while the user is
+working: it starts real workers.
+"""
+from __future__ import annotations
+
+import json
+import os
+import re
+import sqlite3
+import statistics
+import subprocess
+import sys
+import time
+from datetime import datetime
+from pathlib import Path
+
+ROOT = Path(__file__).resolve().parents[1]
+STATE = ROOT / "state"
+HERMES = Path(os.environ.get("HERMES_HOME", Path.home() / ".hermes"))
+SANDBOX = ROOT / "sandbox" / "test-project"
+_API_KEYS = ("ANTHROPIC_API_KEY", "ANTHROPIC_AUTH_TOKEN", "ANTHROPIC_BASE_URL", "OPENAI_API_KEY", "OPENAI_BASE_URL",
+             "CODEX_API_KEY", "CLAUDE_CODE_USE_BEDROCK", "CLAUDE_CODE_USE_VERTEX")
+
+
+def _py_count() -> int:
+    return len([p for p in (ROOT / "plugin" / "command-centre").glob("*.py") if p.is_file()])
+
+
+REQUESTS = {
+    "R1": {"text": "Use Claude Code: run sleep 45 in a shell, then reply with exactly DONE-A.",
+           "check": lambda out: bool(re.search(r"(?m)^\s*DONE-A\s*$", out)), "what": "fixed overhead"},
+    "R2": {"text": "Use Claude Code: in ~/hermes count the .py files directly inside plugin/command-centre (not "
+                   "subfolders) with a shell command, then reply with just the number.",
+           "check": lambda out: str(_py_count()) in re.findall(r"\b\d+\b", out), "what": "small real work"},
+    "R3": {"text": "Use Claude Code: read ~/hermes/plugin/command-centre/router.py and explain in 5 bullets how "
+                   "classify() scores a request.",
+           "check": lambda out: len(re.findall(r"(?m)^\s*[-*•]\s+\S", out)) >= 5 and "plan_threshold" in out,
+           "what": "long result (relay cost)"},
+}
+
+
+def _env() -> dict:
+    env = dict(os.environ)
+    for k in _API_KEYS:
+        env.pop(k, None)
+    return env
+
+
+def limits_ok() -> tuple[bool, str]:
+    msgs = []
+    for agent in ("claude", "codex"):
+        p = subprocess.run([str(ROOT / "bin" / "limit-gate"), agent, "--purpose", "work"], capture_output=True,
+                           text=True, input="", env=_env(), timeout=60)
+        if p.returncode == 2:
+            msgs.append(p.stderr.strip())
+    return (not msgs), "; ".join(msgs)
+
+
+def _decisions_since(t0: float) -> list[dict]:
+    out = []
+    f = STATE / "decisions.jsonl"
+    if not f.exists():
+        return out
+    for ln in f.read_text(errors="replace").splitlines()[-4000:]:
+        try:
+            d = json.loads(ln)
+            ts = datetime.strptime(d.get("ts", ""), "%Y-%m-%dT%H:%M:%S").timestamp()
+        except (ValueError, json.JSONDecodeError):
+            continue
+        if ts >= t0 - 1:
+            d["_t"] = ts
+            out.append(d)
+    return out
+
+
+def _request_for(text: str, t0: float) -> dict | None:
+    best = None
+    for f in sorted((STATE / "requests").glob("*/request.json"))[-40:]:
+        try:
+            d = json.loads(f.read_text())
+        except (OSError, json.JSONDecodeError):
+            continue
+        created = datetime.strptime(d.get("created", "1970-01-01T00:00:00"), "%Y-%m-%dT%H:%M:%S").timestamp()
+        if created >= t0 - 1 and (d.get("raw_message") or "").strip() == text.strip():
+            best = d
+    return best
+
+
+_API_RX = re.compile(r"^(\S+ \S+),\d+ .*API call #(\d+): model=(\S+) .*?in=(\d+) out=(\d+) .*?latency=([\d.]+)s"
+                     r"(?: cache=(\d+)/(\d+))?")
+
+
+def _hub_calls(t0: float, t1: float) -> list[dict]:
+    f = HERMES / "logs" / "agent.log"
+    out = []
+    try:
+        lines = f.read_text(errors="replace").splitlines()[-6000:]
+    except OSError:
+        return out
+    for ln in lines:
+        m = _API_RX.search(ln)
+        if not m:
+            continue
+        ts = datetime.strptime(m.group(1), "%Y-%m-%d %H:%M:%S").timestamp()
+        if t0 - 1 <= ts <= t1 + 1:
+            out.append({"t": ts, "call": int(m.group(2)), "model": m.group(3), "in": int(m.group(4)),
+                        "out": int(m.group(5)), "latency_s": float(m.group(6)),
+                        "cache_pct": round(100 * int(m.group(7)) / int(m.group(8)), 1) if m.group(7) else None})
+    return out
+
+
+def _hub_tokens(t0: float, t1: float) -> dict:
+    db = HERMES / "state.db"
+    try:
+        con = sqlite3.connect(f"file:{db}?mode=ro", uri=True, timeout=5)
+        rows = con.execute("SELECT model, task, input_tokens, output_tokens, cache_read_tokens, cache_write_tokens "
+                           "FROM session_model_usage WHERE first_seen >= ? AND first_seen <= ?", (t0 - 1, t1 + 1)).fetchall()
+        con.close()
+    except sqlite3.Error as exc:
+        return {"error": str(exc)}
+    tot = {"input": 0, "output": 0, "cache_read": 0, "cache_write": 0, "rows": len(rows)}
+    for _m, _task, i, o, cr, cw in rows:
+        tot["input"] += i; tot["output"] += o; tot["cache_read"] += cr; tot["cache_write"] += cw
+    return tot
+
+
+def _worker_first_call(req: dict | None) -> dict:
+    if not req:
+        return {}
+    ex = req.get("executor") or {}
+    sid, cwd = ex.get("session_id"), req.get("project")
+    if not sid or not cwd:
+        return {}
+    enc = re.sub(r"[^A-Za-z0-9]", "-", str(Path(cwd).resolve()))
+    f = Path.home() / ".claude" / "projects" / enc / f"{sid}.jsonl"
+    try:
+        for ln in f.read_text(errors="replace").splitlines():
+            ev = json.loads(ln)
+            u = ((ev.get("message") or {}).get("usage") or {}) if ev.get("type") == "assistant" else {}
+            if u:
+                return {"cache_creation": u.get("cache_creation_input_tokens"), "cache_read": u.get("cache_read_input_tokens"),
+                        "input": u.get("input_tokens"), "profile": ex.get("profile")}
+    except (OSError, json.JSONDecodeError):
+        pass
+    return {}
+
+
+def run_one(key: str) -> dict:
+    spec = REQUESTS[key]
+    t0 = time.time()
+    p = subprocess.run(["hermes", "chat", "-q", spec["text"], "--oneshot", "-Q"], cwd=SANDBOX, env=_env(),
+                       capture_output=True, text=True, timeout=1800)
+    t1 = time.time()
+    out = p.stdout or ""
+    req = _request_for(spec["text"], t0)
+    dec = [d for d in _decisions_since(t0) if not req or d.get("request") == req.get("id")]
+    routed = next((d["_t"] for d in dec if d.get("event") == "routed"), None)
+    tm = (req or {}).get("timings") or {}
+    phases = {k: round(v - t0, 2) for k, v in tm.items() if isinstance(v, (int, float))}
+    if routed:
+        phases["routed"] = round(routed - t0, 2)
+    calls = _hub_calls(t0, t1)
+    return {"key": key, "ok": p.returncode == 0 and spec["check"](out), "exit": p.returncode,
+            "wall_s": round(t1 - t0, 2), "phases": phases, "hub_calls": calls,
+            "hub_latency_s": round(sum(c["latency_s"] for c in calls), 2), "hub_tokens": _hub_tokens(t0, t1),
+            "worker_first_call": _worker_first_call(req), "request_id": (req or {}).get("id"),
+            "worker_s": round(tm["done"] - tm["spawn"], 2) if tm.get("done") and tm.get("spawn") else None,
+            "answer_tail": out.strip()[-300:]}
+
+
+def summarise(runs: list[dict]) -> dict:
+    out = {}
+    for key in sorted({r["key"] for r in runs}):
+        rs = [r for r in runs if r["key"] == key]
+        warm = rs[1:] or rs
+        med = lambda f: statistics.median([f(r) for r in warm if f(r) is not None]) if any(f(r) is not None for r in warm) else None
+        out[key] = {"cold": {"wall_s": rs[0]["wall_s"], "hub_latency_s": rs[0]["hub_latency_s"]},
+                    "median_wall_s": med(lambda r: r["wall_s"]),
+                    "median_overhead_s": med(lambda r: (r["wall_s"] - r["worker_s"]) if r.get("worker_s") else None),
+                    "median_hub_latency_s": med(lambda r: r["hub_latency_s"]),
+                    "median_hub_input": med(lambda r: (r["hub_tokens"] or {}).get("input")),
+                    "median_worker_first_write": med(lambda r: (r["worker_first_call"] or {}).get("cache_creation")),
+                    "median_worker_first_read": med(lambda r: (r["worker_first_call"] or {}).get("cache_read")),
+                    "pass": all(r["ok"] for r in rs)}
+    return out
+
+
+def compare(a: Path, b: Path) -> None:
+    A, B = json.loads(a.read_text())["summary"], json.loads(b.read_text())["summary"]
+    for key in sorted(set(A) | set(B)):
+        print(f"{key}:")
+        for m in ("median_wall_s", "median_overhead_s", "median_hub_latency_s", "median_hub_input",
+                  "median_worker_first_write", "median_worker_first_read", "pass"):
+            x, y = (A.get(key) or {}).get(m), (B.get(key) or {}).get(m)
+            delta = f"{y - x:+.1f}" if isinstance(x, (int, float)) and isinstance(y, (int, float)) and not isinstance(x, bool) else ""
+            print(f"  {m:28} {x!s:>10} -> {y!s:>10} {delta}")
+
+
+def main(argv: list[str]) -> int:
+    if "--compare" in argv:
+        i = argv.index("--compare")
+        compare(Path(argv[i + 1]), Path(argv[i + 2]))
+        return 0
+    label = argv[argv.index("--label") + 1] if "--label" in argv else "run"
+    n = int(argv[argv.index("--runs") + 1]) if "--runs" in argv else 3
+    only = argv[argv.index("--only") + 1].split(",") if "--only" in argv else list(REQUESTS)
+    ok, why = limits_ok()
+    if not ok:
+        print(f"Not starting: {why}", file=sys.stderr)
+        return 2
+    runs = []
+    for key in only:
+        for i in range(n):
+            print(f"{key} run {i + 1}/{n} ({REQUESTS[key]['what']})…", file=sys.stderr, flush=True)
+            r = run_one(key)
+            runs.append(r)
+            print(f"  {'pass' if r['ok'] else 'FAIL'} · {r['wall_s']}s · hub {r['hub_latency_s']}s", file=sys.stderr)
+    out = {"label": label, "at": time.strftime("%Y-%m-%dT%H:%M:%S"), "runs": runs, "summary": summarise(runs)}
+    dest = STATE / "bench" / f"{label}-{time.strftime('%Y%m%d-%H%M%S')}.json"
+    dest.parent.mkdir(parents=True, exist_ok=True)
+    dest.write_text(json.dumps(out, indent=2))
+    print(json.dumps(out["summary"], indent=2))
+    print(f"Saved {dest}", file=sys.stderr)
+    return 0 if all(v["pass"] for v in out["summary"].values()) else 1
+
+
+if __name__ == "__main__":
+    sys.exit(main(sys.argv[1:]))
