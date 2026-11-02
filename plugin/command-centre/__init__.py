@@ -1010,8 +1010,9 @@ def _run_request(r: Request, feed=None, force: dict | None = None) -> dict:
     else:
         if r["route"] == CLAUDE and ecfg.get("resume_project_session", True):
             prev = sessions.get(_resume_key(r))
-            if prev and time.time() - prev.get("at", 0) < 60 * int(ecfg.get("resume_max_age_minutes", 120)):
-                resume = prev.get("session_id")
+            if (prev and time.time() - prev.get("at", 0) < 60 * int(ecfg.get("resume_max_age_minutes", 120))
+                    and (prev.get("ctx") or 0) < int(ecfg.get("resume_max_context", 120000))):
+                resume = prev.get("session_id")  # past the cap a fresh session + recent turns costs far less
         prompt = _claude_prompt(r, manifest, history=not resume)
         r.write_text("claude_prompt.md", prompt)
     r["status"] = "executing"
@@ -1082,7 +1083,8 @@ def _run_request(r: Request, feed=None, force: dict | None = None) -> dict:
         run.save(force=True)
     if res.get("session_id"):
         sessions = read_json(_CLAUDE_SESSIONS, {}) or {}  # fresh: other chats may have saved meanwhile
-        sessions[_resume_key(r)] = {"session_id": res["session_id"], "at": time.time()}
+        main = run.main() or {}
+        sessions[_resume_key(r)] = {"session_id": res["session_id"], "at": time.time(), "ctx": main.get("tokens") or 0}
         cutoff = time.time() - 7 * 86400
         sessions = {k: v for k, v in sessions.items() if isinstance(v, dict) and v.get("at", 0) > cutoff}
         write_json(_CLAUDE_SESSIONS, sessions)

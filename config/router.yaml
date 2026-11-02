@@ -28,12 +28,13 @@ executor:
   max_parallel: 10              # Claude jobs across ALL conversations; each conversation queues its own
                                 # (8 GB M1: each job ~300-600 MB; macOS swaps beyond ~5-6 heavy jobs)
   queue_wait_seconds: 1800      # how long a request waits for a free worker slot
-  resume_project_session: true  # follow-ups in the same project continue the last Claude session
+  resume_project_session: true  # follow-ups in the same chat continue its last Claude session
   resume_max_age_minutes: 120
+  resume_max_context: 120000    # past this many context tokens a follow-up starts fresh with the recent turns
   max_subagents: 2              # guidance passed to Claude about parallel subagents
   worker_profile: lean          # lean = no user plugins/MCP/hooks except the kept design plugins + all your own
                                 # skills (~/.claude/skills); full = the whole ~/.claude environment (old behaviour)
-  plugins_keep: [frontend-design, impeccable, ui-ux-pro-max, taste-skill, stop-slop]
+  plugins_keep: [frontend-design, impeccable, ui-ux-pro-max, taste-skill]  # stop-slop comes in as a user skill
   early_start: true             # start the worker from the routing hook, before the hub's first reply
   relay: verbatim               # verbatim = the worker's own reply is shown (the hub only writes the route line);
                                 # hub = the hub rewrites the result (old behaviour)

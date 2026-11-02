@@ -132,3 +132,15 @@ def test_project_workspace_label_renames_only(tmp_path, monkeypatch):
     assert not hp.label_webui_workspace({"id": "new-1", "name": "New", "status": "active"})  # never adds
     assert hp.label_webui_workspace({"id": "gs-56e2", "name": "GaffSwipe", "status": "archived"})
     assert [w["name"] for w in json.loads(f.read_text())] == ["other"]
+
+
+def test_a_huge_session_is_not_resumed(monkeypatch):
+    d = _setup(monkeypatch)
+    calls = []
+    monkeypatch.setattr(cc, "run_claude", lambda prompt, **k: calls.append(k) or {
+        "ok": True, "result": "Done.", "billing": "s", "session_id": f"S{len(calls)}"})
+    cc._execute(_req("chatH", "build it"))
+    s = json.loads((d / "cs.json").read_text())
+    key = next(iter(s)); s[key]["ctx"] = 150000; (d / "cs.json").write_text(json.dumps(s))
+    cc._execute(_req("chatH", "now polish it"))
+    assert calls[1]["resume_session"] is None  # over resume_max_context: fresh session, recent turns instead

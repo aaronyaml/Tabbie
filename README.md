@@ -76,6 +76,9 @@ Each request passes through the hub, a worker and back. To cut both time and tok
   stray MCP servers, but keeps your user skills and the plugins in `plugins_keep` (the design
   plugins by default). `worker_profile: full` loads everything, as before.
 - **Early start**: a clear request starts its worker while the hub is still replying.
+- **Per-chat sessions**: a follow-up in the same chat continues that chat's Claude session
+  (`resume_max_age_minutes`); once it passes `resume_max_context` (120k tokens) the next one starts
+  fresh with the last few turns instead of re-reading the whole history.
 - **Verbatim relay** (`relay: verbatim`): the worker's answer is passed through as-is, instead of
   the hub model re-typing it. `relay: hub` lets the hub rewrite it, as before.
 - **Planner finalize skip** (`planner.finalize: auto`): an approved plan goes straight to Claude
