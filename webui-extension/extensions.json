@@ -345,6 +345,16 @@
       "stylesheets": [
         "custom-controls.css?v=2"
       ]
+    },
+    {
+      "id": "worker-tokens",
+      "name": "Worker tokens on Insights",
+      "scripts": [
+        "worker-tokens.js?v=2"
+      ],
+      "stylesheets": [
+        "worker-tokens.css?v=1"
+      ]
     }
   ]
 }

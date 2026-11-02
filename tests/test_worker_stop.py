@@ -232,3 +232,45 @@ def test_retry_claim_once_for_a_recent_interrupted_run(tmp_path, monkeypatch):
     os.utime(d / "request.json", (old, old))
     assert sc.retry_claim({"session": SID})[1] == {"ok": False}            # too old
     assert sc.retry_claim({"session": "../x"})[0] == 400
+
+
+def test_token_totals_add_up_runs_by_day_and_model(tmp_path, monkeypatch):
+    import datetime as dt
+    sc = _sidecar()
+    reqs = tmp_path / "requests"
+    monkeypatch.setattr(sc.common, "REQUESTS_DIR", reqs)
+    today = dt.date.today().strftime("%Y%m%d")
+    for i, (model, usage) in enumerate([("claude-opus-5-5", {"input": 1000, "cached": 800, "output": 50}),
+                                        ("gpt-6-luna", {"input": 300, "cached": 0, "output": 20}),
+                                        ("claude-opus-5-5", None)]):
+        d = reqs / f"{today}-12000{i}-abcde{i}"; d.mkdir(parents=True)
+        d.joinpath("request.json").write_text(json.dumps({"executor": {"provider": "claude-cli", "model": model, "usage": usage}}))
+    (reqs / "20200101-000000-aaaaaa").mkdir()
+    out = sc.token_totals("7")
+    assert out["total"] == {"runs": 2, "input": 1300, "cached": 800, "output": 70, "unknown": 1}
+    assert list(out["by_model"]) == ["claude-opus-5-5", "gpt-6-luna"]
+    assert out["by_model"]["claude-opus-5-5"]["runs"] == 1
+
+
+def test_inbox_lists_chats_waiting_on_the_user(tmp_path, monkeypatch):
+    import datetime as dt
+    sc = _sidecar()
+    reqs = tmp_path / "requests"
+    monkeypatch.setattr(sc.common, "REQUESTS_DIR", reqs)
+    monkeypatch.setattr(sc, "WEBUI_STATE", tmp_path / "webui")
+    (tmp_path / "webui" / "sessions").mkdir(parents=True)
+    today = dt.date.today().strftime("%Y%m%d")
+    def req(n, sid, status, q=None):
+        d = reqs / f"{today}-12000{n}-abcde{n}"; d.mkdir(parents=True)
+        d.joinpath("request.json").write_text(json.dumps({"session_id": sid, "status": status, "question": q}))
+    def sess(sid, **kw):
+        (tmp_path / "webui" / "sessions" / f"{sid}.json").write_text(json.dumps({"title": sid.upper(), **kw}))
+    sess("aaa111"); sess("bbb222"); sess("ccc333", archived=True); sess("ddd444")
+    req(1, "aaa111", "awaiting_answer", {"questions": [{"question": "Which colour?"}]})
+    req(2, "bbb222", "awaiting_approval")
+    req(3, "ccc333", "awaiting_answer")          # archived chat
+    req(4, "ddd444", "awaiting_answer"); req(5, "ddd444", "done")  # answered since
+    req(6, "eee555", "awaiting_answer")          # chat deleted
+    out = sc.inbox()
+    assert [(i["session"], i["kind"]) for i in out["items"]] == [("bbb222", "plan"), ("aaa111", "question")]
+    assert out["items"][1]["text"] == "Which colour?"

@@ -954,6 +954,16 @@ _CLAUDE_AUTH_RX = re.compile(r"Claude auth check failed|authentication_error|OAu
                              r"run /login|not logged in|Invalid API key", re.I)
 
 
+def _usage_row(u) -> dict | None:
+    """A run's token usage in one shape for both CLIs: input (incl. cache reads/writes), cached, output."""
+    if not isinstance(u, dict) or not u:
+        return None
+    n = lambda k: int(u.get(k) or 0)  # noqa: E731
+    cached = n("cache_read_input_tokens") or n("cached_input_tokens")
+    inp = n("input_tokens") + n("cache_read_input_tokens") + n("cache_creation_input_tokens")
+    return {"input": inp, "cached": cached, "output": n("output_tokens") + n("reasoning_output_tokens")}
+
+
 def _auto_review(r: Request, cwd: str, snap: str, claude_model: str | None, feed=None) -> str | None:
     """Codex reviews a finished Claude job's sensitive changes (see review.py). Never fails the request."""
     try:
@@ -1112,7 +1122,8 @@ def _run_request(r: Request, feed=None, force: dict | None = None) -> dict:
     r["executor"] = {"provider": "claude-cli", "billing": res.get("billing"), "model": claude_model,
                      "effort": claude_effort, "auto_effort": not choice["effort"],
                      "session_id": res.get("session_id") or resume, "resumed": bool(resume),
-                     "profile": res.get("profile") or profile, "dynamic": bool(delegate)}
+                     "profile": res.get("profile") or profile, "dynamic": bool(delegate),
+                     "usage": _usage_row(res.get("usage"))}
     r["timings"] = {**(r.data.get("timings") or {}), **{k: round(v, 3) for k, v in timings.items()}}
     r["result"] = res
     r["status"] = "done" if res.get("ok") else ("stopped" if res.get("stopped_by_user") else "failed")
@@ -1296,7 +1307,8 @@ def _astra_takeover(r: Request, reason: str, choice: dict | None = None, feed=No
     r["pending_answer"] = None
     r["executor"] = {"provider": "codex-cli" if choice else "codex-cli (takeover)", "model": res.get("model"),
                      "effort": effort, "auto_effort": not (choice or {}).get("effort"), "chosen": bool(choice),
-                     "billing": res.get("billing"), "thread_id": res.get("thread_id"), "dynamic": bool(delegate)}
+                     "billing": res.get("billing"), "thread_id": res.get("thread_id"), "dynamic": bool(delegate),
+                     "usage": _usage_row(res.get("usage"))}
     r["timings"] = {**(r.data.get("timings") or {}), **{k: round(v, 3) for k, v in timings.items()}}
     r["result"] = res
     r["status"] = "done" if res.get("ok") else ("stopped" if res.get("stopped_by_user") else "failed")

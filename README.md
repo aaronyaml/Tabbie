@@ -97,6 +97,9 @@ Measured with `bin/bench-latency` (two passes of 3 runs each, Opus 5.5):
 sets the hub's effort for those runs only, to compare); results go to `state/bench/`. The hub stays at
 medium: low was faster on routed jobs but no better on plain answers in a small A/B.
 
+Insights has a **Workers** card: Claude Code and Codex tokens per model for the chosen period (in,
+cached share, out), read from each request's recorded usage. The hub's own tokens are in the cards below it.
+
 ### Second opinion on sensitive changes
 
 When a Claude job in a git project changes files about auth, sessions, secrets, payments, billing,

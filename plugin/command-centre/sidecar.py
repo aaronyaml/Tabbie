@@ -379,6 +379,77 @@ def worker_stop(body: dict) -> tuple[int, dict]:
     return 200, {"ok": True, "request_id": rid}
 
 
+_WAITING = {"awaiting_answer": "question", "awaiting_answers": "question", "awaiting_approval": "plan"}
+
+
+def inbox(days: int = 14, limit: int = 10) -> dict:
+    """What's waiting on the user: a chat whose newest request asked a question or proposed a plan
+    (chat still there, not archived), and memory proposals left for review. Newest first."""
+    import datetime as _dt
+    since = (_dt.date.today() - _dt.timedelta(days=days)).strftime("%Y%m%d")
+    newest: dict[str, tuple[str, dict]] = {}
+    rd = common.REQUESTS_DIR
+    for d in sorted(x for x in rd.iterdir() if x.is_dir() and x.name[:8] >= since) if rd.exists() else []:
+        req = common.read_json(d / "request.json", {}) or {}
+        sid = str(req.get("session_id") or "")
+        if _SID.match(sid):
+            newest[sid] = (d.name, req)  # sorted by id: the last one per chat wins
+    items = []
+    for sid, (rid, req) in newest.items():
+        kind = _WAITING.get(req.get("status"))
+        if not kind:
+            continue
+        sess = common.read_json(WEBUI_STATE / "sessions" / f"{sid}.json", None)
+        if not sess or sess.get("archived"):
+            continue
+        q = req.get("question") or {}
+        qs = q.get("questions") if isinstance(q, dict) else None
+        text = (qs[0].get("question") if qs and isinstance(qs[0], dict) else "") or (
+            "A plan is ready for your approval." if kind == "plan" else "Tabbie has a question for you.")
+        items.append({"kind": kind, "session": sid, "title": str(sess.get("title") or "Untitled")[:80],
+                      "text": str(text)[:160], "request_id": rid, "at": req.get("updated") or req.get("created")})
+    items.sort(key=lambda x: x["request_id"], reverse=True)
+    try:
+        from hmem import proposals as _props
+        pending = len(_props.list_("pending"))
+    except Exception:
+        pending = 0
+    return {"items": items[:limit], "memory_pending": pending}
+
+
+def token_totals(days: str | int = 7) -> dict:
+    """Worker tokens (Claude Code / Codex runs, not the hub) per day and per model, from each request's
+    executor.usage. Requests recorded before usage was stored are only counted in "unknown"."""
+    import datetime as _dt
+    try:
+        n = max(1, min(90, int(days)))
+    except (TypeError, ValueError):
+        n = 7
+    since = (_dt.date.today() - _dt.timedelta(days=n - 1)).strftime("%Y%m%d")
+    by_day: dict[str, dict] = {}
+    by_model: dict[str, dict] = {}
+    total = {"runs": 0, "input": 0, "cached": 0, "output": 0, "unknown": 0}
+    rd = common.REQUESTS_DIR
+    for d in sorted(x for x in rd.iterdir() if x.is_dir() and x.name[:8] >= since) if rd.exists() else []:
+        ex = (common.read_json(d / "request.json", {}) or {}).get("executor") or {}
+        if not ex.get("provider"):
+            continue
+        u = ex.get("usage") or None
+        day = f"{d.name[:4]}-{d.name[4:6]}-{d.name[6:8]}"
+        model = str(ex.get("model") or ("claude" if str(ex.get("provider")).startswith("claude") else "codex"))
+        dayb = by_day.setdefault(day, {"runs": 0, "input": 0, "cached": 0, "output": 0, "unknown": 0})
+        if not u:  # older runs: counted apart so they don't show as zero-token rows
+            total["unknown"] += 1
+            dayb["unknown"] += 1
+            continue
+        for bucket in (total, dayb, by_model.setdefault(model, {"runs": 0, "input": 0, "cached": 0, "output": 0, "unknown": 0})):
+            bucket["runs"] += 1
+            for k in ("input", "cached", "output"):
+                bucket[k] += int(u.get(k) or 0)
+    return {"days": n, "total": total, "by_day": by_day,
+            "by_model": dict(sorted(by_model.items(), key=lambda kv: -(kv[1]["input"] + kv[1]["output"])))}
+
+
 _retry_lock = threading.Lock()
 RETRY_WINDOW_S = 2 * 3600
 
@@ -673,6 +744,10 @@ class Handler(BaseHTTPRequestHandler):
                 return self._send(200, update_payload(q.get("force") == "1"))
             if u.path == "/title":
                 return self._send(200, title_for(q.get("text", "")))
+            if u.path == "/inbox":
+                return self._send(200, inbox())
+            if u.path == "/tokens":
+                return self._send(200, token_totals(q.get("days", "7")))
             if u.path == "/worker":
                 sid = q.get("session", "")
                 if not _SID.match(sid):
