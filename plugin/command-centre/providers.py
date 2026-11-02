@@ -131,8 +131,9 @@ def _run(cmd: list[str], *, cwd: str, env: dict, timeout: int, stdin: str | None
 
 
 def _run_stream(cmd: list[str], *, cwd: str, env: dict, timeout: int, stdin: str,
-                on_line, on_start=None) -> tuple[int, str, str]:
-    """Like _run, but hands each stdout line to on_line as it arrives (stream-json workers)."""
+                on_line, on_start=None, live=None) -> tuple[int, str, str]:
+    """Like _run, but hands each stdout line to on_line as it arrives (stream-json workers).
+    With live (a LiveInput), stdin stays open so the user's messages reach the worker mid-run."""
     import threading
     proc = subprocess.Popen(cmd, cwd=cwd, env=env, stdin=subprocess.PIPE, stdout=subprocess.PIPE,
                             stderr=subprocess.PIPE, text=True, bufsize=1, start_new_session=True)
@@ -154,11 +155,16 @@ def _run_stream(cmd: list[str], *, cwd: str, env: dict, timeout: int, stdin: str
     timer.daemon = True
     timer.start()
     try:
-        proc.stdin.write(stdin)
-        proc.stdin.close()
+        if live:
+            live.start(proc, stdin)
+        else:
+            proc.stdin.write(stdin)
+            proc.stdin.close()
         out_lines = []
         for line in proc.stdout:
             out_lines.append(line)
+            if live:
+                live.on_line(line)
             try:
                 on_line(line)
             except Exception:
@@ -166,8 +172,122 @@ def _run_stream(cmd: list[str], *, cwd: str, env: dict, timeout: int, stdin: str
         proc.wait()
     finally:
         timer.cancel()
+        if live:
+            live.stop()
     err = "".join(err_buf) + (f"\nTIMEOUT after {timeout}s" if timed_out.is_set() else "")
     return (124 if timed_out.is_set() else proc.returncode), "".join(out_lines), err
+
+
+class LiveInput:
+    """Messages from the chat to a running Claude Code worker (`--input-format stream-json`).
+
+    The request folder is the channel: the sidecar appends {id, text, mode} lines to inbox.jsonl
+    (WebUI queue / Send now), this writes them to the worker's stdin and records each id in
+    inbox-acks.jsonl, and live.json says whether the channel is still open.
+      mode "queue": Claude reads it at its next step, in the same turn (as in interactive Claude Code).
+      mode "now":   interrupt the current step first, then the message runs straight away.
+    stdin closes at the first result that isn't the end of an interrupted step; anything already
+    written is still read before Claude exits. Lines that arrive after that stay unacknowledged,
+    so the WebUI keeps them queued and sends them as a normal message.
+    """
+
+    def __init__(self, folder: Path):
+        import threading
+        self.dir = Path(folder)
+        self.lock = threading.Lock()
+        self.stopped = threading.Event()
+        self.proc = None
+        self.open = False
+        self.interrupts = 0
+        self.offset = 0
+
+    @staticmethod
+    def user_line(text: str) -> str:
+        return json.dumps({"type": "user", "message": {"role": "user", "content": [{"type": "text", "text": text}]}}) + "\n"
+
+    def _mark(self, is_open: bool) -> None:
+        try:
+            (self.dir / "live.json").write_text(json.dumps({"open": is_open, "pid": self.proc.pid if self.proc else None,
+                                                            "at": time.time()}))
+        except OSError:
+            pass
+
+    def start(self, proc, prompt: str) -> None:
+        import threading
+        self.proc = proc
+        inbox = self.dir / "inbox.jsonl"
+        self.offset = inbox.stat().st_size if inbox.exists() else 0  # only messages sent from now on
+        with self.lock:
+            proc.stdin.write(self.user_line(prompt))
+            proc.stdin.flush()
+            self.open = True
+            self._mark(True)
+        threading.Thread(target=self._pump, daemon=True, name="claude-live-input").start()
+
+    def _pump(self) -> None:
+        inbox = self.dir / "inbox.jsonl"
+        while not self.stopped.wait(0.7):
+            try:
+                with inbox.open("rb") as f:
+                    f.seek(self.offset)
+                    chunk = f.read()
+            except OSError:
+                continue
+            chunk = chunk[: chunk.rfind(b"\n") + 1]  # a half-written line waits for the next pass
+            if not chunk:
+                continue
+            self.offset += len(chunk)
+            for raw in chunk.decode("utf-8", "replace").splitlines():
+                try:
+                    m = json.loads(raw)
+                except json.JSONDecodeError:
+                    continue
+                text = str(m.get("text") or "").strip()
+                if not text:
+                    continue
+                with self.lock:
+                    if not self.open:
+                        return
+                    try:
+                        if m.get("mode") == "now":
+                            self.proc.stdin.write(json.dumps({"type": "control_request", "request_id": f"int-{m.get('id')}",
+                                                              "request": {"subtype": "interrupt"}}) + "\n")
+                            self.interrupts += 1
+                        self.proc.stdin.write(self.user_line(f"(Message from the user while you were working)\n{text}"))
+                        self.proc.stdin.flush()
+                    except (OSError, ValueError):
+                        return
+                    with (self.dir / "inbox-acks.jsonl").open("a") as a:
+                        a.write(json.dumps({"id": m.get("id"), "at": time.time()}) + "\n")
+
+    def on_line(self, line: str) -> None:
+        if '"result"' not in line:
+            return
+        try:
+            ev = json.loads(line)
+        except json.JSONDecodeError:
+            return
+        if ev.get("type") != "result":
+            return
+        with self.lock:
+            if self.interrupts:  # the end of the step a Send now interrupted: its message runs next
+                self.interrupts -= 1
+                return
+            self._close()
+
+    def _close(self) -> None:
+        if self.open:
+            self.open = False
+            self._mark(False)
+            try:
+                self.proc.stdin.close()
+            except (OSError, ValueError):
+                pass
+
+    def stop(self) -> None:
+        self.stopped.set()
+        with self.lock:
+            self._close()
 
 
 def _short(s, n: int) -> str:
@@ -446,11 +566,12 @@ class WorkerSlot:
 
 
 def build_claude_cmd(ecfg: dict, *, add_dirs: list[str], resume_session: str | None, stream: bool,
-                     model: str | None = None, effort: str | None = None) -> list[str]:
-    """`claude -p` argv. model/effort (the conversation's picker choice) win over executor.model."""
+                     model: str | None = None, effort: str | None = None, live: bool = False) -> list[str]:
+    """`claude -p` argv. model/effort (the conversation's picker choice) win over executor.model.
+    live: the prompt (and later chat messages) arrive as stream-json on stdin (LiveInput)."""
     from .executor_choice import claude_args
     fmt = ["stream-json", "--verbose"] if stream else ["json"]
-    cmd = ["claude", "-p", "--output-format", *fmt,
+    cmd = ["claude", "-p", "--output-format", *fmt, *(["--input-format", "stream-json"] if live and stream else []),
            "--permission-mode", str(ecfg.get("permission_mode", "auto")),
            "--append-system-prompt", WORKER_RULES.format(max_subagents=ecfg.get("max_subagents", 2))]
     # Shared memory changes only through hmem proposals; file tools can't edit the store directly (Bash
@@ -467,17 +588,19 @@ def build_claude_cmd(ecfg: dict, *, add_dirs: list[str], resume_session: str | N
 
 def run_claude(prompt: str, *, cwd: str, add_dirs: list[str], cfg: dict, resume_session: str | None,
                on_progress=None, session_key: str | None = None, on_event=None,
-               model: str | None = None, effort: str | None = None) -> dict:
+               model: str | None = None, effort: str | None = None, inbox: Path | None = None) -> dict:
     """Run Claude Code headless. With on_progress, streams (stream-json) and calls on_progress(line)
-    for each step (thinking, text, tool calls, errors) as it happens."""
+    for each step (thinking, text, tool calls, errors) as it happens. With inbox (the request
+    folder), the user's chat messages reach Claude while it works (LiveInput)."""
     ecfg = cfg.get("executor", {}) or {}
     ok, why = claude_auth()
     if not ok:
         return {"ok": False, "error": f"Claude auth check failed: {why}", "billing": None}
     if on_event and not on_progress:
         on_progress = lambda _t: None  # noqa: E731 - events need the stream format
+    live = LiveInput(inbox) if (inbox and on_progress) else None
     cmd = build_claude_cmd(ecfg, add_dirs=add_dirs, resume_session=resume_session, stream=bool(on_progress),
-                           model=model, effort=effort)
+                           model=model, effort=effort, live=bool(live))
     started = time.time()
     try:
         with WorkerSlot(ecfg.get("max_parallel", 1), int(ecfg.get("queue_wait_seconds", 1800)), session_key):
@@ -510,7 +633,7 @@ def run_claude(prompt: str, *, cwd: str, add_dirs: list[str], cfg: dict, resume_
                 threading.Thread(target=heartbeat, daemon=True).start()
                 try:
                     code, out, err = _run_stream(cmd, cwd=cwd, env=run_env, timeout=run_timeout, stdin=prompt,
-                                                 on_line=on_line)
+                                                 on_line=on_line, live=live)
                 finally:
                     stop.set()
             else:

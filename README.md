@@ -463,6 +463,10 @@ Design notes: `docs/memory/ARCHITECTURE.md`, `docs/projects/ARCHITECTURE.md`.
 - **Takeover**: if Claude hits its usage limit, Tabbie offers to let the planner continue from where
   it stopped. `/takeover` toggles it.
 - **Limits**: `/limit` or `bin/hub limits` shows % used and reset times for each signed-in subscription.
+- **Messages while it works**: anything you send while Claude Code is working is queued and handed
+  straight to Claude, which reads it at its next step (like typing ahead in Claude Code). **Send now**
+  (or ⌘/Ctrl+Enter) stops Claude's current step so it reads your message right away. Codex runs can't
+  take messages mid-run, so for those the queue sends after the reply.
 
 ### Choosing Claude Code, Codex or both
 

@@ -13,6 +13,9 @@
  *      remove, reorder, combine and clear stay upstream's.
  *   3. ⌘/Ctrl+Enter in the composer while a turn runs = queue it and push it straight in.
  *      A small "Send now" button beside the send button does the same.
+ *   4. While a Claude Code worker runs, queued messages go straight to it (it reads them at its next
+ *      step) and Send now interrupts its current step first. Without a live worker (Codex, or the
+ *      hub replying by itself) both fall back to the steer above.
  * Never drops a message: if the push is refused the item stays queued (it drains when the turn
  * ends, as upstream does), and if the turn already ended it is sent as a normal message. A toast
  * says which happened.
@@ -81,13 +84,55 @@
     return true;
   }
 
+  // ── 2a. straight to the running Claude Code worker ────────────────────────
+  // While the hub waits on a Claude Code worker, steering the hub only lands when the worker is done.
+  // The helper writes the message into the worker's own input instead (providers.LiveInput):
+  // "queue" = Claude reads it at its next step; "now" = it stops the current step and reads it.
+  const SIDE = 'api/extensions/cc-agents/sidecar/worker';
+  async function sideJSON(url, body) {
+    const r = await fetch(url, body ? { method: 'POST', credentials: 'same-origin', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) }
+      : { credentials: 'same-origin', cache: 'no-store' });
+    if (!r.ok) throw new Error(String(r.status));
+    return r.json();
+  }
+  let liveCache = { sid: null, at: 0, open: false };
+  async function workerOpen(sid) {
+    if (liveCache.sid === sid && Date.now() - liveCache.at < 4000) return liveCache.open;
+    let open = false;
+    try { open = !!(await sideJSON(`${SIDE}?session=${encodeURIComponent(sid)}`)).open; } catch (_) {}
+    liveCache = { sid, at: Date.now(), open };
+    return open;
+  }
+  // true = Claude has it; false = no live worker (or it closed before reading it): use the old path
+  async function toWorker(sid, text, mode) {
+    let res;
+    try { res = await sideJSON(`${SIDE}/message`, { session: sid, text, mode }); } catch (_) { return false; }
+    if (!res || !res.ok) return false;
+    for (let i = 0; i < 12; i++) {
+      await new Promise((r) => setTimeout(r, 700));
+      try { if ((await sideJSON(`${SIDE}/ack?request=${encodeURIComponent(res.request_id)}&id=${res.id}`)).delivered) return true; } catch (_) {}
+    }
+    return false;
+  }
+
   // ── 2. push one queued entry straight into the running turn ───────────────
-  async function pushNow(sid, ts) {
+  async function pushNow(sid, ts, mode) {
     if (!sid || ts == null || pushing.has(ts)) return;
     const taken = takeEntry(sid, ts); // out of the queue first so a drain can't also send it
     if (!taken) return;
     const { entry, index } = taken;
     const text0 = entryText(entry);
+    if (text0 && !realFiles(entry).length && runningFor(sid) && await workerOpen(sid)) {
+      pushing.add(ts);
+      const ok = await toWorker(sid, text0, mode === 'queue' ? 'queue' : 'now');
+      pushing.delete(ts);
+      if (ok) {
+        if (curSid() === sid && has('_showSteerIndicator')) _showSteerIndicator(text0);
+        toast(mode === 'queue' ? 'Passed to Claude: it reads it at its next step' : 'Sent to Claude: it paused and is reading it now', 2600);
+        return;
+      }
+      liveCache.at = 0;
+    }
 
     if (!runningFor(sid)) {
       // Nothing running to push into: just send it now as a normal message.
@@ -134,6 +179,18 @@
     toast((why ? why + '. ' : 'Couldn’t push it in. ') + 'It stays queued and sends after this reply.', 4500, 'warning');
   }
   window.hxQueuePushNow = pushNow;
+
+  // Queued messages don't wait for the whole reply: while a Claude Code worker runs, each one is
+  // handed to it (like typing ahead in Claude Code), oldest first. Ones with files keep waiting.
+  let forwarding = false;
+  setInterval(async () => {
+    const sid = curSid();
+    if (forwarding || !sid || !runningFor(sid) || document.hidden) return;
+    const next = liveQueue(sid).find((e) => e && entryText(e) && !realFiles(e).length && !pushing.has(e._queued_at));
+    if (!next || !(await workerOpen(sid))) return;
+    forwarding = true;
+    try { await pushNow(sid, next._queued_at, 'queue'); } finally { forwarding = false; }
+  }, 2500);
 
   // ── restyle/augment upstream's card after each render ─────────────────────
   function decorate(sid) {

@@ -3,7 +3,8 @@
  *   GET  …/sidecar/update          -> {available, ahead_by, commits, remote, pending_restart}
  *   POST …/sidecar/update          -> download it (fast-forward; local edits are never overwritten)
  *   POST …/sidecar/update/restart  -> restart what it touched now, or once nothing is running ({waiting: true})
- * "Later" hides the card until GitHub has something newer than what you dismissed.
+ * "Later" snoozes the card for a day (or until GitHub has something newer). Settings → System has a
+ * "Tabbie" row with the version and a Check for updates button, any time.
  */
 (() => {
   'use strict';
@@ -14,6 +15,9 @@
   const KEY = 'hx-update-dismissed';
   const EVERY = 30 * 60 * 1000;
   const SOON = 10 * 60 * 1000;
+  const SNOOZE = 24 * 3600 * 1000;
+  // dismissed this exact version within the last day (older builds stored just the commit: not snoozed)
+  const snoozed = (remote) => { try { const d = JSON.parse(get(KEY) || 'null'); return !!d && d.remote === remote && Date.now() < d.until; } catch (_) { return false; } };
   const esc = (s) => String(s == null ? '' : s).replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
   const get = (k) => { try { return localStorage.getItem(k); } catch (_) { return null; } };
   const set = (k, v) => { try { localStorage.setItem(k, v); } catch (_) {} };
@@ -80,7 +84,7 @@
   async function onClick(e) {
     const t = e.target.closest('button');
     if (!t) return;
-    if (t.hasAttribute('data-later')) { if (info) set(KEY, info.remote); hide(); return; }
+    if (t.hasAttribute('data-later')) { if (info) set(KEY, JSON.stringify({ remote: info.remote, until: Date.now() + SNOOZE })); hide(); return; }
     if (t.hasAttribute('data-close') || t.hasAttribute('data-later-restart')) { hide(); return; }
     if (t.hasAttribute('data-reload')) { location.reload(); return; }
     if (t.hasAttribute('data-update')) {
@@ -109,18 +113,50 @@
     if (j.pending_restart && j.pending_restart.length) { if (!j.restart_waiting) finished({ needs: j.pending_restart }); return; }
     if (!j.available) {
       // A copy that can't fast-forward says so once per GitHub version, so it isn't silently stuck.
-      if (j.note && j.remote && /can't update automatically/.test(j.note) && get(KEY) !== j.remote) {
+      if (j.note && j.remote && /can't update automatically/.test(j.note) && !snoozed(j.remote)) {
         info = j;
         show(`<div class="hx-up-head"><b>Tabbie update available</b></div><p class="hx-up-note">${esc(j.note)} Run <code>bin/hub update</code> on the Mac for details.</p>`
           + `<div class="hx-up-btns"><button type="button" data-later>OK</button></div>`);
       }
       return;
     }
-    if (get(KEY) === j.remote) return;
+    if (!force && snoozed(j.remote)) return;
     offer(j);
   }
 
+  // Settings → System: a Tabbie row (version, Check for updates). Upstream's block there covers the
+  // WebUI and Hermes Agent, not Tabbie.
+  function mountSettings() {
+    const pane = document.getElementById('settingsPaneSystem');
+    if (!pane || document.getElementById('hxUpdSettings')) return;
+    const head = pane.querySelector('.settings-section-head');
+    const row = document.createElement('div');
+    row.id = 'hxUpdSettings';
+    row.innerHTML = `<div><b>Tabbie</b><span data-ver>Checking version…</span></div>`
+      + `<button type="button" class="settings-action-btn" data-check>Check for updates</button>`;
+    (head ? head.after(row) : pane.prepend(row));
+    const ver = row.querySelector('[data-ver]'), btn = row.querySelector('[data-check]');
+    const say = (j) => {
+      const v = j.local ? j.local.slice(0, 7) : '';
+      ver.textContent = j.available ? `Version ${v} · an update is available` : j.note ? `Version ${v} · ${j.note}` : `Version ${v} · up to date`;
+    };
+    call('', 'GET').then(say).catch(() => { ver.textContent = 'Allow Tabbie\'s helper to check for updates.'; });
+    btn.addEventListener('click', async () => {
+      btn.disabled = true; btn.textContent = 'Checking…';
+      try {
+        const j = await call('?force=1', 'GET');
+        say(j);
+        const fresh = () => { if (card) { card.remove(); card = null; } };
+        if (j.pending_restart && j.pending_restart.length && !j.restart_waiting) { fresh(); finished({ needs: j.pending_restart }); }
+        else if (j.available) { fresh(); offer(j); }
+      } catch (e) { ver.textContent = `Couldn't check (${(e && e.message) || e}).`; }
+      btn.disabled = false; btn.textContent = 'Check for updates';
+    });
+  }
+
   window.hxUpdates = { check: () => check(true) };
+  mountSettings();
+  if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', mountSettings);
   setTimeout(() => check(false), 4000);  // after the app has settled
   setInterval(() => check(false), EVERY);
   // Coming back to the tab (a phone unlocking, a laptop waking) checks again after a while.

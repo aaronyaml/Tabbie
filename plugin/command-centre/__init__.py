@@ -565,11 +565,11 @@ def _execute(r: Request) -> dict:
     run.save(force=True)
     res = run_claude(prompt, cwd=cwd, add_dirs=add_dirs, cfg=cfg, resume_session=resume, on_progress=feed,
                      session_key=r["session_id"], on_event=_agent_events(run, "claude"),
-                     model=claude_model, effort=claude_effort)
+                     model=claude_model, effort=claude_effort, inbox=r.dir)
     if not res.get("ok") and resume and not answer and "session" in str(res.get("error", "")).lower():
         res = run_claude(prompt, cwd=cwd, add_dirs=add_dirs, cfg=cfg, resume_session=None, on_progress=feed,
                          session_key=r["session_id"], on_event=_agent_events(run, "claude"),
-                         model=claude_model, effort=claude_effort)
+                         model=claude_model, effort=claude_effort, inbox=r.dir)
     r["pending_answer"] = None
     r["executor"] = {"provider": "claude-cli", "billing": res.get("billing"), "model": claude_model,
                      "effort": claude_effort, "session_id": res.get("session_id") or resume, "resumed": bool(resume)}

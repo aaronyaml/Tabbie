@@ -9,6 +9,8 @@ request. No token file, wrong token -> 401. Only /health answers without it (no 
 GET /session?id=<webui session id>  -> requests (oldest first) with agents, question rounds
 GET /request?id=<request id>        -> one request's agents + question rounds
 GET /plan?id=<request id>           -> the planner's final brief for that request (chat Plan chip)
+GET /worker?session=, POST /worker/message {session, text, mode}, GET /worker/ack?request=&id=
+                                     -> chat messages to the running Claude Code worker (queue / Send now)
 GET /executor?id=<webui session id> -> the conversation's executor choice + the picker catalog
 POST /executor {id, provider, model, effort} -> set it (composer model picker)
 GET /agents, POST /agents {enabled}  -> which coding agents this install uses (Claude Code, Codex, both)
@@ -114,6 +116,47 @@ def _request_row(rid: str) -> dict:
             "session_id": req.get("session_id"), "prompt": agents._short(req.get("original_prompt"), 120),
             "summary": summary, "agents_list": ags,
             "questions": question_rounds(req)}
+
+
+# Chat -> running Claude Code worker (providers.LiveInput reads the request folder's inbox.jsonl).
+def _live_request(sid: str):
+    for row in reversed(agents.session_view(sid)["requests"]):
+        d = common.REQUESTS_DIR / row["id"]
+        live = common.read_json(d / "live.json", {}) or {}
+        pid = live.get("pid")
+        if live.get("open") and isinstance(pid, int):
+            try:
+                os.kill(pid, 0)
+            except OSError:
+                continue
+            return row["id"], d
+    return None, None
+
+
+def worker_payload(sid: str) -> dict:
+    rid, _ = _live_request(sid)
+    return {"open": bool(rid), "request_id": rid}
+
+
+def worker_message(body: dict) -> tuple[int, dict]:
+    sid, text, mode = str(body.get("session") or ""), str(body.get("text") or "").strip(), body.get("mode") or "queue"
+    if not _SID.match(sid) or not text or len(text) > 8000 or mode not in ("queue", "now"):
+        return 400, {"error": "bad message"}
+    rid, d = _live_request(sid)
+    if not rid:
+        return 200, {"ok": False, "reason": "no running Claude Code worker"}
+    mid = __import__("secrets").token_hex(6)
+    with (d / "inbox.jsonl").open("a") as f:
+        f.write(json.dumps({"id": mid, "text": text, "mode": mode, "at": __import__("time").time()}) + "\n")
+    return 200, {"ok": True, "id": mid, "request_id": rid}
+
+
+def worker_ack(rid: str, mid: str) -> dict:
+    try:
+        lines = (common.REQUESTS_DIR / rid / "inbox-acks.jsonl").read_text().splitlines()
+    except OSError:
+        lines = []
+    return {"delivered": any(f'"id": "{mid}"' in ln for ln in lines)}
 
 
 def plan_payload(rid: str) -> dict:
@@ -283,6 +326,16 @@ class Handler(BaseHTTPRequestHandler):
                 return self._send(200, update_payload(q.get("force") == "1"))
             if u.path == "/title":
                 return self._send(200, title_for(q.get("text", "")))
+            if u.path == "/worker":
+                sid = q.get("session", "")
+                if not _SID.match(sid):
+                    return self._send(400, {"error": "bad session id"})
+                return self._send(200, worker_payload(sid))
+            if u.path == "/worker/ack":
+                rid, mid = q.get("request", ""), q.get("id", "")
+                if not _RID.match(rid) or not re.match(r"^[0-9a-f]{12}$", mid):
+                    return self._send(400, {"error": "bad id"})
+                return self._send(200, worker_ack(rid, mid))
             if u.path == "/plan":
                 rid = q.get("id", "")
                 if not _RID.match(rid):
@@ -315,6 +368,8 @@ class Handler(BaseHTTPRequestHandler):
                 return self._send(*set_executor(body))
             if u.path == "/agents" and isinstance(body, dict):
                 return self._send(*set_agents(body))
+            if u.path == "/worker/message" and isinstance(body, dict):
+                return self._send(*worker_message(body))
             if u.path == "/motion/ensure":
                 return self._send(200, motion_studio.status(create=True))
             if u.path == "/update":

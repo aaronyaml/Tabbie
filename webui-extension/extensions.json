@@ -209,10 +209,10 @@
       "id": "updates",
       "name": "Tabbie updates (asks before downloading)",
       "scripts": [
-        "updates.js?v=3"
+        "updates.js?v=4"
       ],
       "stylesheets": [
-        "updates.css?v=1"
+        "updates.css?v=2"
       ]
     },
     {
@@ -237,7 +237,7 @@
       "id": "message-queue",
       "name": "Message queue & send now",
       "scripts": [
-        "message-queue.js?v=1"
+        "message-queue.js?v=2"
       ],
       "stylesheets": [
         "message-queue.css?v=2"
