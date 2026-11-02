@@ -214,7 +214,7 @@ class Delegator:
                 slot = providers.WorkerSlot(ecfg.get("max_parallel", 1), SLOT_WAIT_S, None)
                 slot.__enter__()
             except TimeoutError:
-                return refuse("busy", "every worker slot on this Mac is busy")
+                return refuse("busy", "every worker slot on this computer is busy")
             try:
                 return self._delegate(args, rdir=rdir, caller=caller, target=target, mode=mode, model=model,
                                       effort=effort, peer=peer, ecfg=ecfg, task=task)

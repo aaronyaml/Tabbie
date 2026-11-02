@@ -185,7 +185,7 @@ def set_choice(session_id: str, provider: str, model: str, effort: str | None = 
 
 def public_catalog(available_openai: list[str] | None = None) -> dict:
     """Catalog for the picker: only what this user can run. OpenAI models are trimmed to what this
-    Codex login exposes; linked providers carry their billing label (Plan / Pay per use / On this Mac)."""
+    Codex login exposes; linked providers carry their billing label (Plan / Pay per use / On this computer)."""
     out = {}
     for pid in providers_on():
         models = _models(pid)

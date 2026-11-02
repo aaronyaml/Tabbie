@@ -128,7 +128,7 @@ def _browse_root(raw: str | None) -> Path:
     try:
         p = projects.true_case(p.resolve(strict=True))
     except (OSError, RuntimeError):
-        raise BadRequest("that folder doesn't exist on this Mac") from None
+        raise BadRequest("that folder doesn't exist on this computer") from None
     if not p.is_dir() or not p.is_relative_to(base):
         raise BadRequest(f"only folders inside {projects.tilde(str(base))} can be browsed")
     rel = p.relative_to(base).parts
@@ -210,7 +210,7 @@ def repo_file(p: dict, folder_id: str, rel: str) -> dict:
     target = root / rel
     # the allowlisted name itself, not a symlink to something else in (or out of) the repo
     if any(x.is_symlink() for x in [target, *target.parents] if x.is_relative_to(root) and x != root):
-        raise BadRequest("that file is a link; open it on the Mac")
+        raise BadRequest("that file is a link; open it on the computer")
     import stat as _stat
     try:
         fd = os.open(target, os.O_RDONLY | os.O_NOFOLLOW | os.O_NONBLOCK)

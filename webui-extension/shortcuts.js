@@ -1,6 +1,6 @@
 /* Hermes — Tabbie keyboard shortcuts and the "?" cheat sheet (plain JS, no build step).
  *   ⌥⌘M model picker · ⌥⌘A Agents sheet · ⌥⌘P Projects · ⌥⌘↓ jump to latest · ? this list
- * (Ctrl+Alt instead of ⌥⌘ off the Mac.) Chords match e.code, because ⌥ changes e.key on a Mac.
+ * (Ctrl+Alt instead of ⌥⌘ off a Mac.) Chords match e.code, because ⌥ changes e.key on a Mac.
  * They fire from the page or the composer, never from another text field, and never while another
  * sheet or dialog is open. "?" fires only outside text fields. Upstream's own shortcuts (⌘K, ⌘/, ⌘,,
  * ⌘B, J/K) and the other extensions' (⌘↵ send now, ⌘\ sidebar) are listed, not rebound.

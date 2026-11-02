@@ -1,9 +1,9 @@
 /* Tabbie — Projects: first-class multi-folder projects with their own memory and Dreamer (plain JS).
  *
- * A Project (Acme = several repos) lives in the hmem registry on the Mac. This panel talks to it
+ * A Project (Acme = several repos) lives in the hmem registry on the computer. This panel talks to it
  * only through the cc-agents sidecar, which the WebUI proxies behind its own login + per-extension
  * token (api/extensions/cc-agents/sidecar/projects/*). Folder access is explicit: the picker lists
- * folder names on the Mac (never files), and attaching shows the real path to confirm first.
+ * folder names on the computer (never files), and attaching shows the real path to confirm first.
  *
  * Each Project also gets one native WebUI project bound to its workspace (~/hermes/workspaces/<id>,
  * symlinks to its folders), so "New task" opens a chat that the router already knows is that project.
@@ -475,7 +475,7 @@
         h('span', { class: 'hxp-item-i', icon: f.git ? 'GitBranchIcon' : 'Folder01Icon', size: 18 }),
         h('div', { class: 'hxp-item-b' },
           h('div', { class: 'hxp-item-t' }, h('strong', { text: f.label }), isPrim ? h('span', { class: 'hxp-tag is-ink', text: 'primary' }) : null,
-            f.missing ? h('span', { class: 'hxp-tag is-bad', text: 'missing on this Mac' }) : null),
+            f.missing ? h('span', { class: 'hxp-tag is-bad', text: 'missing on this computer' }) : null),
           h('div', { class: 'hxp-item-s', text: f.display }),
           h('div', { class: 'hxp-meta' },
             f.git ? h('span', { text: [live.branch, live.head, live.dirty ? `${live.dirty} uncommitted` : 'clean'].filter(Boolean).join(' · ') }) : h('span', { text: 'not a git repo' }),
@@ -483,7 +483,7 @@
             (f.context_files || []).length ? h('span', { text: `context: ${f.context_files.slice(0, 3).join(', ')}${f.context_files.length > 3 ? '…' : ''}` }) : null)),
         h('div', { class: 'hxp-item-a' },
           !isPrim ? btn('hxp-ghost hxp-sm', 'Make primary', () => act(() => call('/projects/folder/primary', { id: p.id, hash: p.hash, folder_id: f.id }).then(() => loadProject(p.id, true)), 'Primary folder changed')) : null,
-          btn('hxp-ib', '', () => { S.sheet = { kind: 'confirm', title: `Remove ${f.label}?`, text: 'The folder stays on your Mac. Hermes stops treating it as part of this project; its past sessions and memories stay with the project.', ok: 'Remove', danger: true, run: () => call('/projects/folder/remove', { id: p.id, hash: p.hash, folder_id: f.id }).then(() => loadProject(p.id, true)) }; render(); }, 'Delete02Icon', { 'aria-label': `Remove ${f.label}`, title: 'Remove from project' }))));
+          btn('hxp-ib', '', () => { S.sheet = { kind: 'confirm', title: `Remove ${f.label}?`, text: 'The folder stays on your computer. Hermes stops treating it as part of this project; its past sessions and memories stay with the project.', ok: 'Remove', danger: true, run: () => call('/projects/folder/remove', { id: p.id, hash: p.hash, folder_id: f.id }).then(() => loadProject(p.id, true)) }; render(); }, 'Delete02Icon', { 'aria-label': `Remove ${f.label}`, title: 'Remove from project' }))));
     }
     if (!p.folders.length) list.append(h('p', { class: 'hxp-muted', text: 'No folders yet. Add the repos and folders that make up this project.' }));
     out.append(h('div', { class: 'hxp-row hxp-row-end' },
@@ -550,7 +550,7 @@
   const ownMem = (p, m) => m.status === 'active' && /^projects\//.test(m.id) && [p.id, ...(p.memory_keys || [])].includes(m.id.split('/')[1]);
   function deleteMemory(p, m) {
     S.sheet = { kind: 'confirm', title: `Delete “${m.title || m.id}”?`, danger: true, ok: 'Delete',
-      text: 'Agents stop seeing it straight away. It is kept in the memory history on the Mac, so it can be restored.',
+      text: 'Agents stop seeing it straight away. It is kept in the memory history on the computer, so it can be restored.',
       run: () => call('/projects/memory/delete', { id: p.id, mem: m.id }).then(() => { S.cache = {}; S.memHits = null; return loadProject(p.id, true); }),
       done: 'Memory deleted' };
     render();
@@ -725,7 +725,7 @@
       for (const k of p.memory_keys) out.append(h('div', { class: 'hxp-row' }, h('span', { text: k }),
         btn('hxp-ghost hxp-sm', 'Stop including', () => act(() => call('/projects/update', { id: p.id, hash: p.hash, memory_keys: p.memory_keys.filter((x) => x !== k) }).then(() => loadProject(p.id, true)), 'Updated'))));
     }
-    out.append(h('p', { class: 'hxp-muted', text: 'Auto-approval of Dreamer proposals is off. It can only be turned on in Hermes’ config on the Mac, and never covers global memory or skills.' }));
+    out.append(h('p', { class: 'hxp-muted', text: 'Auto-approval of Dreamer proposals is off. It can only be turned on in Hermes’ config on the computer, and never covers global memory or skills.' }));
     out.append(h('h3', { class: 'hxp-h3', text: 'Project' }));
     out.append(h('p', { class: 'hxp-muted', text: `id ${p.id} · workspace ${p.workspace.replace(/^\/Users\/[^/]+/, '~')}` }));
     const actions = h('div', { class: 'hxp-row' });
@@ -793,7 +793,7 @@
       btn('hxp-ib', '', shut, 'Cancel01Icon', { 'aria-label': 'Close' }));
     const err = sh.error ? h('p', { class: 'hxp-err', text: sh.error }) : null;
     if (sh.kind === 'new') box.append(head('New project'), sheetNew(sh));
-    else if (sh.kind === 'picker') box.append(head('Choose a folder', 'on this Mac'), sheetPicker(sh));
+    else if (sh.kind === 'picker') box.append(head('Choose a folder', 'on this computer'), sheetPicker(sh));
     else if (sh.kind === 'confirm') box.append(head(sh.title), h('p', { text: sh.text }),
       h('div', { class: 'hxp-row hxp-row-end' }, btn('hxp-ghost', 'Cancel', shut),
         btn(`hxp-primary${sh.danger ? ' is-danger' : ''}`, sh.ok || 'OK', () => act(async () => { await sh.run(); S.sheet = null; }, sh.done || 'Done'))));
@@ -836,7 +836,7 @@
       }, (p) => `Created ${p.name}${p.claimed_sessions ? ` · ${plural(p.claimed_sessions, 'past session')} attached` : ''}`), 'Tick02Icon', { disabled: S.busy || null })));
   }
 
-  // folder picker: browse folders on the Mac (names only) + suggested repos + a typed path
+  // folder picker: browse folders on the computer (names only) + suggested repos + a typed path
   function openPicker(ctx) {
     const back = S.sheet && S.sheet.kind === 'new' ? S.sheet : null;
     S.sheet = { kind: 'picker', ctx, back, path: null, data: null, repos: null, mode: 'repos', sel: new Map() };
@@ -923,14 +923,14 @@
         sh.sel.set(chk.path, chk.display); render();
       };
       inp.addEventListener('keydown', (e) => { if (e.key === 'Enter') add(); });
-      out.append(h('label', {}, h('span', { text: 'Folder on the Mac running Hermes' }), inp),
+      out.append(h('label', {}, h('span', { text: 'Folder on the computer running Hermes' }), inp),
         h('div', { class: 'hxp-row hxp-row-end' }, btn('hxp-ghost hxp-sm', 'Check and select', add, 'Search01Icon')));
     }
     if (sh.sel.size) out.append(h('div', { class: 'hxp-selbar' },
       h('div', { class: 'hxp-chips' }, ...[...sh.sel].map(([path, display]) => h('button', { type: 'button', class: 'hxp-chip', title: display, onclick: () => toggle(sh, path, display), 'aria-label': `Unselect ${display}` },
         h('span', { text: display.split('/').pop() }), h('span', { class: 'hxp-i', icon: 'Cancel01Icon', size: 12 })))),
       btn('hxp-primary', sh.sel.size === 1 ? 'Add 1 folder' : `Add ${sh.sel.size} folders`, () => act(() => chooseAll([...sh.sel.keys()])), 'Tick02Icon', { disabled: S.busy || null })));
-    out.append(h('p', { class: 'hxp-foot', text: 'This is the Mac’s filesystem, even when you’re on your phone. Hidden, personal (Documents, Desktop, Downloads…) and Hermes’ own folders can’t be attached.' }));
+    out.append(h('p', { class: 'hxp-foot', text: 'This is the computer’s filesystem, even when you’re on your phone. Hidden, personal (Documents, Desktop, Downloads…) and Hermes’ own folders can’t be attached.' }));
     if (sh.back) out.append(h('div', { class: 'hxp-row' }, btn('hxp-ghost hxp-sm', 'Back', () => { S.sheet = sh.back; render(); }, 'ArrowLeft01Icon')));
     return out;
   }
@@ -960,7 +960,7 @@
   function sheetDelete(sh) {
     const inp = h('input', { placeholder: sh.p.name });
     return h('div', { class: 'hxp-form' },
-      h('p', { text: 'The project, its memory and its settings leave Hermes. Your folders are not touched. Everything stays in the memory history and can be recovered from the Mac.' }),
+      h('p', { text: 'The project, its memory and its settings leave Hermes. Your folders are not touched. Everything stays in the memory history and can be recovered from the computer.' }),
       h('label', {}, h('span', { text: `Type “${sh.p.name}” to confirm` }), inp),
       h('div', { class: 'hxp-row hxp-row-end' }, btn('hxp-ghost', 'Cancel', () => { S.sheet = null; render(); }),
         btn('hxp-primary is-danger', 'Delete project', () => act(async () => {

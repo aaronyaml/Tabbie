@@ -30,7 +30,7 @@ HERMES_HOME = Path(os.environ.get("HERMES_HOME") or (Path(os.environ["LOCALAPPDA
                                                      and os.environ.get("LOCALAPPDATA") else HOME / ".hermes"))
 CACHE_TTL = 60
 TIMEOUT = 8
-CLI_TIMEOUT = 20  # the higgsfield/elevenlabs CLIs are slow to start when the Mac is busy
+CLI_TIMEOUT = 20  # the higgsfield/elevenlabs CLIs are slow to start when the computer is busy
 _cache: dict = {"at": 0.0, "rows": None}
 
 CLAUDE_USAGE_URL = "https://api.anthropic.com/api/oauth/usage"
@@ -379,7 +379,7 @@ def elevenlabs_rows() -> list[dict]:
 
 # ---------------------------------------------------------------- collect + format
 
-SLOW = "timed out (the Mac is busy) — `/limit refresh` to retry"
+SLOW = "timed out (the computer is busy) — `/limit refresh` to retry"
 SOURCES = (claude_rows, codex_rows, higgsfield_rows, elevenlabs_rows)
 
 
@@ -554,7 +554,7 @@ def _cmd_limit(raw_args: str = "", platform: str | None = None, **kwargs):
     refresh = "refresh" in (raw_args or "").lower()
     rows = collect(refresh=refresh)
     if not rows:
-        return "No connected accounts to show. Sign in with `bin/setup` on the Mac; `bin/hub health` lists what's missing."
+        return "No connected accounts to show. Sign in with `bin/setup` on the computer; `bin/hub health` lists what's missing."
     if not platform or platform in ("webui", "web"):
         return format_webui(rows)  # WebUI (no platform passed): cards via limits-view.js
     if platform == "api_server":

@@ -1,7 +1,7 @@
 /* Tabbie — "Notify this device" (Web Push). Adds a row under Settings → Browser notifications: one tap
  * subscribes this phone / browser, and Tabbie pings it when a job finishes or needs you, even with Tabbie
  * closed. On iPhone it works from the home-screen app (iOS 16.4+). The push is empty; push-sw.js asks
- * Tabbie what happened. Subscriptions live on the Mac (sidecar /push/*), never in git.
+ * Tabbie what happened. Subscriptions live on the computer (sidecar /push/*), never in git.
  */
 (() => {
   'use strict';
@@ -47,7 +47,7 @@
     let sub = null, st = {};
     try { sub = await (await reg()).pushManager.getSubscription(); } catch (_) {}
     try { st = await call('key?endpoint=' + encodeURIComponent(sub ? sub.endpoint : '')); } catch (_) {}
-    if (!st.available) { btn.hidden = true; note.textContent = 'Push is off on the Mac (the sidecar is missing pywebpush).'; return; }
+    if (!st.available) { btn.hidden = true; note.textContent = 'Push is off on the computer (the sidecar is missing pywebpush).'; return; }
     btn.hidden = false;
     const on = !!(sub && st.this_device);
     btn.textContent = on ? 'Turn off on this device' : 'Notify this device';

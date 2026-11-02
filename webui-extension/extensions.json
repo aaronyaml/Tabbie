@@ -21,7 +21,7 @@
       "id": "spaces-projects",
       "name": "Spaces & Projects",
       "scripts": [
-        "spaces-projects.js?v=8"
+        "spaces-projects.js?v=9"
       ],
       "stylesheets": [
         "spaces-projects.css?v=6"
@@ -109,7 +109,7 @@
       "id": "push",
       "name": "Push notifications on this device",
       "scripts": [
-        "push.js?v=4"
+        "push.js?v=5"
       ],
       "stylesheets": [
         "push.css?v=2"
@@ -145,7 +145,7 @@
       "id": "cc-agents",
       "name": "Agents & questions",
       "scripts": [
-        "cc-agents.js?v=18"
+        "cc-agents.js?v=19"
       ],
       "stylesheets": [
         "cc-agents.css?v=10"
@@ -197,7 +197,7 @@
       "id": "shortcuts",
       "name": "Keyboard shortcuts",
       "scripts": [
-        "shortcuts.js?v=2"
+        "shortcuts.js?v=3"
       ],
       "stylesheets": [
         "shortcuts.css?v=1"
@@ -251,7 +251,7 @@
       "scripts": [
         "motion.js?v=9",
         "motion-scrub.js?v=6",
-        "motion-studio.js?v=28"
+        "motion-studio.js?v=29"
       ],
       "stylesheets": [
         "motion.css?v=8",
@@ -262,7 +262,7 @@
       "id": "projects",
       "name": "Projects (multi-folder, memory, Dreamer)",
       "scripts": [
-        "projects.js?v=10"
+        "projects.js?v=11"
       ],
       "stylesheets": [
         "projects.css?v=7"
@@ -280,7 +280,7 @@
       "id": "updates",
       "name": "Tabbie updates (asks before downloading)",
       "scripts": [
-        "updates.js?v=6"
+        "updates.js?v=7"
       ],
       "stylesheets": [
         "updates.css?v=4"
@@ -290,7 +290,7 @@
       "id": "model-picker",
       "name": "Model picker",
       "scripts": [
-        "model-picker.js?v=14"
+        "model-picker.js?v=15"
       ],
       "stylesheets": [
         "model-picker.css?v=11"
@@ -328,7 +328,7 @@
       "id": "hub-signin",
       "name": "Hub sign-in card",
       "scripts": [
-        "hub-signin.js?v=2"
+        "hub-signin.js?v=3"
       ],
       "stylesheets": [
         "hub-signin.css?v=1"
@@ -346,7 +346,7 @@
       "id": "helper-consent",
       "name": "Helper permission card",
       "scripts": [
-        "helper-consent.js?v=2"
+        "helper-consent.js?v=3"
       ],
       "stylesheets": [
         "helper-consent.css?v=1"
@@ -356,7 +356,7 @@
       "id": "plan-chip",
       "name": "Plan chip",
       "scripts": [
-        "plan-chip.js?v=3"
+        "plan-chip.js?v=4"
       ],
       "stylesheets": [
         "plan-chip.css?v=2"

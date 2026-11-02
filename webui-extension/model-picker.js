@@ -2,7 +2,7 @@
  * that runs each request), replacing upstream's hub-model chip + reasoning chip (hidden in CSS).
  *   step 1: Anthropic / OpenAI / linked providers   step 2: that provider's models (+ optional effort)
  *   step 3: Providers: add an API key (Anthropic, OpenAI, DeepSeek, Kimi, GLM...), a local Ollama or a
- *           custom endpoint. Keys go straight to the Mac's Keychain; the page never keeps or shows one.
+ *           custom endpoint. Keys go straight to the computer's keychain; the page never keeps or shows one.
  *   GET/POST api/extensions/cc-agents/sidecar/providers  (list | {action: key|check|enable|disable|remove|add})
  * Phone: bottom sheet. Desktop: popover above the chip.
  * Data: cc-agents sidecar via the WebUI's authenticated, consent-gated proxy:
@@ -15,7 +15,7 @@
  *        at one agent's usage limit carries on in the other; both on by default,
  *        greyed out unless both are enabled and signed in)
  * A pick made before the chat exists is held and saved as soon as the session id appears (retried
- * while the sidecar catches up). If the Mac can't be reached, the panel says so and offers Try again.
+ * while the sidecar catches up). If the computer can't be reached, the panel says so and offers Try again.
  */
 (() => {
   'use strict';
@@ -31,7 +31,7 @@
   const BILLING_NOTE = {
     'pay-per-use': (n) => `Billed by ${n} per use with your API key, separate from any Claude or ChatGPT plan.`,
     subscription: (n) => `Uses your ${n} plan.`,
-    local: () => 'Runs on this Mac. Free.',
+    local: () => 'Runs on this computer. Free.',
   };
   const EFFORT_LABEL = { '': 'Auto', low: 'Low', medium: 'Medium', high: 'High' };
   const FALLBACK = {
@@ -64,7 +64,7 @@
   let offline = false;     // last fetch failed (network / 5xx): notice + Try again, auto-retry in tick
   let retryAt = 0;
   let pendingTries = 0;
-  const OFFLINE = 'Can’t reach Tabbie on your Mac right now. Showing the last model.';
+  const OFFLINE = 'Can’t reach Tabbie on your computer right now. Showing the last model.';
   const NO_CONSENT = 'Allow “Agents & questions” in Settings › Extensions to switch models.';
   let handoffs = { dynamic: true, available: null, known: false };  // GET /agents (known: answered once)
   let step = 1;
@@ -178,7 +178,7 @@
       if (code === 401 || code === 403) { notice = NO_CONSENT; if (!flushing) choice = prev; }
       else if (flushing && code !== 400 && ++pendingTries < 8 && sid() === s) { pending = next; return; }
       else if (code === 400) { pendingTries = 0; notice = 'That model isn’t available any more. Pick another.'; await load(s); return; }
-      else { pendingTries = 0; choice = prev; setOffline(true); notice = 'Couldn’t save. Check the connection to your Mac.'; }
+      else { pendingTries = 0; choice = prev; setOffline(true); notice = 'Couldn’t save. Check the connection to your computer.'; }
       if (open) paint();
     }
     paintChip();
@@ -308,7 +308,7 @@
       + `<button type="button" class="hx-mp-row hx-mp-add" data-manage><span class="hx-mp-tile">${icon('Add01Icon', 20)}</span>`
       + `<span class="hx-mp-text"><span class="hx-mp-name">More models</span><span class="hx-mp-desc">DeepSeek, Kimi, GLM, OpenRouter, API keys, Ollama…</span></span>`
       + `<span class="hx-mp-go">${icon('ArrowRight01Icon', 16)}</span></button></div>`
-      + `<p class="hx-mp-group">Agents</p><div class="hx-mp-togs" role="group" aria-label="Coding agents on this Mac">${tiles}</div>`
+      + `<p class="hx-mp-group">Agents</p><div class="hx-mp-togs" role="group" aria-label="Coding agents on this computer">${tiles}</div>`
       + (notice ? noteHtml() : `<p class="hx-mp-cap">${sid() ? 'For this conversation' : 'For this new chat'}</p>`);
   }
 
@@ -422,7 +422,7 @@
       + '<p class="hx-mp-group">Other providers</p>' + rest.map(provRow).join('')
       + (custom.length ? '<p class="hx-mp-group">Yours</p>' + custom.map(provRow).join('') : '')
       + customForm() + '</div>'
-      + '<p class="hx-mp-cap">Keys are stored in this Mac’s Keychain and never shown again. Only providers you link appear in the picker.</p>';
+      + '<p class="hx-mp-cap">Keys are stored in this computer’s keychain and never shown again. Only providers you link appear in the picker.</p>';
   }
 
   function noteHtml() {

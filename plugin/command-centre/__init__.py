@@ -893,7 +893,7 @@ def _route_motion(session_id: str, user_message, text: str):
         else:
             step = {"node": "installing Node.js", "studio": "creating the studio folder",
                     "packages": "installing the studio's Remotion packages"}.get(st["step"], "starting")
-            what = (f"Motion isn't installed on this Mac yet, so Tabbie has just started installing it in the background "
+            what = (f"Motion isn't installed on this computer yet, so Tabbie has just started installing it in the background "
                     f"(now: {step}). It downloads Node.js and the studio's packages, about 300 MB, a few minutes. Tell the "
                     "user that in 2-3 short sentences: they can watch it in the Motion panel (rail, under Chat), and "
                     "should send their /motion request again once it's done. Their brief was not started.")
@@ -1253,7 +1253,7 @@ def _run_request(r: Request, feed=None, force: dict | None = None) -> dict:
             return _execute(r, force={"provider": alt["provider"], "model": alt["model"], "effort": claude_effort}, feed=feed)
         msg = _out_of_limits(mine, theirs)
         if not agents().has("codex"):
-            msg += ". Codex isn't enabled on this Mac (Settings → Agents), so nothing could take over"
+            msg += ". Codex isn't enabled on this computer (Settings → Agents), so nothing could take over"
         return {"request_id": r.id, "ok": False, "claude_usage_limit": limit, "usage_limit": msg,
                 "note": f"Tell the user in one line: {msg}. What Claude finished before the limit is kept."}
     if (not res.get("ok") and not res.get("stopped_by_user") and not force and not answer
@@ -1472,7 +1472,7 @@ def _tool_takeover(params, **kwargs):
             msg = (r.data.get("limits") or {}).get("message") or "the limit"
             return json.dumps({"ok": True, "message": f"OK, nothing was started ({msg}). Send it again after the reset."})
         if not agents().has(to):
-            return json.dumps({"ok": False, "error": f"{_WHO[to]} isn't enabled on this Mac (Settings → Agents)."})
+            return json.dumps({"ok": False, "error": f"{_WHO[to]} isn't enabled on this computer (Settings → Agents)."})
         log_decision(event="limit_switch_accepted", request=r.id, to=to, model=offer.get("model"))
         if to == "codex":
             ch = executor_choice.get_choice(r["session_id"])
@@ -1484,7 +1484,7 @@ def _tool_takeover(params, **kwargs):
         return json.dumps(_execute(r, force={"provider": "anthropic", "model": offer.get("model") or "claude-opus-5-5"}))
     if params.get("accept") and not agents().has("codex"):
         save_session_state(r["session_id"], st)
-        return json.dumps({"ok": False, "error": "Codex isn't enabled on this Mac (Settings → Agents)."})
+        return json.dumps({"ok": False, "error": "Codex isn't enabled on this computer (Settings → Agents)."})
     if not params.get("accept"):
         st["takeover_declined"] = True
         save_session_state(r["session_id"], st)
@@ -1532,7 +1532,7 @@ def _cmd_takeover(raw_args: str = "", session_id: str = "", session_key: str = "
         log_decision(event="takeover_disabled", session=sid)
         return f"Takeover off — Claude executes again.{stopped}"
     if not agents().has("codex"):
-        return "Takeover needs Codex, and only Claude Code is enabled on this Mac (Settings → Agents)."
+        return "Takeover needs Codex, and only Claude Code is enabled on this computer (Settings → Agents)."
     st["takeover"], st["takeover_declined"] = True, False
     save_session_state(sid, st)
     log_decision(event="takeover_enabled", session=sid)

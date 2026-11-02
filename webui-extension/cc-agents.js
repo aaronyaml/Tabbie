@@ -19,7 +19,7 @@
   const sid = () => { try { return (typeof S !== 'undefined' && S && S.session && S.session.session_id) || ''; } catch (_) { return ''; } };
   const toast = (m, ms, type) => { try { if (typeof window.showToast === 'function') window.showToast(m, ms || 3200, type); } catch (_) {} };
   const reduced = () => { try { return window.matchMedia('(prefers-reduced-motion: reduce)').matches; } catch (_) { return false; } };
-  const DOWN = "Can't reach Tabbie on your Mac right now.";
+  const DOWN = "Can't reach Tabbie on your computer right now.";
   async function post(path, body) {
     const r = await fetch(API + path, { method: 'POST', credentials: 'same-origin', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
     if (r.status === 401 || r.status === 403) { if (window.hxHelperConsent) window.hxHelperConsent.open(); throw new Error('consent'); }
@@ -34,7 +34,7 @@
   let inflight = null;
   let lastFetch = 0;
 
-  // A run cut off by a restart (Mac rebooted, Tabbie crashed): resend it once when its chat is opened.
+  // A run cut off by a restart (computer restarted, Tabbie crashed): resend it once when its chat is opened.
   // The sidecar hands the claim to one tab only and only for the chat's newest request, within 2 h.
   const retryAsked = new Set();
   async function autoRetry(s) {
@@ -375,7 +375,7 @@
       html = '<div class="hx-as-empty"><p>Allow this panel to read Command Centre agent state through Tabbie (signed-in only).</p><button type="button" class="hx-as-allow">Allow</button></div>';
     } else if (state === 'down' && !data) {
       sub.textContent = '';
-      html = `<div class="hx-as-empty"><p class="hx-as-down">${esc(DOWN)}</p><p class="hx-as-hint">It comes back by itself when the helper is running again. On the Mac: <code>bin/hub health</code></p><button type="button" class="hx-as-allow hx-as-retry">Try again</button></div>`;
+      html = `<div class="hx-as-empty"><p class="hx-as-down">${esc(DOWN)}</p><p class="hx-as-hint">It comes back by itself when the helper is running again. On the computer: <code>bin/hub health</code></p><button type="button" class="hx-as-allow hx-as-retry">Try again</button></div>`;
     } else {
       const reqs = (data ? data.requests : []).filter((r) => (r.agents_list || []).length).slice().reverse();
       sub.textContent = reqs.length ? summaryText(allAgents()) : '';

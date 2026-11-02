@@ -111,7 +111,7 @@ def log_decision(**fields: Any) -> None:
 
 
 def agents():
-    """hmem.agents: which coding agents (claude / codex) are enabled on this Mac."""
+    """hmem.agents: which coding agents (claude / codex) are enabled on this computer."""
     import sys
     if str(ROOT) not in sys.path:
         sys.path.insert(0, str(ROOT))

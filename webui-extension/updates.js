@@ -75,7 +75,7 @@
     const needs = res.needs || [];
     lastNeeds = needs;
     const restart = needs.some((x) => x === 'gateway' || x === 'webui' || x === 'sidecar' || x === 'caddy');
-    const setup = needs.includes('setup') ? '<p class="hx-up-note">This update changed setup steps: run <code>bin/setup</code> on the Mac when convenient.</p>' : '';
+    const setup = needs.includes('setup') ? '<p class="hx-up-note">This update changed setup steps: run <code>bin/setup</code> on the computer when convenient.</p>' : '';
     if (restart) {
       show(`<div class="hx-up-head"><b>Update downloaded</b>${res.from ? `<span>${esc(res.from)} → ${esc(res.to)}</span>` : ''}</div>`
         + `<p class="hx-up-note">Restart Tabbie's services to finish. If anything is running (a request, a worker or a Motion render) it waits until that's done, so nothing is cut off.</p>${setup}`
@@ -173,7 +173,7 @@
       // A copy that can't fast-forward says so once per GitHub version, so it isn't silently stuck.
       if (j.note && j.remote && /can't update automatically/.test(j.note) && !snoozed(j.remote)) {
         info = j;
-        show(`<div class="hx-up-head"><b>Tabbie update available</b></div><p class="hx-up-note">${esc(j.note)} Run <code>bin/hub update</code> on the Mac for details.</p>`
+        show(`<div class="hx-up-head"><b>Tabbie update available</b></div><p class="hx-up-note">${esc(j.note)} Run <code>bin/hub update</code> on the computer for details.</p>`
           + `<div class="hx-up-btns"><button type="button" data-later>OK</button></div>`);
       }
       return;

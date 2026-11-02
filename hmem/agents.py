@@ -1,4 +1,4 @@
-"""Which coding agents Tabbie uses on this Mac: Claude Code, Codex, or both.
+"""Which coding agents Tabbie uses on this computer: Claude Code, Codex, or both.
 
 One small file, config/agents.yaml (per machine, git-ignored), written by `bin/setup` and by the
 WebUI's model picker (Settings). Everything that would start a `claude` or `codex` process asks here
@@ -76,7 +76,7 @@ def save(agents: list[str] | None = None, dynamic: bool | None = None, takeover:
     p = path()
     p.parent.mkdir(parents=True, exist_ok=True)
     tmp = p.with_suffix(".tmp")
-    tmp.write_text("# Which coding agents Tabbie uses on this Mac: claude, codex, or both.\n"
+    tmp.write_text("# Which coding agents Tabbie uses on this computer: claude, codex, or both.\n"
                    "# Change it in the WebUI (model picker → Agents) or with bin/setup. No restart needed.\n"
                    f"enabled: [{', '.join(picked)}]\n"
                    "# Hand-offs: with both agents signed in, Claude Code and Codex may pass part of a job to each other.\n"

@@ -16,6 +16,8 @@ def env(tmp_path, monkeypatch):
     home.mkdir()
     monkeypatch.setenv("HMEM_ROOT", str(tmp_path / "hermes" / "memory"))
     monkeypatch.setenv("HERMES_PROJECT_ROOT", str(home))
+    monkeypatch.setenv("HOME", str(home))  # on Windows the temp folder is inside the real home
+    monkeypatch.setenv("USERPROFILE", str(home))
     monkeypatch.setenv("HMEM_SKILLS_DIR", str(tmp_path / "skills"))
     from hmem import api, dreamer, projects, proposals, retrieve, store, trace
     store._HEAD_CACHE.update(head=None, blobs={})
@@ -85,7 +87,8 @@ def test_duplicate_nested_and_overlapping_folders_rejected(env):
 
 @pytest.mark.parametrize("path,why", [("", "empty"), ("relative/dir", "full path"), ("~nope/x", "full path"),
                                       ("{home}", "whole home"), ("{home}/.ssh", "hidden"), ("{home}/Documents", "personal"),
-                                      ("{home}/missing", "doesn't exist"), ("/etc", "only folders inside"),
+                                      ("{home}/missing", "doesn't exist"),
+                                      ("C:\\Windows" if sys.platform == "win32" else "/etc", "only folders inside"),
                                       ("{hermes}/memory", "Hermes"), ("{hermes}", "Hermes")])
 def test_unsafe_folders_rejected(env, path, why, monkeypatch):
     (env.home / ".ssh").mkdir()

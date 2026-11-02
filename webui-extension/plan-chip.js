@@ -40,7 +40,7 @@
         const r = await fetch(API + encodeURIComponent(d.dataset.rid), { credentials: 'same-origin', cache: 'no-store' });
         if (r.status === 401 || r.status === 403) {
           if (window.hxHelperConsent) window.hxHelperConsent.open();
-          body.innerHTML = `<p class="hx-plan-dim">Allow Tabbie's helper on this Mac to read the plan.</p>${window.hxHelperConsent ? '<button type="button" class="hx-plan-retry" data-plan-allow>Allow</button>' : ''}`;
+          body.innerHTML = `<p class="hx-plan-dim">Allow Tabbie's helper on this computer to read the plan.</p>${window.hxHelperConsent ? '<button type="button" class="hx-plan-retry" data-plan-allow>Allow</button>' : ''}`;
           return;
         }
         if (!r.ok) throw new Error(String(r.status));
@@ -56,7 +56,7 @@
       if (em) em.textContent = p.planner ? p.planner.split(':').pop() : '';
     } catch (e) {
       const down = e instanceof TypeError || /^5\d\d$/.test(String(e && e.message));
-      body.innerHTML = `<p class="hx-plan-dim">${down ? "Can't reach Tabbie on your Mac right now." : `Couldn't load the plan (${esc((e && e.message) || e)}).`}</p><button type="button" class="hx-plan-retry" data-plan-retry>Try again</button>`;
+      body.innerHTML = `<p class="hx-plan-dim">${down ? "Can't reach Tabbie on your computer right now." : `Couldn't load the plan (${esc((e && e.message) || e)}).`}</p><button type="button" class="hx-plan-retry" data-plan-retry>Try again</button>`;
     }
   }
 

@@ -8,7 +8,7 @@ feature (narration, Stop, questions, reviews, hand-offs) works the same.
                           logs, config or a command line.
 
 Billing is explicit: "subscription" (a flat plan, e.g. Kimi Code), "pay-per-use" (an API key billed per
-token; the picker labels it) or "local" (free, on this Mac).
+token; the picker labels it) or "local" (free, on this computer).
 """
 from __future__ import annotations
 
@@ -90,12 +90,12 @@ PRESETS: dict[str, dict] = {
         "models": [],
     },
     "ollama": {
-        "name": "Ollama (this Mac)", "base_url": "http://127.0.0.1:11434", "billing": "local", "auth": "none",
+        "name": "Ollama (this computer)", "base_url": "http://127.0.0.1:11434", "billing": "local", "auth": "none",
         "models_url": "http://127.0.0.1:11434/api/tags", "key_url": "https://ollama.com/download",
         "models": [],
     },
 }
-BILLING_LABEL = {"subscription": "Plan", "pay-per-use": "Pay per use", "local": "On this Mac"}
+BILLING_LABEL = {"subscription": "Plan", "pay-per-use": "Pay per use", "local": "On this computer"}
 _ID = re.compile(r"^[a-z0-9][a-z0-9-]{1,30}$")
 _MODEL = re.compile(r"^[A-Za-z0-9][A-Za-z0-9._:/@+-]{0,120}$")
 
@@ -421,7 +421,7 @@ def claude_env(pid: str, model: str) -> dict:
 
 def billing_text(pid: str) -> str:
     p = get(pid) or {}
-    return {"subscription": f"{p.get('name', pid)} plan", "local": f"{p.get('name', pid)} on this Mac"}.get(
+    return {"subscription": f"{p.get('name', pid)} plan", "local": f"{p.get('name', pid)} on this computer"}.get(
         p.get("billing"), f"{p.get('name', pid)} (pay per use)")
 
 

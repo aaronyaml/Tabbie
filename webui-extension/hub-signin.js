@@ -3,8 +3,8 @@
  * "No LLM provider configured". Subscription logins only, never API keys:
  *   ChatGPT  WebUI's device-code sign-in (POST api/onboarding/oauth/start {provider: openai-codex}):
  *            open the link on any device, type the code. Works from a phone too.
- *   Claude   WebUI links Claude Code's login on the Mac ({provider: anthropic}); if Claude Code isn't
- *            signed in yet, the sidecar starts `claude auth login` on the Mac.
+ *   Claude   WebUI links Claude Code's login on the computer ({provider: anthropic}); if Claude Code isn't
+ *            signed in yet, the sidecar starts `claude auth login` on the computer.
  * Then the sidecar points the hub at that login (POST …/sidecar/hub {provider}, config backed up).
  */
 (() => {
@@ -47,7 +47,7 @@
     try { on = (await get(SIDE + 'agents')).enabled || on; } catch (_) {}
     const opts = [];
     if (on.includes('codex')) opts.push(['openai-codex', 'Sign in with ChatGPT', 'Uses your ChatGPT subscription. You can do this from any device.']);
-    if (on.includes('claude')) opts.push(['anthropic', 'Use my Claude login', 'Uses the Claude account Claude Code is signed in with on your Mac.']);
+    if (on.includes('claude')) opts.push(['anthropic', 'Use my Claude login', 'Uses the Claude account Claude Code is signed in with on your computer.']);
     paint(`<h2 id="hxHsTitle">Finish setting up Tabbie</h2>
       <p>Tabbie needs to sign in to your AI account before it can chat. No API key needed.</p>
       <div class="hx-hs-opts">${opts.map(([p, t, d], i) => `<button type="button" class="hx-hs-opt${i ? '' : ' is-primary'}" data-p="${p}"><b>${t}</b><span>${d}</span></button>`).join('')}</div>
@@ -77,9 +77,9 @@
         <div class="hx-hs-foot"><button type="button" class="hx-hs-btn" data-cancel>Cancel</button></div>`);
     } else if (f.provider === 'anthropic') {
       paint(`<h2 id="hxHsTitle">Use your Claude login</h2>
-        <p>Claude Code isn't signed in on your Mac yet. Sign it in, and Tabbie will pick it up automatically.</p>
-        <button type="button" class="hx-hs-btn is-primary" data-claude>Open Claude sign-in on the Mac</button>
-        <p class="hx-hs-dim">This opens claude.ai in the Mac's browser. Not at the Mac? Run <code>claude auth login</code> there later.</p>
+        <p>Claude Code isn't signed in on your computer yet. Sign it in, and Tabbie will pick it up automatically.</p>
+        <button type="button" class="hx-hs-btn is-primary" data-claude>Open Claude sign-in on the computer</button>
+        <p class="hx-hs-dim">This opens claude.ai in that computer's browser. Not at that computer? Run <code>claude auth login</code> there later.</p>
         <p class="hx-hs-dim"><span class="hx-hs-spin"></span>Waiting for Claude Code's login…</p>
         <div class="hx-hs-foot"><button type="button" class="hx-hs-btn" data-cancel>Cancel</button></div>`);
     }
@@ -94,7 +94,7 @@
   async function finish(provider) {
     stop();
     try { await post(SIDE + 'hub', { provider }); }
-    catch (e) { return fail(`Signed in, but couldn't save it (${e.message}). Run bin/setup on the Mac.`, provider); }
+    catch (e) { return fail(`Signed in, but couldn't save it (${e.message}). Run bin/setup on the computer.`, provider); }
     paint(`<h2 id="hxHsTitle">You're all set</h2>
       <p>Tabbie is signed in with ${NAME[provider]}. Send your message again.</p>
       <div class="hx-hs-foot"><button type="button" class="hx-hs-btn is-primary" data-close>Done</button></div>`);
@@ -119,7 +119,7 @@
       return choose();
     }
     if (t.hasAttribute('data-claude')) {
-      try { const j = await post(SIDE + 'hub/claude-login', {}); if (j.ok === false) throw new Error(j.error); t.textContent = 'Opened on the Mac'; t.disabled = true; }
+      try { const j = await post(SIDE + 'hub/claude-login', {}); if (j.ok === false) throw new Error(j.error); t.textContent = 'Opened on the computer'; t.disabled = true; }
       catch (err) { fail(err.message, 'anthropic'); }
     }
   }

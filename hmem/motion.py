@@ -8,7 +8,7 @@ A different folder (e.g. an existing studio of your own) can be named in config/
 
 status() is what the sidecar's /motion/status serves: booleans and hints only, never a key or token.
 films() is /motion/films: the films in <studio>/studio, so any browser finds them without a file-API session.
-Stdlib only (setup runs on the Mac's built-in Python 3.9).
+Stdlib only (setup runs on the computer's built-in Python 3.9).
 """
 from __future__ import annotations
 

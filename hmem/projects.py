@@ -7,7 +7,7 @@ concurrency: a stale editor gets ConflictError instead of overwriting), write at
 Identity is the id (`<slug>-<4 hex>`), fixed at creation; renaming changes only `name`. Memory,
 traces, proposals and dream runs all key on the id.
 
-Folder policy (the filesystem belongs to the Mac running Hermes; the browser may be an iPhone):
+Folder policy (the filesystem belongs to the computer running Hermes; the browser may be an iPhone):
 - realpath'd existing directory under the allowed root ($HOME), never $HOME itself, never a hidden
   top-level folder (~/.ssh, ~/.hermes, …), ~/Library or Hermes' own state;
 - at most one active project per folder, and no nesting (inside/containing an attached folder).
@@ -115,13 +115,15 @@ def canonical(path: str) -> Path:
     raw = str(path or "").strip()
     if not raw or "\x00" in raw:
         raise ProjectError("empty path")
+    if raw.startswith("~") and raw[1:2] not in ("", "/", "\\"):
+        raise ProjectError("use a full path (e.g. ~/acme-app)")  # ~user: someone else's home
     p = Path(os.path.expanduser(raw))
     if not p.is_absolute():
         raise ProjectError("use a full path (e.g. ~/acme-app)")
     try:
         real = true_case(p.resolve(strict=True))
     except (OSError, RuntimeError):
-        raise ProjectError(f"{tilde(str(p))} doesn't exist on this Mac") from None
+        raise ProjectError(f"{tilde(str(p))} doesn't exist on this computer") from None
     if not real.is_dir():
         raise ProjectError(f"{tilde(str(real))} is not a folder")
     why = _forbidden(real)

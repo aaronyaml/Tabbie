@@ -160,7 +160,7 @@
           <button type="button" class="hxs-primary hxs-sm" data-act="el-save"${EL.busy ? ' disabled' : ''}>${EL.busy ? 'Checking…' : 'Connect'}</button>
         </div>
         ${EL.err ? `<p class="hxs-note hxs-err-note">${esc(EL.err)}</p>` : ''}
-        <p class="hxs-note">Kept only on this Mac, in the studio's .env. Music uses your ElevenLabs credits. Or add ELEVENLABS_API_KEY to that file yourself.</p>
+        <p class="hxs-note">Kept only on this computer, in the studio's .env. Music uses your ElevenLabs credits. Or add ELEVENLABS_API_KEY to that file yourself.</p>
       </div>`;
   }
   async function elSave() {
@@ -176,7 +176,7 @@
       if (d.status && d.status.path) ST = d.status; else await studioCheck(true);
       try { if (typeof window.showToast === 'function') window.showToast('ElevenLabs connected', 3000); } catch (_) {}
     } catch (_) {
-      EL.err = 'Can’t reach Tabbie on your Mac right now. Try again.';
+      EL.err = 'Can’t reach Tabbie on your computer right now. Try again.';
     } finally { EL.busy = false; render(); }
   }
   // Controls that need a provider carry data-needs="elevenlabs|higgsfield": greyed out, the how-to as tooltip.
@@ -198,7 +198,7 @@
         <div class="hxs-buddy hxs-buddy-xl" data-buddy="zoetie" aria-hidden="true"></div>
         <div class="hxs-eyebrow">${NAME} <span>· Motion studio</span></div>
         <h1>Motion isn’t installed yet</h1>
-        <p>Motion makes product films on this Mac with Remotion. It needs Node.js and the studio’s packages: about 300 MB, a few minutes. Everything installs inside Tabbie.</p>
+        <p>Motion makes product films on this computer with Remotion. It needs Node.js and the studio’s packages: about 300 MB, a few minutes. Everything installs inside Tabbie.</p>
         ${run ? `<ol class="hxs-jc-steps hxs-inst-steps">${steps.map(([k, l, have], n) => {
           const done = have || (at > n), on = at === n;
           return `<li class="${done ? 'is-done' : on ? 'is-on' : ''}">${done ? icon('Tick02Icon', 12) : '<i></i>'}<span>${l}</span></li>`;

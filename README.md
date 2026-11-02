@@ -822,11 +822,11 @@ appear in the picker. Only providers you've linked are listed; long lists (OpenR
 | Kimi Code plan · Kimi (Moonshot API) | Claude Code | Plan · Pay per use |
 | GLM (Z.ai coding plan) | Claude Code | Plan |
 | MiniMax · Qwen (Alibaba) · OpenRouter | Claude Code | Pay per use |
-| Ollama (this Mac) | Claude Code | On this Mac (free) |
+| Ollama (this computer) | Claude Code | On this computer (free) |
 | Custom endpoint | Claude Code (Anthropic API) or Codex (Responses API) | you choose |
 
 - **Billing is always visible.** *Plan* uses that provider's flat subscription, *Pay per use* bills your
-  key per token (separately from any Claude or ChatGPT plan), *On this Mac* is free. Nothing pay-per-use
+  key per token (separately from any Claude or ChatGPT plan), *On this computer* is free. Nothing pay-per-use
   is ever turned on for you.
 - **Keys are stored in the OS credential store**: the macOS Keychain (service `tabbie-provider`) or,
   elsewhere, the system keyring. Never in git, config, logs or a command line; the page never shows a

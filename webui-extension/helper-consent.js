@@ -1,5 +1,5 @@
 /* Tabbie — "Allow Tabbie's helper" card. Tabbie's panels (Projects, the model picker, Motion, updates,
- * sign-in) reach their helper on this Mac (the cc-agents sidecar, 127.0.0.1:8794) through the WebUI's
+ * sign-in) reach their helper on this computer (the cc-agents sidecar, 127.0.0.1:8794) through the WebUI's
  * proxy, which upstream only opens after a one-time consent hidden in Settings → Extensions. Until
  * then every panel failed with a permission error. This asks once, in place: Allow sends the same
  * consent the Extensions panel would (POST api/extensions/sidecar-proxy-consent), then reloads.
@@ -14,7 +14,7 @@
   let card = null;
 
   // Settings → Extensions checks the helper by fetching its health_url (127.0.0.1:8794/health)
-  // straight from the browser: blocked by CORS on the Mac and pointing at the phone itself on a
+  // straight from the browser: blocked by CORS on the computer and pointing at the phone itself on a
   // phone, so it always said "unreachable". Send that one request through the same proxy instead
   // (it forwards /health; before consent it answers 403, shown as "unhealthy").
   const HEALTH = 'http://127.0.0.1:8794/health';
@@ -63,7 +63,7 @@
     card.setAttribute('role', 'dialog');
     card.setAttribute('aria-labelledby', 'hxHcTitle');
     card.innerHTML = `<b id="hxHcTitle">Allow Tabbie's helper</b>
-      <p>Projects, the model picker, Motion and updates talk to a small helper running on this Mac. Allow it once to turn them on.</p>
+      <p>Projects, the model picker, Motion and updates talk to a small helper running on this computer. Allow it once to turn them on.</p>
       <p class="hx-hc-err"></p>
       <div class="hx-hc-btns"><button type="button" data-later>Later</button><button type="button" class="hx-hc-go" data-allow>Allow</button></div>`;
     card.addEventListener('click', (e) => {

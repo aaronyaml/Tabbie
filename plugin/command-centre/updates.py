@@ -124,7 +124,7 @@ def check(force: bool = False) -> dict:
         elif diff["status"] == "identical":
             pass
         elif diff["status"] == "behind":
-            res["note"] = "This Mac has changes that aren't on GitHub yet."
+            res["note"] = "This computer has changes that aren't on GitHub yet."
         else:  # diverged, or this commit isn't on GitHub at all
             res["note"] = "This copy has its own changes, so it can't update automatically."
     _cache.update(at=time.time(), result=res)
@@ -176,7 +176,7 @@ def apply() -> dict:
     except Exception as exc:
         if "overwritten" in str(exc) or "local changes" in str(exc):
             edited = [f for f in _git("diff", "--name-only", "HEAD").splitlines() if f][:5]
-            return {"ok": False, "error": "The update changes files you've edited on this Mac"
+            return {"ok": False, "error": "The update changes files you've edited on this computer"
                     + (f" ({', '.join(edited)})" if edited else "") + ". Save a copy, undo the edits, then update."}
         last = (str(exc).strip().splitlines() or [""])[-1]
         return {"ok": False, "error": f"Update failed, nothing changed ({last[:160]})"}
@@ -184,6 +184,8 @@ def apply() -> dict:
     installed = ensure_services()  # new services: nothing runs in them yet, so install right away
     changed = sorted({f[len("services/"):-len(".plist.template")] for f in files
                       if f.startswith("services/") and f.endswith(".plist.template")} - set(installed))
+    if sys.platform == "win32" and any(f in ("hmem/winsvc.py", "bin/tabbie-mdns.py") for f in files):
+        changed = ["supervisor"]  # the service list lives in code there
     _save_state({"from": before, "to": after, "at": int(time.time()), "needs": needs, "services": changed})
     _cache.update(at=0.0, result=None)
     return {"ok": True, "from": before[:7], "to": after[:7], "files": len(files), "needs": needs,
@@ -229,9 +231,19 @@ def _install(label: str, text: str) -> bool:
     return _launchctl("bootstrap", f"gui/{_uid()}", str(dest)).returncode == 0
 
 
+def _winsvc():
+    from .procutil import procutil  # noqa: F401  (puts ~/hermes on sys.path)
+    from hmem import winsvc
+    return winsvc
+
+
 def ensure_services() -> list[str]:
     """Install any service from services/ that isn't loaded yet. Safe to call any time: a missing
-    service has nothing running in it. Returns the labels it installed."""
+    service has nothing running in it. Returns the labels it installed. On Windows one supervisor
+    runs them all (hmem/winsvc.py): start it if setup installed it and it isn't running."""
+    if sys.platform == "win32":
+        w = _winsvc()
+        return ["supervisor"] if not os.environ.get("TABBIE_NO_SERVICES") and w.installed() and w.start() else []
     if sys.platform != "darwin" or os.environ.get("TABBIE_NO_SERVICES") or not _loaded("ai.hermes.webui"):
         return []
     from .flockcompat import fcntl
@@ -409,23 +421,36 @@ def restart(after_reply=None) -> dict:
     if busy():
         return {"ok": False, "error": "A request is running. Try again when it finishes."}
     uid = _uid()
+    win = sys.platform == "win32"
     done = []
     if "gateway" in needs:
-        subprocess.run(["launchctl", "kickstart", "-k", f"gui/{uid}/ai.hermes.gateway"], capture_output=True)
+        if win:
+            hermes = shutil.which("hermes")
+            if hermes:
+                subprocess.run([hermes, "gateway", "restart"], capture_output=True, timeout=120)
+        else:
+            subprocess.run(["launchctl", "kickstart", "-k", f"gui/{uid}/ai.hermes.gateway"], capture_output=True)
         done.append("gateway")
     if "caddy" in needs:
         caddy = shutil.which("caddy") or str(Path.home() / ".local/bin/caddy")
         subprocess.run([caddy, "reload", "--config", str(ROOT / "services" / "Caddyfile")], capture_output=True)
         done.append("caddy")
-    if "webui" in needs:
+    if "webui" in needs and win:
+        _winsvc().request_restart(["webui"], delay=2)  # the supervisor restarts it once we've answered
+        done.append("webui")
+    elif "webui" in needs:
         # The browser's restart call comes through the WebUI, so let it answer first.
         subprocess.Popen(["/bin/sh", "-c", f"sleep 2; launchctl kickstart -k gui/{uid}/ai.hermes.webui"],
                          stdin=subprocess.DEVNULL, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL,
                          start_new_session=True)
         done.append("webui")
     st = _state()
-    if st.get("services") and sys.platform == "darwin" and not os.environ.get("TABBIE_NO_SERVICES"):
-        done += _reinstall_changed(st["services"])
+    if st.get("services") and not os.environ.get("TABBIE_NO_SERVICES"):
+        if sys.platform == "darwin":
+            done += _reinstall_changed(st["services"])
+        elif win and _winsvc().running():
+            _winsvc().request_restart(["supervisor"], delay=3)
+            done.append("supervisor")
     st["needs"] = [n for n in st.get("needs", []) if n not in ("gateway", "webui", "caddy", "sidecar")]
     st.pop("services", None)
     _save_state(st)
