@@ -3,6 +3,14 @@
 	admin localhost:2019
 	local_certs
 	skip_install_trust
+	# Rotated server log (launchd's caddy.log only catches start-up failures now). Streams the browser
+	# closes mid-reply log "aborting with incomplete response" a lot: harmless, and capped here.
+	log {
+		output file {$HOME}/hermes/state/logs/caddy-server.log {
+			roll_size 5MiB
+			roll_keep 2
+		}
+	}
 }
 
 (lan_only) {

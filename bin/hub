@@ -68,7 +68,7 @@ PY
     case "${2:-webui}" in
       webui) tail -n 60 ~/.hermes/webui.log ;;
       gateway) tail -n 60 ~/.hermes/logs/gateway.log ;;
-      caddy) tail -n 40 ~/hermes/state/logs/caddy.log ;;
+      caddy) tail -n 40 ~/hermes/state/logs/caddy-server.log 2>/dev/null || tail -n 40 ~/hermes/state/logs/caddy.log ;;
       mdns) tail -n 20 ~/hermes/state/logs/mdns.log ;;
       sidecar|cc-sidecar) tail -n 40 ~/hermes/state/logs/cc-sidecar.log ;;
       decisions) tail -n 30 ~/hermes/state/decisions.jsonl ;;
