@@ -89,3 +89,10 @@ def test_old_attachment_copies_are_pruned_and_replies_kept(tmp_path, monkeypatch
     assert not (old / "attachments").exists() and (old / "reply-1.md").exists()
     assert (new / "attachments").exists()
     assert up.prune_old_attachments() == []  # once a day
+
+
+def test_hub_stop_matches_whole_session_ids_only():
+    assert cc._key_has_session("agent:main:webui:abc123", "abc123")
+    assert cc._key_has_session("abc123", "abc123")
+    assert not cc._key_has_session("agent:main:webui:xabc123y", "abc123")
+    assert not cc._key_has_session("agent:main:webui:abc1234", "abc123")

@@ -293,12 +293,19 @@ def _attach_job(rid: str):
     return job["result"]
 
 
+def _key_has_session(session_key, sid: str) -> bool:
+    """Gateway keys are ':'-joined ("agent:main:webui:<sid>"): match the id as a whole part, so a short
+    id never stops another chat's worker whose key merely contains it."""
+    key = str(session_key or "")
+    return key == sid or sid in key.split(":")
+
+
 def _on_agent_loop_stopped(session_key: str = "", **kwargs):
     """The hub turn was stopped before it reached the tool: stop that turn's early-started worker."""
     try:
         with _JOBS_LOCK:
             jobs = [(rid, j) for rid, j in _JOBS.items() if not j["attached"] and not j["done"].is_set()
-                    and j["session_id"] and (j["session_id"] == session_key or j["session_id"] in str(session_key))]
+                    and j["session_id"] and _key_has_session(session_key, j["session_id"])]
         for rid, j in jobs:
             d = REQUESTS_DIR / rid
             try:
