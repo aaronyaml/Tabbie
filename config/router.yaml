@@ -26,6 +26,7 @@ executor:
   permission_mode: auto         # auto | acceptEdits | bypassPermissions | dontAsk
   timeout_seconds: 10800         # 3h: long renders (motion) outlast 1h
   max_parallel: 10              # Claude jobs across ALL conversations; each conversation queues its own
+  busy_fallback: true            # all Claude slots busy with other chats: the GPT equivalent starts now
                                 # (8 GB M1: each job ~300-600 MB; macOS swaps beyond ~5-6 heavy jobs)
   queue_wait_seconds: 1800      # how long a request waits for a free worker slot
   resume_project_session: true  # follow-ups in the same chat continue its last Claude session

@@ -157,3 +157,27 @@ def test_claude_sign_in_failure_hands_the_job_to_its_gpt_equivalent(monkeypatch)
     assert cc._execute(_req("chatX", "fix the bug")) == {"ok": True}
     reason, choice = got[0]
     assert "couldn't sign in" in reason and choice["provider"] == "openai" and choice["effort"]
+
+
+def test_busy_claude_slots_send_a_new_chat_to_its_gpt_equivalent(monkeypatch, tmp_path):
+    import fcntl
+    _setup(monkeypatch)
+    pv = import_module("command_centre.providers")
+    monkeypatch.setattr(pv, "LOCKS_DIR", tmp_path / "locks")
+    (tmp_path / "locks").mkdir()
+    monkeypatch.setattr(cc, "agents", lambda: type("A", (), {"has": staticmethod(lambda a: True)})())
+    monkeypatch.setattr(cc, "_codex_models_safe", lambda: [])
+    got = []
+    monkeypatch.setattr(cc, "_astra_takeover", lambda r, reason, choice=None, **k: got.append(reason) or {"ok": True})
+    monkeypatch.setattr(cc, "run_claude", lambda prompt, **k: got.append("claude") or {"ok": True, "result": "Done.", "billing": "s"})
+    held = open(tmp_path / "locks" / "claude-worker-0.lock", "w"); fcntl.flock(held, fcntl.LOCK_EX)
+    try:
+        cc._execute(_req("chatBusy", "fix the bug"))
+        assert "busy with other chats" in got[-1]
+        mine = open(tmp_path / "locks" / "claude-session-chatBusy.lock", "w"); fcntl.flock(mine, fcntl.LOCK_EX)
+        assert not pv.WorkerSlot.all_busy(1, "chatBusy")  # its own earlier job: it queues behind itself
+        mine.close()
+    finally:
+        held.close()
+    cc._execute(_req("chatFree", "fix the bug"))
+    assert got[-1] == "claude"

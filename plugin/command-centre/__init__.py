@@ -1012,6 +1012,15 @@ def _run_request(r: Request, feed=None, force: dict | None = None) -> dict:
                                        "effort": claude_effort}, feed=feed, offer=False)
     if blocked:
         return blocked
+    if (not force and not answer and ecfg.get("busy_fallback", True) and agents().has("codex")
+            and providers.WorkerSlot.all_busy(ecfg.get("max_parallel", 1), r["session_id"])):
+        # every Claude slot is running another chat's job: its GPT equivalent starts now instead of queueing
+        peer = executor_choice.peer_model("anthropic", claude_model or ecfg.get("model") or executor_choice.DEFAULT["model"],
+                                          (cfg.get("dynamic_agents") or {}).get("models") or {}, _codex_models_safe())
+        log_decision(event="claude_busy_fallback", request=r.id, to=peer["model"])
+        return _astra_takeover(r, reason="Claude is busy with other chats, so its equivalent took this one",
+                               choice={"provider": "openai", "model": peer["model"], "name": peer["name"],
+                                       "effort": claude_effort}, feed=feed, offer=False)
     resume = None
     sessions = read_json(_CLAUDE_SESSIONS, {}) or {}
     if answer:  # the worker asked; continue exactly that Claude session with the answers

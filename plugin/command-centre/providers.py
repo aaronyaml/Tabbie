@@ -695,6 +695,33 @@ class WorkerSlot:
                 raise TimeoutError(f"all {self.max} Claude worker slots busy")
             time.sleep(3)
 
+    @staticmethod
+    def all_busy(max_parallel: int, session_key: str | None = None) -> bool:
+        """True when every machine-wide Claude slot is held by OTHER conversations right now (no waiting).
+        A conversation whose own earlier job is running is not "busy" here: it queues behind itself."""
+        LOCKS_DIR.mkdir(parents=True, exist_ok=True)
+        key = "".join(c if c.isalnum() else "-" for c in (session_key or ""))[:80]
+        if key:
+            fh = open(LOCKS_DIR / f"claude-session-{key}.lock", "w")
+            try:
+                fcntl.flock(fh, fcntl.LOCK_EX | fcntl.LOCK_NB)
+                fcntl.flock(fh, fcntl.LOCK_UN)
+            except BlockingIOError:
+                return False
+            finally:
+                fh.close()
+        for i in range(max(1, int(max_parallel))):
+            fh = open(LOCKS_DIR / f"claude-worker-{i}.lock", "w")
+            try:
+                fcntl.flock(fh, fcntl.LOCK_EX | fcntl.LOCK_NB)
+                fcntl.flock(fh, fcntl.LOCK_UN)
+                return False
+            except BlockingIOError:
+                pass
+            finally:
+                fh.close()
+        return True
+
     def __exit__(self, *exc):
         for fh in (self.fh, self.session_fh):
             if fh:
