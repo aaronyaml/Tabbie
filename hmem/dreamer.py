@@ -27,7 +27,6 @@ from __future__ import annotations
 
 import collections
 import datetime as _dt
-import fcntl
 import json
 import os
 import re
@@ -39,6 +38,7 @@ import time
 from pathlib import Path
 
 from . import doc as D
+from . import flockcompat as fcntl
 from . import extract, projects, proposals, security, store, trace as T
 
 HERMES = T.HERMES

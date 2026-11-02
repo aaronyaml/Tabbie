@@ -474,7 +474,7 @@ def delete(pid: str, actor: str = "user") -> dict:
     from . import proposals as P
     lockf = store.root() / ".locks" / f"dream-{pid}.lock"
     if lockf.exists():
-        import fcntl
+        from . import flockcompat as fcntl
         with open(lockf, "w") as fh:
             try:
                 fcntl.flock(fh, fcntl.LOCK_EX | fcntl.LOCK_NB)

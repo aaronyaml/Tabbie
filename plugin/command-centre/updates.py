@@ -230,7 +230,7 @@ def ensure_services() -> list[str]:
     service has nothing running in it. Returns the labels it installed."""
     if sys.platform != "darwin" or os.environ.get("TABBIE_NO_SERVICES") or not _loaded("ai.hermes.webui"):
         return []
-    import fcntl
+    from .flockcompat import fcntl
     STATE_DIR.mkdir(parents=True, exist_ok=True)
     with open(STATE_DIR / "services.lock", "w") as lock:
         try:  # several Hermes processes start together; one installs, the rest skip

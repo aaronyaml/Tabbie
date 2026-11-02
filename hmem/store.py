@@ -13,7 +13,6 @@ Guarantees
 from __future__ import annotations
 
 import contextlib
-import fcntl
 import json
 import os
 import subprocess
@@ -23,6 +22,7 @@ from dataclasses import dataclass
 from pathlib import Path
 
 from . import doc as D
+from . import flockcompat as fcntl
 from . import security
 
 DEFAULT_ROOT = Path.home() / "hermes" / "memory"

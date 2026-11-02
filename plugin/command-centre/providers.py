@@ -7,7 +7,6 @@ environment variables so a stray key can never silently switch billing.
 
 from __future__ import annotations
 
-import fcntl
 import json
 import os
 import shutil
@@ -17,6 +16,7 @@ import time
 from dataclasses import dataclass
 from pathlib import Path
 
+from .flockcompat import fcntl
 from .common import LOCKS_DIR, read_json
 from .questions import QUESTION_ITEM_SCHEMA, QUESTION_RULES
 

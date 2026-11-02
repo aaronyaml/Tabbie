@@ -3,13 +3,14 @@
 from __future__ import annotations
 
 import contextlib
-import fcntl
 import json
 import os
 import tempfile
 import time
 from pathlib import Path
 from typing import Any
+
+from .flockcompat import fcntl
 
 ROOT = Path(os.environ.get("COMMAND_CENTRE_HOME", Path.home() / "hermes")).expanduser()
 CONFIG_DIR = ROOT / "config"

@@ -257,3 +257,15 @@ def test_effort_only_where_the_api_takes_it(env):
     _link("deepseek"); _link("anthropic-api", "sk-a")
     cat = ec.public_catalog()["providers"]
     assert cat["anthropic"]["effort"] and cat["anthropic-api"]["effort"] and not cat["deepseek"]["effort"]
+
+
+def test_flock_shim_excludes_a_second_holder(tmp_path):
+    from hmem import flockcompat as fcntl
+    p = tmp_path / "x.lock"
+    a, b = open(p, "w"), open(p, "w")
+    fcntl.flock(a, fcntl.LOCK_EX | fcntl.LOCK_NB)
+    with pytest.raises(BlockingIOError):
+        fcntl.flock(b, fcntl.LOCK_EX | fcntl.LOCK_NB)
+    fcntl.flock(a, fcntl.LOCK_UN)
+    fcntl.flock(b, fcntl.LOCK_EX | fcntl.LOCK_NB)
+    fcntl.flock(b, fcntl.LOCK_UN)

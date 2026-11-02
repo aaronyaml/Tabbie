@@ -21,7 +21,6 @@ Windows that apply:
 
 from __future__ import annotations
 
-import fcntl
 import importlib.util
 import os
 import re
@@ -30,6 +29,7 @@ from dataclasses import dataclass, field
 from datetime import datetime
 from pathlib import Path
 
+from .flockcompat import fcntl
 from .common import STATE_DIR, load_config, log_decision, read_json, write_json
 
 CACHE_FILE = STATE_DIR / "limits_cache.json"

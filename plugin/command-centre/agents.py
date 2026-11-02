@@ -25,7 +25,6 @@ Also per request (shown live in the reply, and after a reload, by cc-narration.j
 
 from __future__ import annotations
 
-import fcntl
 import hashlib
 import json
 import os
@@ -35,6 +34,7 @@ import threading
 import time
 from pathlib import Path
 
+from .flockcompat import fcntl
 from .common import REQUESTS_DIR, STATE_DIR, read_json, write_json
 
 AGENTS_INDEX_DIR = STATE_DIR / "agents"

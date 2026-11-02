@@ -405,7 +405,7 @@ def _own_proposal(p: dict, b: dict) -> dict:
 
 
 def _dreaming(pid: str) -> bool:
-    import fcntl
+    from . import flockcompat as fcntl
     f = store.root() / ".locks" / f"dream-{pid}.lock"
     if not f.exists():
         return False

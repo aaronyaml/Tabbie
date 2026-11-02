@@ -160,7 +160,7 @@ def test_claude_sign_in_failure_hands_the_job_to_its_gpt_equivalent(monkeypatch)
 
 
 def test_busy_claude_slots_send_a_new_chat_to_its_gpt_equivalent(monkeypatch, tmp_path):
-    import fcntl
+    from hmem import flockcompat as fcntl
     _setup(monkeypatch)
     pv = import_module("command_centre.providers")
     monkeypatch.setattr(pv, "LOCKS_DIR", tmp_path / "locks")
