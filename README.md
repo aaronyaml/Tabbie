@@ -93,7 +93,9 @@ Measured with `bin/bench-latency` (two passes of 3 runs each, Opus 5.5):
 | Long answer (R3: explain a file) | 11–17 s |
 | Worker's first call | about 21k tokens, half cached (was 35–48k) |
 
-`bin/bench-latency --label NAME [--runs 3] [--only R1,R2]` runs it again; results go to `state/bench/`.
+`bin/bench-latency --label NAME [--runs 3] [--only R1,R2,R4] [--reasoning low]` runs it again (`--reasoning`
+sets the hub's effort for those runs only, to compare); results go to `state/bench/`. The hub stays at
+medium: low was faster on routed jobs but no better on plain answers in a small A/B.
 
 ### Second opinion on sensitive changes
 

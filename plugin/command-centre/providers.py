@@ -584,6 +584,8 @@ WORKER_RULES = """You are the execution worker of the user's command centre (dis
     Verified: <tests/build/status>
     Note: <only if something important remains; name any specialist used, e.g. "Used Higgsfield: hero video">
   On failure: Problem / Cause / Required action. If nothing to add beyond success: "Done."
+  A question or a request for information is answered in full in the final message (the answer
+  itself, not "Done.").
   Never claim success you did not verify.
 """ + QUESTION_RULES.replace("{", "{{").replace("}", "}}")
 
@@ -1009,6 +1011,7 @@ def run_astra_executor(prompt: str, *, cwd: str, add_dirs: list[str], cfg: dict,
     timings = timings if timings is not None else {}
     timings.setdefault("run_start", started)
     thread = {"id": resume_thread}
+    usage: dict = {}
 
     def on_ev(ev):
         if ev.get("type") == "thread.started":
@@ -1017,6 +1020,10 @@ def run_astra_executor(prompt: str, *, cwd: str, add_dirs: list[str], cfg: dict,
             timings.setdefault("first_reply", time.time())
         if ev.get("type") == "thread.started" and ev.get("thread_id"):
             thread["id"] = ev["thread_id"]
+        if ev.get("type") == "turn.completed" and isinstance(ev.get("usage"), dict):
+            for k, v in ev["usage"].items():  # one per turn (an answered question resumes): add them up
+                if isinstance(v, (int, float)):
+                    usage[k] = usage.get(k, 0) + v
         if on_event:
             try:
                 on_event(ev)
@@ -1041,4 +1048,4 @@ def run_astra_executor(prompt: str, *, cwd: str, add_dirs: list[str], cfg: dict,
             "error": ("stopped by you" if by_user else "stopped by /takeover") if stopped
             else (None if code == 0 else (err or "")[-800:]),
             **({"stopped_by_user": True} if by_user else {}),
-            "billing": why, "model": model, "duration_s": round(time.time() - started, 1)}
+            "billing": why, "model": model, "duration_s": round(time.time() - started, 1), "usage": usage}
