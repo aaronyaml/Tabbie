@@ -25,6 +25,7 @@ from pathlib import Path
 
 from . import doc as D
 from . import store
+from .paths import is_link, link_dir, read_link, unlink as unlink_path
 
 SCHEMA = "hermes.project/1"
 MAX_INSTRUCTIONS = 16_000
@@ -570,12 +571,12 @@ def sync_workspace(p: dict) -> None:
         used.add(name)
         want[name] = f["path"]
     for link in wdir.iterdir():
-        if link.is_symlink() and (link.name not in want or os.readlink(link) != want[link.name]):
-            link.unlink()
+        if is_link(link) and (link.name not in want or read_link(link) != want[link.name]):
+            unlink_path(link)
     for name, target in want.items():
         link = wdir / name
-        if not link.exists() and not link.is_symlink():
-            link.symlink_to(target, target_is_directory=True)
+        if not link.exists() and not is_link(link):
+            link_dir(link, target)
 
 
 # ------------------------------------------------------------------ legacy memory (opt-in aliases, no moves)

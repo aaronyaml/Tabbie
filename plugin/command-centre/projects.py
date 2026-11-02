@@ -17,6 +17,7 @@ import time
 from pathlib import Path
 
 from .common import STATE_DIR, hermes_home, webui_state, load_projects_file, projects_file_lock, read_json, save_projects_file, write_json
+from hmem.paths import is_link, link_dir, unlink as unlink_path
 
 CURRENT_FILE = STATE_DIR / "current_project.json"
 GENERAL_DIR = Path.home() / "hermes" / "general"  # WebUI "General" workspace = no project
@@ -102,15 +103,15 @@ def create_workspace(name: str, folders: list[str], primary: str | None = None) 
     wdir = WORKSPACES_DIR / slug
     wdir.mkdir(parents=True, exist_ok=True)
     for link in wdir.iterdir():
-        if link.is_symlink():
-            link.unlink()
+        if is_link(link):
+            unlink_path(link)
     for path in paths:
         link = wdir / Path(path).name
         n = 2
-        while link.exists() or link.is_symlink():
+        while link.exists() or is_link(link):
             link = wdir / f"{Path(path).name}-{n}"
             n += 1
-        link.symlink_to(path, target_is_directory=True)
+        link_dir(link, path)
     _add_webui_workspace(str(wdir), f"{name} ({len(paths)} folders)")
     _mirror_hermes_project(slug, paths, primary_path)
     return True, f"Workspace '{slug}': primary {primary_path}; also " + (", ".join(p for p in paths if p != primary_path) or "nothing else")

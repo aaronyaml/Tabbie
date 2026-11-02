@@ -36,6 +36,7 @@ import re
 from pathlib import Path
 
 from .common import ROOT, STATE_DIR, write_json
+from hmem.paths import is_link, link_dir, read_link, unlink as unlink_path
 
 WORKER_DIR = STATE_DIR / "worker"
 SETTINGS_FILE = WORKER_DIR / "claude-settings.json"
@@ -113,10 +114,10 @@ def ensure(ecfg: dict) -> dict:
         _write_if_changed(man, {"name": "user-skills", "version": "1.0.0",
                                 "description": "The user's own skills (~/.claude/skills) for Tabbie workers"})
         link = SKILLS_PLUGIN / "skills"
-        if not (link.is_symlink() and os.readlink(link) == str(skills)):
-            if link.is_symlink() or link.exists():
-                link.unlink()
-            link.symlink_to(skills)
+        if not (is_link(link) and read_link(link) == str(skills)):
+            if is_link(link) or link.exists():
+                unlink_path(link)
+            link_dir(link, skills)
         plugin_dir = str(SKILLS_PLUGIN)
     return {"settings": str(SETTINGS_FILE), "plugin_dir": plugin_dir}
 

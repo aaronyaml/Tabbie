@@ -1,0 +1,2 @@
+bin/*.cmd text eol=crlf
+bin/*.ps1 text eol=crlf

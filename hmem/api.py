@@ -15,6 +15,7 @@ from pathlib import Path
 
 from . import doc as D
 from . import dreamer, projects, proposals, retrieve, security, store, trace as T
+from .paths import is_link
 
 MAX_BODY = 64_000
 _PID = re.compile(r"^[a-z0-9][a-z0-9-]{0,40}-[0-9a-f]{4}$")
@@ -209,11 +210,11 @@ def repo_file(p: dict, folder_id: str, rel: str) -> dict:
     root = Path(f["path"])
     target = root / rel
     # the allowlisted name itself, not a symlink to something else in (or out of) the repo
-    if any(x.is_symlink() for x in [target, *target.parents] if x.is_relative_to(root) and x != root):
+    if any(is_link(x) for x in [target, *target.parents] if x.is_relative_to(root) and x != root):
         raise BadRequest("that file is a link; open it on the computer")
     import stat as _stat
     try:
-        fd = os.open(target, os.O_RDONLY | os.O_NOFOLLOW | os.O_NONBLOCK)
+        fd = os.open(target, os.O_RDONLY | getattr(os, "O_NOFOLLOW", 0) | getattr(os, "O_NONBLOCK", 0) | getattr(os, "O_BINARY", 0))
     except OSError:
         raise BadRequest("file not found") from None
     with os.fdopen(fd, "rb") as fh:

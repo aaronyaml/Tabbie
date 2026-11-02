@@ -57,8 +57,8 @@ def _python() -> str:
     return str(exe)
 
 
-def _pythonw() -> str:
-    exe = Path(sys.executable)
+def _pythonw(python: str | None = None) -> str:
+    exe = Path(python or sys.executable)
     w = exe.parent / "pythonw.exe"
     return str(w) if w.exists() else str(exe)
 
@@ -170,7 +170,7 @@ def _requests() -> set[str]:
 
 def run() -> int:
     """The supervisor loop. Exits at once if another one is running."""
-    from .flockcompat import fcntl
+    from . import flockcompat as fcntl
     RUN.mkdir(parents=True, exist_ok=True)
     lock = open(RUN / "supervisor.lock", "a", encoding="utf-8")
     try:
@@ -242,8 +242,8 @@ def running() -> bool:
     return procutil.alive(_pid("supervisor"))
 
 
-def _command() -> str:
-    return f'"{_pythonw()}" "{ROOT / "bin" / "tabbie-svc.pyw"}" run'
+def _command(python: str | None = None) -> str:
+    return f'"{_pythonw(python)}" "{ROOT / "bin" / "tabbie-svc.pyw"}" run'
 
 
 def installed() -> bool:
@@ -258,20 +258,31 @@ def installed() -> bool:
         return False
 
 
+def _registered_python() -> str | None:
+    """The pythonw.exe the Run key starts (setup picks a lasting one, not a throwaway uv env)."""
+    import winreg
+    try:
+        with winreg.OpenKey(winreg.HKEY_CURRENT_USER, RUN_KEY) as k:
+            cmd = winreg.QueryValueEx(k, VALUE)[0]
+    except OSError:
+        return None
+    return cmd.split('"')[1] if cmd.startswith('"') else None
+
+
 def start() -> bool:
     if running():
         return False
-    subprocess.Popen([_pythonw(), str(ROOT / "bin" / "tabbie-svc.pyw"), "run"], cwd=str(ROOT), env=env(),
+    subprocess.Popen([_registered_python() or _pythonw(), str(ROOT / "bin" / "tabbie-svc.pyw"), "run"], cwd=str(ROOT), env=env(),
                      stdin=subprocess.DEVNULL, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL,
                      **procutil.DETACHED)
     return True
 
 
-def install() -> bool:
+def install(python: str | None = None) -> bool:
     """Start at sign-in (per-user Run key: no admin, no Task Scheduler) and start now."""
     import winreg
     with winreg.CreateKey(winreg.HKEY_CURRENT_USER, RUN_KEY) as k:
-        winreg.SetValueEx(k, VALUE, 0, winreg.REG_SZ, _command())
+        winreg.SetValueEx(k, VALUE, 0, winreg.REG_SZ, _command(python))
     start()
     return True
 

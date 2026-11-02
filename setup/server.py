@@ -2,10 +2,10 @@
 """Tabbie setup page: the same steps as bin/setup-terminal, as a page in your browser.
 
 bin/setup starts this on 127.0.0.1 (a random free port) and opens the page with a one-time token.
-Only this Mac can reach it: it binds to loopback, checks the Host header (no DNS rebinding), and
+Only this computer can reach it: it binds to loopback, checks the Host header (no DNS rebinding), and
 every request needs the token cookie; POSTs also need a same-origin Origin and an X-Tabbie header.
 Every action is from a fixed list (no command ever comes from the page), and installs/sign-ins run
-the providers' own official commands. Stdlib only: runs on the Mac's built-in Python 3.9.
+the providers' own official commands. Stdlib only: runs on the computer's built-in Python 3.9.
 """
 from __future__ import annotations
 
@@ -167,7 +167,7 @@ def job(cmd, label: str) -> str:
 
 
 def in_terminal(command: str) -> dict:
-    """For steps that need your Mac password or typing: open Terminal with the command ready."""
+    """For steps that need your computer password or typing: open Terminal with the command ready."""
     script = f"cd {shlex.quote(str(ROOT))} && {command}"
     esc = script.replace("\\", "\\\\").replace('"', '\\"')
     sh(["osascript", "-e", f'tell application "Terminal" to do script "{esc}"', "-e", 'tell application "Terminal" to activate'])
