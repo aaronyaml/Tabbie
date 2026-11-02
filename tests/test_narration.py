@@ -228,3 +228,12 @@ def test_codex_file_change_and_failed_command(tmp_path, monkeypatch):
     run.apply_codex({"type": "item.completed", "item": {"id": "c1", "type": "command_execution", "command": "npm test", "exit_code": 1}})
     assert ops(run) == [("file_change", "Editing HeroDeck.tsx", "Edited HeroDeck.tsx", "done"),
                         ("command_execution", "Running: npm test", "Ran: npm test", "failed")]
+
+
+def test_codex_commands_show_without_the_shell_wrapper():
+    import importlib
+    ag = importlib.import_module("command_centre.agents")
+    assert ag._codex_cmd("/bin/zsh -lc 'sleep 15'") == "sleep 15"
+    assert ag._codex_cmd('bash -lc "npm test"') == "npm test"
+    assert ag._codex_cmd("/bin/zsh -lc 'echo '\\''hi'\\'''") == "echo 'hi'"
+    assert ag._codex_cmd("ls -la") == "ls -la"

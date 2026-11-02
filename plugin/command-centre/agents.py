@@ -236,10 +236,20 @@ def _step_of(block: dict) -> str | None:
     return "Thinking" if line.startswith("Thinking:") else _short(line, 140)
 
 
+_SHELL_WRAP = re.compile(r"^(?:/\S*/)?(?:ba|z)?sh\s+-l?c\s+(?P<q>['\"])(?P<cmd>.*)(?P=q)\s*$", re.S)
+
+
+def _codex_cmd(cmd) -> str:
+    """Codex runs everything as `/bin/zsh -lc '<command>'`: show the command itself."""
+    s = str(cmd or "").strip()
+    m = _SHELL_WRAP.match(s)
+    return m.group("cmd").replace("'\\''", "'") if m else s
+
+
 def _codex_op_label(it: dict) -> str | None:
     k = it.get("type")
     if k == "command_execution":
-        return "Running: " + _short(it.get("command"), 120)
+        return "Running: " + _short(_codex_cmd(it.get("command")), 120)
     if k == "file_change":
         names = [Path(str(c.get("path") or "")).name for c in it.get("changes") or [] if isinstance(c, dict)]
         names = [n for n in names if n]
@@ -584,7 +594,7 @@ class AgentRun:
                 if t == "item.completed":
                     self.take_text(main, it["text"], now, key=it.get("id"))
             elif k == "command_execution":
-                step = "Running: " + _short(it.get("command"), 120)
+                step = "Running: " + _short(_codex_cmd(it.get("command")), 120)
                 if t == "item.started":
                     main["tool_uses"] += 1
             elif k == "mcp_tool_call":
