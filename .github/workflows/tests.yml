@@ -1,18 +1,21 @@
 name: tests
 
+# Windows only: the macOS suite runs on the Mac before every push, and hosted macOS runners
+# never got picked up for this repo (every run sat queued, then was cancelled).
 on:
   push:
     branches: [main]
   pull_request:
   workflow_dispatch:
 
+concurrency:
+  group: tests-${{ github.ref }}
+  cancel-in-progress: true
+
 jobs:
-  tests:
-    strategy:
-      fail-fast: false
-      matrix:
-        os: [macos-latest, windows-latest]
-    runs-on: ${{ matrix.os }}
+  windows:
+    runs-on: windows-latest
+    timeout-minutes: 20
     steps:
       - uses: actions/checkout@v4
       - uses: astral-sh/setup-uv@v6
