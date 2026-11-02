@@ -117,10 +117,13 @@
       const said = steps.filter((x) => x.kind === 'text').length;
       const did = steps.length - said;
       if (live) {
-        const hidden = open ? 0 : Math.max(0, steps.length - LIVE_SHOWN);
-        const shown = steps.slice(hidden);
+        // the latest step(s), plus the latest spoken line pinned on top even when later tool steps would fold it
+        let shown = open ? steps : steps.slice(-LIVE_SHOWN);
+        const lastSaid = steps.map((x) => x.kind).lastIndexOf('text');
+        if (!open && lastSaid >= 0 && !shown.includes(steps[lastSaid])) shown = [steps[lastSaid], ...steps.slice(-(LIVE_SHOWN - 1))];
+        const hidden = steps.length - shown.length;
         const lastText = shown.map((x) => x.kind).lastIndexOf('text');
-        html += `<div class="hx-narr-lines is-live">${hidden ? `<button type="button" class="hx-narr-more" data-narr="open">${hidden} earlier step${hidden === 1 ? '' : 's'}</button>` : ''}`
+        html += `<div class="hx-narr-lines is-live">${hidden > 0 ? `<button type="button" class="hx-narr-more" data-narr="open">${hidden} earlier step${hidden === 1 ? '' : 's'}</button>` : ''}`
           + shown.map((x, i) => stepHtml(x, i === lastText)).join('')
           + (open && steps.length > LIVE_SHOWN ? '<button type="button" class="hx-narr-more" data-narr="close">Show fewer</button>' : '')
           + '</div>';
