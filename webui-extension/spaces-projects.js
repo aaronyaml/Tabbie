@@ -408,6 +408,7 @@
 
   function scan(root) {
     if (!root || root.nodeType !== 1) return;
+    if (root.matches('.project-bar') || (root.querySelector && root.querySelector('.project-bar'))) fileByFolder();
     if (root.matches('.project-bar')) requestAnimationFrame(() => fixBar(root));
     else if (root.querySelector) { const b = root.querySelector('.project-bar'); if (b) requestAnimationFrame(() => fixBar(b)); }
     if (root.matches('.project-ctx-menu')) enhanceCtxMenu(root);
@@ -417,6 +418,38 @@
     if (root.matches('.ws-list-container')) groupWsList(root);
     root.querySelectorAll && root.querySelectorAll('.ws-list-container').forEach(groupWsList);
   }
+  // Chats started in a project's folder belong to that project. Upstream files a chat under a project only
+  // when it's made from the project's (+); one started from the folder menu or the home page stayed
+  // "Unassigned" (upstream stores auto_assign but doesn't act on it yet). File each such chat once; a chat
+  // the user later moves out stays where they put it.
+  const FILED_KEY = 'hxsp-filed';
+  let filedAt = 0;
+  async function fileByFolder() {
+    if (Date.now() - filedAt < 15000) return;
+    filedAt = Date.now();
+    let filed;
+    try { filed = new Set(JSON.parse(localStorage.getItem(FILED_KEY) || '[]')); } catch (_) { filed = new Set(); }
+    try {
+      const [pr, ss] = await Promise.all([call('/api/projects'), call('/api/sessions')]);
+      const byWs = new Map();
+      for (const p of (pr && pr.projects) || pr || []) {
+        for (const w of [...(p.workspaces || []), p.default_workspace, p.workspace]) {
+          if (w && !byWs.has(w.replace(/\/+$/, ''))) byWs.set(w.replace(/\/+$/, ''), p.project_id);
+        }
+      }
+      let moved = 0;
+      for (const sess of (ss && ss.sessions) || ss || []) {
+        const ws = String(sess.workspace || '').replace(/\/+$/, '');
+        const pid = byWs.get(ws);
+        if (!pid || sess.project_id || sess.archived || filed.has(sess.session_id)) continue;
+        filed.add(sess.session_id);
+        try { await call('/api/session/move', { session_id: sess.session_id, project_id: pid }); moved++; } catch (_) {}
+      }
+      try { localStorage.setItem(FILED_KEY, JSON.stringify([...filed].slice(-500))); } catch (_) {}
+      if (moved) refreshSidebar();
+    } catch (_) { /* offline / logged out */ }
+  }
+
   // The composer's folder menu opens upward with a fixed height; on the home screen the composer sits
   // high, so the top of the menu (the Projects heading) went off-screen. Open it below when there's
   // more room there, and never taller than the room it has.
@@ -455,6 +488,7 @@
   function boot() {
     addHeaderButton();
     watchDropdowns();
+    fileByFolder();
     scan(document.body);
     enhanceDetail();
     mo.observe(document.body, { childList: true, subtree: true });

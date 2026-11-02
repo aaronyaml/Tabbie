@@ -21,7 +21,7 @@
       "id": "spaces-projects",
       "name": "Spaces & Projects",
       "scripts": [
-        "spaces-projects.js?v=7"
+        "spaces-projects.js?v=8"
       ],
       "stylesheets": [
         "spaces-projects.css?v=6"
