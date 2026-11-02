@@ -20,10 +20,10 @@
       "id": "spaces-projects",
       "name": "Spaces & Projects",
       "scripts": [
-        "spaces-projects.js?v=4"
+        "spaces-projects.js?v=5"
       ],
       "stylesheets": [
-        "spaces-projects.css?v=5"
+        "spaces-projects.css?v=6"
       ]
     },
     {

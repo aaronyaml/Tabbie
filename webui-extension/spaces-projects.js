@@ -168,6 +168,23 @@
     opt.append(btn);
   }
 
+  // 2c. The picker lists projects (Tabbie's multi-folder workspaces, ~/hermes/workspaces/<id>) and spaces
+  // (single folders) in one list: show projects first, under their own headings.
+  const PROJECT_WS = /\/hermes\/workspaces\/[^/]+\/?$/;
+  function groupWsList(list) {
+    if (list.dataset.hxspGrouped) return;
+    const opts = [...list.querySelectorAll(':scope > .ws-opt[data-path]')];
+    const projects = opts.filter((o) => PROJECT_WS.test(o.dataset.path));
+    if (!opts.length || !projects.length) return;
+    list.dataset.hxspGrouped = '1';
+    const spaces = opts.filter((o) => !projects.includes(o));
+    const head = (text) => h('div', { class: 'hxsp-ws-head', role: 'presentation', text });
+    const first = list.firstChild;
+    list.insertBefore(head('Projects'), first);
+    projects.forEach((o) => { o.classList.add('hxsp-ws-project'); list.insertBefore(o, first); });
+    if (spaces.length) list.insertBefore(head('Spaces'), spaces[0]);
+  }
+
   // ── project sheet ────────────────────────────────────────────────────────
   let sheet = null;
   function closeSheet() {
@@ -373,11 +390,31 @@
     if (rename) rename.after(item); else menu.prepend(item);
   }
 
+  // Project chips sit in one horizontally scrolling row (spaces-projects.css). Upstream rebuilds the row on
+  // every sidebar render: keep the scroll position, and bring the active chip into view.
+  let barLeft = 0;
+  document.addEventListener('scroll', (e) => {
+    if (e.target && e.target.classList && e.target.classList.contains('project-bar')) { barLeft = e.target.scrollLeft; fade(e.target); }
+  }, true);
+  const fade = (bar) => bar.classList.toggle('hxsp-more', bar.scrollLeft + bar.clientWidth < bar.scrollWidth - 4);
+  function fixBar(bar) {
+    bar.scrollLeft = barLeft;
+    const a = bar.querySelector('.project-chip.active');
+    if (!a) { fade(bar); return; }
+    const l = a.offsetLeft - bar.offsetLeft, r = l + a.offsetWidth;
+    if (l < bar.scrollLeft || r > bar.scrollLeft + bar.clientWidth) bar.scrollLeft = barLeft = Math.max(0, l - 24);
+    fade(bar);
+  }
+
   function scan(root) {
     if (!root || root.nodeType !== 1) return;
+    if (root.matches('.project-bar')) requestAnimationFrame(() => fixBar(root));
+    else if (root.querySelector) { const b = root.querySelector('.project-bar'); if (b) requestAnimationFrame(() => fixBar(b)); }
     if (root.matches('.project-ctx-menu')) enhanceCtxMenu(root);
     if (root.matches('.ws-opt[data-path]')) enhanceWsOpt(root);
     root.querySelectorAll && root.querySelectorAll('.ws-opt[data-path]').forEach(enhanceWsOpt);
+    if (root.matches('.ws-list-container')) groupWsList(root);
+    root.querySelectorAll && root.querySelectorAll('.ws-list-container').forEach(groupWsList);
   }
   let detailQueued = false;
   const mo = new MutationObserver((muts) => {

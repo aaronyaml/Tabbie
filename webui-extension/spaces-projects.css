@@ -74,3 +74,16 @@
   .hxsp-actions .app-dialog-btn{min-width:0;min-height:44px;}
   .hxsp-ws-toggle{width:36px;height:36px;top:4px;}
 }
+
+/* project filter chips: one row that scrolls sideways instead of wrapping down */
+.project-bar { flex-wrap: nowrap !important; overflow-x: auto; overflow-y: hidden; scrollbar-width: none;
+  overscroll-behavior-x: contain; -webkit-overflow-scrolling: touch; scroll-padding-inline: 12px; }
+.project-bar.hxsp-more { -webkit-mask-image: linear-gradient(to right, #000 calc(100% - 28px), transparent);
+          mask-image: linear-gradient(to right, #000 calc(100% - 28px), transparent); }
+.project-bar::-webkit-scrollbar { display: none; }
+.project-bar > * { flex: none; white-space: nowrap; }
+
+/* folder picker: Projects above Spaces */
+.hxsp-ws-head { padding: 8px 12px 4px; font-size: 11px; font-weight: 600; letter-spacing: .02em; text-transform: uppercase;
+  color: var(--hx-text-2); user-select: none; }
+.hxsp-ws-head:not(:first-child) { margin-top: 4px; border-top: 0.5px solid var(--hx-hair); padding-top: 10px; }
