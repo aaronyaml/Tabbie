@@ -49,9 +49,12 @@ Tabbie is built on two open-source projects and runs entirely on your machine:
 - [Hermes Agent](https://github.com/NousResearch/hermes-agent): the hub agent, plugins and CLI.
 - [Hermes WebUI](https://github.com/nesquena/hermes-webui): the web app. Tabbie adds an extension to it.
 
-**No API keys.** Every provider signs in with its own subscription login (OAuth). Workers strip
-`ANTHROPIC_API_KEY` / `OPENAI_API_KEY` from their environment and refuse to fall back to
-pay-per-token billing.
+**Subscriptions first, API keys only if you add them.** Claude Code and Codex sign in with your Claude
+and ChatGPT subscription logins (OAuth). Workers strip `ANTHROPIC_API_KEY` / `OPENAI_API_KEY` from their
+environment, so a stray key never switches you to pay-per-token billing. If you *want* other models
+(DeepSeek, Kimi, GLM, OpenRouter, a local Ollama, or Claude / GPT on an API key), you link them yourself
+in the model picker ([More models](#more-models-other-providers-and-api-keys)); each is labelled with how
+it bills.
 
 ---
 
@@ -149,8 +152,12 @@ never use up the ChatGPT allowance the hub shares. If usage can't be read, it st
 
 ## Requirements
 
-- **macOS** on Apple silicon or Intel. No Homebrew needed. The core runs anywhere Python does; the
-  always-on services use launchd and Bonjour.
+- **macOS** on Apple silicon or Intel. No Homebrew needed.
+- **Windows: not supported yet.** The router, workers and model providers are plain Python and the
+  provider keys use the OS credential store (Keychain on macOS, Windows Credential Manager through
+  `keyring` elsewhere), but setup, the always-on services (launchd), the `bin/` scripts (bash) and
+  `hermes.local` (Bonjour) are macOS-only today. A Windows port (PowerShell setup, Task Scheduler
+  services) is planned; until it ships, use a Mac. Linux is untested.
 - **git** and **Python 3** (Apple's free developer tools; setup offers to install them)
 - **[Hermes Agent](https://github.com/NousResearch/hermes-agent)**: the hub (`hermes`)
 - **At least one coding agent** (you pick at setup):
@@ -269,7 +276,8 @@ Then tell the user:
 - **The four plugins must be enabled**, not just linked: `command-centre`, `fragment-memory`,
   `limits`, `workboard` (`hermes plugins enable <name> --no-allow-tool-override`). Without them
   the hub answers everything itself and ignores the model picker, Claude Code and Codex.
-- **Subscription logins only.** Never create, ask for or paste an API key. Never print or log
+- **Subscription logins only.** Never create, ask for or paste an API key. Users who want API-key
+  providers add their own keys later in the model picker (**More models**). Never print or log
   passwords or tokens.
 - **Don't hand-install pieces** or edit `~/.hermes/config.yaml` yourself. `bin/setup` backs up the
   config and is safe to re-run: done steps are skipped.
@@ -795,11 +803,49 @@ scan-flagged proposals; set it to `false` to review everything yourself.
 
 ---
 
+### More models: other providers and API keys
+
+Beyond your Claude and ChatGPT subscriptions, Tabbie can run any model whose API speaks the
+**Anthropic Messages API** (run inside Claude Code, pointed at that provider) or the **OpenAI Responses
+API** (run inside Codex). Every Tabbie feature keeps working: narration, Stop, questions, files changed,
+reviews and hand-offs.
+
+Open the composer's **model picker → More models**, pick a provider, paste a key and **Save**. Tabbie
+checks the key with the provider straight away (a rejected key isn't kept) and the provider's models
+appear in the picker. Only providers you've linked are listed; long lists (OpenRouter) get a search box.
+
+| Provider | Runs in | Billing badge |
+|---|---|---|
+| Anthropic API key (Claude models) | Claude Code | Pay per use |
+| OpenAI API key (GPT models) | Codex | Pay per use |
+| DeepSeek | Claude Code | Pay per use (very cheap) |
+| Kimi Code plan · Kimi (Moonshot API) | Claude Code | Plan · Pay per use |
+| GLM (Z.ai coding plan) | Claude Code | Plan |
+| MiniMax · Qwen (Alibaba) · OpenRouter | Claude Code | Pay per use |
+| Ollama (this Mac) | Claude Code | On this Mac (free) |
+| Custom endpoint | Claude Code (Anthropic API) or Codex (Responses API) | you choose |
+
+- **Billing is always visible.** *Plan* uses that provider's flat subscription, *Pay per use* bills your
+  key per token (separately from any Claude or ChatGPT plan), *On this Mac* is free. Nothing pay-per-use
+  is ever turned on for you.
+- **Keys are stored in the OS credential store**: the macOS Keychain (service `tabbie-provider`) or,
+  elsewhere, the system keyring. Never in git, config, logs or a command line; the page never shows a
+  key again. `config/providers.yaml` (git-ignored) only lists which providers are on.
+- **Takeover and hand-offs reach further.** When a subscription is at its limit and the other one is
+  out too (or not linked), the same task carries on with a linked provider's same-tier model
+  (top / mid / fast), when **Takeover** is on. Anything a provider-run worker hands back to Claude Code
+  or Codex runs on your subscriptions as usual.
+- With no Claude or ChatGPT plan at all, a linked provider becomes the default.
+- Effort (Low / Medium / High) is only offered for Claude and GPT models; other providers use their
+  own defaults. Codex only speaks the Responses API, so OpenAI-compatible endpoints that only have
+  Chat Completions can't be used through Codex; use their Anthropic-compatible endpoint if they have one.
+
 ## Security model
 
 - **No secrets in the repo.** `.gitignore` excludes `.env*`, token, credential and key files,
   `memory/`, `state/` and all per-machine config. Provider logins live in each tool's own store
-  (Keychain, `~/.claude`, `~/.codex`, `~/.hermes`).
+  (Keychain, `~/.claude`, `~/.codex`, `~/.hermes`); API keys you add for other providers live in the
+  Keychain and reach a worker only through its environment.
 - **Traces are scrubbed.** Keys, tokens, passwords and URL credentials are removed before anything
   is written to disk.
 - **The WebUI is the only door.** It is password-protected and listens on localhost; Caddy exposes
@@ -824,7 +870,7 @@ Use Claude Code's own permission settings for hard limits.
 
 | Path | What |
 |---|---|
-| `plugin/command-centre/` | Router plugin: `router.py` scoring, `attachments.py`, `state.py` request lifecycle, `providers.py` Claude/planner runners and auth checks, `projects.py`, `agents.py`, `questions.py`, `sidecar.py` |
+| `plugin/command-centre/` | Router plugin: `router.py` scoring, `attachments.py`, `state.py` request lifecycle, `providers.py` Claude/planner runners and auth checks, `executor_choice.py` the model picker's catalog, `model_providers.py` other providers and API keys, `projects.py`, `agents.py`, `questions.py`, `sidecar.py` |
 | `plugin/fragment-memory/` | Hub memory tools (`mem_save/search/read/forget`) |
 | `plugin/limits/` | `/limit` usage view |
 | `plugin/workboard/` | Kanban cards and todos shared with the WebUI |
@@ -852,7 +898,8 @@ The tests use temporary folders only and never touch your memory or state.
 - `bin/hub logs webui|gateway|caddy|mdns|sidecar|decisions` shows logs.
 - **Page hangs in a Mac browser**: System Settings › Privacy & Security › Local Network → allow the browser.
 - **Wrong route**: `/cc route <text>` shows the score. Tune the signals in `router.py` or `router.plan_threshold`.
-- **Claude refuses to run**: `claude auth status` must show a `claude.ai` login. API keys are refused on purpose.
+- **Claude refuses to run**: `claude auth status` must show a `claude.ai` login. A stray `ANTHROPIC_API_KEY` is ignored on purpose; to use an API key, add it in **model picker → More models**.
+- **A linked provider fails**: **More models → the provider → Check** tests the key. Third-party models vary in how well they handle Claude Code's tools; switch back to a Claude or GPT model for heavy agentic work.
 - **Planner errors**: `/cc planner` lists the models your login exposes.
 - **"Can't reach Tabbie on your Mac" / "couldn't connect to the sidecar"** (agents panel, Stop, Hand-offs,
   Motion or updates don't work): Tabbie's helper isn't running. `bin/hub services` installs it if it's
