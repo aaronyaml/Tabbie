@@ -44,12 +44,15 @@ _PLAN_SIGNALS: list[tuple[str, int, str]] = [
     (r"\b(concepts?|creative direction|ideas for|brainstorm|explore options|moodboard)\b", 2, "creative interpretation"),
     (r"\brefactor (the )?(whole|entire|all)\b|\blarge refactor\b", 3, "large refactor"),
     (r"\b(landing page|website|homepage)\b.*\b(motion|cinematic|animated|video)\b", 2, "motion-heavy creative build"),
+    (r"(?=.*\b(all|anything|everything|every|team|full set)\b).*\b(legal|t&c|terms and conditions|privacy policy|"
+     r"contracts?|compliance|gdpr|security audit)\b", 3, "broad legal / compliance work"),
 ]
 
 _DIRECT_SIGNALS: list[tuple[str, int]] = [
     (r"^\s*(please\s+)?(change|make|set|fix|rename|move|remove|delete|add|update|bump|tweak|adjust|swap|replace|hide|show|align|center|centre|increase|decrease|shorten|lengthen|revert|undo)\b", 2),
     (r"\b\d+\s?(px|rem|em|%|ms|s)\b|#[0-9a-fA-F]{3,8}\b", 2),
-    (r"\b(run|re-?run) (the )?(tests?|lint|build|typecheck)\b|\bcommit\b|\bpush\b|\bdeploy\b", 3),
+    (r"\b(run|re-?run) (the )?(tests?|lint|build|typecheck)\b|\bcommit\b|\bpush\b"
+     r"|\bdeploy(ing)? (it|this|that|to|the (app|site|build|changes?))\b", 3),
     (r"\b(typo|error|exception|traceback|stack trace|failing test|bug|broken|crash(es|ing)?)\b", 2),
     (r"[\w./-]+\.(ts|tsx|js|jsx|py|rs|go|css|scss|html|json|md|yml|yaml|swift|kt)\b|:\d+\b", 1),
     (r"\b(button|padding|margin|colou?r|font|copy|text|modal|navbar|icon|label|spacing|border|shadow|animation)\b", 1),
