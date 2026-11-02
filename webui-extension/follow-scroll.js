@@ -12,7 +12,7 @@
   'use strict';
   const LIVE = '[data-live-assistant="1"], [data-live-tool-call-group="1"], '
     + '[data-live-tool-worklog-group="1"], [data-tool-worklog-running="1"], #hxLiveStatus';
-  let following = true, ours = 0, touchY = null;
+  let following = true, ours = 0, touchY = null, touching = false, lastTop = 0, lastSH = 0, stuckH = 0;
   // "New" dot: the transcript height when the reader stopped following, and the chat it belongs to.
   let baseH = 0, baseSid = null;
 
@@ -23,9 +23,14 @@
     try { busy = !!S.busy; } catch (_) {}
     return busy || !!document.querySelector(LIVE);
   }
-  function stick() {
+  // Only follow real growth. Text that changes without growing (the status word's dots, timers)
+  // must never move the view, or a reader starting to scroll up gets yanked back down.
+  function stick(force) {
     const el = scroller();
-    if (!el || !following || !live() || gap(el) < 2) return;
+    if (!el || !following || !live() || touching) return;
+    if (!force && el.scrollHeight === stuckH) return;
+    stuckH = el.scrollHeight;
+    if (gap(el) < 2) return;
     ours = performance.now();
     el.scrollTop = el.scrollHeight;
   }
@@ -79,7 +84,7 @@
     btn.addEventListener('click', () => {
       const el = scroller();
       if (!el) return;
-      following = true;
+      following = true; stuckH = 0;
       clearNew();
       el.scrollTo({ top: el.scrollHeight, behavior: matchMedia('(prefers-reduced-motion: reduce)').matches ? 'auto' : 'smooth' });
     });
@@ -117,19 +122,28 @@
     if (!el || el.dataset.hxFollow) return;
     el.dataset.hxFollow = '1';
     el.addEventListener('wheel', (e) => { if (e.deltaY < -2) unfollow(); }, { passive: true });
-    el.addEventListener('touchstart', (e) => { touchY = e.touches[0] ? e.touches[0].clientY : null; }, { passive: true });
+    el.addEventListener('touchstart', (e) => { touching = true; touchY = e.touches[0] ? e.touches[0].clientY : null; }, { passive: true });
+    const lift = () => { touching = false; touchY = null; };
+    el.addEventListener('touchend', lift, { passive: true });
+    el.addEventListener('touchcancel', lift, { passive: true });
     el.addEventListener('touchmove', (e) => {
-      // finger moving down = reading earlier content
-      if (touchY !== null && e.touches[0] && e.touches[0].clientY - touchY > 24) unfollow();
+      // finger moving down = reading earlier content: let go at once
+      if (touchY !== null && e.touches[0] && e.touches[0].clientY - touchY > 4) unfollow();
     }, { passive: true });
     el.addEventListener('scroll', () => {
       syncBtn();
-      if (performance.now() - ours < 120) return;
-      if (gap(el) < 60) following = true;
+      const top = el.scrollTop, sh = el.scrollHeight;
+      if (performance.now() - ours >= 120) {
+        // Moved up while the content stayed the same size: the reader did that (finger, momentum,
+        // scrollbar, keys). A shrink also lowers scrollTop, but changes scrollHeight, so it's ignored.
+        if (top < lastTop - 2 && sh === lastSH) unfollow();
+        else if (gap(el) < 8 && !touching) { following = true; stuckH = 0; }
+      }
+      lastTop = top; lastSH = sh;
     }, { passive: true });
     const inner = document.getElementById('msgInner');
     if (inner && 'ResizeObserver' in window) new ResizeObserver(() => requestAnimationFrame(() => { stick(); checkNew(); syncBtn(); })).observe(inner);
-    new MutationObserver(() => requestAnimationFrame(stick)).observe(el, { childList: true, subtree: true, characterData: true });
+    new MutationObserver(() => requestAnimationFrame(() => stick())).observe(el, { childList: true, subtree: true, characterData: true });
   }
 
   function start() {
@@ -137,11 +151,11 @@
     setInterval(() => { bind(scroller()); makeBtn(); syncBtn(); }, 2000);
     try {
       const ext = window.hermesExt && window.hermesExt.register('follow-scroll');
-      if (ext && ext.events) ext.events.on('turn:start', () => { following = true; clearNew(); stick(); });
+      if (ext && ext.events) ext.events.on('turn:start', () => { following = true; clearNew(); stick(true); });
     } catch (_) {}
     // Sending (Enter or the send button) always resumes following.
-    addEventListener('keydown', (e) => { if (e.key === 'Enter' && !e.shiftKey && e.target && e.target.id === 'msg') following = true; }, true);
-    addEventListener('click', (e) => { if (e.target && e.target.closest && e.target.closest('#btnSend, .send-btn')) following = true; }, true);
+    addEventListener('keydown', (e) => { if (e.key === 'Enter' && !e.shiftKey && e.target && e.target.id === 'msg') { following = true; stuckH = 0; } }, true);
+    addEventListener('click', (e) => { if (e.target && e.target.closest && e.target.closest('#btnSend, .send-btn')) { following = true; stuckH = 0; } }, true);
   }
   if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', start); else start();
 })();

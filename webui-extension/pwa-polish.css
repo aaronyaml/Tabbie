@@ -54,3 +54,12 @@
 .hx-dl-save:disabled { opacity: .4; }
 @keyframes hx-dl-fade { from { opacity: 0; } }
 @keyframes hx-dl-up { from { transform: translateY(24px); opacity: 0; } }
+
+/* Status text ("Reconnecting…", "Restoring stream…") squeezed the model chip in the toolbar row on
+   phones. Float it as a small pill just above the row instead, right-aligned. */
+@media (max-width: 640px) {
+  #composerStatus:not(:empty) { position: absolute; right: 12px; bottom: calc(100% + 2px); z-index: 2;
+    max-width: 70%; padding: 2px 9px; border-radius: 10px; font-size: 12px; line-height: 18px;
+    white-space: nowrap; overflow: hidden; text-overflow: ellipsis; pointer-events: none;
+    background: var(--hx-fill, rgba(127,127,127,.16)); color: var(--hx-text-2, #8E8E93); }
+}

@@ -13,12 +13,25 @@ into its own file agents-<id>.json and merged at read time) or "background" (a b
 shown muted, never counted as an agent).
 `tokens` follows Claude Code's own subagent figure (totalTokens): the agent's context at its latest
 call (input + cache write + cache read + output). `output_tokens` is cumulative.
+
+Also per request (shown live in the reply, and after a reload, by cc-narration.js):
+- narration: the short text a main worker writes between tool calls ("Found it, now fixing the CSS."),
+  [{at, agent, text, acts}], newest last, capped, secrets scrubbed, code blocks dropped. The text after
+  the worker's last tool call is its final answer (already the reply), so it is dropped at the end.
+- images: pictures the worker attached mid-run with an `ATTACH: <path>` line (see providers.WORKER_RULES):
+  validated (inside the run's folders, png/jpg/webp/gif by content), copied to <request>/shots/<id>.<ext>,
+  [{id, name, ext, at, agent, bytes}]. The sidecar serves them (GET /shot).
 """
 
 from __future__ import annotations
 
 import fcntl
+import hashlib
 import json
+import os
+import re
+import sys
+import threading
 import time
 from pathlib import Path
 
@@ -26,6 +39,152 @@ from .common import REQUESTS_DIR, STATE_DIR, read_json, write_json
 
 AGENTS_INDEX_DIR = STATE_DIR / "agents"
 _SUB_TOOLS = ("Agent", "Task")
+
+NARRATION_MAX = 80            # timeline entries kept per request (narration lines + operations)
+NARRATION_CHARS = 280         # one line, after cleaning
+SHOTS_MAX = 24                # images per request
+SHOT_MAX_BYTES = 25 * 1024 * 1024
+IMAGE_EXT = {".png": "png", ".jpg": "jpg", ".jpeg": "jpg", ".webp": "webp", ".gif": "gif"}
+_ATTACH_RX = re.compile(r"^[ \t>*-]*ATTACH(?:\*\*)?:(?:\*\*)?[ \t]*(.+?)[ \t]*$", re.M)
+_FENCE_RX = re.compile(r"```.*?(?:```|$)", re.S)
+_SHOT_ID = re.compile(r"^[0-9a-f]{16}$")
+
+
+def _scrub(text: str) -> str:
+    """hmem.security.scrub (secrets out of anything the browser sees); hmem lives in the repo root."""
+    try:
+        from hmem.security import scrub
+    except ImportError:
+        root = str(Path(__file__).resolve().parents[2])
+        if root not in sys.path:
+            sys.path.insert(0, root)
+        try:
+            from hmem.security import scrub
+        except ImportError:
+            return text
+    return scrub(text)
+
+
+def attach_paths(text: str) -> list[str]:
+    """Paths named on `ATTACH: <path>` lines (backticks, quotes and <> around the path are fine)."""
+    out = []
+    for m in _ATTACH_RX.finditer(text or ""):
+        raw = m.group(1).strip().strip("`'\"<>").strip()
+        if raw and raw not in out:
+            out.append(raw)
+    return out
+
+
+def strip_attach(text: str) -> str:
+    """Text without its ATTACH lines (the images show in the reply's Agents block instead)."""
+    if not text or "ATTACH" not in text:
+        return text
+    return re.sub(r"\n{3,}", "\n\n", _ATTACH_RX.sub("", text)).strip()
+
+
+def clean_narration(text: str) -> str | None:
+    """A worker text block -> one short, safe narration line (None = nothing to show)."""
+    t = _FENCE_RX.sub(" ", strip_attach(text or ""))
+    t = " ".join(t.split())
+    if not t:
+        return None
+    t = _scrub(t)
+    return t if len(t) <= NARRATION_CHARS else t[: NARRATION_CHARS - 1].rstrip() + "…"
+
+
+_PAST = (("Running:", "Ran:"), ("Reading", "Read"), ("Editing", "Edited"), ("Writing", "Wrote"),
+         ("Searching the web for", "Searched the web for"), ("Searching the web", "Searched the web"),
+         ("Searching for", "Searched for"), ("Finding", "Found"), ("Fetching", "Fetched"),
+         ("Delegating:", "Delegated:"), ("Using skill", "Used skill"), ("Using", "Used"),
+         ("Updating the task list", "Updated the task list"), ("Updating the plan", "Updated the plan"),
+         ("Handing off to", "Handed off to"), ("Starting a sub-agent", "Started a sub-agent"),
+         ("Waiting for sub-agents", "Waited for sub-agents"))
+
+
+def past_tense(label: str) -> str:
+    """"Running: npm test" -> "Ran: npm test", "Editing HeroDeck.tsx" -> "Edited HeroDeck.tsx"."""
+    for now_, done in _PAST:
+        if label.startswith(now_):
+            return done + label[len(now_):]
+    return label
+
+
+def _magic_ok(head: bytes, ext: str) -> bool:
+    return {"png": head.startswith(b"\x89PNG\r\n\x1a\n"), "jpg": head.startswith(b"\xff\xd8\xff"),
+            "gif": head[:6] in (b"GIF87a", b"GIF89a"),
+            "webp": head[:4] == b"RIFF" and head[8:12] == b"WEBP"}.get(ext, False)
+
+
+def check_image(raw: str, roots: list[str]) -> tuple[Path | None, str]:
+    """(resolved path, ext) when raw names an existing png/jpg/webp/gif inside one of roots, else
+    (None, why not). Relative paths are taken from the first root. Symlinks are resolved first."""
+    if not raw or "\x00" in raw:
+        return None, "no path"
+    if not roots:
+        return None, "outside the project folders"
+    try:
+        p = Path(os.path.expanduser(raw))
+        if not p.is_absolute():
+            p = Path(roots[0]) / p
+        try:
+            p = p.resolve(strict=True)
+        except OSError:
+            return None, "file not found"
+        if not p.is_file():
+            return None, "file not found"
+        ext = IMAGE_EXT.get(p.suffix.lower())
+        if not ext:
+            return None, "not a png, jpg, webp or gif"
+        size = p.stat().st_size
+        if size > SHOT_MAX_BYTES:
+            return None, "too large"
+        inside = False
+        for r in roots:
+            try:
+                rr = Path(r).expanduser().resolve()
+            except OSError:
+                continue
+            if rr != Path(rr.anchor) and os.path.commonpath([str(p), str(rr)]) == str(rr):
+                inside = True
+                break
+        if not inside:
+            return None, "outside the project folders"
+        with open(p, "rb") as fh:
+            if size < 16 or not _magic_ok(fh.read(16), ext):
+                return None, "not a valid image"
+        return p, ext
+    except (OSError, ValueError, RuntimeError):
+        return None, "unreadable"
+
+
+def validate_image(raw: str, roots: list[str]) -> tuple[Path, str] | None:
+    p, ext = check_image(raw, roots)
+    return (p, ext) if p else None
+
+
+def backfill_images(request_id: str, text: str, roots: list[str], existing: list[dict] | None = None,
+                    now: float | None = None, base: Path | None = None) -> dict:
+    """ATTACH lines of a finished reply -> {images, attach_rejected} (stored like a live attach). For replies
+    written before live pickup, or whose live pickup missed (the sidecar runs this once per request)."""
+    run = AgentRun(request_id, data={"agents": [], "images": [dict(i) for i in existing or []]})
+    run.attach_roots, run.base = list(roots), base
+    n0 = len(run.data["images"])
+    a = {"id": "reply", "parent": None}
+    for raw in attach_paths(text):
+        run.attach(raw, a, time.time() if now is None else now)
+    return {"images": run.data["images"][n0:], "attach_rejected": run.data.get("attach_rejected") or []}
+
+
+def shot_path(request_id: str, shot_id: str, base: Path | None = None) -> Path | None:
+    """The stored copy of an attached image (None for a bad id or no such file)."""
+    if not _SHOT_ID.match(shot_id or ""):
+        return None
+    d = (base or REQUESTS_DIR) / request_id / "shots"
+    for ext in ("png", "jpg", "webp", "gif"):
+        f = d / f"{shot_id}.{ext}"
+        if f.is_file():
+            return f
+    return None
 
 
 def _short(s, n: int) -> str:
@@ -77,6 +236,27 @@ def _step_of(block: dict) -> str | None:
     return "Thinking" if line.startswith("Thinking:") else _short(line, 140)
 
 
+def _codex_op_label(it: dict) -> str | None:
+    k = it.get("type")
+    if k == "command_execution":
+        return "Running: " + _short(it.get("command"), 120)
+    if k == "file_change":
+        names = [Path(str(c.get("path") or "")).name for c in it.get("changes") or [] if isinstance(c, dict)]
+        names = [n for n in names if n]
+        if len(names) == 1:
+            return "Editing " + _short(names[0], 120)
+        return f"Editing {len(names)} files" if names else "Editing files"
+    if k == "mcp_tool_call":
+        if it.get("server") == "tabbie" and it.get("tool") == "delegate":
+            return "Handing off to Claude Code"
+        return f"Using {it.get('tool') or 'a tool'}"
+    if k == "web_search":
+        return "Searching the web" + (f" for {_short(it.get('query'), 100)}" if it.get("query") else "")
+    if k == "collab_tool_call":
+        return "Starting a sub-agent" if str(it.get("tool") or "").startswith("spawn") else None
+    return None
+
+
 class AgentRun:
     """Agent records for one request. Mutated by apply_* (pure, testable), persisted by save()."""
 
@@ -88,6 +268,12 @@ class AgentRun:
         self._saved = 0.0
         self.file_name = "agents.json"   # a delegate's rows live in agents-<id>.json (no write race)
         self.index = True                 # update the session index on save (main runs only)
+        self.attach_roots: list[str] = [] # folders an ATTACH line may name (the run's cwd + extra dirs)
+        self.lock = threading.RLock()     # apply_* (stream reader) vs a deferred save (timer)
+        self._acts: dict[str, int] = {}   # agent id -> tool calls so far (narration after the last = answer)
+        self._said: set = set()           # narration already taken (message id, text)
+        self._timer = None
+        self.base: Path | None = None     # requests dir (default REQUESTS_DIR; the sidecar passes its own)
 
     # -- lookup ---------------------------------------------------------------------------
     @property
@@ -183,7 +369,11 @@ class AgentRun:
                 step = _step_of(b)
                 if step:
                     a["step"] = step
+                if b.get("type") == "text" and b.get("text"):
+                    self.take_text(a, b["text"], now, key=mid)
                 if b.get("type") == "tool_use":
+                    self._act(a)
+                    self.take_op(a, b.get("id"), b.get("name") or "", step, now)
                     a["tool_uses"] += 1
                     if b.get("name") in _SUB_TOOLS and b.get("id"):
                         i = b.get("input") or {}
@@ -195,6 +385,7 @@ class AgentRun:
             for b in (ev.get("message") or {}).get("content") or []:
                 if not isinstance(b, dict) or b.get("type") != "tool_result":
                     continue
+                changed = self.end_op(b.get("tool_use_id"), bool(b.get("is_error")), now) or changed
                 a = self.get(b.get("tool_use_id") or "")
                 if not a or a["parent"] is None:
                     continue
@@ -221,11 +412,102 @@ class AgentRun:
                     _finish(a, "done" if ok else "failed", now)
             _finish(main, "done" if ok else "failed", now,
                     (ev["duration_ms"] / 1000) if ev.get("duration_ms") else None)
+            self.drop_final(main["id"])
             main["step"] = "Done" if ok else _short(ev.get("result") or "Failed", 140)
             if ev.get("num_turns") is not None:
                 main["turns"] = ev["num_turns"]
             return True
         return False
+
+    # -- narration + attached images -------------------------------------------------------
+    def _act(self, a: dict) -> None:
+        self._acts[a["id"]] = self._acts.get(a["id"], 0) + 1
+
+    def take_text(self, a: dict, text: str, now: float, key=None) -> bool:
+        """A worker's text block: ATTACH lines become images; a main worker's words become narration."""
+        changed = False
+        for raw in attach_paths(text):
+            changed = self.attach(raw, a, now) or changed
+        if a.get("parent") is not None or a.get("kind") in ("background", "delegate"):
+            return changed
+        line = clean_narration(text)
+        k = (key, line)
+        if not line or k in self._said:
+            return changed
+        self._said.add(k)
+        narr = self.data.setdefault("narration", [])
+        narr.append({"at": now, "agent": a["id"], "kind": "text", "text": line, "acts": self._acts.get(a["id"], 0)})
+        del narr[:-NARRATION_MAX]
+        return True
+
+    def take_op(self, a: dict, op_id, tool: str, label: str | None, now: float) -> bool:
+        """A main worker's tool call, in order with its narration: {kind: op, tool, text (live label),
+        done (past tense), status running|done|failed}. Labels are the same short step lines the Agents
+        block shows (file names, a Bash description), scrubbed; never tool output."""
+        if a.get("parent") is not None or a.get("kind") in ("background", "delegate") or not label:
+            return False
+        label = _scrub(label)
+        narr = self.data.setdefault("narration", [])
+        narr.append({"at": now, "agent": a["id"], "kind": "op", "id": str(op_id or "")[:80], "tool": tool[:40],
+                     "text": label, "done": past_tense(label), "status": "running", "acts": self._acts.get(a["id"], 0)})
+        del narr[:-NARRATION_MAX]
+        return True
+
+    def end_op(self, op_id, failed: bool, now: float) -> bool:
+        if not op_id:
+            return False
+        for n in reversed(self.data.get("narration") or []):
+            if n.get("kind") == "op" and n.get("id") == op_id:
+                if n.get("status") == "running":
+                    n["status"], n["ended"] = ("failed" if failed else "done"), now
+                    return True
+                return False
+        return False
+
+    def drop_final(self, agent_id: str | None) -> None:
+        """The text after an agent's last tool call is its final answer (the reply itself): not narration.
+        Operations still running when the run ends are settled with it."""
+        if not agent_id:
+            return
+        narr = self.data.get("narration") or []
+        n = self._acts.get(agent_id, 0)
+        while narr and narr[-1].get("agent") == agent_id and narr[-1].get("kind", "text") == "text" \
+                and narr[-1].get("acts", 0) >= n:
+            narr.pop()
+        for e in narr:
+            if e.get("agent") == agent_id and e.get("status") == "running":
+                e["status"] = "done"
+
+    def attach(self, raw: str, a: dict, now: float) -> bool:
+        imgs = self.data.setdefault("images", [])
+        if len(imgs) >= SHOTS_MAX:
+            return False
+        p, ext = check_image(raw, self.attach_roots)
+        if p is None:  # shown in the reply as "couldn't show": a silent drop looks like a broken chat
+            rej = self.data.setdefault("attach_rejected", [])
+            name = _short(Path(raw).name or raw, 120)
+            if len(rej) < SHOTS_MAX and not any(r.get("name") == name for r in rej):
+                rej.append({"name": name, "reason": ext, "at": now})
+            return True
+        try:
+            blob = p.read_bytes()
+        except OSError:
+            return False
+        sid = hashlib.sha1(blob).hexdigest()[:16]
+        if any(i.get("id") == sid for i in imgs):
+            return False
+        dest = (self.base or REQUESTS_DIR) / self.request_id / "shots" / f"{sid}.{ext}"
+        try:
+            dest.parent.mkdir(parents=True, exist_ok=True)
+            if not dest.exists():
+                tmp = dest.with_name(f".tmp-{sid}-{os.getpid()}")
+                tmp.write_bytes(blob)
+                os.replace(tmp, dest)
+        except OSError:
+            return False
+        imgs.append({"id": sid, "name": _short(p.name, 120), "ext": ext, "at": now, "agent": a["id"],
+                     "bytes": len(blob)})
+        return True
 
     def _sub(self, tool_use_id: str, name: str, now: float) -> dict:
         a = self.get(tool_use_id)
@@ -249,8 +531,21 @@ class AgentRun:
             k = it.get("type")
             step = {"reasoning": "Thinking", "file_change": "Editing files", "web_search": "Searching the web",
                     "todo_list": "Updating the plan"}.get(k)
+            if k in ("command_execution", "file_change", "mcp_tool_call", "web_search", "collab_tool_call"):
+                key = ("tool", it.get("id")) if it.get("id") else None  # one call: started + completed
+                if (key and key not in self._said) or (not key and t == "item.started"):
+                    if key:
+                        self._said.add(key)
+                    self._act(main)
+                    self.take_op(main, it.get("id"), k, _codex_op_label(it), now)
+                if t == "item.completed" and it.get("id"):
+                    bad = str(it.get("status") or "").lower() in ("failed", "error", "declined") or \
+                        (it.get("exit_code") not in (None, 0))
+                    self.end_op(it["id"], bad, now)
             if k == "agent_message" and it.get("text"):
                 step = _short(it["text"], 140)
+                if t == "item.completed":
+                    self.take_text(main, it["text"], now, key=it.get("id"))
             elif k == "command_execution":
                 step = "Running: " + _short(it.get("command"), 120)
                 if t == "item.started":
@@ -319,6 +614,8 @@ class AgentRun:
                 _finish(a, end, now)
         if m["status"] == "running":
             _finish(m, end, now)
+        if not stopped:
+            self.drop_final(m["id"])
         if stopped:
             m["step"] = "Stopped by you"
             return
@@ -345,7 +642,19 @@ class AgentRun:
     def save(self, *, force: bool = False, meta: dict | None = None) -> None:
         now = time.time()
         if not force and now - self._saved < 0.75:
+            # throttled: still persist this change soon (a long tool call may follow with no new event)
+            if self._timer is None:
+                def later():
+                    with self.lock:
+                        self._timer = None
+                        self.save(force=True)
+                self._timer = threading.Timer(0.8, later)
+                self._timer.daemon = True
+                self._timer.start()
             return
+        if self._timer is not None and force:
+            self._timer.cancel()
+            self._timer = None
         self._saved = now
         self.data["updated"] = now
         supersede_waiting(self.agents)

@@ -240,6 +240,7 @@ class Delegator:
 
         run = agents_mod.AgentRun(rdir.name if rdir else did, _env("TABBIE_SESSION_ID"))
         run.file_name, run.index = f"agents-{did}.json", False
+        run.attach_roots = [cwd, *add_dirs] + ([str(rdir)] if rdir else [])
         row = run.start_main(f"{_peer_label(target, peer['name'])} · {task}",
                              "astra" if target == "codex" else "claude",
                              description=f"hand-off from {LABEL[caller]} ({mode})", model=model)
@@ -256,9 +257,10 @@ class Delegator:
                 return
             if not isinstance(ev, dict):
                 return
-            changed = run.apply_claude(ev) if target == "claude" else run.apply_codex(ev)
-            if changed and rdir:
-                run.save()
+            with run.lock:
+                changed = run.apply_claude(ev) if target == "claude" else run.apply_codex(ev)
+                if changed and rdir:
+                    run.save()
 
         timeout = int(ecfg.get("timeout_seconds", 3600))
         out_file = ddir / "last.txt"
@@ -314,10 +316,11 @@ class Delegator:
         ok = code == 0 and bool(text.strip())
         if not ok and rdir and (rdir / providers.STOP_MARKER).exists():
             text = text or "stopped by the user"
-        run.finish_main(ok, step=None if ok else _cap(err or text or "failed", 140))
-        row["tokens"] = row.get("tokens") or tokens
-        if rdir:
-            run.save(force=True)
+        with run.lock:
+            run.finish_main(ok, step=None if ok else _cap(err or text or "failed", 140))
+            row["tokens"] = row.get("tokens") or tokens
+            if rdir:
+                run.save(force=True)
         (ddir / "result.md").write_text(text or (err or "")[-4000:])
         changed = sorted(_changed_files(cwd) - before) if mode == "write" else []
         if not ok:

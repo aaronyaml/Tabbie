@@ -166,14 +166,28 @@
       } finally { busy = false; }
     }
     ext.events.on('turn:error', (d) => { if (d && d.status === 'connection_lost') resume(d.sessionId); });
-    // Coming back online/foreground with an interruption notice on screen: retry right away too.
-    const kick = () => {
-      const last = Array.isArray(S && S.messages) ? S.messages[S.messages.length - 1] : null;
-      if (last && last.role === 'assistant' && typeof last.content === 'string'
-          && last.content.startsWith('**Connection interrupted:**') && S.session) resume(S.session.session_id);
+    // Upstream sends that event once per stream. Once a resume re-attaches the same stream, a second
+    // drop (common on phones: lock, app switch, Wi-Fi to mobile data) sends nothing. So also watch for
+    // the interruption notice itself and resume whenever it is on screen. Each notice is retried at
+    // most every 20 s, so a notice the server kept (turn really failed) can't cause a reload loop.
+    const tried = new Map(); // session id -> when its notice was last resumed
+    const interrupted = () => {
+      const m = Array.isArray(S && S.messages) ? S.messages : [];
+      const last = m[m.length - 1];
+      return !!(last && last.role === 'assistant' && typeof last.content === 'string'
+        && last.content.startsWith('**Connection interrupted:**'));
     };
-    addEventListener('online', kick);
-    document.addEventListener('visibilitychange', () => { if (visible()) kick(); });
+    const kick = (force) => {
+      if (busy || !S.session || !visible() || !interrupted()) return;
+      const sid = S.session.session_id, at = tried.get(sid) || 0;
+      if (!force && Date.now() - at < 20000) return;
+      tried.set(sid, Date.now());
+      resume(sid);
+    };
+    addEventListener('online', () => kick(true));
+    document.addEventListener('visibilitychange', () => kick(true));
+    addEventListener('pageshow', () => kick(true));
+    setInterval(() => kick(false), 3000);
   }
   // Phone: drag right anywhere on the page to pull the drawer open, drag left to push
   // it closed. The drawer follows the finger and settles by distance or flick speed.
@@ -253,18 +267,20 @@
   }
   // The focus glow is the ring's own light falling off: tight, medium and wide blurs of the same
   // gradient, so line and bloom read as one object. Pseudo-elements only give one blur, hence spans.
+  // Every composer gets one, whenever it appears: the box can be drawn after this script starts (slow
+  // load, sign-in redirect) or replaced later, and a box without it shows no glow at all.
   function neon() {
-    const box = document.querySelector('.composer-box');
-    if (!box) return;
-    const add = () => {
+    const add = (box) => {
       if (box.querySelector(':scope > .hx-neon')) return;
       const n = document.createElement('span');
       n.className = 'hx-neon'; n.setAttribute('aria-hidden', 'true');
       n.innerHTML = '<i></i><i></i><i></i>';
       box.prepend(n);
     };
-    add();
-    new MutationObserver(add).observe(box, { childList: true });
+    const all = () => document.querySelectorAll('.composer-box').forEach(add);
+    all();
+    addEventListener('focusin', (e) => { const b = e.target.closest && e.target.closest('.composer-box'); if (b) add(b); });
+    setInterval(all, 1500);
   }
   if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', start); else start();
 })();

@@ -13,6 +13,9 @@ GET /worker?session=, POST /worker/message {session, text, mode}, GET /worker/ac
                                      -> chat messages to the running Claude Code worker (queue / Send now)
 POST /worker/stop {session}          -> stop this chat's running worker (Agents block Stop; "stopped by you")
 GET /request/files?id=<request id>   -> files the finished worker edited (paths only) + Claude resume command
+GET /shot?id=<request id>&img=<id>&size=thumb|full -> an image the worker attached mid-run (ATTACH line),
+                                     from <request>/shots/ only; downscaled JPEG when it would not fit the
+                                     WebUI proxy's 512 KB response cap
 GET /executor?id=<webui session id> -> the conversation's executor choice + the picker catalog
 GET /executor (no id)               -> what a new chat will run (the default) + the catalog (new-chat home)
 POST /executor {id, provider, model, effort} -> set it (composer model picker)
@@ -124,7 +127,113 @@ def _request_row(rid: str) -> dict:
     return {"id": rid, "status": req.get("status"), "route": req.get("route"), "created": req.get("created"),
             "session_id": req.get("session_id"), "prompt": agents._short(req.get("original_prompt"), 120),
             "summary": summary, "agents_list": ags,
-            "questions": question_rounds(req)}
+            "questions": question_rounds(req), **narration_of(rid, data, req)}
+
+
+BACKFILL = "images-backfill.json"
+_FINISHED = ("done", "failed", "stopped", "awaiting_answer", "claude_limited")
+
+
+def request_roots(rid: str, req: dict) -> list[str]:
+    """The folders a request's ATTACH lines may point into: its project (or work dir), extra project
+    folders and its own request folder (which holds attach/ and the original attachments)."""
+    d = common.REQUESTS_DIR / rid
+    return [req.get("project") or str(d / "work"), *[x for x in req.get("extra_dirs") or [] if x], str(d)]
+
+
+def backfill(rid: str, req: dict, data: dict, extra_roots: list[str] | None = None, force: bool = False) -> dict:
+    """ATTACH lines in a finished reply that live pickup didn't store (replies from before this feature,
+    or a final message): stored once in <request>/images-backfill.json."""
+    d = common.REQUESTS_DIR / rid
+    f = d / BACKFILL
+    if f.exists() and not force:
+        return common.read_json(f, {}) or {}
+    text = str((req.get("result") or {}).get("result") or "")
+    if req.get("status") not in _FINISHED or "ATTACH" not in text:
+        return {}
+    out = agents.backfill_images(rid, text, request_roots(rid, req) + list(extra_roots or []),
+                                 existing=data.get("images") or [], base=common.REQUESTS_DIR)
+    common.write_json(f, out)
+    return out
+
+
+def narration_of(rid: str, data: dict, req: dict | None = None) -> dict:
+    """The worker's live words between tool calls + the images it attached (agents.json, images from
+    hand-offs' agents-<id>.json, and a finished reply's backfill). Only display fields: never a path."""
+    narr = []
+    for n in (data.get("narration") or [])[-agents.NARRATION_MAX:]:
+        if not isinstance(n, dict):
+            continue
+        e = {"at": n.get("at"), "agent": n.get("agent"), "kind": n.get("kind") or "text",
+             "text": str(n.get("text") or "")[:agents.NARRATION_CHARS]}
+        if e["kind"] == "op":
+            e.update(tool=str(n.get("tool") or "")[:40], done=str(n.get("done") or e["text"])[:agents.NARRATION_CHARS],
+                     status=n.get("status") if n.get("status") in ("running", "done", "failed") else "done")
+        narr.append(e)
+    imgs = list(data.get("images") or [])
+    rejected = list(data.get("attach_rejected") or [])
+    try:
+        bf = backfill(rid, req or {}, data)
+    except Exception as exc:  # a backfill problem must never break the agents payload
+        sys.stderr.write(f"cc-sidecar backfill {rid}: {exc!r}\n")
+        bf = {}
+    imgs += bf.get("images") or []
+    rejected += bf.get("attach_rejected") or []
+    for f in sorted((common.REQUESTS_DIR / rid).glob("agents-*.json")):
+        imgs += (common.read_json(f, {}) or {}).get("images") or []
+    seen, out = set(), []
+    for i in sorted((x for x in imgs if isinstance(x, dict)), key=lambda x: x.get("at") or 0):
+        if agents._SHOT_ID.match(str(i.get("id") or "")) and i["id"] not in seen:
+            seen.add(i["id"])
+            out.append({"id": i["id"], "name": str(i.get("name") or "image")[:120], "at": i.get("at"),
+                        "agent": i.get("agent")})
+    names = {i["name"] for i in out}
+    rej, rseen = [], set()
+    for r in rejected:
+        if isinstance(r, dict) and r.get("name") not in names and r.get("name") not in rseen:
+            rseen.add(r.get("name"))
+            rej.append({"name": str(r.get("name") or "")[:120], "reason": str(r.get("reason") or "")[:60]})
+    return {"narration": narr, "images": out[: agents.SHOTS_MAX], "attach_rejected": rej[: agents.SHOTS_MAX]}
+
+
+SHOT_LIMIT = 500 * 1024  # under the WebUI extension proxy's 512 KB response cap
+_CTYPE = {"png": "image/png", "jpg": "image/jpeg", "webp": "image/webp", "gif": "image/gif"}
+_shot_lock = threading.Lock()
+
+
+def _sips(src: Path, dest: Path, px: int, quality: int) -> bool:
+    tmp = dest.with_name(f".tmp-{dest.name}")
+    try:
+        subprocess.run(["sips", "-s", "format", "jpeg", "-s", "formatOptions", str(quality), "-Z", str(px),
+                        str(src), "--out", str(tmp)], capture_output=True, timeout=8, check=True)
+        os.replace(tmp, dest)
+        return True
+    except (OSError, subprocess.SubprocessError):
+        tmp.unlink(missing_ok=True)
+        return False
+
+
+def shot_bytes(rid: str, img: str, size: str) -> tuple[bytes, str] | None:
+    """(bytes, content type) of an attached image: the stored copy when it fits, else a cached JPEG."""
+    src = agents.shot_path(rid, img, common.REQUESTS_DIR)
+    if src is None:
+        return None
+    ext = src.suffix[1:]
+    n = src.stat().st_size
+    if (size == "full" or ext == "gif") and n <= SHOT_LIMIT:
+        return src.read_bytes(), _CTYPE[ext]
+    cache = src.parent / ".cache"
+    steps = [(480, 74), (360, 60)] if size == "thumb" else [(2400, 80), (1800, 74), (1400, 68), (1000, 60)]
+    with _shot_lock:
+        for px, qual in steps:
+            out = cache / f"{img}-{px}-{qual}.jpg"
+            if not out.exists():
+                cache.mkdir(exist_ok=True)
+                if not _sips(src, out, px, qual):
+                    break
+            if out.stat().st_size <= SHOT_LIMIT:
+                return out.read_bytes(), "image/jpeg"
+    return (src.read_bytes(), _CTYPE[ext]) if n <= SHOT_LIMIT else None
 
 
 # Chat -> running Claude Code worker (providers.LiveInput reads the request folder's inbox.jsonl).
@@ -459,6 +568,15 @@ class Handler(BaseHTTPRequestHandler):
         self.end_headers()
         self.wfile.write(raw)
 
+    def _send_bytes(self, body: bytes, ctype: str) -> None:
+        self.send_response(200)
+        self.send_header("Content-Type", ctype)
+        self.send_header("Cache-Control", "private, max-age=86400")
+        self.send_header("X-Content-Type-Options", "nosniff")
+        self.send_header("Content-Length", str(len(body)))
+        self.end_headers()
+        self.wfile.write(body)
+
     def do_GET(self):
         u = urlsplit(self.path)
         q = {k: v[0] for k, v in parse_qs(u.query).items()}
@@ -506,6 +624,14 @@ class Handler(BaseHTTPRequestHandler):
                 if not _RID.match(rid):
                     return self._send(400, {"error": "bad request id"})
                 return self._send(200, request_files(rid))
+            if u.path == "/shot":
+                rid = q.get("id", "")
+                if not _RID.match(rid) or not agents._SHOT_ID.match(q.get("img", "")):
+                    return self._send(400, {"error": "bad id"})
+                got = shot_bytes(rid, q["img"], "full" if q.get("size") == "full" else "thumb")
+                if got is None:
+                    return self._send(404, {"error": "not found"})
+                return self._send_bytes(*got)
             if u.path == "/plan":
                 rid = q.get("id", "")
                 if not _RID.match(rid):

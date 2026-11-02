@@ -13,8 +13,24 @@
   function syncKb() {
     const vv = window.visualViewport;
     const shrunk = vv ? innerHeight - vv.height > 120 : false;
+    const was = root.classList.contains('hx-kb');
     root.classList.toggle('hx-kb', editable(document.activeElement) && shrunk);
+    if (was !== root.classList.contains('hx-kb')) redrawCaret();
   }
+  // iOS Safari keeps painting the caret where the field was before the keyboard moved the composer
+  // (it can sit at the bottom of the box, under the + button). Re-setting the selection once the
+  // layout has settled makes it draw the caret in the right place.
+  let caretT = 0;
+  function redrawCaret() {
+    clearTimeout(caretT);
+    caretT = setTimeout(() => {
+      const el = document.activeElement;
+      if (!el || (el.tagName !== 'TEXTAREA' && el.tagName !== 'INPUT') || typeof el.selectionStart !== 'number') return;
+      const a = el.selectionStart, b = el.selectionEnd, d = el.selectionDirection;
+      try { el.setSelectionRange(a, b, d || 'none'); } catch (_) {}
+    }, 120);
+  }
+  addEventListener('focusin', (e) => { if (editable(e.target)) { redrawCaret(); setTimeout(redrawCaret, 400); } });
   addEventListener('focusin', () => setTimeout(syncKb, 50));
   addEventListener('focusout', () => setTimeout(syncKb, 50));
   if (window.visualViewport) visualViewport.addEventListener('resize', syncKb);

@@ -609,6 +609,14 @@ Design notes: `docs/memory/ARCHITECTURE.md`, `docs/projects/ARCHITECTURE.md`.
   step, tokens, time). The Agents pill opens the whole session; tap a request there to jump to its
   reply. **Stop** ends a running worker and keeps the work so far. Finished jobs list the files they
   changed and a command to resume the session in a terminal.
+- **Live timeline**: while a worker runs, the short lines it writes between steps type into the reply,
+  each followed by the step it led to (an icon per kind: command, file, image; green done, red failed),
+  with "· N running tasks" beside the status. Once the reply finishes it folds into "N updates · N steps".
+- **Images in the chat**: when a worker takes a screenshot or makes an image you should see, it writes
+  `ATTACH: <path>` and the image shows in the reply straight away, mid-run. Tap one to open it: swipe
+  between the chat's images, pinch or double-tap to zoom, swipe up or down to close. Only images inside
+  the project or the request's own folder are shown; anything else says why it couldn't be.
+  `bin/attach-images <request-id> --allow <dir>` adds images to a finished reply by hand.
 - **Plans**: a plan card has **Approve**, **Change** and **Cancel** buttons (typing `yes` still works).
 - **Questions**: when a worker needs a decision it asks a structured question card (number keys pick
   an option; a half-typed answer is kept), and your reply resumes the same session.

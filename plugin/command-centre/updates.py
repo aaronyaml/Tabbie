@@ -267,8 +267,72 @@ def _reinstall_changed(labels: list[str]) -> list[str]:
     return done
 
 
+def _workers_alive() -> bool:
+    out = subprocess.run(["pgrep", "-f", r"claude -p|codex exec|remotion render"], capture_output=True, text=True)
+    return bool(out.stdout.strip())
+
+
+INTERRUPTED = "Interrupted: Tabbie restarted while this was running. Send it again to retry."
+
+
+def reap_orphans(min_age: float = 120.0) -> list[str]:
+    """Settle requests left "executing"/"planning" by a restart or crash: their worker is gone, so they
+    would show as running forever and block every update restart (busy() would stay true). Only when
+    no worker process exists at all, and only records untouched for `min_age` seconds. Returns the ids."""
+    rd = STATE_DIR / "requests"
+    if not rd.exists() or _workers_alive():
+        return []
+    now, done = time.time(), []
+    for d in sorted(rd.iterdir())[-60:]:
+        rf = d / "request.json"
+        try:
+            req = json.loads(rf.read_text())
+        except (OSError, ValueError):
+            continue
+        if req.get("status") not in ("executing", "planning"):
+            continue
+        newest = max((f.stat().st_mtime for f in d.iterdir() if f.is_file()), default=0)
+        if now - newest < min_age:
+            continue
+        req["status"] = "failed"
+        req["result"] = {**(req.get("result") or {}), "ok": False, "error": INTERRUPTED}
+        req["updated"] = time.strftime("%Y-%m-%dT%H:%M:%S")
+        _write(rf, req)
+        af = d / "agents.json"
+        try:
+            ag = json.loads(af.read_text())
+        except (OSError, ValueError):
+            ag = None
+        if ag:
+            n = 0
+            for a in ag.get("agents") or []:
+                if a.get("status") in ("running", "waiting"):
+                    a.update(status="failed", step="Interrupted by a restart", ended=now,
+                             duration_s=round(now - (a.get("started") or now), 1))
+                    n += 1
+            sm = ag.get("summary") or {}
+            if sm:
+                sm["running"] = 0
+                sm["waiting"] = False
+                sm["failed"] = (sm.get("failed") or 0) + n
+            ag["updated"] = now
+            _write(af, ag)
+        done.append(d.name)
+    return done
+
+
+def _write(path: Path, data: dict) -> None:
+    tmp = path.with_suffix(path.suffix + ".tmp")
+    tmp.write_text(json.dumps(data, indent=2))
+    os.replace(tmp, path)
+
+
 def busy() -> bool:
     """True while a worker is running (planning or executing), so a restart would cut it off."""
+    try:
+        reap_orphans()
+    except OSError:
+        pass
     rd = STATE_DIR / "requests"
     if rd.exists():
         for d in sorted(rd.iterdir())[-40:]:
@@ -278,8 +342,7 @@ def busy() -> bool:
                 continue
             if st in ("executing", "planning"):
                 return True
-    out = subprocess.run(["pgrep", "-f", r"claude -p|codex exec|remotion render"], capture_output=True, text=True)
-    return bool(out.stdout.strip()) or _chatting()
+    return _workers_alive() or _chatting()
 
 
 def _chatting() -> bool:

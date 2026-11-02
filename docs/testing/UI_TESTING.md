@@ -18,6 +18,20 @@ open -na "Google Chrome" --args --remote-debugging-port=9222 \
 export BU_CDP_URL=http://127.0.0.1:9222
 ```
 
+**Run the tests headless** so nothing pops up on the user's screen while they work: `docs/testing/headless-chrome`
+starts a headless Chrome on `127.0.0.1:9333` (its own profile) and copies the sign-in cookie over from
+the automation Chrome above, so the password is never typed. Then point the harness at it:
+
+```bash
+docs/testing/headless-chrome
+BU_NAME=headless BU_CDP_URL=http://127.0.0.1:9333 browser-harness <<'PY'
+...
+PY
+```
+
+Use the visible automation Chrome only when the user wants to watch. Close every tab you open as soon
+as you're done with it (`cdp("Page.close")`).
+
 **Address.** Test at `http://127.0.0.1:8788`: Caddy's local port, so it's the full Tabbie (icons,
 `/kanban`, `/projects`, `/motion`), and it counts as a local address. Not `:8787` (bare upstream WebUI).
 

@@ -22,7 +22,7 @@
       "id": "apple-skin",
       "name": "Apple skin",
       "scripts": [
-        "apple-skin.js?v=10"
+        "apple-skin.js?v=12"
       ],
       "stylesheets": [
         "apple-skin.css?v=15"
@@ -110,10 +110,10 @@
       "id": "cc-agents",
       "name": "Agents & questions",
       "scripts": [
-        "cc-agents.js?v=13"
+        "cc-agents.js?v=17"
       ],
       "stylesheets": [
-        "cc-agents.css?v=7"
+        "cc-agents.css?v=10"
       ],
       "sidecar": {
         "type": "loopback",
@@ -123,20 +123,30 @@
       }
     },
     {
+      "id": "cc-narration",
+      "name": "Worker narration & attached images",
+      "scripts": [
+        "cc-narration.js?v=12"
+      ],
+      "stylesheets": [
+        "cc-narration.css?v=7"
+      ]
+    },
+    {
       "id": "pwa-polish",
       "name": "Phone app polish",
       "scripts": [
-        "pwa-polish.js?v=5"
+        "pwa-polish.js?v=6"
       ],
       "stylesheets": [
-        "pwa-polish.css?v=3"
+        "pwa-polish.css?v=4"
       ]
     },
     {
       "id": "follow-scroll",
       "name": "Follow streaming reply",
       "scripts": [
-        "follow-scroll.js?v=3"
+        "follow-scroll.js?v=4"
       ],
       "stylesheets": []
     },
@@ -225,7 +235,7 @@
     },
     {
       "id": "routes",
-      "name": "Page addresses (/kanban, /projects, …)",
+      "name": "Page addresses (/kanban, /projects, \u2026)",
       "scripts": [
         "routes.js?v=2"
       ],

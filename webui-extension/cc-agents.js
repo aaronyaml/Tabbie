@@ -45,7 +45,7 @@
         lastFetch = Date.now();
         if (r.status === 403) { state = 'consent'; data = null; }
         else if (!r.ok) { state = 'down'; }
-        else { const j = await r.json(); if (sid() === s) { data = j; dataSid = s; state = 'ok'; } }
+        else { const j = await r.json(); if (sid() === s) { data = j; dataSid = s; state = 'ok'; try { window.dispatchEvent(new CustomEvent('hx-agents-data')); } catch (_) {} } }
       } catch (_) { state = 'down'; }
       finally { inflight = null; }
       render();
@@ -62,6 +62,7 @@
     refresh(true);
   }
 
+  window.hxAgentsData = () => (data && dataSid === sid() ? data : null); // cc-narration.js reads the same payload
   const allAgents = () => (data ? data.requests.flatMap((r) => (r.agents_list || []).map((a) => Object.assign({ request: r.id }, a))) : []);
 
   // ── formatting ──────────────────────────────────────────────────────────
@@ -93,7 +94,7 @@
     const sub = a.parent ? ' hx-ag-sub' + deep : '';
     const st = statusOf(a);
     const kind = a.kind === 'delegate' ? ' hx-ag-delegate' : (isBg(a) ? ' hx-ag-bg' : '');
-    const meta = [a.tokens ? fmtTokens(a.tokens) + ' tokens' : '', st === 'running' ? fmtDur(elapsed(a)) : (a.duration_s != null ? fmtDur(a.duration_s) : '')].filter(Boolean).join(' · ');
+    const meta = [a.tokens ? fmtTokens(a.tokens) + ' tokens' : '', st === 'running' ? fmtDur(elapsed(a)) : (a.duration_s != null && !(isBg(a) && a.duration_s < 1) ? fmtDur(a.duration_s) : '')].filter(Boolean).join(' · ');
     const step = st === 'stopped' ? 'Stopped by you'
       : (st === 'running' || st === 'waiting' || st === 'failed' ? a.step : (a.description && a.description !== 'subagent' ? a.description : ''));
     const badge = a.kind === 'delegate'
@@ -121,6 +122,8 @@
     if (failed) parts.push(`${failed} failed`);
     const handoffs = list.filter((a) => a.kind === 'delegate').length;
     if (handoffs) parts.push(`${handoffs} hand-off${handoffs === 1 ? '' : 's'}`);
+    const bg = all.filter((a) => isBg(a) && a.status === 'running').length;
+    if (bg) parts.push(`${bg} background task${bg === 1 ? '' : 's'}`);
     if (tokens) parts.push(fmtTokens(tokens) + ' tokens');
     if (span) parts.push(fmtDur(span));
     return parts.join(' · ');
@@ -317,9 +320,10 @@
     const show = !!sid() && (agents.length > 0 || state === 'consent');
     ensurePill().hidden = !show;
     if (!show) return;
-    const run = agents.filter((a) => a.status === 'running').length;
-    const wait = agents.some((a) => a.status === 'waiting');
-    const html = `${icon('UserMultiple02Icon', 16)}<span class="hx-pill-tx">Agents</span>${agents.length ? `<span class="hx-pill-n${run ? ' is-live' : ''}${wait && !run ? ' is-wait' : ''}">${run || agents.length}</span>` : ''}`;
+    const list = agents.filter((a) => !isBg(a)); // same count as the sheet's "N agents · N running"
+    const run = list.filter((a) => a.status === 'running').length;
+    const wait = list.some((a) => a.status === 'waiting');
+    const html = `${icon('UserMultiple02Icon', 16)}<span class="hx-pill-tx">Agents</span>${list.length ? `<span class="hx-pill-n${run ? ' is-live' : ''}${wait && !run ? ' is-wait' : ''}">${run || list.length}</span>` : ''}`;
     if (pill.__html !== html) { pill.innerHTML = html; pill.__html = html; }
     placePill();
   }
@@ -362,7 +366,7 @@
       sub.textContent = reqs.length ? summaryText(allAgents()) : '';
       html = reqs.length ? reqs.map((r) => `<section class="hx-as-req">
           <button type="button" class="hx-as-req-head" data-rid="${esc(r.id)}" title="${esc(r.prompt || r.id)}" aria-label="Go to the reply for: ${esc(r.prompt || r.id)}"><span class="hx-as-req-p">${esc(r.prompt || r.id)}</span><span class="hx-as-chip" data-s="${esc(r.status)}">${esc(reqLabel(r.status))}</span>${icon('ArrowRight01Icon', 12)}</button>
-          <div class="hx-agents-list">${r.agents_list.map(agentRow).join('')}</div></section>`).join('')
+          <div class="hx-agents-list">${r.agents_list.map((a) => agentRow(a, r.agents_list)).join('')}</div></section>`).join('')
         : '<div class="hx-as-empty"><p>No agents have run in this chat yet.</p></div>';
     }
     if (body.__html !== html) { body.innerHTML = html; body.__html = html; }
@@ -379,7 +383,7 @@
       row.classList.remove('hx-flash'); void row.offsetWidth; row.classList.add('hx-flash');
       row.scrollIntoView({ block: 'start', behavior: reduced() ? 'auto' : 'smooth' });
       clearTimeout(row.__hxFlash);
-      row.__hxFlash = setTimeout(() => row.classList.remove('hx-flash'), 1600);
+      row.__hxFlash = setTimeout(() => row.classList.remove('hx-flash'), 2400);
     });
   }
   const reqLabel = (s) => ({ executing: 'Running', planning: 'Planning', done: 'Done', failed: 'Failed', awaiting_answer: 'Needs you', awaiting_answers: 'Needs you', awaiting_approval: 'Awaiting approval', answered: 'Resuming', approved: 'Approved', cancelled: 'Cancelled', claude_limited: 'Usage limit', limit_blocked: 'Usage limit', stopped: 'Stopped', unanswered: 'Skipped' }[s] || s || '');
@@ -722,7 +726,7 @@
 
   let queued = false;
   const mo = new MutationObserver((muts) => {
-    if (muts.every((m) => { const t = m.target.nodeType === 1 ? m.target : m.target.parentElement; return t && t.closest('.hx-agents, .hx-q, .hx-plan-act'); })) return;
+    if (muts.every((m) => { const t = m.target.nodeType === 1 ? m.target : m.target.parentElement; return t && t.closest('.hx-agents, .hx-q, .hx-plan-act, .hx-narr, .hx-shot-box'); })) return;
     if (queued) return;
     queued = true;
     requestAnimationFrame(() => { queued = false; render(); if (Date.now() - lastFetch > 3000) refresh(); });

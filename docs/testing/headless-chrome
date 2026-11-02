@@ -1,0 +1,39 @@
+#!/bin/bash
+# Headless Chrome for UI tests, so test tabs never appear on the user's screen.
+# Starts one on 127.0.0.1:9333 (own profile, kept between runs) unless it's already up, then copies
+# the Tabbie sign-in cookie from the automation Chrome (127.0.0.1:9222) once, so tests don't need the
+# password. After that it never touches the visible Chrome (HEADLESS_RECOPY=1 forces a fresh copy).
+# Use it:  docs/testing/headless-chrome && BU_NAME=headless BU_CDP_URL=http://127.0.0.1:9333 browser-harness <<'PY' ... PY
+set -euo pipefail
+umask 077  # the cookie handoff file is private
+PORT="${HEADLESS_PORT:-9333}"
+PROFILE="${HEADLESS_PROFILE:-$HOME/.cache/tabbie-headless-chrome}"
+CHROME="/Applications/Google Chrome.app/Contents/MacOS/Google Chrome"
+if ! curl -s -m 2 "http://127.0.0.1:$PORT/json/version" >/dev/null; then
+  mkdir -p "$PROFILE"
+  "$CHROME" --headless=new --remote-debugging-port="$PORT" --remote-debugging-address=127.0.0.1 \
+    --user-data-dir="$PROFILE" --no-first-run --no-default-browser-check --disable-gpu \
+    --window-size=1280,900 about:blank >/dev/null 2>&1 &
+  for _ in $(seq 1 30); do curl -s -m 1 "http://127.0.0.1:$PORT/json/version" >/dev/null && break; sleep 0.5; done
+fi
+# Already signed in? The headless profile keeps its cookies, so normally we're done here and the
+# visible automation Chrome is never touched (attaching to it can bring its window to the front).
+HAVE=$(BU_NAME=headless BU_CDP_URL="http://127.0.0.1:$PORT" browser-harness <<'PY'
+print(sum(1 for c in cdp("Storage.getCookies").get("cookies", []) if c.get("domain") in ("127.0.0.1", "localhost")))
+PY
+)
+if [ "${HAVE:-0}" != "0" ] && [ -z "${HEADLESS_RECOPY:-}" ]; then echo "headless Chrome on 127.0.0.1:$PORT, already signed in"; exit 0; fi
+# First run only: copy the 127.0.0.1 session cookie (automation Chrome -> headless). Values never printed.
+BU_NAME=default browser-harness <<'PY' > "$PROFILE/.cookies.json"
+import json
+print(json.dumps([c for c in cdp("Storage.getCookies").get("cookies", []) if c.get("domain") in ("127.0.0.1", "localhost")]))
+PY
+BU_NAME=headless BU_CDP_URL="http://127.0.0.1:$PORT" HX_COOKIES="$PROFILE/.cookies.json" browser-harness <<'PY'
+import json, os
+cs = json.load(open(os.environ["HX_COOKIES"]))
+keep = ("name", "value", "domain", "path", "secure", "httpOnly", "sameSite", "expires")
+if cs:
+    cdp("Storage.setCookies", cookies=[{k: c[k] for k in keep if k in c and c[k] not in (None, -1)} for c in cs])
+print(f"headless Chrome on 127.0.0.1:{os.environ.get('HEADLESS_PORT', '9333')}, {len(cs)} cookie(s) copied")
+PY
+rm -f "$PROFILE/.cookies.json"

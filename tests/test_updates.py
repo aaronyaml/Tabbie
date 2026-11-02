@@ -170,3 +170,41 @@ def test_changed_service_waits_for_restart(tmp_path, monkeypatch):
     assert res["ok"] and "ai.hermes.cc-sidecar" in res["restarted"]
     assert (agents / "ai.hermes.cc-sidecar.plist").exists() and "bootstrap" in popen[0][-1]
     assert up.pending_restart() == []
+
+
+def _req(root, rid, status, age, agents=None):
+    import json, os, time
+    d = root / "requests" / rid
+    d.mkdir(parents=True)
+    (d / "request.json").write_text(json.dumps({"id": rid, "status": status, "result": None}))
+    if agents is not None:
+        (d / "agents.json").write_text(json.dumps({"agents": agents, "summary": {"running": 1, "failed": 0}}))
+    t = time.time() - age
+    for f in d.iterdir():
+        os.utime(f, (t, t))
+    return d
+
+
+def test_orphaned_runs_are_settled(tmp_path, monkeypatch):
+    import json
+    monkeypatch.setattr(up, "STATE_DIR", tmp_path)
+    monkeypatch.setattr(up, "_workers_alive", lambda: False)
+    old = _req(tmp_path, "20261102-100000-aaaaaa", "executing", 600,
+               [{"id": "claude-1", "status": "running", "started": 1.0}, {"id": "bg", "status": "done"}])
+    fresh = _req(tmp_path, "20261102-100100-bbbbbb", "executing", 5)
+    done = _req(tmp_path, "20261102-100200-cccccc", "done", 600)
+    assert up.reap_orphans() == [old.name]
+    req = json.loads((old / "request.json").read_text())
+    assert req["status"] == "failed" and "restarted" in req["result"]["error"]
+    ag = json.loads((old / "agents.json").read_text())
+    assert [a["status"] for a in ag["agents"]] == ["failed", "done"] and ag["summary"]["running"] == 0
+    assert json.loads((fresh / "request.json").read_text())["status"] == "executing"  # may still be starting
+    assert json.loads((done / "request.json").read_text())["status"] == "done"
+    assert up.reap_orphans() == []
+
+
+def test_orphans_left_alone_while_any_worker_runs(tmp_path, monkeypatch):
+    monkeypatch.setattr(up, "STATE_DIR", tmp_path)
+    monkeypatch.setattr(up, "_workers_alive", lambda: True)
+    _req(tmp_path, "20261102-100000-aaaaaa", "executing", 600)
+    assert up.reap_orphans() == []

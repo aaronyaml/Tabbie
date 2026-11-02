@@ -1,0 +1,35 @@
+#!/bin/bash
+# attach-images — re-read a finished reply's ATTACH lines and store the images for the chat.
+#   bin/attach-images <request-id> [--allow DIR ...]
+# --allow adds a folder the images may come from (beyond the request's project folders), for a reply
+# whose worker saved its screenshots elsewhere. The chat shows them after a reload.
+set -euo pipefail
+HERMES="$(cd "$(dirname "$0")/.." && pwd)"
+exec /usr/bin/env python3 - "$HERMES" "$@" <<'PY'
+import importlib, sys
+from pathlib import Path
+home, args = sys.argv[1], sys.argv[2:]
+if not args or args[0].startswith("-"):
+    sys.exit("usage: bin/attach-images <request-id> [--allow DIR ...]")
+rid, allow = args[0], []
+i = 1
+while i < len(args):
+    if args[i] == "--allow" and i + 1 < len(args):
+        allow.append(str(Path(args[i + 1]).expanduser().resolve())); i += 2
+    else:
+        sys.exit(f"unknown argument: {args[i]}")
+sys.argv = [sys.argv[0]]
+sys.path.insert(0, str(Path(home) / "plugin" / "command-centre"))
+sc = importlib.import_module("sidecar")
+if not sc._RID.match(rid):
+    sys.exit("bad request id")
+d = sc.common.REQUESTS_DIR / rid
+req = sc.common.read_json(d / "request.json", None)
+if not req:
+    sys.exit(f"no request {rid}")
+data = sc.common.read_json(d / "agents.json", {}) or {}
+out = sc.backfill(rid, req, data, extra_roots=allow, force=True)
+print(f"{len(out.get('images') or [])} image(s) stored, {len(out.get('attach_rejected') or [])} not shown")
+for r in out.get("attach_rejected") or []:
+    print(f"  not shown: {r['name']} ({r['reason']})")
+PY

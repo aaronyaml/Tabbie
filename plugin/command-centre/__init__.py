@@ -20,7 +20,7 @@ import time
 from pathlib import Path
 
 from . import executor_choice, limits_gate, projects, providers, questions, worker_profile
-from .agents import AgentRun
+from .agents import AgentRun, strip_attach
 from .attachments import Manifest
 from .common import REQUESTS_DIR, STATE_DIR, load_config, log_decision, read_json, write_json
 from .providers import (WORKER_RULES, claude_transcript_tail, codex_models, git_state, run_astra_executor, run_claude,
@@ -173,9 +173,9 @@ def _reply_body(r: Request, res: dict, *, clean: str | None = None, started: flo
     if res.get("stopped_by_user"):
         body = "Stopped by you. The work done so far stays in the project."
     elif res.get("ok"):
-        body = (clean if clean is not None else (res.get("result") or "")).strip() or "Done."
+        body = strip_attach((clean if clean is not None else (res.get("result") or "")).strip()) or "Done."
     else:
-        text = (res.get("result") or "").strip()
+        text = strip_attach((res.get("result") or "").strip())
         body = text or f"Problem: {str(res.get('error') or 'the worker failed')[:600]}"
     lines = _note_lines(r, started)
     denials = res.get("permission_denials") or []
@@ -735,8 +735,9 @@ def _ask_user(r: Request, source: str, data: dict, clean: str, res: dict, run: A
 
 def _agent_events(run: AgentRun, kind: str):
     def on_event(ev):
-        if (run.apply_claude(ev) if kind == "claude" else run.apply_codex(ev)):
-            run.save()
+        with run.lock:
+            if (run.apply_claude(ev) if kind == "claude" else run.apply_codex(ev)):
+                run.save()
     return on_event
 
 
@@ -796,6 +797,9 @@ def _claude_prompt(r: Request, manifest: Manifest) -> str:
                       f"above/below remain the source of truth if anything is ambiguous:",
                   r["brief"]]
     parts += ["", manifest.render(), "", _memory_context(r)]
+    parts += ["", f"IMAGES FOR THE USER: save screenshots/renders to show under {(r.dir / 'attach').resolve()} "
+                  "(or inside the project folders above), then write `ATTACH: <absolute path>` on its own line. "
+                  "Images anywhere else are not shown."]
     return "\n".join(parts)
 
 
@@ -909,6 +913,7 @@ def _execute(r: Request, feed=None, force: dict | None = None) -> dict:
     _notify(f"Using Claude Code: {'continuing session in ' if resume else ''}{cwd}")
     add_dirs = ([str(manifest.dir)] if manifest.items else []) + list(r.data.get("extra_dirs") or [])
     run = AgentRun.load(r.id, r["session_id"])
+    run.attach_roots = [cwd, *add_dirs, str(r.dir)]  # where an ATTACH: <image> line may point
     run.start_main("Claude Code" + (" · answered" if answer else ""), "claude",
                    description="resumed with your answers" if answer else "main worker")
     run.save(force=True)
@@ -939,9 +944,10 @@ def _execute(r: Request, feed=None, force: dict | None = None) -> dict:
     r["status"] = "done" if res.get("ok") else ("stopped" if res.get("stopped_by_user") else "failed")
     r.save()
     clean, asked = questions.extract(res.get("result") or "") if res.get("ok") else ("", None)
-    run.finish_main(bool(res.get("ok")), step=None if res.get("ok") else res.get("error"),
-                    stopped=bool(res.get("stopped_by_user")))
-    run.save(force=True)
+    with run.lock:
+        run.finish_main(bool(res.get("ok")), step=None if res.get("ok") else res.get("error"),
+                        stopped=bool(res.get("stopped_by_user")))
+        run.save(force=True)
     if res.get("session_id") and r["project"]:
         sessions[r.data.get("project_id") or r["project"]] = {"session_id": res["session_id"], "at": time.time()}
         write_json(_CLAUDE_SESSIONS, sessions)
@@ -1026,6 +1032,8 @@ def _takeover_prompt(r: Request) -> str:
     parts = ["You are taking over from Claude Code, which stopped (usage limit) or is paused for this session.",
              "Continue the work from where it stopped. Do not redo finished work; check the repo state first.",
              "Be exhaustive in execution, minimal in words. Final message: Done / Verified / Note bullets.",
+             "To show the user an image while you work (screenshot, render), write a line "
+             "`ATTACH: /absolute/path.png` (png/jpg/webp/gif inside the project); it appears in the chat at once.",
              questions.QUESTION_RULES,
              "", _claude_prompt(r, Manifest(r.dir)),
              "", "RECENT SESSION CONVERSATION (compacted):", convo or "(none)",
@@ -1060,6 +1068,7 @@ def _astra_takeover(r: Request, reason: str, choice: dict | None = None, feed=No
     manifest = Manifest(r.dir)
     add_dirs = ([str(manifest.dir)] if manifest.items else []) + list(r.data.get("extra_dirs") or [])
     run = AgentRun.load(r.id, r["session_id"])
+    run.attach_roots = [cwd, *add_dirs, str(r.dir)]
     who = (f"Codex {choice['name']}" + (f" ({choice['effort']})" if choice.get("effort") else "")) if choice else "Codex"
     run.start_main(who + (" · answered" if answer else ("" if choice else " · takeover")), "astra",
                    description="executor (Codex)", model=model)
@@ -1095,9 +1104,10 @@ def _astra_takeover(r: Request, reason: str, choice: dict | None = None, feed=No
     r["result"] = res
     r["status"] = "done" if res.get("ok") else ("stopped" if res.get("stopped_by_user") else "failed")
     r.save()
-    run.finish_main(bool(res.get("ok")), step=None if res.get("ok") else res.get("error"),
-                    stopped=bool(res.get("stopped_by_user")))
-    run.save(force=True)
+    with run.lock:
+        run.finish_main(bool(res.get("ok")), step=None if res.get("ok") else res.get("error"),
+                        stopped=bool(res.get("stopped_by_user")))
+        run.save(force=True)
     log_decision(event="codex_executed" if choice else "takeover_executed", request=r.id, ok=res.get("ok"),
                  model=res.get("model"), reason=reason, dynamic=bool(delegate))
     _learn(r)
@@ -1499,6 +1509,9 @@ def register(ctx):
             done = updates.ensure_services()
             if done:
                 log_decision(event="services_installed", labels=done)
+            reaped = updates.reap_orphans()
+            if reaped:
+                log_decision(event="orphans_settled", requests=reaped)
         except Exception as exc:
             log_decision(event="services_check_failed", error=repr(exc)[:200])
     threading.Thread(target=_ensure_services, daemon=True, name="tabbie-ensure-services").start()

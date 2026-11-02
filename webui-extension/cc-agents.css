@@ -71,7 +71,7 @@
 .hx-as-sub { margin-top: 2px; font-size: 12.5px; color: var(--hx-text-2, #6B6B70); font-variant-numeric: tabular-nums; }
 .hx-as-close { position: absolute; top: 14px; right: 12px; width: 32px; height: 32px; border-radius: 16px; border: 0;
   display: grid; place-items: center; background: var(--hx-fill, #F1F1EF); color: var(--hx-text-2, #6B6B70); cursor: pointer; }
-.hx-as-body { flex: 1; overflow-y: auto; padding: 8px 12px calc(16px + env(safe-area-inset-bottom)); -webkit-overflow-scrolling: touch; }
+.hx-as-body { flex: 1 1 auto; min-height: 0; overflow-y: auto; padding: 8px 12px calc(16px + env(safe-area-inset-bottom)); -webkit-overflow-scrolling: touch; }
 .hx-as-req { padding: 10px 0 6px; }
 .hx-as-req + .hx-as-req { border-top: 1px solid var(--hx-hair, #E6E5E1); }
 .hx-as-req-head { display: flex; align-items: center; gap: 8px; padding: 0 4px 6px; }
@@ -134,7 +134,13 @@
 #messages .msg-row.hx-q-ans-row { display: none !important; }
 
 /* ── 1b. block: Stop (live), files changed + resume (settled) ─────────── */
-.hx-agents-bar { display: flex; align-items: center; flex-wrap: wrap; gap: 6px 10px; min-height: 28px; }
+.hx-agents-bar { display: flex; align-items: center; flex-wrap: nowrap; gap: 6px 12px; min-height: 28px; }
+/* Summary takes the row and wraps left-aligned under its icon; Stop stays pinned right on the same line. */
+.hx-agents-bar > .hx-agents-head { flex: 1 1 auto; min-width: 0; justify-content: flex-start; text-align: left; }
+.hx-agents-head > span:not(.hx-agents-caret) { min-width: 0; overflow-wrap: anywhere; }
+.hx-agents-head > svg { flex: none; }
+.hx-agents-bar > .hx-agents-stop { flex: none; margin-left: auto; }
+.hx-agents-bar:has(.hx-agents-confirm) { flex-wrap: wrap; }
 .hx-agents-btn { display: inline-flex; align-items: center; gap: 5px; height: 28px; padding: 0 11px; border-radius: 14px;
   border: 1px solid var(--hx-hair, #E6E5E1); background: var(--hx-raised, #fff); color: var(--hx-text, #141413);
   font: inherit; font-size: 12.5px; font-weight: 500; line-height: 1; cursor: pointer; white-space: nowrap;
@@ -161,7 +167,7 @@
 @media (hover: none) and (pointer: coarse) { .hx-agents-resume { display: none; } } /* a terminal command: Mac only */
 @media (max-width: 640px) {
   .hx-agents-bar { min-height: 40px; }
-  .hx-agents-head { min-height: 40px; }
+  .hx-agents-head { min-height: 40px; font-size: 13px; line-height: 18px; }
   .hx-agents-btn { height: 36px; padding: 0 14px; border-radius: 18px; font-size: 13.5px; }
   .hx-agents-file { height: 34px; border-radius: 17px; padding: 0 12px; font-size: 13px; }
 }
@@ -178,10 +184,15 @@
 .hx-as-hint code { font-size: 12px; padding: 1px 5px; border-radius: 5px; background: var(--hx-fill, #F1F1EF); white-space: nowrap; }
 .hx-as-retry:disabled { opacity: .6; cursor: default; }
 @media (max-width: 640px) { .hx-as-retry { height: 44px; padding: 0 22px; border-radius: 22px; } }
-#messages .msg-row.hx-flash { scroll-margin-top: 16px; border-radius: 14px; animation: hx-flash 1.5s ease-out; }
-@keyframes hx-flash { 0%, 35% { box-shadow: 0 0 0 2px var(--hx-accent, #3054FD); background: var(--hx-tint, rgba(48,84,253,.1)); } 100% { box-shadow: 0 0 0 2px transparent; background: transparent; } }
+/* Jumped-to reply: a soft glow behind it with room around the text, then it fades away. */
+#messages .msg-row.hx-flash { position: relative; isolation: isolate; scroll-margin-top: 84px; }
+#messages .msg-row.hx-flash::before { content: ''; position: absolute; inset: -10px -8px; z-index: -1; pointer-events: none;
+  border-radius: 20px; background: color-mix(in srgb, var(--hx-accent, #3054FD) 8%, transparent);
+  box-shadow: 0 0 0 1px color-mix(in srgb, var(--hx-accent, #3054FD) 22%, transparent), 0 8px 32px color-mix(in srgb, var(--hx-accent, #3054FD) 14%, transparent);
+  animation: hx-flash 2.3s cubic-bezier(.2,.7,.2,1) forwards; }
+@keyframes hx-flash { 0% { opacity: 0; transform: scale(.985); } 14% { opacity: 1; transform: none; } 65% { opacity: 1; } 100% { opacity: 0; } }
 @media (prefers-reduced-motion: reduce) {
-  #messages .msg-row.hx-flash { animation: none; box-shadow: 0 0 0 2px var(--hx-accent, #3054FD); }
+  #messages .msg-row.hx-flash::before { animation: none; opacity: 1; }
   .hx-agents-btn, .hx-agents-caret { transition: none; }
 }
 
