@@ -224,7 +224,7 @@
       "scripts": [
         "motion.js?v=9",
         "motion-scrub.js?v=6",
-        "motion-studio.js?v=27"
+        "motion-studio.js?v=28"
       ],
       "stylesheets": [
         "motion.css?v=8",

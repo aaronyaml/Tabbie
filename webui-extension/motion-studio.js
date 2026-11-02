@@ -638,7 +638,7 @@
     await dispatch('analyze', `Prepare the soundtrack, then analyse it. The original is ${src} in the studio (${HOME}); never modify it. `
       + `From the studio folder, make ${out} with ffmpeg (or \`npm run ffmpeg --\` when ffmpeg isn't on PATH), cutting sample-accurately (decode, then cut with the atrim filter; no -ss input seeking): `
       + `\`ffmpeg -y -i "${src}" -vn${af.length ? ` -af "${af.join(',')}"` : ''} -ar 48000 -ac 2 -c:a pcm_s24le ${out}\`. `
-      + `${full ? 'That is the full track, untrimmed' : `That keeps ${S(t.startMs)} s to ${S(t.endMs)} s of the original`}${t.fadeInMs || t.fadeOutMs ? ` with a ${t.fadeInMs} ms fade-in and a ${t.fadeOutMs} ms fade-out` : ''}. `
+      + `${full ? 'That is the full track, untrimmed' : `That keeps ${S(t.startMs)} s to ${S(t.endMs)} s of the original`}${t.fadeInMs || t.fadeOutMs ? ` with a ${Number(t.fadeInMs) || 0} ms fade-in and a ${Number(t.fadeOutMs) || 0} ms fade-out` : ''}. `
       + `Check with ffprobe that it is 48000 Hz PCM and ${S(len)} s long (within 1 ms). `
       + `Then run \`npm run audio -- analyze ${out} --project ${P.project} --fps ${FPS} --stems\` (Demucs vocal split first, in .venv-stems; drop --stems only if .venv-stems is missing) so audio/analysis/${P.project}/analysis.json describes edit.wav, the exact file that gets mixed into the film. `
       + `Then set "audio.path" to "${out}" and "audio.status" to "ready" in ${pdir()}/project.json; keep "audio.trim" and "audio.sourcePath" as they are. `
@@ -717,7 +717,7 @@
       rows.push(`<div class="hxs-tr hxs-tr-ruler" data-track="ruler"><span class="hxs-tr-l">Time</span><div class="hxs-tr-b">${ticks}</div></div>`);
     }
     if (tracks.includes('wave')) {
-      const mk = markers().map((m) => `<i class="hxs-mk hxs-mk-${m.kind}" style="left:${pct(m.ms)}" title="${esc(`${m.label} · ${fmt(m.ms)} · ${m.id}`)}"></i>`).join('');
+      const mk = markers().map((m) => `<i class="hxs-mk hxs-mk-${esc(m.kind)}" style="left:${pct(m.ms)}" title="${esc(`${m.label} · ${fmt(m.ms)} · ${m.id}`)}"></i>`).join('');
       const kps = opts.keypoints ? (F.keypoints.points || []).map((k, i) => `<button type="button" class="hxs-pin${kpSel === k.id ? ' is-on' : ''}" data-kp="${esc(k.id)}" style="left:${pct(k.timeMs)}" title="${esc(k.label || k.anchor)}"><span>${i + 1}</span></button>`).join('') : '';
       rows.push(`<div class="hxs-tr hxs-tr-wave" data-track="wave"><span class="hxs-tr-l">Audio</span><div class="hxs-tr-b"><canvas class="hxs-wave"></canvas>${mk}${kps}</div></div>`);
     }
@@ -746,7 +746,7 @@
       rows.push(`<div class="hxs-tr hxs-tr-rev" data-track="revisions"><span class="hxs-tr-l">Revisions</span><div class="hxs-tr-b">${rv || '<em class="hxs-tr-none">None yet</em>'}</div></div>`);
     }
     const ranges = (opts.selectable ? sel.ranges : []).map((g, i) => `<i class="hxs-range" data-range="${i}" style="left:${pct(g.startMs)};width:${pct(g.endMs - g.startMs)}"></i>`).join('');
-    return `<div class="hxs-tl" data-dur="${dur}"><div class="hxs-tl-rows">${rows.join('')}<div class="hxs-tl-over">${ranges}<i class="hxs-ph" style="left:0"></i></div></div></div>`;
+    return `<div class="hxs-tl" data-dur="${Number(dur) || 0}"><div class="hxs-tl-rows">${rows.join('')}<div class="hxs-tl-over">${ranges}<i class="hxs-ph" style="left:0"></i></div></div></div>`;
   }
   function paintWave() {
     if (!root) return;
@@ -1016,7 +1016,7 @@
     const live = st === 'waiting' ? 'Waiting for your answer' : st === 'running' ? (liveStatus(j || it) || 'Working') : '';
     const prog = j && typeof j.progress === 'number' && st === 'running' ? Math.max(0, Math.min(1, j.progress)) : null;
     const t0 = (j && j.at) || it.at;
-    const time = run ? `<em class="hxs-jc-t" data-since="${t0}">${fmtDur(Date.now() - t0)}</em>` : j && j.endedAt ? `<em class="hxs-jc-t">${fmtDur(j.endedAt - t0)}</em>` : '';
+    const time = run ? `<em class="hxs-jc-t" data-since="${Number(t0) || 0}">${fmtDur(Date.now() - t0)}</em>` : j && j.endedAt ? `<em class="hxs-jc-t">${fmtDur(j.endedAt - t0)}</em>` : '';
     const note = (j && j.note) || (it.reply && it.reply.body.split('\n')[0]) || '';
     const stages = run && top ? stagesFor(it, j, r, live) : [];
     const more = [...(it.reply ? it.reply.body.split('\n').slice(1).filter(Boolean) : []), ...(it.reply ? it.reply.more : [])];
@@ -1059,7 +1059,7 @@
       if (it.type === 'user') {
         const p = it.local;
         const st = !p ? '' : p.state === 'failed' ? `<span class="hxs-m-st is-bad">Couldn’t send · <button type="button" class="hxs-link" data-act="retry-msg" data-pid="${p.id}">Retry</button></span>`
-          : p.state === 'queued' ? `<span class="hxs-m-st">Queued · sends when ${NAME} finishes ${busyJob ? `“${esc(JOBNAME[busyJob.kind] || 'this step')}”` : 'this reply'} · <button type="button" class="hxs-link" data-act="cancel-msg" data-pid="${p.id}">Cancel</button></span>` : `<span class="hxs-m-st">${PSTATE[p.state] || ''}</span>`;
+          : p.state === 'queued' ? `<span class="hxs-m-st">Queued · sends when ${NAME} finishes ${busyJob ? `“${esc(JOBNAME[busyJob.kind] || 'this step')}”` : 'this reply'} · <button type="button" class="hxs-link" data-act="cancel-msg" data-pid="${esc(p.id)}">Cancel</button></span>` : `<span class="hxs-m-st">${PSTATE[p.state] || ''}</span>`;
         return `<div class="hxs-m u${p ? ` is-${p.state}` : ''}"><div class="hxs-bub">${md(it.text)}</div>${st}</div>`;
       }
       if (it.type === 'z') return `<div class="hxs-m z"><span class="hxs-av" aria-hidden="true"></span><div class="hxs-bub">${md(it.r.body || '…')}${it.r.more.length ? `<details><summary>How I checked</summary>${it.r.more.map(md).join('<br>')}</details>` : ''}</div></div>${it.ask ? replyForm() : ''}`;
@@ -1320,7 +1320,7 @@
       : analysed ? facts.line : st === 'generating' ? 'Making your track. You can trim it once it’s ready.' : 'Nice track. I’m listening to it now; the markers land on the timeline when I’m done.');
     const locked = audioLocked();
     const t = a && a.trim;
-    const trimLine = a && st === 'ready' && !t && !tr && F.analysis ? `<p class="hxs-trim-sum">${icon('MusicNote01Icon', 16)}<span>Full track · ${fmtMs(F.analysis.durationMs)}</span>${!locked && !active() && trimSource() ? '<button type="button" class="hxs-link" data-act="retrim">Trim</button>' : ''}</p>` : t && !tr ? `<p class="hxs-trim-sum">${icon('MusicNote01Icon', 16)}<span>${t.full ? 'Full track' : `Using ${fmtMs(t.startMs)} – ${fmtMs(t.endMs)}`} · ${fmtMs(t.endMs - t.startMs)}${t.fadeInMs || t.fadeOutMs ? ` · fades ${t.fadeInMs}/${t.fadeOutMs} ms` : ''}</span>${!locked && !active() && trimSource() ? '<button type="button" class="hxs-link" data-act="retrim">Re-trim</button>' : ''}</p>` : '';
+    const trimLine = a && st === 'ready' && !t && !tr && F.analysis ? `<p class="hxs-trim-sum">${icon('MusicNote01Icon', 16)}<span>Full track · ${fmtMs(F.analysis.durationMs)}</span>${!locked && !active() && trimSource() ? '<button type="button" class="hxs-link" data-act="retrim">Trim</button>' : ''}</p>` : t && !tr ? `<p class="hxs-trim-sum">${icon('MusicNote01Icon', 16)}<span>${t.full ? 'Full track' : `Using ${fmtMs(t.startMs)} – ${fmtMs(t.endMs)}`} · ${fmtMs(t.endMs - t.startMs)}${t.fadeInMs || t.fadeOutMs ? ` · fades ${Number(t.fadeInMs) || 0}/${Number(t.fadeOutMs) || 0} ms` : ''}</span>${!locked && !active() && trimSource() ? '<button type="button" class="hxs-link" data-act="retrim">Re-trim</button>' : ''}</p>` : '';
     return `${head}
       ${locked ? lockNote(`Locked after mapping. Start a new film to change the track${a && a.name ? ` (${esc(a.name)})` : ''}.`) : `<div class="hxs-choices">
         <button type="button" class="hxs-choice${mode === 'upload' ? ' is-on' : ''}" data-audio-mode="upload">${icon('Upload04Icon', 22)}<b>Upload my own audio</b><span>MP3, WAV, M4A or a video with sound</span></button>
@@ -1350,7 +1350,7 @@
       ${P.audio ? `<div class="hxs-card hxs-scrub-card"><div data-slot="scrub"></div></div><div data-rangebar>${rangeBar()}</div>` : ''}
       ${m === 'keypoints' ? `<div class="hxs-kps">${pts.length ? pts.map((p, i) => `<button type="button" class="hxs-kp${p.id === kpSel ? ' is-on' : ''}" data-kp="${esc(p.id)}"><i>${i + 1}</i><b>${esc(p.label || p.tag || 'Keypoint')}</b><span>${fmt(p.timeMs)} · ${esc(p.anchor)}</span></button>`).join('') : '<p class="hxs-note">No keypoints yet.</p>'}</div>
         ${k ? `<form class="hxs-card hxs-kp-edit" data-form="kp" data-id="${esc(k.id)}">
-          <div class="hxs-kp-h"><b>Keypoint ${pts.indexOf(k) + 1}</b><span>${fmt(k.timeMs)} · frame ${k.frame} · ${esc(k.anchor)}</span><button type="button" class="hxs-link hxs-danger" data-act="kp-del">Remove</button></div>
+          <div class="hxs-kp-h"><b>Keypoint ${pts.indexOf(k) + 1}</b><span>${fmt(k.timeMs)} · frame ${esc(k.frame)} · ${esc(k.anchor)}</span><button type="button" class="hxs-link hxs-danger" data-act="kp-del">Remove</button></div>
           <div class="hxs-tags">${TAGS.map((t) => `<button type="button" class="hxs-tag${k.tag === t ? ' is-on' : ''}" data-tag="${t}">${t}</button>`).join('')}</div>
           <input name="label" maxlength="60" placeholder="Label, e.g. Logo slam" value="${esc(k.label)}">
           <textarea name="description" rows="2" maxlength="400" placeholder="What is this moment about?">${esc(k.description)}</textarea>
@@ -1456,7 +1456,7 @@
           <div class="hxs-row"><select name="treatment"${n ? '' : ' disabled'}><option value="">Any treatment</option>${TREATMENTS.map((t) => `<option value="${t}">${TLABEL[t][0]} · ${TLABEL[t][1]}</option>`).join('')}</select>
             <label class="hxs-mini hxs-attach">${icon('Attachment01Icon', 16)}<span data-attach-name>Sketch</span><input type="file" accept="${IMAGE_ACCEPT}" data-file="redo" class="hxs-file"${n ? '' : ' disabled'}></label>
             <button type="submit" class="hxs-primary"${n && !blocked() ? '' : ' disabled'}>${icon('RefreshIcon', 16)}<span>Regenerate</span></button></div></form>
-        ${revs.length ? `<section class="hxs-revs"><h3>Revisions</h3>${revs.slice().reverse().map((r) => `<div class="hxs-rev"><span class="hxs-badge hxs-st-${esc(r.status)}">${esc(r.status)}</span><b>${esc(r.instruction)}</b><span>${(r.ranges || []).map((g) => `${fmt(g.startMs)}–${fmt(g.endMs)}`).concat(r.eventIds || []).join(', ')}${r.treatment ? ` · ${esc(tlab(r.treatment))}` : ''}</span></div>`).join('')}</section>` : ''}
+        ${revs.length ? `<section class="hxs-revs"><h3>Revisions</h3>${revs.slice().reverse().map((r) => `<div class="hxs-rev"><span class="hxs-badge hxs-st-${esc(r.status)}">${esc(r.status)}</span><b>${esc(r.instruction)}</b><span>${(r.ranges || []).map((g) => `${fmt(g.startMs)}–${fmt(g.endMs)}`).concat((r.eventIds || []).map(esc)).join(', ')}${r.treatment ? ` · ${esc(tlab(r.treatment))}` : ''}</span></div>`).join('')}</section>` : ''}
       </div>`;
   }
 
