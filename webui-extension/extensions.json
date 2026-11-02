@@ -98,6 +98,14 @@
       "stylesheets": []
     },
     {
+      "id": "share-in",
+      "name": "Share into Tabbie (iOS Shortcut)",
+      "scripts": [
+        "share-in.js?v=1"
+      ],
+      "stylesheets": []
+    },
+    {
       "id": "push",
       "name": "Push notifications on this device",
       "scripts": [

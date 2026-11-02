@@ -529,6 +529,19 @@ Tabbie closed. On iPhone, open Tabbie from its home-screen icon first (iOS 16.4 
 Google's push service only carries a ping, and the phone then asks Tabbie (behind its password) what
 happened. Keys and subscriptions stay on the Mac in `state/push/`.
 
+### Share to Tabbie from any iPhone app
+
+iOS doesn't let web apps appear in the share sheet, so a one-time Shortcut does it:
+
+1. Open **Shortcuts**, tap **+**, and name it **Share to Tabbie**.
+2. Tap the **(i)** button and turn on **Show in Share Sheet** (accept Text, URLs and Safari web pages).
+3. Add **URL Encode** (input: *Shortcut Input*).
+4. Add **Open URLs** with `https://hermes.local/?share=` followed by the **URL Encoded Text** variable
+   (use your Tailscale address instead if you set that up).
+
+Share a link or some text, pick **Share to Tabbie**, and Tabbie opens a new chat with it in the box,
+ready for you to add a line and send. Nothing is sent by itself. It opens in Safari, so sign in there once.
+
 ### Updates
 
 Tabbie checks GitHub ([aaronyaml/Tabbie](https://github.com/aaronyaml/Tabbie)) for a newer version
