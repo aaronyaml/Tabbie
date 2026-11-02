@@ -20,7 +20,7 @@ Rules
 from __future__ import annotations
 
 import datetime as _dt
-import json
+import json, re
 import secrets
 from pathlib import Path
 
@@ -261,14 +261,14 @@ def approve(pid: str, *, actor: str = "user", confirm_flagged: bool = False, edi
     return p
 
 
-def reject(pid: str, *, actor: str = "user", reason: str = "") -> dict:
+def reject(pid: str, *, actor: str = "user", reason: str = "", auto_policy: bool = False) -> dict:
     if actor != "user":
         raise store.PermissionDenied("only the user rejects proposals")
     got = load(pid)
     if not got or got[1] != "pending":
         raise ProposalError(f"{pid} is not pending")
     p = got[0]
-    p.update(status="rejected", decided_by="user", decided_at=D.now_iso(), note=reason)
+    p.update(status="rejected", decided_by="auto-policy" if auto_policy else "user", decided_at=D.now_iso(), note=reason)
     _save(p, "rejected", "reject")
     store.append_event("proposal_rejected", id=pid, signature=p.get("signature"))
     return p
@@ -293,18 +293,39 @@ def diff(p: dict) -> str:
     return "\n".join(difflib.unified_diff(old, new, f"current/{label}", f"proposed/{label}", lineterm=""))
 
 
+_AUTO_TYPES = {"create", "modify", "deprecate", "merge"}
+_DEICTIC_END = re.compile(r"\b(this|that|it|them|those|these|so|too|btw)\W*$", re.I)
+
+
+def too_vague(p: dict) -> bool:
+    """A title that only makes sense next to the chat it came from ("Prefers the idea of that")."""
+    title = str(((p.get("proposed_change") or {}).get("meta") or {}).get("title") or "")
+    words = [w for w in re.findall(r"[a-z0-9]+", title.lower()) if len(w) > 2 and w not in
+             {"the", "and", "user", "prefers", "likes", "wants", "uses", "always", "never", "idea", "this", "that"}]
+    return p.get("type") in ("create", "modify") and bool(title) and (len(words) < 2 or bool(_DEICTIC_END.search(title)))
+
+
 def auto_approvable(p: dict, cfg: dict) -> bool:
-    """The (off by default) policy for approving without a human. Narrow on purpose: only a new or
-    corrected PROJECT memory, low risk, agent/user trust, clean scan, no taint, no confirmation needed.
-    Never global memory, never skills, never deprecations or merges. Config lives in router.yaml
-    (memory.auto_approve, memory.auto_approve_types), not in anything a browser or worker edits."""
+    """Approve without a human (memory.auto_approve, on by default). The Dreamer runs on its own; this is
+    the line it may not cross alone:
+    - never skills (they are instructions every worker would be offered), never anything from untrusted
+      external content, never a proposal the poisoning scan flagged, never a high-risk one;
+    - the user's own verified words (trust "user") apply even if that chat also read web pages: the quote
+      is theirs, not the page's. Agent-derived findings need untainted sessions;
+    - agent text never changes or retires a memory the user wrote.
+    Config lives in router.yaml (memory.auto_approve, memory.auto_approve_types), not in anything a
+    browser or worker edits."""
     if not cfg.get("auto_approve"):
         return False
     types = {t.strip() for t in str(cfg.get("auto_approve_types") or "").split(",") if t.strip()}
-    return (p.get("type") in types & {"create", "modify"} and bool(p.get("project"))
-            and str(p.get("target", "")).startswith(f"projects/{p.get('project')}/") and p.get("risk") == "low"
-            and p.get("trust") in ("agent", "user") and not p.get("scan") and not p.get("taint")
-            and not needs_confirmation(p))
+    trust = p.get("trust")
+    if p.get("type") not in types & _AUTO_TYPES or trust not in ("agent", "user") or p.get("scan"):
+        return False
+    if p.get("risk") == "high" or (trust == "agent" and p.get("taint")) or too_vague(p):
+        return False
+    if p.get("type") != "create" and trust != "user" and _target_trust(p) == "user":
+        return False
+    return str(p.get("target", "")).startswith(("projects/", "global/"))
 
 
 def render(p: dict) -> str:

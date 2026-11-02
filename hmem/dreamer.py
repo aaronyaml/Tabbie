@@ -44,7 +44,7 @@ from . import extract, projects, proposals, security, store, trace as T
 HERMES = T.HERMES
 DEFAULTS = {"dream_after_sessions": 20, "min_support": 3, "min_days": 2, "max_proposals_per_cycle": 5,
             "dream_llm": False, "dream_skills": False, "dream_window_days": 60,
-            "auto_approve": False, "auto_approve_types": "",
+            "auto_approve": False, "auto_approve_types": "create,modify,deprecate,merge",
             # explicit user statements ("I like X", "always Y", "we deploy on Z"): one is enough
             "dream_stated": True, "dream_stated_llm": True, "max_stated_per_cycle": 8}
 # How a cycle can start. Each is (description, needs a project?). Idle-time is registered so it can be
@@ -76,6 +76,8 @@ def config() -> dict:
         cfg.update({k: v for k, v in out.items() if k in DEFAULTS})
     except OSError:
         pass
+    if os.environ.get("HMEM_AUTO_APPROVE") in ("0", "1"):  # tests pin review mode
+        cfg["auto_approve"] = os.environ["HMEM_AUTO_APPROVE"] == "1"
     return cfg
 
 
@@ -923,7 +925,7 @@ def synthesise(findings: list[dict], cfg: dict, *, dry_run: bool = False, llm: b
                                   confidence=meta["confidence"], risk="low" if trust != "external" else "medium",
                                   trust=trust, taint=f["support"]["origins"], signature=f["signature"],
                                   proposed_change={"meta": meta, "body": body}, project=owner_pid)
-            made.append(pr if p.get("no_auto") else _maybe_auto(pr, cfg))  # user-stated: always reviewed
+            made.append(_maybe_auto(pr, cfg))
             n_stated += stated
             n_stated_new += stated and f["signature"] not in pending_sigs  # adding evidence uses no quota
         except proposals.ProposalError as e:
@@ -949,13 +951,28 @@ def _propose_deprecate(f: dict, p: dict, dry_run: bool, skipped: list) -> dict |
 
 
 def _maybe_auto(pr: dict, cfg: dict) -> dict:
-    """Off unless router.yaml says otherwise; see proposals.auto_approvable for the (narrow) rules."""
-    if proposals.auto_approvable(pr, cfg):
-        try:
-            return proposals.approve(pr["proposal_id"], actor="user", auto_policy=True)
-        except (proposals.ProposalError, store.MemoryError_) as e:
-            store.append_event("auto_approve_failed", id=pr["proposal_id"], error=str(e)[:200])
+    """Apply a proposal on its own when proposals.auto_approvable allows it; drop one too vague to keep.
+    Anything else stays pending for review."""
+    if not cfg.get("auto_approve") or pr.get("status", "pending") != "pending":
+        return pr
+    try:
+        if proposals.too_vague(pr):
+            return proposals.reject(pr["proposal_id"], actor="user", reason="too vague to remember", auto_policy=True)
+        if proposals.auto_approvable(pr, cfg):
+            return proposals.approve(pr["proposal_id"], actor="user", auto_policy=True, confirm_flagged=True)
+    except (proposals.ProposalError, store.MemoryError_) as e:
+        store.append_event("auto_approve_failed", id=pr["proposal_id"], error=str(e)[:200])
     return pr
+
+
+def auto_sweep(cfg: dict | None = None) -> list[str]:
+    """Settle pending proposals the policy allows (ones made before auto-approval was on, or stale ones)."""
+    cfg = cfg or config()
+    done = []
+    for pr in proposals.list_("pending"):
+        if _maybe_auto(pr, cfg) is not pr:
+            done.append(pr["proposal_id"])
+    return done
 
 
 # ------------------------------------------------------------------ optional LLM phrasing
@@ -1088,6 +1105,8 @@ def run_cycle(*, trigger: str = "manual", dry_run: bool = False, llm: bool | Non
             findings += fs
         _covered_by_stated(findings)
         made, skipped = synthesise(findings, cfg, dry_run=dry_run, llm=llm)
+        if not dry_run:
+            auto_sweep(cfg)
         result = {"cycle": cycle, "project": project, "trigger": trigger, "at": D.now_iso(),
                   "seconds": round(time.time() - t0, 1),
                   "traces_analysed": len(traces), "collected": collected, "specialists": ran,

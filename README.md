@@ -66,7 +66,7 @@ pay-per-token billing.
    attachments and tells the hub which worker to call.
 2. Workers read your **verbatim** prompt and the original files from disk, never a paraphrase.
 3. After each request a sanitised trace is saved (secrets scrubbed). The Dreamer learns from these
-   traces, and nothing becomes memory until you approve it.
+   traces and applies what it learns on its own (never skills or anything from untrusted content).
 
 ### Speed and tokens
 
@@ -584,15 +584,19 @@ For lighter routing, `config/projects.yaml` names folders the router can target,
 - `memory/` is a separate git repo:
   - Markdown memories with provenance, scoped `global/`, `projects/<id>/` or `agents/<a>/`;
   - every write is locked, hash-checked and committed.
-- **Only you change memory.**
-  - Workers can't edit it.
-  - They file proposals (`hmem propose …`), which you approve in the WebUI or with `hmem approve <id>`.
+- **Workers can't edit memory.**
+  - They file proposals (`hmem propose …`); the Dreamer's auto-policy applies safe ones, the rest wait
+    for you in the WebUI or `hmem approve <id>`.
   - Content from web pages or tools stays marked `external` and is never injected into a prompt as fact.
 - **The Dreamer** (`hmem dream`, nightly, or after N sessions) looks for repeated failures, and
   for preferences and rules you state in chats ("I like…", "always use…", "never…"), from the WebUI
   as well as the CLI. A preference stated once is enough. It files a few proposals, each with the
-  quote as evidence, and never approves them itself. In a project it only reads that project's
-  sessions; the Projects rail shows a "to review" badge when proposals are waiting.
+  quote as evidence, and applies them itself (`memory.auto_approve`, on): your own verified words,
+  and agent findings from sessions that read no external content. Never skills, never untrusted or
+  scan-flagged text, never agent text over a memory you wrote; vague ones ("the idea of that") are
+  dropped. Anything else waits for review. In a project it only reads that project's sessions; the
+  Projects rail shows a "to review" badge when proposals are waiting. Every change is a git commit
+  in `memory/` (`hmem history`, `hmem rollback`).
 - CLI reference: `hmem search|read|proposals|show|approve|reject|history|rollback|stats|doctor`, and
   `hmem project …`.
 
@@ -733,8 +737,8 @@ limits:
 dynamic_agents:
   models: {}                 # override the equivalent model, e.g. {claude-opus-5-5: gpt-6-astra}
   hints: []                  # optional strength hints; none = pure judgement
-``` Auto-approval of Dreamer proposals is off (`memory.auto_approve`); it never covers
-global memory, skills or deletions.
+``` Dreamer auto-approval (`memory.auto_approve`, on) never covers skills, untrusted content or
+scan-flagged proposals; set it to `false` to review everything yourself.
 
 ---
 

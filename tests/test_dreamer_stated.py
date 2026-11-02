@@ -148,7 +148,7 @@ def test_llm_titles_that_invent_content_are_dropped(env):
     assert not env.dreamer.verify_stated("API key is abc", "I like dark mode")
 
 
-def test_dedup_against_memory_and_pending_and_never_auto_approved(env, monkeypatch):
+def test_dedup_against_memory_and_auto_applied(env, monkeypatch):
     stub_llm(env, monkeypatch, _llm_answer)
     cfg = {**env.dreamer.config(), "auto_approve": True, "auto_approve_types": "create"}
     monkeypatch.setattr(env.dreamer, "config", lambda: cfg)
@@ -156,16 +156,14 @@ def test_dedup_against_memory_and_pending_and_never_auto_approved(env, monkeypat
                      "type": "preference"}, "Use Tailwind.", actor="user", create_only=True)
     cc_session(env, "s4-aaaa-bbbb", "2026-10-20", ["I like dark mode and Tailwind."])
     r = env.dreamer.run_cycle(trigger="manual", project=env.pid)
-    titles = [p["proposed_change"]["meta"]["title"] for p in pending(env)]
-    assert titles.count("Prefers dark mode") == 1 and "Prefers Tailwind" not in titles  # already a memory
+    approved = lambda: [p["proposed_change"]["meta"]["title"] for p in env.proposals.list_("approved")]
+    assert approved() == ["Prefers dark mode"] and not pending(env)  # the user's own words apply on their own
     f = next(f for f in findings(env, r) if f["title"] == "Prefers Tailwind")
     assert f["report_only"] and "already in memory" in f["detail"]
-    assert not env.proposals.list_("approved")  # auto-approve on: user-stated still waits for the user
-    # the same statement in a later session adds evidence, never a second proposal
+    # the same statement in a later session is already a memory: nothing new
     cc_session(env, "s5-aaaa-bbbb", "2026-10-22", ["I like dark mode and Tailwind."])
     env.dreamer.run_cycle(trigger="manual", project=env.pid)
-    ps = [p for p in pending(env) if p["proposed_change"]["meta"]["title"] == "Prefers dark mode"]
-    assert len(ps) == 1
+    assert approved() == ["Prefers dark mode"] and not pending(env)
 
 
 def test_sentences_are_sent_to_the_llm_once(env, monkeypatch):

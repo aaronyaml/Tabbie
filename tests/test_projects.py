@@ -330,15 +330,19 @@ def test_untrusted_content_never_becomes_trusted_project_memory(env):
     assert "curl" not in env.retrieve.worker_context("curl evil", p["id"])
 
 
-def test_auto_approval_is_off_by_default_and_narrow(env):
+def test_auto_approval_policy(env):
     x = {"type": "create", "project": "p-1234", "target": "projects/p-1234/x", "risk": "low", "trust": "agent",
-         "scan": [], "taint": []}
-    assert not env.proposals.auto_approvable(x, env.dreamer.config())
-    on = {"auto_approve": True, "auto_approve_types": "create"}
+         "scan": [], "taint": [], "proposed_change": {"meta": {"title": "Deploys with wrangler from the api folder"}}}
+    assert not env.proposals.auto_approvable(x, env.dreamer.config())  # off unless router.yaml turns it on
+    on = {"auto_approve": True, "auto_approve_types": "create,modify,deprecate,merge"}
     assert env.proposals.auto_approvable(x, on)
-    for bad in ({"target": "global/x", "project": None}, {"type": "skill"}, {"trust": "external"}, {"taint": ["web"]},
-                {"type": "deprecate"}, {"risk": "medium"}):
+    assert env.proposals.auto_approvable({**x, "target": "global/x", "project": None}, on)
+    assert env.proposals.auto_approvable({**x, "trust": "user", "taint": ["web"]}, on)  # the user's own words
+    for bad in ({"type": "skill"}, {"trust": "external"}, {"taint": ["web"]}, {"risk": "high"},
+                {"scan": [{"severity": "high", "rule": "x"}]}, {"target": "elsewhere/x"},
+                {"proposed_change": {"meta": {"title": "Prefers the idea of that"}}}):
         assert not env.proposals.auto_approvable({**x, **bad}, on)
+    assert env.proposals.too_vague({**x, "proposed_change": {"meta": {"title": "Prefers the idea of that"}}})
 
 
 def test_after_session_trigger_is_per_project(env, monkeypatch):
@@ -521,3 +525,18 @@ def test_user_can_delete_a_project_memory_but_not_anothers(env):
     st, d = env.api.handle("GET", "/projects/memory", {"id": pa["id"]})
     assert not any(x["id"] == m.id for x in d["memories"])
     assert not any(h.id == m.id for _, h in env.retrieve.search("tabs", project=pa["id"]))
+
+
+def test_dreamer_applies_its_own_proposals_when_on(env, monkeypatch):
+    monkeypatch.setenv("HMEM_AUTO_APPROVE", "1")
+    cfg = env.dreamer.config()
+    mk = lambda title, trust="user", taint=None: env.proposals.create(
+        type="create", target=env.store.id_for("global", title), reason="stated", evidence=[{"session": "s1", "quote": title}],
+        source_sessions=["s1"], created_by="dreamer", confidence=0.9, risk="low", trust=trust, taint=taint or [],
+        proposed_change={"meta": {"type": "preference", "scope": "global", "title": title, "description": title,
+                                  "confidence": 0.9, "id": env.store.id_for("global", title)}, "body": title})
+    good, vague, ext = mk("Prefers dark mode screenshots", taint=["web"]), mk("Prefers the idea of that"), mk("Deploys with wrangler", "agent", ["web"])
+    done = env.dreamer.auto_sweep(cfg)
+    assert good["proposal_id"] in done and vague["proposal_id"] in done and ext["proposal_id"] not in done
+    assert [p["proposal_id"] for p in env.proposals.list_("pending")] == [ext["proposal_id"]]
+    assert env.proposals.list_("approved")[0]["decided_by"] == "auto-policy"

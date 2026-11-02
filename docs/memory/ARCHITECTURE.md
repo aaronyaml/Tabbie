@@ -150,7 +150,7 @@ workspace, its WebUI project, or the one project its worker requests ran in.
   candidate sentences; a Haiku pass (`dream_stated_llm`, subscription only, cached per sentence,
   capped per cycle) classifies them as preference / fact / rule and titles them; `verify_stated`
   rejects any title whose words don't come from the sentence, and anything sensitive or flagged by
-  the poison scan. Each becomes a proposal with the quote as evidence. Never auto-approved. An optional LLM pass (claude -p on the
+  the poison scan. Each becomes a proposal with the quote as evidence, applied by the auto-policy (`proposals.auto_approvable`) unless too vague. An optional LLM pass (claude -p on the
   subscription, never an API key) only *phrases* proposals from the evidence; it cannot add
   findings.
 - Triggers: manual (`hmem dream`), after N new traces, nightly LaunchAgent. Dreaming never runs
