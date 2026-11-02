@@ -613,7 +613,8 @@ Design notes: `docs/memory/ARCHITECTURE.md`, `docs/projects/ARCHITECTURE.md`.
 ### Attachments, agents, questions, takeover
 
 - **Attachments** (uploads, `@file:` refs, pasted paths):
-  - stored byte-exact and read-only under `state/requests/<id>/attachments/`;
+  - stored byte-exact and read-only under `state/requests/<id>/attachments/` (these copies are
+    dropped after `retention.attachments_days`, 30; replies and images in old chats stay);
   - a manifest records each file's name, type, size and sha256;
   - derived files (extracted ZIPs, PDF text, media info) sit beside the originals.
   - never picked up: keys and credential files (`.ssh/`, `*.pem`, `id_*`, `*.token`, cloud/CLI

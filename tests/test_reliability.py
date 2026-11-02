@@ -73,3 +73,19 @@ def test_attachments_never_pick_up_keys_or_tabbie_state():
     assert at._is_secret("/u/.hermes/webui/settings.json")
     assert not at._is_secret("/u/.hermes/webui/attachments/abc/photo.png")
     assert not at._is_secret("/u/proj/README.md") and not at._is_secret("/u/proj/keys.ts")
+
+
+def test_old_attachment_copies_are_pruned_and_replies_kept(tmp_path, monkeypatch):
+    monkeypatch.setattr(up, "STATE_DIR", tmp_path)
+    old, new = (tmp_path / "requests" / n for n in ("20260101-000000-aaaaaa", "20261101-000000-bbbbbb"))
+    for d in (old, new):
+        (d / "attachments" / "originals").mkdir(parents=True)
+        f = d / "attachments" / "originals" / "01-a.png"; f.write_bytes(b"x"); f.chmod(0o444)
+        (d / "request.json").write_text(json.dumps({"status": "done"}))
+        (d / "reply-1.md").write_text("hi")
+    t = time.time() - 40 * 86400
+    os.utime(old / "request.json", (t, t))
+    assert up.prune_old_attachments(30) == [old.name]
+    assert not (old / "attachments").exists() and (old / "reply-1.md").exists()
+    assert (new / "attachments").exists()
+    assert up.prune_old_attachments() == []  # once a day

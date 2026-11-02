@@ -12,6 +12,7 @@ Settings: `updates:` in config/router.yaml (repo, branch, check). No tokens: the
 """
 from __future__ import annotations
 
+import contextlib
 import json
 import os
 import re
@@ -324,6 +325,41 @@ def reap_orphans(min_age: float = 120.0) -> list[str]:
     return done
 
 
+def prune_old_attachments(days: float | None = None, *, now: float | None = None) -> list[str]:
+    """Drop the attachment copies of settled requests older than `days` (retention.attachments_days, 30).
+    They are byte copies of files the user still has; replies, images and agent blocks in old chats stay.
+    Runs at most once a day. Returns the request ids it cleaned."""
+    now = now or time.time()
+    stamp = STATE_DIR / ".pruned-at"
+    if days is None:
+        try:
+            if now - stamp.stat().st_mtime < 86400:
+                return []
+        except OSError:
+            pass
+        try:
+            from .common import load_config
+            days = float(((load_config().get("retention") or {}).get("attachments_days")) or 30)
+        except Exception:
+            days = 30.0
+    rd, done = STATE_DIR / "requests", []
+    if rd.exists():
+        for d in (x for x in rd.iterdir() if x.is_dir()):
+            att = d / "attachments"
+            try:
+                if not att.is_dir() or now - (d / "request.json").stat().st_mtime < days * 86400:
+                    continue
+                if json.loads((d / "request.json").read_text()).get("status") in ("executing", "planning"):
+                    continue
+            except (OSError, ValueError):
+                continue
+            shutil.rmtree(att, onerror=lambda fn, path, _e: (os.chmod(path, 0o700), fn(path)))
+            done.append(d.name)
+    with contextlib.suppress(OSError):
+        stamp.touch()
+    return done
+
+
 def _write(path: Path, data: dict) -> None:
     tmp = path.with_suffix(path.suffix + ".tmp")
     tmp.write_text(json.dumps(data, indent=2))
@@ -334,6 +370,7 @@ def busy() -> bool:
     """True while a worker is running (planning or executing), so a restart would cut it off."""
     try:
         reap_orphans()
+        prune_old_attachments()  # once a day at most
     except OSError:
         pass
     rd = STATE_DIR / "requests"

@@ -96,3 +96,8 @@ updates:
   repo: aaronyaml/Tabbie
   branch: main
   check: true
+
+# Housekeeping: attachment copies of finished requests are dropped after this many days
+# (replies, images and agent blocks in old chats stay).
+retention:
+  attachments_days: 30

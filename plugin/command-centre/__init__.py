@@ -1667,6 +1667,9 @@ def register(ctx):
             reaped = updates.reap_orphans()
             if reaped:
                 log_decision(event="orphans_settled", requests=reaped)
+            pruned = updates.prune_old_attachments()
+            if pruned:
+                log_decision(event="attachments_pruned", requests=len(pruned))
             _hmem()
             from hmem import projects as hprojects
             if hprojects.label_all_webui_workspaces():
