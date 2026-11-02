@@ -53,6 +53,14 @@ html.hx-typing #hxHome { opacity: 0; transform: translateY(6px); pointer-events:
 .hx-need-tt { font-size: 13.5px; font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .hx-need-tx { font-size: 12.5px; color: var(--hx-text-2, #8a8a8e); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 
+/* Project launcher */
+.hx-projs { display: flex; flex-wrap: wrap; gap: 8px; }
+.hx-proj { display: inline-flex; align-items: center; gap: 7px; padding: 8px 14px; border-radius: 999px; font: inherit; font-size: 13.5px;
+  font-weight: 500; border: 1px solid var(--hx-border, rgba(127,127,127,.22)); background: transparent; color: var(--hx-text, inherit);
+  cursor: pointer; transition: background-color .15s ease; }
+.hx-proj:hover { background: var(--hx-fill, rgba(127,127,127,.1)); }
+.hx-proj-ic { display: grid; color: var(--hx-text-2, #8a8a8e); }
+
 /* desktop: buddy beside the greeting, like Claude */
 @media (min-width: 641px) {
   /* upstream sometimes sets an inline display:block; keep the row layout regardless */
@@ -69,6 +77,8 @@ html.hx-typing #hxHome { opacity: 0; transform: translateY(6px); pointer-events:
   .hx-home-head { margin: 0 16px 8px; }
   .hx-need { padding: 0 16px; margin-bottom: 12px; }
   .hx-need-head { margin-top: 0; }
+  .hx-projs { flex-wrap: nowrap; overflow-x: auto; padding: 0 16px 2px; margin-bottom: 12px; scrollbar-width: none; }
+  .hx-proj { flex: none; }
   .hx-tries { display: flex; overflow-x: auto; scroll-snap-type: x mandatory; gap: 10px; padding: 0 16px 4px; scrollbar-width: none;
     -webkit-mask-image: linear-gradient(90deg, transparent 0, #000 12px, #000 calc(100% - 24px), transparent 100%);
     mask-image: linear-gradient(90deg, transparent 0, #000 12px, #000 calc(100% - 24px), transparent 100%); }

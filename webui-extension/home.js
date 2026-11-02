@@ -99,6 +99,21 @@
     } catch (_) {}
   }
 
+  // Project launcher: one tap starts a chat in that project's folder (upstream switchToWorkspace).
+  let projects = [], projectsAt = 0;
+  async function loadProjects() {
+    if (Date.now() - projectsAt < 60000) return;
+    projectsAt = Date.now();
+    try {
+      const r = await fetch('api/projects', { credentials: 'same-origin' });
+      if (!r.ok) return;
+      const d = await r.json();
+      projects = (d.projects || d || []).map((p) => ({ name: p.name, path: p.default_workspace || p.workspace || (p.workspaces || [])[0] || '' }))
+        .filter((p) => p.name && p.path).slice(0, 6);
+      render();
+    } catch (_) {}
+  }
+
   let home = null;
   function render() {
     if (!home) return;
@@ -124,7 +139,11 @@
           <span class="hx-need-tt">${esc(w.title)}</span>
           <span class="hx-need-tx">${esc(w.text)}</span>
         </button>`).join('')}</div>` : '';
-    const html = `${need}<div class="hx-home-head"><span>${icon('BulbIcon', 16)} Try Tabbie</span></div><div class="hx-tries">${cards}</div>${rec}`;
+    const proj = projects.length ? `
+      <div class="hx-home-head"><span>${icon('Folder01Icon', 16)} Start in a project</span></div>
+      <div class="hx-projs">${projects.map((p, i) => `
+        <button type="button" class="hx-proj" data-p="${i}"><span class="hx-proj-ic">${icon('Folder01Icon', 15)}</span>${esc(p.name)}</button>`).join('')}</div>` : '';
+    const html = `${need}${proj}<div class="hx-home-head"><span>${icon('BulbIcon', 16)} Try Tabbie</span></div><div class="hx-tries">${cards}</div>${rec}`;
     if (home.dataset.html !== html) { home.innerHTML = html; home.dataset.html = html; }
   }
 
@@ -138,6 +157,11 @@
       home.addEventListener('click', (e) => {
         const t = e.target.closest('.hx-try');
         if (t) return fillComposer(pick()[+t.dataset.i]);
+        const pj = e.target.closest('.hx-proj');
+        if (pj && typeof switchToWorkspace === 'function') {
+          const p = projects[+pj.dataset.p];
+          if (p) return switchToWorkspace(p.path, p.name).then(() => { const ta = document.getElementById('msg'); if (ta) ta.focus(); });
+        }
         const r = e.target.closest('.hx-rec, .hx-need-row');
         if (r && typeof loadSession === 'function') loadSession(r.dataset.sid);
       });
@@ -155,7 +179,7 @@
 
   function tick() { setGreeting(); place(); syncTyping(); }
   function start() {
-    tick(); loadRecent(); loadInbox();
+    tick(); loadRecent(); loadInbox(); loadProjects();
     addEventListener('input', (e) => { if (e.target && e.target.id === 'msg') syncTyping(); }, true);
     addEventListener('resize', place);
     const es = document.getElementById('emptyState');
