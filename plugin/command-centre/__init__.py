@@ -21,7 +21,7 @@ from pathlib import Path
 
 from . import executor_choice, limits_gate, projects, providers, questions, worker_profile
 from .agents import AgentRun, strip_attach
-from .attachments import Manifest
+from .attachments import Manifest, find_candidates, kind_of
 from .common import REQUESTS_DIR, STATE_DIR, load_config, log_decision, read_json, write_json
 from .providers import (WORKER_RULES, claude_transcript_tail, codex_models, git_state, run_astra_executor, run_claude,
                         run_planner, usage_limit_info, worker_rules)
@@ -349,7 +349,7 @@ _OTHER_NAME = {"claude": "Claude", "codex": "GPT"}
 
 def _auto_effort(r: Request) -> str:
     """Effort for a run whose chat is on Auto: what the user typed decides (see executor_choice.auto_effort)."""
-    return executor_choice.auto_effort(r.data.get("raw_message") or r["original_prompt"] or "")
+    return executor_choice.auto_effort(_brief_text(r))
 
 
 def _takeover_peer(r: Request) -> str | None:
@@ -521,6 +521,75 @@ def _on_pre_llm_call(session_id: str = "", user_message=None, **kwargs):
         return f"{TAG} routing error: {exc!r}. Tell the user routing failed and why; do not pretend it worked."
 
 
+def _attached_text(user_message, limit: int = 20000) -> str:
+    """Text/markdown files sent with the message (a brief pasted as a file): read for routing, effort and
+    memory lookup, which would otherwise only see "I've uploaded 2 file(s)"."""
+    out, left = [], limit
+    try:
+        paths, _ = find_candidates(user_message)
+    except Exception:
+        return ""
+    for p in paths[:5]:
+        try:
+            if kind_of(p.suffix, None) != "text" or not p.is_file() or p.stat().st_size > 2 * limit:
+                continue
+            t = p.read_text(encoding="utf-8", errors="replace")[:left]
+        except OSError:
+            continue
+        out.append(t)
+        left -= len(t)
+        if left <= 0:
+            break
+    return "\n\n".join(out)
+
+
+def _brief_text(r: Request) -> str:
+    """What the user asked, including a brief attached as a text file."""
+    return r.data.get("effective_text") or r.data.get("raw_message") or r["original_prompt"] or ""
+
+
+_UNFINISHED_RX = re.compile(r"\b(i'?ll|i will|will) (check|pull|report|let you know|look|review|update you)\b.{0,80}"
+                            r"\b(once|when|after)\b|\bonce (they|it|the \w+) (report|finish|complete|are done|is done)"
+                            r"|\bstill (running|working)\b", re.I | re.S)
+_UNFINISHED_NUDGE = ("Your run ended while work you started in the background was still running, so the user got "
+                     "no result. Wait for every background subagent and command to finish, check their results, "
+                     "then write the final message with the actual outcome.")
+
+
+def _left_unfinished(result: str, run: AgentRun) -> bool:
+    """A reply that promises to report back later, from a run that started background work."""
+    bg = any(a.get("kind") == "background" or a.get("async") for a in run.agents)
+    return bg and bool(_UNFINISHED_RX.search(result[-600:]))
+
+
+def _cwd(r: Request) -> str:
+    """Where the worker runs: the project, else this chat's own folder (kept across its requests, so a
+    follow-up like "make it blue" finds the previous work and can resume the same worker session)."""
+    if r["project"]:
+        return r["project"]
+    sid = re.sub(r"[^A-Za-z0-9_-]", "_", str(r["session_id"] or ""))[:80]
+    return str((STATE_DIR / "chat-work" / sid).resolve()) if sid else str((r.dir / "work").resolve())
+
+
+def _resume_key(r: Request) -> str:
+    """Worker sessions resume per chat (and project): another chat's history never leaks in."""
+    return f"{r['session_id']}:{r.data.get('project_id') or r['project'] or '-'}"
+
+
+def _recent_block(r: Request, turns: int = 6, cap: int = 600) -> str:
+    """The chat's last turns, for a worker that starts fresh (no session to resume)."""
+    recent = [m for m in (session_state(r["session_id"]).get("recent") or []) if m.get("content")]
+    cur = (r.data.get("raw_message") or "").strip()
+    if recent and recent[-1].get("role") == "user" and recent[-1]["content"].strip() == cur:
+        recent = recent[:-1]
+    recent = recent[-turns:]
+    if not recent:
+        return ""
+    lines = [f"{m['role'].upper()}: {' '.join(m['content'].split())[:cap]}" for m in recent]
+    return ("RECENT CONVERSATION IN THIS CHAT (oldest first; resolve 'it', 'that', 'the site' from here):\n"
+            + "\n".join(lines))
+
+
 def _remember(session_id: str, history) -> None:
     """Keep a compact rolling copy of the conversation for takeover handoffs."""
     recent = []
@@ -630,6 +699,11 @@ def _route_turn(session_id: str, user_message, history=None):
 
     # 4) a new request
     decision = classify(text, cfg)
+    attached = _attached_text(user_message)
+    effective = (text + "\n\n" + attached).strip() if attached else ""
+    if effective and not decision.forced:  # a brief sent as a file decides the route too
+        d2 = classify(effective, cfg)
+        decision.route, decision.reason, decision.score = d2.route, d2.reason, d2.score
     if (not decision.forced and decision.route == CLAUDE and cfg.get("router", {}).get("llm_tiebreak")
             and decision.score == int(cfg.get("router", {}).get("plan_threshold", 3)) - 1
             and _tiebreak(decision.text)):
@@ -658,6 +732,8 @@ def _route_turn(session_id: str, user_message, history=None):
     r = Request.create(session_id=session_id, route=decision.route, reason=decision.reason,
                        forced=decision.forced, prompt=decision.text, raw_message=text,
                        project=project, project_source=source)
+    if effective:
+        r["effective_text"] = effective[:20000]
     if registry_project:
         r["project_id"] = registry_project["id"]
     if extra_dirs:
@@ -793,7 +869,7 @@ def _route_motion(session_id: str, user_message, text: str):
 
 # --------------------------------------------------------------------------- tools
 
-def _claude_prompt(r: Request, manifest: Manifest) -> str:
+def _claude_prompt(r: Request, manifest: Manifest, history: bool = False) -> str:
     parts = [f"COMMAND CENTRE REQUEST {r.id}", _route_line(r), _project_lines(r),
              "", "ORIGINAL USER REQUEST (verbatim):", r["original_prompt"]]
     if r["route"] == ASTRA:
@@ -804,6 +880,9 @@ def _claude_prompt(r: Request, manifest: Manifest) -> str:
                       f"{r.data.get('approved_at')}). Follow it; the original request and attachments "
                       f"above/below remain the source of truth if anything is ambiguous:",
                   r["brief"]]
+    recent = _recent_block(r) if history else ""
+    if recent:
+        parts += ["", recent]
     parts += ["", manifest.render(), "", _memory_context(r)]
     parts += ["", f"IMAGES FOR THE USER: save screenshots/renders to show under {(r.dir / 'attach').resolve()} "
                   "(or inside the project folders above), then write `ATTACH: <absolute path>` on its own line. "
@@ -822,6 +901,9 @@ def _project_lines(r: Request) -> str:
                     p, r.data.get("raw_message") or r["original_prompt"] or "")
         except Exception as exc:
             log_decision(event="project_context_failed", request=r.id, error=str(exc)[:200])
+    if not r["project"]:
+        return (f"WORKING DIRECTORY: {_cwd(r)} (this chat's own folder; no project selected. Files you make "
+                "for the user go here unless they name another place)")
     return (f"WORKING DIRECTORY / PROJECT: {r['project']}"
             + (f"\nALSO PART OF THIS WORKSPACE (you may read/edit): {', '.join(r.data.get('extra_dirs') or [])}"
                if r.data.get("extra_dirs") else ""))
@@ -843,8 +925,7 @@ def _memory_context(r: Request) -> str:
     try:
         h = _hmem()
         project = r.data.get("project_id") or (h.trace.project_name(r["project"]) if r["project"] else None)
-        text = (r.data.get("raw_message") or r["original_prompt"] or "")[:2000]
-        return h.retrieve.worker_context(text, project, request_id=r.id)
+        return h.retrieve.worker_context(_brief_text(r)[:2000], project, request_id=r.id)
     except Exception as exc:  # memory must never block a run
         log_decision(event="memory_context_failed", request=r.id, error=str(exc)[:200])
         return "MEMORY: ~/hermes/memory/README.md explains what exists and how to search it."
@@ -868,7 +949,7 @@ def _execute(r: Request, feed=None, force: dict | None = None) -> dict:
     a limit switch)."""
     cfg = load_config()
     manifest = Manifest(r.dir)
-    cwd = r["project"] or str((r.dir / "work").resolve())
+    cwd = _cwd(r)
     Path(cwd).mkdir(parents=True, exist_ok=True)
     answer = r.data.get("pending_answer")
     q = r.data.get("question") or {}
@@ -904,11 +985,11 @@ def _execute(r: Request, feed=None, force: dict | None = None) -> dict:
         prompt = questions.answer_prompt(q, answer)
         r.write_text(f"answer-{len(r.data.get('question_log') or [])}.md", prompt)
     else:
-        if r["route"] == CLAUDE and r["project"] and ecfg.get("resume_project_session", True):
-            prev = sessions.get(r.data.get("project_id") or r["project"])
+        if r["route"] == CLAUDE and ecfg.get("resume_project_session", True):
+            prev = sessions.get(_resume_key(r))
             if prev and time.time() - prev.get("at", 0) < 60 * int(ecfg.get("resume_max_age_minutes", 120)):
                 resume = prev.get("session_id")
-        prompt = _claude_prompt(r, manifest)
+        prompt = _claude_prompt(r, manifest, history=not resume)
         r.write_text("claude_prompt.md", prompt)
     r["status"] = "executing"
     r.save()
@@ -949,6 +1030,19 @@ def _execute(r: Request, feed=None, force: dict | None = None) -> dict:
                          model=claude_model, effort=claude_effort, inbox=r.dir, profile=profile, delegate=delegate,
                          timings=timings)
         res["live_messages"] = sent + (res.get("live_messages") or [])
+    if res.get("ok") and res.get("session_id") and _left_unfinished(res.get("result") or "", run):
+        # it ended its reply while background work it started was still going: finish it now, once
+        log_decision(event="unfinished_resumed", request=r.id)
+        (feed or (lambda _t: None))("Finishing the background work it left running…")
+        sent = res.get("live_messages") or []
+        with run.lock:
+            run.main()["step"] = "Finishing background work"
+        more = run_claude(_UNFINISHED_NUDGE, cwd=cwd, add_dirs=add_dirs, cfg=cfg, resume_session=res["session_id"],
+                          on_progress=feed, session_key=r["session_id"], on_event=_agent_events(run, "claude"),
+                          model=claude_model, effort=claude_effort, inbox=r.dir, profile=profile, delegate=delegate,
+                          timings=timings)
+        if more.get("ok") and (more.get("result") or "").strip():
+            res = {**more, "live_messages": sent + (more.get("live_messages") or [])}
     r["pending_answer"] = None
     r["executor"] = {"provider": "claude-cli", "billing": res.get("billing"), "model": claude_model,
                      "effort": claude_effort, "auto_effort": not choice["effort"],
@@ -963,8 +1057,11 @@ def _execute(r: Request, feed=None, force: dict | None = None) -> dict:
         run.finish_main(bool(res.get("ok")), step=None if res.get("ok") else res.get("error"),
                         stopped=bool(res.get("stopped_by_user")))
         run.save(force=True)
-    if res.get("session_id") and r["project"]:
-        sessions[r.data.get("project_id") or r["project"]] = {"session_id": res["session_id"], "at": time.time()}
+    if res.get("session_id"):
+        sessions = read_json(_CLAUDE_SESSIONS, {}) or {}  # fresh: other chats may have saved meanwhile
+        sessions[_resume_key(r)] = {"session_id": res["session_id"], "at": time.time()}
+        cutoff = time.time() - 7 * 86400
+        sessions = {k: v for k, v in sessions.items() if isinstance(v, dict) and v.get("at", 0) > cutoff}
         write_json(_CLAUDE_SESSIONS, sessions)
     log_decision(event="executed", request=r.id, ok=res.get("ok"), billing=res.get("billing"),
                  duration_s=res.get("duration_s"), profile=res.get("profile"), dynamic=bool(delegate))
@@ -1043,7 +1140,7 @@ def _takeover_prompt(r: Request) -> str:
     sid = (r.data.get("executor") or {}).get("session_id") or res.get("session_id")
     st = session_state(r["session_id"])
     convo = "\n".join(f"{m['role'].upper()}: {m['content']}" for m in st.get("recent", [])[-10:])
-    cwd = r["project"] or str((r.dir / "work").resolve())
+    cwd = _cwd(r)
     parts = ["You are taking over from Claude Code, which stopped (usage limit) or is paused for this session.",
              "Continue the work from where it stopped. Do not redo finished work; check the repo state first.",
              "Be exhaustive in execution, minimal in words. Final message: Done / Verified / Note bullets.",
@@ -1071,7 +1168,7 @@ def _codex_worker_prompt(r: Request, dynamic: bool = False) -> str:
 def _astra_takeover(r: Request, reason: str, choice: dict | None = None, feed=None, offer: bool = True) -> dict:
     """Codex executes the request: Astra takeover, or (choice) the OpenAI model the user picked."""
     cfg = load_config()
-    cwd = r["project"] or str((r.dir / "work").resolve())
+    cwd = _cwd(r)
     answer = r.data.get("pending_answer")
     thread = (r.data.get("executor") or {}).get("thread_id") if answer else None
     model = choice["model"] if choice else ((cfg.get("takeover", {}) or {}).get("model")
