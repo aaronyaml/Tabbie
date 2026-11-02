@@ -287,28 +287,28 @@
         + `<span class="hx-mp-text"><span class="hx-mp-name">${esc(pv.name)}${badge}</span><span class="hx-mp-desc">${esc(sub)}</span></span>`
         + `<span class="hx-mp-go">${icon('ArrowRight01Icon', 16)}</span></button>`;
     }).join('');
+    // Agents: one card of switch rows (Claude Code, Codex, Hand-offs, Takeover). Same data attributes
+    // and handlers as before; unavailable ones are dimmed with the reason as their subtitle.
     const on = catalog.agents || AGENTS.map((x) => x[0]);
-    const agents = AGENTS.map(([a, label]) => `<button type="button" class="hx-mp-seg${on.includes(a) ? ' is-on' : ''}" data-agent="${a}" aria-pressed="${on.includes(a)}">${label}</button>`).join('');
-    // Hand-offs: same pill style. Unavailable (an agent off or signed out) = greyed, with a caption.
-    const unavail = handoffs.known && handoffs.available === false;
-    const hoOn = handoffs.dynamic && !unavail;
-    const ho = !handoffs.known ? ''
-      : `<button type="button" class="hx-mp-seg hx-mp-handoffs${hoOn ? ' is-on' : ''}${unavail ? ' is-unavail' : ''}" data-handoffs`
-        + ` aria-pressed="${hoOn}"${unavail ? ' aria-disabled="true" disabled' : ''}`
-        + ` title="${unavail ? 'Needs Claude Code and Codex signed in' : 'Claude Code and Codex may hand part of a job to each other'}">Hand-offs</button>`;
     const bothOn = on.includes('claude') && on.includes('codex');
-    const tkOn = handoffs.takeover !== false && bothOn;
-    const tk = !handoffs.known ? ''
-      : `<button type="button" class="hx-mp-seg hx-mp-takeover${tkOn ? ' is-on' : ''}${bothOn ? '' : ' is-unavail'}" data-takeover`
-        + ` aria-pressed="${tkOn}"${bothOn ? '' : ' aria-disabled="true" disabled'}`
-        + ` title="${bothOn ? 'When Claude or Codex hits its usage limit, the other carries on with the same task' : 'Needs Claude Code and Codex both on'}">Takeover</button>`;
+    const extra = Object.values(catalog.providers || {}).some((p) => p.endpoint);
+    const unavail = handoffs.known && handoffs.available === false;
+    const tile = (attr, ic, name, sub, isOn, off) => `<button type="button" class="hx-mp-tog${isOn ? ' is-on' : ''}${off ? ' is-unavail' : ''}" ${attr}`
+      + ` role="switch" aria-checked="${isOn}"${off ? ' aria-disabled="true" disabled' : ''}>`
+      + `<span class="hx-mp-tog-ic">${icon(ic, 16)}</span><span class="hx-mp-tog-tx"><span class="hx-mp-tog-name">${name}</span>`
+      + `<span class="hx-mp-tog-sub">${sub}</span></span><span class="hx-mp-switch" aria-hidden="true"></span></button>`;
+    const tiles = tile('data-agent="claude"', 'AiBrain01Icon', 'Claude Code', 'Claude plan', on.includes('claude'), false)
+      + tile('data-agent="codex"', 'AiMagicIcon', 'Codex', 'ChatGPT plan', on.includes('codex'), false)
+      + (!handoffs.known ? '' : tile('data-handoffs', 'ShuffleIcon', 'Hand-offs', unavail ? 'Needs Claude Code and Codex signed in' : 'Pass parts of a job along',
+        handoffs.dynamic && !unavail, unavail))
+      + (!handoffs.known ? '' : tile('data-takeover', 'RefreshIcon', 'Takeover', bothOn || extra ? 'Carry on elsewhere at a limit' : 'Needs a second agent or provider',
+        handoffs.takeover !== false && (bothOn || extra), !(bothOn || extra)));
     return `<header class="hx-mp-head"><span class="hx-mp-title">Model</span></header>`
       + `<div class="hx-mp-list">${rows}`
       + `<button type="button" class="hx-mp-row hx-mp-add" data-manage><span class="hx-mp-tile">${icon('Add01Icon', 20)}</span>`
       + `<span class="hx-mp-text"><span class="hx-mp-name">More models</span><span class="hx-mp-desc">DeepSeek, Kimi, GLM, OpenRouter, API keys, Ollama…</span></span>`
       + `<span class="hx-mp-go">${icon('ArrowRight01Icon', 16)}</span></button></div>`
-      + `<div class="hx-mp-effort hx-mp-agents"><span class="hx-mp-effort-label">Agents</span><div class="hx-mp-segs" role="group" aria-label="Coding agents on this Mac">${agents}${ho}${tk}</div></div>`
-      + (unavail ? '<p class="hx-mp-cap hx-mp-ho-cap">Hand-offs: needs Claude Code and Codex signed in</p>' : '')
+      + `<p class="hx-mp-group">Agents</p><div class="hx-mp-togs" role="group" aria-label="Coding agents on this Mac">${tiles}</div>`
       + (notice ? noteHtml() : `<p class="hx-mp-cap">${sid() ? 'For this conversation' : 'For this new chat'}</p>`);
   }
 
