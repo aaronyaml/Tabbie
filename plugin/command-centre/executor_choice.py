@@ -5,6 +5,8 @@ state (state/sessions/<id>.json, key "executor_choice"). No choice = Anthropic, 
 
   anthropic -> Claude Code (`claude -p --model <id> [--effort <level>]`, Claude Max OAuth)
   openai    -> Codex (`codex exec -m <id> [-c model_reasoning_effort=...]`, ChatGPT plan OAuth)
+  <other>   -> a linked model provider (model_providers: DeepSeek, Kimi, an API key, Ollama...), run in
+               Claude Code or Codex pointed at that provider. Listed only once it is linked.
 
 Only models verified to run on the user's subscriptions are listed (tiny `say hi` runs, 2026-10-28).
 """
@@ -24,20 +26,20 @@ CATALOG: dict[str, dict] = {
         "name": "Anthropic",
         "worker": "Claude Code",
         "models": [
-            {"id": "claude-opus-5-5", "name": "Opus 5.5", "desc": "Most capable"},
-            {"id": "claude-fable-5-1", "name": "Fable 5.1", "desc": "Deepest reasoning, slower"},
-            {"id": "claude-sonnet-5-5", "name": "Sonnet 5.5", "desc": "Fast and capable"},
-            {"id": "claude-haiku-5-5", "name": "Haiku 5.5", "desc": "Quickest"},
+            {"id": "claude-opus-5-5", "name": "Opus 5.5", "desc": "Most capable", "tier": "top"},
+            {"id": "claude-fable-5-1", "name": "Fable 5.1", "desc": "Deepest reasoning, slower", "tier": "top"},
+            {"id": "claude-sonnet-5-5", "name": "Sonnet 5.5", "desc": "Fast and capable", "tier": "mid"},
+            {"id": "claude-haiku-5-5", "name": "Haiku 5.5", "desc": "Quickest", "tier": "fast"},
         ],
     },
     "openai": {
         "name": "OpenAI",
         "worker": "Codex",
         "models": [
-            {"id": "gpt-6-astra", "name": "GPT-6 Astra", "desc": "Frontier intelligence"},
-            {"id": "gpt-6.1-sol", "name": "GPT-6.1 Sol", "desc": "Everyday workhorse"},
-            {"id": "gpt-6.1-terra", "name": "GPT-6.1 Terra", "desc": "Balanced"},
-            {"id": "gpt-6-luna", "name": "GPT-6 Luna", "desc": "Quickest"},
+            {"id": "gpt-6-astra", "name": "GPT-6 Astra", "desc": "Frontier intelligence", "tier": "top"},
+            {"id": "gpt-6.1-sol", "name": "GPT-6.1 Sol", "desc": "Everyday workhorse", "tier": "top"},
+            {"id": "gpt-6.1-terra", "name": "GPT-6.1 Terra", "desc": "Balanced", "tier": "mid"},
+            {"id": "gpt-6-luna", "name": "GPT-6 Luna", "desc": "Quickest", "tier": "fast"},
         ],
     },
 }
@@ -55,23 +57,75 @@ def _agents():
     return agents
 
 
+def _mp():
+    from . import model_providers
+    return model_providers
+
+
+WORKER_NAME = {"claude": "Claude Code", "codex": "Codex"}
+TIER_DESC = {"top": "Most capable", "mid": "Balanced", "fast": "Quickest"}
+
+
+def worker_of(provider: str) -> str | None:
+    """The CLI that runs this provider's models: claude or codex."""
+    if provider in AGENT_OF:
+        return AGENT_OF[provider]
+    p = _mp().get(provider)
+    return p.get("worker", "claude") if p else None
+
+
+def is_endpoint(provider: str | None) -> bool:
+    """A linked model provider (not the Claude / ChatGPT subscription logins)."""
+    return bool(provider) and provider not in CATALOG
+
+
+def endpoints_on() -> list[str]:
+    """Linked model providers whose CLI is installed."""
+    import shutil
+    try:
+        ids = _mp().linked_ids()
+    except Exception:
+        return []
+    return [pid for pid in ids if shutil.which(worker_of(pid) or "")]
+
+
 def providers_on() -> list[str]:
-    """Providers whose CLI the user enabled (config/agents.yaml): Claude only, Codex only, or both."""
+    """Subscriptions the user enabled (config/agents.yaml), then linked model providers."""
     on = _agents().enabled()
-    return [p for p in CATALOG if AGENT_OF[p] in on]
+    return [p for p in CATALOG if AGENT_OF[p] in on] + endpoints_on()
 
 
 def default_choice() -> dict:
-    p = providers_on()[0]
+    on = providers_on()
+    p = on[0] if on else DEFAULT["provider"]
     if p == DEFAULT["provider"]:
         return dict(DEFAULT)
-    return {"provider": p, "model": CATALOG[p]["models"][0]["id"], "effort": None}
+    ms = _models(p)
+    return {"provider": p, "model": ms[0]["id"] if ms else DEFAULT["model"], "effort": None}
+
+
+def _models(provider: str) -> list[dict]:
+    if provider in CATALOG:
+        return CATALOG[provider]["models"]
+    mp = _mp()
+    label = mp.BILLING_LABEL.get((mp.get(provider) or {}).get("billing"), "")
+    return [{**m, "desc": m.get("desc") or " · ".join(x for x in (TIER_DESC.get(m.get("tier"), ""), label) if x)}
+            for m in mp.models(provider)]
+
+
+def provider_name(provider: str) -> str:
+    if provider in CATALOG:
+        return CATALOG[provider]["name"]
+    return (_mp().get(provider) or {}).get("name") or provider
 
 
 def model_info(provider: str, model: str) -> dict | None:
-    for m in (CATALOG.get(provider) or {}).get("models", []):
+    for m in _models(provider) if (provider in CATALOG or _mp().get(provider)) else []:
         if m["id"] == model:
             return m
+    if is_endpoint(provider) and _mp().get(provider):
+        m = _mp().model_info(provider, model)  # typed by the user, not in the fetched list
+        return {**m, "desc": TIER_DESC.get(m.get("tier"), "")} if m else None
     return None
 
 
@@ -79,27 +133,39 @@ def valid(provider: str, model: str, effort: str | None) -> bool:
     return model_info(provider, model) is not None and (effort is None or effort in EFFORTS)
 
 
+def label(provider: str, name: str) -> str:
+    """"DeepSeek V4 Pro", "Kimi K2" ...: the provider name only when the model name lacks it."""
+    pn = provider_name(provider)
+    return name if name.lower().startswith(pn.lower().split()[0]) else f"{pn} {name}"
+
+
+def _worker_label(provider: str) -> str:
+    w = WORKER_NAME.get(worker_of(provider) or "", "")
+    return w if not is_endpoint(provider) else f"{w} → {provider_name(provider)}"
+
+
 def get_choice(session_id: str) -> dict:
     """The conversation's choice, or the default. Always a complete, valid dict."""
     raw = session_state(session_id).get(KEY) or {}
     p, m, e = raw.get("provider"), raw.get("model"), raw.get("effort") or None
-    if isinstance(p, str) and isinstance(m, str) and valid(p, m, e) and p not in providers_on() \
-            and AGENT_OF.get("openai" if p == "anthropic" else "anthropic") in _agents().enabled():
+    ok = isinstance(p, str) and isinstance(m, str) and valid(p, m, e)
+    on = providers_on()
+    if ok and p not in on and len(on) > 0 and not is_endpoint(p):
         p, m = (peer := peer_model(p, m))["provider"], peer["model"]  # agent switched off: its equivalent
-    elif not (isinstance(p, str) and isinstance(m, str) and valid(p, m, e)) or p not in providers_on():
+    elif not ok or p not in on:
         d = default_choice()
         p, m, e = d["provider"], d["model"], d["effort"]
-    info = model_info(p, m)
-    return {"provider": p, "model": m, "effort": e, "name": info["name"], "desc": info["desc"],
-            "worker": CATALOG[p]["worker"], "default": not raw}
+    info = model_info(p, m) or {"name": m, "desc": ""}
+    return {"provider": p, "model": m, "effort": e, "name": info["name"], "desc": info.get("desc", ""),
+            "worker": _worker_label(p), "agent": worker_of(p), "endpoint": is_endpoint(p), "default": not raw}
 
 
 def new_chat_choice() -> dict:
     """What a chat that does not exist yet will run: the default, in get_choice's shape."""
     d = default_choice()
-    info = model_info(d["provider"], d["model"])
-    return {**d, "name": info["name"], "desc": info["desc"], "worker": CATALOG[d["provider"]]["worker"],
-            "default": True}
+    info = model_info(d["provider"], d["model"]) or {"name": d["model"], "desc": ""}
+    return {**d, "name": info["name"], "desc": info.get("desc", ""), "worker": _worker_label(d["provider"]),
+            "agent": worker_of(d["provider"]), "endpoint": is_endpoint(d["provider"]), "default": True}
 
 
 def set_choice(session_id: str, provider: str, model: str, effort: str | None = None) -> dict:
@@ -113,15 +179,18 @@ def set_choice(session_id: str, provider: str, model: str, effort: str | None = 
 
 
 def public_catalog(available_openai: list[str] | None = None) -> dict:
-    """Catalog for the picker. OpenAI models are trimmed to what this Codex login exposes."""
+    """Catalog for the picker: only what this user can run. OpenAI models are trimmed to what this
+    Codex login exposes; linked providers carry their billing label (Plan / Pay per use / On this Mac)."""
     out = {}
-    for pid, p in CATALOG.items():
-        if pid not in providers_on():
-            continue
-        models = p["models"]
+    for pid in providers_on():
+        models = _models(pid)
         if pid == "openai" and available_openai:
             models = [m for m in models if m["id"] in available_openai]
-        out[pid] = {"name": p["name"], "worker": p["worker"], "models": models}
+        entry = {"name": provider_name(pid), "worker": _worker_label(pid), "agent": worker_of(pid), "models": models}
+        if is_endpoint(pid):
+            p = _mp().get(pid) or {}
+            entry.update(endpoint=True, billing=p.get("billing"), billing_label=_mp().BILLING_LABEL.get(p.get("billing"), ""))
+        out[pid] = entry
     return {"providers": out, "efforts": list(EFFORTS), "default": default_choice(),
             "agents": _agents().enabled()}
 
@@ -165,11 +234,32 @@ PEER = {
 }
 
 
+def tier_of(provider: str, model: str | None) -> str:
+    m = model_info(provider, model or "") if model else None
+    return (m or {}).get("tier") or "top"
+
+
 def peer_model(provider: str, model: str | None, overrides: dict | None = None,
-               available_openai: list[str] | None = None) -> dict:
-    """{provider, model, name} of the other provider's same-tier model. An OpenAI peer the Codex login
-    does not expose falls back to the first catalog model it does."""
+               available_openai: list[str] | None = None, exclude: list[str] | tuple = ()) -> dict:
+    """{provider, model, name} of a same-tier model elsewhere, for hand-offs and limit switches.
+    Claude <-> Codex first (the PEER map, router.yaml overrides); when that side is off or excluded, a
+    linked model provider at the same tier. An OpenAI peer the Codex login does not expose falls back
+    to the first catalog model it does."""
+    on = providers_on()
     other = "openai" if provider == "anthropic" else "anthropic"
+    if provider not in CATALOG or other not in on or other in exclude:
+        tier = tier_of(provider, model)
+        for pid in [*[p for p in CATALOG if p in on], *endpoints_on()]:
+            if pid == provider or pid in exclude or pid not in on:
+                continue
+            ms = _models(pid)
+            if pid == "openai" and available_openai:
+                ms = [m for m in ms if m["id"] in available_openai] or ms
+            if ms:
+                pick = next((m for m in ms if m.get("tier") == tier), ms[0])
+                return {"provider": pid, "model": pick["id"], "name": pick.get("name") or pick["id"]}
+        if provider not in CATALOG:  # nothing else is on: the subscriptions' defaults
+            other = "anthropic"
     want = (overrides or {}).get(model or "") or PEER.get(model or "")
     ids = [m["id"] for m in CATALOG[other]["models"]]
     if other == "openai" and available_openai:

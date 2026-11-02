@@ -68,3 +68,4 @@ config/.*.yaml.*
 # UI code, not credentials
 !webui-extension/worker-tokens.js
 !webui-extension/worker-tokens.css
+config/providers.yaml

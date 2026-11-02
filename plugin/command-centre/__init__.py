@@ -369,6 +369,20 @@ def _takeover_peer(r: Request) -> str | None:
                                       _codex_models_safe())["model"]
 
 
+def _endpoint_peer(provider: str, model: str | None) -> dict | None:
+    """A same-tier model on a linked model provider (DeepSeek, an API key...), or None. The last stop
+    when the Claude and ChatGPT subscriptions are both out."""
+    try:
+        if not executor_choice.endpoints_on():
+            return None
+        peer = executor_choice.peer_model(provider, model, exclude=tuple(executor_choice.CATALOG))
+    except Exception:
+        return None
+    if not executor_choice.is_endpoint(peer["provider"]):
+        return None
+    return {**peer, "label": executor_choice.label(peer["provider"], peer["name"])}
+
+
 def _limit_block(r: Request, agent: str, model: str | None, *, offer: bool = True) -> dict | None:
     """Before spawning: None = go. Blocked: when the other provider is linked, enabled and itself below the
     limit, {"switch": <its same-tier model>} and the caller runs that instead (no question); else nothing
@@ -395,6 +409,10 @@ def _limit_block(r: Request, agent: str, model: str | None, *, offer: bool = Tru
         if offer and _handover_on() and not og.blocked:
             log_decision(event="limit_switch_auto", request=r.id, to=other, model=peer["model"])
             return {"switch": peer}
+    alt = _endpoint_peer("anthropic" if agent == "claude" else "openai", model) if offer and _handover_on() else None
+    if alt:  # both subscriptions are out (or the other isn't linked): a linked provider does it
+        log_decision(event="limit_switch_endpoint", request=r.id, to=alt["provider"], model=alt["model"])
+        return {"switch": alt}
     r["status"] = "limit_blocked"
     r.save()
     msg = _out_of_limits(g.message, og.message if og is not None and og.blocked else None)
@@ -1065,9 +1083,12 @@ def _run_request(r: Request, feed=None, force: dict | None = None) -> dict:
     if force:
         info = executor_choice.model_info(force["provider"], force["model"]) or {"name": force["model"]}
         choice = {**choice, "provider": force["provider"], "model": force["model"], "name": info["name"],
-                  "worker": executor_choice.CATALOG[force["provider"]]["worker"],
+                  "worker": executor_choice.WORKER_NAME.get(executor_choice.worker_of(force["provider"]) or "", ""),
                   "effort": force.get("effort") or choice["effort"]}
-    picked = choice if choice["provider"] == "openai" else None
+    # a linked model provider (DeepSeek, an API key, Ollama...): no subscription limits, its own sessions
+    endpoint = choice["provider"] if executor_choice.is_endpoint(choice["provider"]) else None
+    on_claude = executor_choice.worker_of(choice["provider"]) == "claude"
+    picked = None if on_claude else choice
     if answer and q.get("source") == "astra":
         chosen_run = (r.data.get("executor") or {}).get("chosen")
         return _astra_takeover(r, reason="resumed with your answers", choice=picked if chosen_run else None, feed=feed)
@@ -1075,10 +1096,12 @@ def _run_request(r: Request, feed=None, force: dict | None = None) -> dict:
         return _astra_takeover(r, reason="takeover mode is on for this session", feed=feed)
     if picked and not answer:  # the user picked an OpenAI model for this conversation: Codex executes
         return _astra_takeover(r, reason=r["route_reason"], choice=picked, feed=feed, offer=not force)
-    claude_model = choice["model"] if choice["provider"] == "anthropic" else None
-    claude_effort = (choice["effort"] if choice["provider"] == "anthropic" else None) or _auto_effort(r)
+    claude_model = choice["model"] if on_claude else None
+    claude_effort = (choice["effort"] if on_claude else None) or _auto_effort(r)
     ecfg = dict(cfg.get("executor", {}) or {})
-    blocked = _limit_block(r, "claude", claude_model or ecfg.get("model"), offer=not force)
+    blocked = None if endpoint else _limit_block(r, "claude", claude_model or ecfg.get("model"), offer=not force)
+    if blocked and blocked.get("switch") and executor_choice.is_endpoint(blocked["switch"]["provider"]):
+        return _execute(r, force={**blocked["switch"], "effort": claude_effort}, feed=feed)
     if blocked and blocked.get("switch"):  # Claude is at its limit: its GPT equivalent does this one
         peer = blocked["switch"]
         return _astra_takeover(r, reason=f"Claude {choice['name']} is at its limit, so its equivalent took this one",
@@ -1086,7 +1109,7 @@ def _run_request(r: Request, feed=None, force: dict | None = None) -> dict:
                                        "effort": claude_effort}, feed=feed, offer=False)
     if blocked:
         return blocked
-    if (not force and not answer and ecfg.get("busy_fallback", True) and agents().has("codex")
+    if (not force and not answer and not endpoint and ecfg.get("busy_fallback", True) and agents().has("codex")
             and providers.WorkerSlot.all_busy(ecfg.get("max_parallel", 1), r["session_id"])):
         # every Claude slot is running another chat's job: its GPT equivalent starts now instead of queueing
         peer = executor_choice.peer_model("anthropic", claude_model or ecfg.get("model") or executor_choice.DEFAULT["model"],
@@ -1096,6 +1119,7 @@ def _run_request(r: Request, feed=None, force: dict | None = None) -> dict:
                                choice={"provider": "openai", "model": peer["model"], "name": peer["name"],
                                        "effort": claude_effort}, feed=feed, offer=False)
     resume = None
+    rkey = _resume_key(r) + (f":{endpoint}" if endpoint else "")  # a provider's sessions stay its own
     sessions = read_json(_CLAUDE_SESSIONS, {}) or {}
     if answer:  # the worker asked; continue exactly that Claude session with the answers
         resume = (r.data.get("executor") or {}).get("session_id")
@@ -1103,7 +1127,7 @@ def _run_request(r: Request, feed=None, force: dict | None = None) -> dict:
         r.write_text(f"answer-{len(r.data.get('question_log') or [])}.md", prompt)
     else:
         if r["route"] == CLAUDE and ecfg.get("resume_project_session", True):
-            prev = sessions.get(_resume_key(r))
+            prev = sessions.get(rkey)
             if (prev and time.time() - prev.get("at", 0) < 60 * int(ecfg.get("resume_max_age_minutes", 120))
                     and (prev.get("ctx") or 0) < int(ecfg.get("resume_max_context", 120000))):
                 resume = prev.get("session_id")  # past the cap a fresh session + recent turns costs far less
@@ -1123,11 +1147,12 @@ def _run_request(r: Request, feed=None, force: dict | None = None) -> dict:
                f"({(busy[-1].get('raw_message') or '')[:60]}). Starts when that finishes.")
         _notify(msg)
         (feed or (lambda _t: None))(msg)
-    _notify(f"Using Claude Code: {'continuing session in ' if resume else ''}{cwd}")
+    who = executor_choice.label(endpoint, choice["name"]) if endpoint else "Claude Code"
+    _notify(f"Using {who}: {'continuing session in ' if resume else ''}{cwd}")
     add_dirs = ([str(manifest.dir)] if manifest.items else []) + list(r.data.get("extra_dirs") or [])
     run = AgentRun.load(r.id, r["session_id"])
     run.attach_roots = [cwd, *add_dirs, str(r.dir)]  # where an ATTACH: <image> line may point
-    run.start_main("Claude Code" + (" · answered" if answer else ""), "claude",
+    run.start_main(who + (" · answered" if answer else ""), "claude",
                    description="resumed with your answers" if answer else "main worker")
     run.save(force=True)
     profile = worker_profile.profile_for(ecfg, r.data.get("raw_message") or r["original_prompt"] or "")
@@ -1141,13 +1166,13 @@ def _run_request(r: Request, feed=None, force: dict | None = None) -> dict:
     res = run_claude(prompt, cwd=cwd, add_dirs=add_dirs, cfg=cfg, resume_session=resume, on_progress=feed,
                      session_key=r["session_id"], on_event=_agent_events(run, "claude"),
                      model=claude_model, effort=claude_effort, inbox=r.dir, profile=profile, delegate=delegate,
-                     timings=timings)
+                     timings=timings, endpoint=endpoint)
     if not res.get("ok") and resume and not answer and "session" in str(res.get("error", "")).lower():
         sent = res.get("live_messages") or []
         res = run_claude(prompt, cwd=cwd, add_dirs=add_dirs, cfg=cfg, resume_session=None, on_progress=feed,
                          session_key=r["session_id"], on_event=_agent_events(run, "claude"),
                          model=claude_model, effort=claude_effort, inbox=r.dir, profile=profile, delegate=delegate,
-                         timings=timings)
+                         timings=timings, endpoint=endpoint)
         res["live_messages"] = sent + (res.get("live_messages") or [])
     if res.get("ok") and res.get("session_id") and _left_unfinished(res.get("result") or "", run):
         # it ended its reply while background work it started was still going: finish it now, once
@@ -1159,11 +1184,11 @@ def _run_request(r: Request, feed=None, force: dict | None = None) -> dict:
         more = run_claude(_UNFINISHED_NUDGE, cwd=cwd, add_dirs=add_dirs, cfg=cfg, resume_session=res["session_id"],
                           on_progress=feed, session_key=r["session_id"], on_event=_agent_events(run, "claude"),
                           model=claude_model, effort=claude_effort, inbox=r.dir, profile=profile, delegate=delegate,
-                          timings=timings)
+                          timings=timings, endpoint=endpoint)
         if more.get("ok") and (more.get("result") or "").strip():
             res = {**more, "live_messages": sent + (more.get("live_messages") or [])}
     r["pending_answer"] = None
-    r["executor"] = {"provider": "claude-cli", "billing": res.get("billing"), "model": claude_model,
+    r["executor"] = {"provider": "claude-cli", "endpoint": endpoint, "billing": res.get("billing"), "model": claude_model,
                      "effort": claude_effort, "auto_effort": not choice["effort"],
                      "session_id": res.get("session_id") or resume, "resumed": bool(resume),
                      "profile": res.get("profile") or profile, "dynamic": bool(delegate),
@@ -1186,7 +1211,7 @@ def _run_request(r: Request, feed=None, force: dict | None = None) -> dict:
     if res.get("session_id"):
         sessions = read_json(_CLAUDE_SESSIONS, {}) or {}  # fresh: other chats may have saved meanwhile
         main = run.main() or {}
-        sessions[_resume_key(r)] = {"session_id": res["session_id"], "at": time.time(), "ctx": main.get("tokens") or 0}
+        sessions[rkey] = {"session_id": res["session_id"], "at": time.time(), "ctx": main.get("tokens") or 0}
         cutoff = time.time() - 7 * 86400
         sessions = {k: v for k, v in sessions.items() if isinstance(v, dict) and v.get("at", 0) > cutoff}
         write_json(_CLAUDE_SESSIONS, sessions)
@@ -1198,7 +1223,7 @@ def _run_request(r: Request, feed=None, force: dict | None = None) -> dict:
         out["route"] = _route_line(r)
         return out
     st = session_state(r["session_id"])
-    limit = usage_limit_info(res)
+    limit = usage_limit_info(res) if not endpoint else None  # a provider's own errors are reported as they are
     if res.get("ok") and st.get("takeover_declined"):
         st["takeover_declined"] = False  # Claude works again: the next limit may prompt again
         save_session_state(r["session_id"], st)
@@ -1221,13 +1246,19 @@ def _run_request(r: Request, feed=None, force: dict | None = None) -> dict:
             theirs = cg.message
         elif force:  # Claude was already standing in for Codex at its limit
             theirs = _limit_text("codex", "")
+        alt = _endpoint_peer("anthropic", claude_model) if not force and _handover_on() else None
+        if alt:  # both subscriptions are out: a linked provider carries on
+            log_decision(event="claude_limit_endpoint", request=r.id, to=alt["provider"], model=alt["model"])
+            (feed or (lambda _t: None))(f"Claude hit its usage limit, so {alt['label']} is carrying on with the task…")
+            r = Request(r.id); r["status"] = "executing"; r["claude_limit"] = mine; r.save()
+            return _execute(r, force={"provider": alt["provider"], "model": alt["model"], "effort": claude_effort}, feed=feed)
         msg = _out_of_limits(mine, theirs)
         if not agents().has("codex"):
             msg += ". Codex isn't enabled on this Mac (Settings → Agents), so nothing could take over"
         return {"request_id": r.id, "ok": False, "claude_usage_limit": limit, "usage_limit": msg,
                 "note": f"Tell the user in one line: {msg}. What Claude finished before the limit is kept."}
     if (not res.get("ok") and not res.get("stopped_by_user") and not force and not answer
-            and _CLAUDE_AUTH_RX.search(str(res.get("error") or "")) and agents().has("codex")):
+            and not endpoint and _CLAUDE_AUTH_RX.search(str(res.get("error") or "")) and agents().has("codex")):
         # Claude's sign-in is broken (logged out, expired token): the GPT equivalent does this one
         peer = executor_choice.peer_model("anthropic", claude_model or ecfg.get("model") or executor_choice.DEFAULT["model"],
                                           (cfg.get("dynamic_agents") or {}).get("models") or {}, _codex_models_safe())
@@ -1240,7 +1271,8 @@ def _run_request(r: Request, feed=None, force: dict | None = None) -> dict:
         "request_id": r.id,
         "route": _route_line(r) if not force else f"Route: Claude {choice['name']} — {_WHO['codex']} is at its limit, so its equivalent took this one",
         "ok": res.get("ok"),
-        "executor": f"Claude Code (claude -p --model {claude_model})" if claude_model else "Claude Code (claude -p)",
+        "executor": (f"Claude Code → {executor_choice.provider_name(endpoint)} " if endpoint else "Claude Code ")
+                    + (f"(claude -p --model {claude_model})" if claude_model else "(claude -p)"),
         "billing": res.get("billing"),
         "project": cwd,
         "attachments_passed": [e["stored_path"] for e in manifest.items],
@@ -1315,19 +1347,21 @@ def _astra_takeover(r: Request, reason: str, choice: dict | None = None, feed=No
     thread = (r.data.get("executor") or {}).get("thread_id") if answer else None
     model = choice["model"] if choice else ((cfg.get("takeover", {}) or {}).get("model")
                                             or _takeover_peer(r) or (cfg.get("planner", {}) or {}).get("model"))
+    endpoint = choice["provider"] if choice and executor_choice.is_endpoint(choice.get("provider")) else None
     # a takeover exists because Claude is out: only a picked-Codex run may offer Claude instead
-    blocked = _limit_block(r, "codex", model, offer=bool(choice) and offer)
+    blocked = None if endpoint else _limit_block(r, "codex", model, offer=bool(choice) and offer)
     effort = (choice or {}).get("effort") or (r.data.get("executor") or {}).get("effort") or _auto_effort(r)
-    if blocked and blocked.get("switch"):  # Codex is at its limit: its Claude equivalent does this one
-        return _execute(r, force={"provider": "anthropic", "model": blocked["switch"]["model"], "effort": effort},
-                        feed=feed)
+    if blocked and blocked.get("switch"):  # Codex is at its limit: its Claude equivalent (or a linked provider) does it
+        return _execute(r, force={"provider": blocked["switch"]["provider"], "model": blocked["switch"]["model"],
+                                  "effort": effort}, feed=feed)
     if blocked:
         return blocked
     manifest = Manifest(r.dir)
     add_dirs = ([str(manifest.dir)] if manifest.items else []) + list(r.data.get("extra_dirs") or [])
     run = AgentRun.load(r.id, r["session_id"])
     run.attach_roots = [cwd, *add_dirs, str(r.dir)]
-    who = (f"Codex {choice['name']}" + (f" ({choice['effort']})" if choice.get("effort") else "")) if choice else "Codex"
+    who = ((executor_choice.label(endpoint, choice["name"]) if endpoint else f"Codex {choice['name']}")
+           + (f" ({choice['effort']})" if choice.get("effort") else "")) if choice else "Codex"
     run.start_main(who + (" · answered" if answer else ("" if choice else " · takeover")), "astra",
                    description="executor (Codex)", model=model)
     run.save(force=True)
@@ -1354,9 +1388,11 @@ def _astra_takeover(r: Request, reason: str, choice: dict | None = None, feed=No
                              on_event=_agent_events(run, "codex"), resume_thread=thread,
                              model=choice["model"] if choice else model,
                              effort=effort,
-                             stop_marker=r.dir / "stopped_by_user", delegate=delegate, timings=timings)
+                             stop_marker=r.dir / "stopped_by_user", delegate=delegate, timings=timings,
+                             endpoint=endpoint)
     r["pending_answer"] = None
-    r["executor"] = {"provider": "codex-cli" if choice else "codex-cli (takeover)", "model": res.get("model"),
+    r["executor"] = {"provider": "codex-cli" if choice else "codex-cli (takeover)", "endpoint": endpoint,
+                     "model": res.get("model"),
                      "effort": effort, "auto_effort": not (choice or {}).get("effort"), "chosen": bool(choice),
                      "billing": res.get("billing"), "thread_id": res.get("thread_id"), "dynamic": bool(delegate),
                      "usage": _usage_row(res.get("usage"))}
@@ -1369,7 +1405,7 @@ def _astra_takeover(r: Request, reason: str, choice: dict | None = None, feed=No
         run.finish_main(bool(res.get("ok")), step=None if res.get("ok") else res.get("error"),
                         stopped=bool(res.get("stopped_by_user")))
         run.save(force=True)
-    limit = providers.usage_limit_info(res) if not res.get("stopped_by_user") else None
+    limit = providers.usage_limit_info(res) if not res.get("stopped_by_user") and not endpoint else None
     if limit:
         log_decision(event="codex_limit", request=r.id, detail=limit[:200])
         mine = _limit_text("codex", limit, res.get("model") or model)
@@ -1386,6 +1422,12 @@ def _astra_takeover(r: Request, reason: str, choice: dict | None = None, feed=No
             theirs = cg.message
         elif not choice:  # Codex was standing in for Claude, which is out too
             theirs = r.data.get("claude_limit") or _limit_text("claude", "")
+        alt = _endpoint_peer("openai", res.get("model") or model) if _handover_on() else None
+        if alt:  # both subscriptions are out: a linked provider carries on
+            log_decision(event="codex_limit_endpoint", request=r.id, to=alt["provider"], model=alt["model"])
+            (feed or (lambda _t: None))(f"Codex hit its usage limit, so {alt['label']} is carrying on with the task…")
+            r = Request(r.id); r["status"] = "executing"; r["pending_answer"] = None; r.save()
+            return _execute(r, force={"provider": alt["provider"], "model": alt["model"], "effort": effort}, feed=feed)
         msg = _out_of_limits(mine, theirs)
         r["status"] = "limit_blocked"; r.save()
         return {"request_id": r.id, "ok": False, "usage_limit": msg,

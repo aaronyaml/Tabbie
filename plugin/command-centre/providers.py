@@ -20,9 +20,15 @@ from pathlib import Path
 from .common import LOCKS_DIR, read_json
 from .questions import QUESTION_ITEM_SCHEMA, QUESTION_RULES
 
+# A worker run on a linked provider (model_providers) sets some of these; anything it spawns that runs
+# on the subscriptions (a hand-off, a review) must not inherit them.
+_ENDPOINT_VARS = ("ANTHROPIC_MODEL", "ANTHROPIC_DEFAULT_OPUS_MODEL", "ANTHROPIC_DEFAULT_SONNET_MODEL",
+                  "ANTHROPIC_DEFAULT_HAIKU_MODEL", "ANTHROPIC_SMALL_FAST_MODEL", "CLAUDE_CODE_SUBAGENT_MODEL",
+                  "TABBIE_PROVIDER_KEY", "TABBIE_MODEL_PROVIDER")
 _ANTHROPIC_BILLING_VARS = ("ANTHROPIC_API_KEY", "ANTHROPIC_AUTH_TOKEN", "ANTHROPIC_BASE_URL",
-                           "CLAUDE_CODE_USE_BEDROCK", "CLAUDE_CODE_USE_VERTEX", "CLAUDE_CODE_USE_FOUNDRY")
-_OPENAI_BILLING_VARS = ("OPENAI_API_KEY", "OPENAI_BASE_URL", "CODEX_API_KEY")
+                           "CLAUDE_CODE_USE_BEDROCK", "CLAUDE_CODE_USE_VERTEX", "CLAUDE_CODE_USE_FOUNDRY",
+                           *_ENDPOINT_VARS)
+_OPENAI_BILLING_VARS = ("OPENAI_API_KEY", "OPENAI_BASE_URL", "CODEX_API_KEY", *_ENDPOINT_VARS)
 
 PLAN_SCHEMA = {
     "type": "object",
@@ -800,8 +806,10 @@ def _stream_session_id(out: str) -> str | None:
 def run_claude(prompt: str, *, cwd: str, add_dirs: list[str], cfg: dict, resume_session: str | None,
                on_progress=None, session_key: str | None = None, on_event=None,
                model: str | None = None, effort: str | None = None, inbox: Path | None = None,
-               profile: str | None = None, delegate: dict | None = None, timings: dict | None = None) -> dict:
-    """Run Claude Code headless. With on_progress, streams (stream-json) and calls on_progress(line)
+               profile: str | None = None, delegate: dict | None = None, timings: dict | None = None,
+               endpoint: str | None = None) -> dict:
+    """Run Claude Code headless. endpoint: a linked model provider (model_providers id) to point Claude
+    Code at instead of the Claude subscription (its key goes in the environment only). With on_progress, streams (stream-json) and calls on_progress(line)
     for each step (thinking, text, tool calls, errors) as it happens. With inbox (the request
     folder), the user's chat messages reach Claude while it works (LiveInput).
     profile: lean | full (see worker_profile). delegate: delegate_env() when dynamic agents are allowed:
@@ -809,9 +817,20 @@ def run_claude(prompt: str, *, cwd: str, add_dirs: list[str], cfg: dict, resume_
     timings: filled with phase timestamps (slot, spawn, init, first_reply, done)."""
     ecfg = cfg.get("executor", {}) or {}
     timings = timings if timings is not None else {}
-    ok, why = claude_auth()
-    if not ok:
-        return {"ok": False, "error": f"Claude auth check failed: {why}", "billing": None}
+    endpoint_env: dict = {}
+    if endpoint:
+        from . import model_providers
+        try:
+            endpoint_env = model_providers.claude_env(endpoint, model or "")
+        except Exception as exc:
+            return {"ok": False, "error": str(exc), "billing": None}
+        if not shutil.which("claude"):
+            return {"ok": False, "error": "claude CLI not found on PATH", "billing": None}
+        why = model_providers.billing_text(endpoint)
+    else:
+        ok, why = claude_auth()
+        if not ok:
+            return {"ok": False, "error": f"Claude auth check failed: {why}", "billing": None}
     if on_event and not on_progress:
         on_progress = lambda _t: None  # noqa: E731 - events need the stream format
     live = LiveInput(inbox) if (inbox and on_progress) else None
@@ -833,6 +852,7 @@ def run_claude(prompt: str, *, cwd: str, add_dirs: list[str], cfg: dict, resume_
             timings["slot"] = time.time()
             run_env, run_timeout = _clean_env(_ANTHROPIC_BILLING_VARS), int(ecfg.get("timeout_seconds", 3600))
             run_env["TABBIE_WORKER_MODEL"] = model or str(ecfg.get("model") or "")
+            run_env.update(endpoint_env)
             if delegate:
                 run_env["MCP_TOOL_TIMEOUT"] = str(DELEGATE_TIMEOUT_S * 1000)  # a hand-off may run long
             if on_progress:
@@ -988,7 +1008,7 @@ def run_astra_executor(prompt: str, *, cwd: str, add_dirs: list[str], cfg: dict,
                        on_event=None, resume_thread: str | None = None,
                        model: str | None = None, effort: str | None = None,
                        stop_marker: Path | None = None, delegate: dict | None = None,
-                       timings: dict | None = None) -> dict:
+                       timings: dict | None = None, endpoint: str | None = None) -> dict:
     """Codex executing work (ChatGPT subscription): Astra takeover when Claude is unavailable, or the
     OpenAI model the user picked for this conversation (model/effort given; effort None = Codex default).
     resume_thread continues an earlier run (e.g. after the user answered its questions)."""
@@ -996,17 +1016,29 @@ def run_astra_executor(prompt: str, *, cwd: str, add_dirs: list[str], cfg: dict,
     if not model:  # takeover: the configured Astra model at the planner's effort
         model = (cfg.get("takeover", {}) or {}).get("model") or pcfg.get("model")
         effort = effort or pcfg.get("reasoning_effort", "medium")
-    ok, why = codex_auth()
-    if not ok:
-        return {"ok": False, "error": f"Codex auth check failed: {why}", "billing": None}
-    if model not in codex_models():
-        return {"ok": False, "error": f"model '{model}' not exposed to this Codex login", "billing": why}
+    launch_args, launch_env = [], {}
+    if endpoint:  # a linked provider run in Codex (OpenAI API key, or a Responses API endpoint)
+        from . import model_providers
+        try:
+            launch_args, launch_env = model_providers.codex_launch(endpoint)
+        except Exception as exc:
+            return {"ok": False, "error": str(exc), "billing": None}
+        if not shutil.which("codex"):
+            return {"ok": False, "error": "codex CLI not found on PATH", "billing": None}
+        why = model_providers.billing_text(endpoint)
+    else:
+        ok, why = codex_auth()
+        if not ok:
+            return {"ok": False, "error": f"Codex auth check failed: {why}", "billing": None}
+        if model not in codex_models():
+            return {"ok": False, "error": f"model '{model}' not exposed to this Codex login", "billing": why}
     out_file = pid_file.with_suffix(".last.txt")
     out_file.unlink(missing_ok=True)
     if stop_marker:
         Path(stop_marker).unlink(missing_ok=True)
     cmd = build_codex_exec_cmd(model=model, effort=effort, out_file=out_file, cwd=cwd, add_dirs=add_dirs,
-                               resume_thread=resume_thread, extra=codex_mcp_overrides(delegate) if delegate else None)
+                               resume_thread=resume_thread,
+                               extra=[*launch_args, *(codex_mcp_overrides(delegate) if delegate else [])])
     started = time.time()
     timings = timings if timings is not None else {}
     timings.setdefault("run_start", started)
@@ -1035,7 +1067,7 @@ def run_astra_executor(prompt: str, *, cwd: str, add_dirs: list[str], cfg: dict,
         pid_file.parent.mkdir(parents=True, exist_ok=True)
         pid_file.write_text(str(proc.pid))
     try:
-        code, _out, err = _run_stream(cmd, cwd=cwd, env=_clean_env(_OPENAI_BILLING_VARS),
+        code, _out, err = _run_stream(cmd, cwd=cwd, env={**_clean_env(_OPENAI_BILLING_VARS), **launch_env},
                                       timeout=int((cfg.get("executor", {}) or {}).get("timeout_seconds", 3600)),
                                       stdin=prompt, on_line=_json_lines(on_ev), on_start=on_start)
     finally:
