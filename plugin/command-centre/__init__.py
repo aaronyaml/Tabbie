@@ -19,7 +19,7 @@ import threading
 import time
 from pathlib import Path
 
-from . import executor_choice, limits_gate, projects, providers, questions, worker_profile
+from . import executor_choice, limits_gate, projects, providers, questions, review, worker_profile
 from .agents import AgentRun, strip_attach
 from .attachments import Manifest, find_candidates, kind_of
 from .common import REQUESTS_DIR, STATE_DIR, load_config, log_decision, read_json, write_json
@@ -954,6 +954,26 @@ _CLAUDE_AUTH_RX = re.compile(r"Claude auth check failed|authentication_error|OAu
                              r"run /login|not logged in|Invalid API key", re.I)
 
 
+def _auto_review(r: Request, cwd: str, snap: str, claude_model: str | None, feed=None) -> str | None:
+    """Codex reviews a finished Claude job's sensitive changes (see review.py). Never fails the request."""
+    try:
+        hot = review.risky(review.changed(cwd, snap))
+        if not hot or not agents().has("codex"):
+            return None
+        cfg = load_config()
+        peer = executor_choice.peer_model("anthropic", claude_model or executor_choice.DEFAULT["model"],
+                                          (cfg.get("dynamic_agents") or {}).get("models") or {}, _codex_models_safe())
+        if limits_gate.check("codex", peer["model"], purpose="delegate").blocked:
+            return None
+        (feed or (lambda _t: None))(f"{peer['name']} is reviewing the sensitive changes…")
+        text = review.run_review(cwd, review.diff_text(cwd, snap, hot), hot, model=peer["model"])
+        log_decision(event="auto_review", request=r.id, files=len(hot), ok=bool(text))
+        return review.note(text, peer["name"]) if text else None
+    except Exception as exc:
+        log_decision(event="auto_review_failed", request=r.id, error=repr(exc)[:200])
+        return None
+
+
 def _execute(r: Request, feed=None, force: dict | None = None) -> dict:
     """_run_request, but an unexpected error ends the request as failed instead of leaving it "executing"
     (shown as running and blocking updates until the reaper finds it)."""
@@ -1063,6 +1083,7 @@ def _run_request(r: Request, feed=None, force: dict | None = None) -> dict:
                              effort=claude_effort, profile=profile)
     timings: dict = {}
     started = time.time()
+    snap = review.snapshot(cwd) if (r["project"] and ecfg.get("auto_review", True)) else None
     res = run_claude(prompt, cwd=cwd, add_dirs=add_dirs, cfg=cfg, resume_session=resume, on_progress=feed,
                      session_key=r["session_id"], on_event=_agent_events(run, "claude"),
                      model=claude_model, effort=claude_effort, inbox=r.dir, profile=profile, delegate=delegate,
@@ -1097,6 +1118,11 @@ def _run_request(r: Request, feed=None, force: dict | None = None) -> dict:
     r["status"] = "done" if res.get("ok") else ("stopped" if res.get("stopped_by_user") else "failed")
     r.save()
     clean, asked = questions.extract(res.get("result") or "") if res.get("ok") else ("", None)
+    if snap and res.get("ok") and not asked and not res.get("stopped_by_user"):
+        extra = _auto_review(r, cwd, snap, claude_model or ecfg.get("model"), feed)
+        if extra:
+            clean = (clean or (res.get("result") or "")).rstrip() + "\n\n" + extra
+            res["result"] = (res.get("result") or "").rstrip() + "\n\n" + extra
     with run.lock:
         run.finish_main(bool(res.get("ok")), step=None if res.get("ok") else res.get("error"),
                         stopped=bool(res.get("stopped_by_user")))

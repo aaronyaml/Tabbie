@@ -181,3 +181,37 @@ def test_busy_claude_slots_send_a_new_chat_to_its_gpt_equivalent(monkeypatch, tm
         held.close()
     cc._execute(_req("chatFree", "fix the bug"))
     assert got[-1] == "claude"
+
+
+def _git_repo(d):
+    import subprocess as sp
+    d.mkdir(parents=True, exist_ok=True)
+    for c in (["init", "-q"], ["config", "user.email", "t@t"], ["config", "user.name", "t"]):
+        sp.run(["git", *c], cwd=d, check=True)
+    (d / "README.md").write_text("x\n"); (d / "auth.py").write_text("def ok():\n    return True\n")
+    sp.run(["git", "add", "."], cwd=d, check=True); sp.run(["git", "commit", "-qm", "init"], cwd=d, check=True)
+
+
+def test_risky_changes_get_a_codex_review_line(monkeypatch, tmp_path):
+    _setup(monkeypatch)
+    proj = tmp_path / "app"; _git_repo(proj)
+    rv = import_module("command_centre.review")
+    monkeypatch.setattr(cc, "agents", lambda: type("A", (), {"has": staticmethod(lambda a: True)})())
+    monkeypatch.setattr(cc, "_codex_models_safe", lambda: [])
+    reviewed = []
+    monkeypatch.setattr(rv, "run_review", lambda cwd, diff, why, **k: reviewed.append((diff, why)) or "auth.py:2 — always true — check the session")
+
+    def edit(name):
+        def run(prompt, **k):
+            (proj / name).write_text((proj / name).read_text() + "# changed\n")
+            return {"ok": True, "result": "Done.", "billing": "s"}
+        return run
+    monkeypatch.setattr(cc, "run_claude", edit("auth.py"))
+    out = cc._execute(_req("chatR", "tighten login", proj))
+    assert reviewed and reviewed[0][1] == ["auth.py"] and "# changed" in reviewed[0][0]
+    assert "Review (" in json.dumps(out) or any("Review (" in p.read_text() for p in (cc.REQUESTS_DIR).rglob("reply-*.md"))
+    reviewed.clear()
+    monkeypatch.setattr(cc, "run_claude", edit("README.md"))
+    cc._execute(_req("chatR2", "fix typo", proj))
+    assert not reviewed  # nothing sensitive changed
+    assert rv.note("LGTM", "GPT-6.1 Sol").endswith("no problems found in the sensitive changes.")

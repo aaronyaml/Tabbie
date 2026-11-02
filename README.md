@@ -95,6 +95,14 @@ Measured with `bin/bench-latency` (two passes of 3 runs each, Opus 5.5):
 
 `bin/bench-latency --label NAME [--runs 3] [--only R1,R2]` runs it again; results go to `state/bench/`.
 
+### Second opinion on sensitive changes
+
+When a Claude job in a git project changes files about auth, sessions, secrets, payments, billing,
+webhooks, migrations/SQL, permissions or legal/privacy text, Codex (the same-tier GPT model, read-only,
+low effort) reviews just that diff and the reply gets a short **Review** line: "no problems found",
+or up to six `path:line — problem — fix` findings. It's skipped when Codex is off or near its limit;
+`executor.auto_review: false` turns it off.
+
 ### Hand-offs (dynamic agents)
 
 With **both** Claude Code and Codex linked, each worker gets a `delegate` tool and uses its own
