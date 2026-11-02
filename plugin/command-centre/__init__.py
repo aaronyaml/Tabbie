@@ -403,8 +403,12 @@ def _limit_block(r: Request, agent: str, model: str | None, *, offer: bool = Tru
 
 
 def _handover_on() -> bool:
-    """limits.handover (default on): a limit hit hands the same task to the other agent."""
-    return (load_config().get("limits") or {}).get("handover", True) is not False
+    """Takeover (config/agents.yaml, model picker → Agents; default on): a limit hit hands the same task
+    to the other agent."""
+    try:
+        return bool(agents().takeover_enabled())
+    except Exception:
+        return True
 
 
 def _out_of_limits(first: str, second: str | None) -> str:

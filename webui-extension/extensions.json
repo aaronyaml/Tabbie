@@ -109,10 +109,10 @@
       "id": "push",
       "name": "Push notifications on this device",
       "scripts": [
-        "push.js?v=3"
+        "push.js?v=4"
       ],
       "stylesheets": [
-        "push.css?v=1"
+        "push.css?v=2"
       ]
     },
     {
@@ -290,7 +290,7 @@
       "id": "model-picker",
       "name": "Model picker",
       "scripts": [
-        "model-picker.js?v=7"
+        "model-picker.js?v=8"
       ],
       "stylesheets": [
         "model-picker.css?v=6"

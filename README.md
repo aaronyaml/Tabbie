@@ -138,6 +138,8 @@ other agent is also at its limit or not signed in, nothing starts and Tabbie say
 The same happens mid-task, with no question asked: if Claude hits its limit while working, Codex carries
 on from where it stopped; if a Codex job hits its limit, its Claude equivalent picks up the same task (the
 work already done stays in the folder). If both are out, the reply says so with both reset times.
+On by default; the **Takeover** pill in the model picker's Agents row turns it off (`takeover:` in
+`config/agents.yaml`), and then a limit just stops the job and says when it resets.
 If Claude can't sign in (logged out, expired token), or every Claude slot is busy with other chats
 (`busy_fallback`), the job also goes to its GPT equivalent instead of failing or queueing.
 A planner at its limit falls back to the other planner. Hand-offs to Codex stop at 90%, so they
@@ -522,7 +524,8 @@ asks for your password. Nothing is opened on your router, and port 8787 is never
 
 ### Notifications on your phone
 
-In **Settings → Preferences**, under Browser notifications, tap **Notify this device**. Tabbie then
+On your phone, tap **Turn on** in the card on the home screen (shown once), or in **Settings → Preferences**,
+under Browser notifications, tap **Notify this device**. iOS asks for permission at that tap. Tabbie then
 pings that phone or browser when a job finishes, asks you something or has a plan to approve, even with
 Tabbie closed. On iPhone, open Tabbie from its home-screen icon first (iOS 16.4 or later) and use an
 `https://` address (`https://hermes.local` or your Tailscale one). The push itself is empty: Apple's or
@@ -701,7 +704,7 @@ Design notes: `docs/memory/ARCHITECTURE.md`, `docs/projects/ARCHITECTURE.md`.
 | **Codex only** | Codex | Codex | no fallback agent |
 
 Change it any time from the composer's **model picker → Agents** (Claude Code / Codex toggles; at
-least one stays on; **Hand-offs** sits beside them). It applies on the next request with no restart. It's stored in
+least one stays on; **Hand-offs** and **Takeover** sit beside them). It applies on the next request with no restart. It's stored in
 `config/agents.yaml`:
 
 ```yaml
@@ -782,7 +785,6 @@ executor:
   early_start: true
   relay: verbatim            # or hub (the hub model rewrites the answer)
 limits:
-  handover: true         # a limit hit moves the same task to the other agent (default on)
   block_at_pct: 95
   reserve_for_hub_pct: 90
 dynamic_agents:

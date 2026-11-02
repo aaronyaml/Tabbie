@@ -45,6 +45,17 @@ def dynamic_enabled() -> bool:
     return not (m and m.group(1).strip().strip("'\"").lower() in ("false", "no", "off", "0"))
 
 
+def takeover_enabled() -> bool:
+    """Takeover: a job that hits Claude's or Codex's usage limit carries on in the other one (same task,
+    no question). Default ON: only an explicit `takeover: false` turns it off."""
+    try:
+        text = path().read_text()
+    except OSError:
+        return True
+    m = re.search(r"^takeover:\s*(\S+)", text, re.M)
+    return not (m and m.group(1).strip().strip("'\"").lower() in ("false", "no", "off", "0"))
+
+
 def dynamic_allowed(linked: dict | None = None) -> bool:
     """The setting is on, both agents are enabled, and (when given) both are signed in."""
     on = enabled()
@@ -52,8 +63,8 @@ def dynamic_allowed(linked: dict | None = None) -> bool:
     return dynamic_enabled() and both and (linked is None or all(linked.get(a) for a in AGENTS))
 
 
-def save(agents: list[str] | None = None, dynamic: bool | None = None) -> list[str]:
-    """Write config/agents.yaml. agents None keeps the enabled list; dynamic None keeps the current setting."""
+def save(agents: list[str] | None = None, dynamic: bool | None = None, takeover: bool | None = None) -> list[str]:
+    """Write config/agents.yaml. None for any argument keeps its current setting."""
     if agents is None:
         picked = enabled()
     else:
@@ -61,6 +72,7 @@ def save(agents: list[str] | None = None, dynamic: bool | None = None) -> list[s
     if not picked:
         raise ValueError("pick at least one agent: claude, codex or both")
     dyn = dynamic_enabled() if dynamic is None else bool(dynamic)
+    take = takeover_enabled() if takeover is None else bool(takeover)
     p = path()
     p.parent.mkdir(parents=True, exist_ok=True)
     tmp = p.with_suffix(".tmp")
@@ -68,6 +80,8 @@ def save(agents: list[str] | None = None, dynamic: bool | None = None) -> list[s
                    "# Change it in the WebUI (model picker → Agents) or with bin/setup. No restart needed.\n"
                    f"enabled: [{', '.join(picked)}]\n"
                    "# Hand-offs: with both agents signed in, Claude Code and Codex may pass part of a job to each other.\n"
-                   f"dynamic: {'true' if dyn else 'false'}\n")
+                   f"dynamic: {'true' if dyn else 'false'}\n"
+                   "# Takeover: a job that hits one agent's usage limit carries on in the other (same task).\n"
+                   f"takeover: {'true' if take else 'false'}\n")
     os.replace(tmp, p)
     return picked

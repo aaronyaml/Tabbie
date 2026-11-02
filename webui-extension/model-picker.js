@@ -8,7 +8,8 @@
  *   POST api/extensions/cc-agents/sidecar/executor {id, provider, model, effort}
  *   POST api/extensions/cc-agents/sidecar/agents {enabled: ['claude', 'codex']}  (Agents row, step 1)
  *   GET  api/extensions/cc-agents/sidecar/agents -> {dynamic, dynamic_available, linked}; POST {dynamic: bool}
- *        (Agents row "Hand-offs": Claude Code and Codex may pass part of a job to each other; on by default,
+ *        (Agents row "Hand-offs": Claude Code and Codex may pass part of a job to each other; "Takeover": a job
+ *        at one agent's usage limit carries on in the other; both on by default,
  *        greyed out unless both are enabled and signed in)
  * A pick made before the chat exists is held and saved as soon as the session id appears (retried
  * while the sidecar catches up). If the Mac can't be reached, the panel says so and offers Try again.
@@ -96,7 +97,7 @@
       if (!r.ok) return;
       const j = await r.json();
       if (typeof j.dynamic !== 'boolean') return;  // older sidecar: no Hand-offs pill
-      handoffs = { dynamic: j.dynamic, available: !!j.dynamic_available, known: true };
+      handoffs = { dynamic: j.dynamic, available: !!j.dynamic_available, known: true, takeover: j.takeover !== false };
     } catch (_) { /* keep the last known state */ }
     finally { if (open) paint(); }
   }
@@ -107,10 +108,26 @@
     paint();
     try {
       const j = await post(AGENTS_API, { dynamic: next });
-      if (j && typeof j.dynamic === 'boolean') handoffs = { dynamic: j.dynamic, available: !!j.dynamic_available, known: true };
+      if (j && typeof j.dynamic === 'boolean') handoffs = { dynamic: j.dynamic, available: !!j.dynamic_available, known: true, takeover: j.takeover !== false };
       notice = '';
     } catch (e) {
       handoffs = Object.assign({}, handoffs, { dynamic: !next });
+      notice = statusOf(e) === 403 ? 'Allow “Agents & questions” in Settings › Extensions to change agents.' : 'Couldn’t save. Try again.';
+    }
+    paint();
+  }
+
+  // Takeover: a job at one agent's usage limit carries on in the other (same task). On by default.
+  async function toggleTakeover() {
+    const next = !handoffs.takeover;
+    handoffs = Object.assign({}, handoffs, { takeover: next });
+    paint();
+    try {
+      const j = await post(AGENTS_API, { takeover: next });
+      if (j && typeof j.takeover === 'boolean') handoffs = Object.assign({}, handoffs, { takeover: j.takeover });
+      notice = '';
+    } catch (e) {
+      handoffs = Object.assign({}, handoffs, { takeover: !next });
       notice = statusOf(e) === 403 ? 'Allow “Agents & questions” in Settings › Extensions to change agents.' : 'Couldn’t save. Try again.';
     }
     paint();
@@ -262,9 +279,15 @@
       : `<button type="button" class="hx-mp-seg hx-mp-handoffs${hoOn ? ' is-on' : ''}${unavail ? ' is-unavail' : ''}" data-handoffs`
         + ` aria-pressed="${hoOn}"${unavail ? ' aria-disabled="true" disabled' : ''}`
         + ` title="${unavail ? 'Needs Claude Code and Codex signed in' : 'Claude Code and Codex may hand part of a job to each other'}">Hand-offs</button>`;
+    const bothOn = on.includes('claude') && on.includes('codex');
+    const tkOn = handoffs.takeover !== false && bothOn;
+    const tk = !handoffs.known ? ''
+      : `<button type="button" class="hx-mp-seg hx-mp-takeover${tkOn ? ' is-on' : ''}${bothOn ? '' : ' is-unavail'}" data-takeover`
+        + ` aria-pressed="${tkOn}"${bothOn ? '' : ' aria-disabled="true" disabled'}`
+        + ` title="${bothOn ? 'When Claude or Codex hits its usage limit, the other carries on with the same task' : 'Needs Claude Code and Codex both on'}">Takeover</button>`;
     return `<header class="hx-mp-head"><span class="hx-mp-title">Model</span></header>`
       + `<div class="hx-mp-list">${rows}</div>`
-      + `<div class="hx-mp-effort hx-mp-agents"><span class="hx-mp-effort-label">Agents</span><div class="hx-mp-segs" role="group" aria-label="Coding agents on this Mac">${agents}${ho}</div></div>`
+      + `<div class="hx-mp-effort hx-mp-agents"><span class="hx-mp-effort-label">Agents</span><div class="hx-mp-segs" role="group" aria-label="Coding agents on this Mac">${agents}${ho}${tk}</div></div>`
       + (unavail ? '<p class="hx-mp-cap hx-mp-ho-cap">Hand-offs: needs Claude Code and Codex signed in</p>' : '')
       + (notice ? noteHtml() : `<p class="hx-mp-cap">${sid() ? 'For this conversation' : 'For this new chat'}</p>`);
   }
@@ -363,6 +386,7 @@
     if (t.hasAttribute('data-retry')) { notice = ''; offline = false; t.disabled = true; t.textContent = 'Trying…'; load(sid()); return; }
     if (t.dataset.agent) { toggleAgent(t.dataset.agent).then(loadHandoffs); return; }
     if (t.hasAttribute('data-handoffs')) { toggleHandoffs(); return; }
+    if (t.hasAttribute('data-takeover')) { toggleTakeover(); return; }
     if (t.dataset.provider) { browsing = t.dataset.provider; go(2); return; }
     if (t.hasAttribute('data-back')) { go(1, `[data-provider="${browsing}"]`); return; }
     if (t.dataset.model) {

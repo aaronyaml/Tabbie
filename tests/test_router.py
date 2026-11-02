@@ -227,3 +227,15 @@ def test_codex_limit_mid_task_hands_the_same_task_to_claude():
     finally:
         prov.linked = linked
     assert out["ok"] and got and "build the page" in got[0][0] and str(got[0][1]).startswith("claude-")
+
+
+def test_takeover_off_stops_the_handover(tmp_path, monkeypatch):
+    from hmem import agents as agents_mod
+    monkeypatch.setattr(cc, "agents", lambda: agents_mod)
+    monkeypatch.setattr(agents_mod, "path", lambda: tmp_path / "agents.yaml")
+    assert agents_mod.takeover_enabled() and cc._handover_on()  # no file: on by default
+    agents_mod.save(["claude", "codex"], takeover=False)
+    assert "takeover: false" in (tmp_path / "agents.yaml").read_text()
+    assert not agents_mod.takeover_enabled() and not cc._handover_on()
+    agents_mod.save()  # other changes keep it off
+    assert not agents_mod.takeover_enabled()

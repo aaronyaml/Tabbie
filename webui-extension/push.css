@@ -3,3 +3,14 @@
   border-top: 1px solid var(--border, rgba(127,127,127,.18)); }
 .hx-push .sm-btn { padding: 5px 10px; font-size: 12px; }
 .hx-push-note { font-size: 11px; color: var(--muted, #8a8a8e); line-height: 1.4; }
+
+/* phones: one-time "Get notified on this phone" card above the home suggestions */
+.hx-push-card { display: flex; align-items: center; gap: 10px; margin: 0 16px 12px; padding: 12px 12px 12px 14px;
+  border-radius: 16px; background: var(--hx-fill, rgba(127,127,127,.10)); }
+.hx-push-card-tx { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 2px; }
+.hx-push-card-tx b { font-size: 14px; font-weight: 600; }
+.hx-push-card-tx span { font-size: 12.5px; line-height: 1.35; color: var(--hx-text-2, #8a8a8e); }
+.hx-push-card-on { flex: none; padding: 7px 14px; border: 0; border-radius: 999px; font: inherit; font-size: 13px; font-weight: 600;
+  background: var(--accent, #3b5bfd); color: #fff; cursor: pointer; }
+.hx-push-card-x { flex: none; width: 28px; height: 28px; border: 0; border-radius: 50%; background: transparent; font-size: 18px;
+  line-height: 1; color: var(--hx-text-2, #8a8a8e); cursor: pointer; }
