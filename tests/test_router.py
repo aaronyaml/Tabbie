@@ -160,15 +160,15 @@ def test_takeover_flow(monkeypatch=None):
         assert not out2["ok"] and "Claude hit its usage limit (resets 3pm)" in out2["usage_limit"]
         assert "Codex hit its usage limit (resets 6pm)" in out2["usage_limit"] and "Both are at their limits" in out2["usage_limit"]
         cc.run_astra_executor = lambda prompt, **k: calls.append(prompt) or {"ok": True, "result": "Done.", "model": "gpt-6-astra", "billing": "chatgpt"}
+        # /takeover enables and later disables
+        assert "Takeover on" in cc._cmd_takeover("", session_id="s1")
+        r3 = st.Request.create(session_id="s1", route="claude", reason="x", forced=False, prompt="third",
+                               raw_message="third", project=str(proj), project_source="t")
+        out3 = cc._execute(r3)
+        assert out3["ok"] and "takeover" in out3["route"] and calls and "fix it" not in calls[-1] and "third" in calls[-1]
+        assert "Takeover off" in cc._cmd_takeover("", session_id="s1")
     finally:
         cc.providers.linked = linked
-    # /takeover enables and later disables
-    assert "Takeover on" in cc._cmd_takeover("", session_id="s1")
-    r3 = st.Request.create(session_id="s1", route="claude", reason="x", forced=False, prompt="third",
-                           raw_message="third", project=str(proj), project_source="t")
-    out3 = cc._execute(r3)
-    assert out3["ok"] and "takeover" in out3["route"] and calls and "fix it" not in calls[-1] and "third" in calls[-1]
-    assert "Takeover off" in cc._cmd_takeover("", session_id="s1")
     assert prov.usage_limit_info({"ok": False, "error": "5-hour limit reached ∙ resets 9pm"})
     assert prov.usage_limit_info({"ok": False, "error": "SyntaxError"}) is None
 

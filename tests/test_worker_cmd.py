@@ -1,6 +1,7 @@
 """Worker argv: lean vs full profile, MCP only when hand-offs are allowed, Codex mcp_servers overrides."""
 from __future__ import annotations
 import json
+import re
 from pathlib import Path
 
 import pytest
@@ -43,7 +44,7 @@ def test_settings_keep_design_plugins_drop_secrets_and_caveman():
     assert "SessionStart" not in hooks and "UserPromptSubmit" not in hooks  # no caveman, no vercel hooks
     pre = hooks["PreToolUse"]
     assert pre[0]["matcher"] == "Bash" and pre[0]["hooks"][0]["command"] == "rtk hook claude"
-    assert pre[1]["matcher"] == "Agent|Task" and "limit-gate claude --purpose subagent" in pre[1]["hooks"][0]["command"]
+    assert pre[1]["matcher"] == "Agent|Task" and re.search(r'limit-gate"? claude --purpose subagent', pre[1]["hooks"][0]["command"])
 
 
 def test_lean_vs_full_argv(home):
@@ -117,6 +118,6 @@ def test_worker_rules_variants_are_static():
     a = prov.worker_rules("claude", dynamic=True)
     assert a == prov.worker_rules("claude", dynamic=True)  # byte-identical: the prefix caches
     b = prov.worker_rules("codex", dynamic=True)
-    assert "Claude Code (Anthropic Claude)" in b and "limit-gate codex" in b and "spawn_agent" in b
+    assert "Claude Code (Anthropic Claude)" in b and re.search(r'limit-gate"? codex', b) and "spawn_agent" in b
     assert prov.worker_rules("claude") == prov.WORKER_RULES.format(max_subagents=2)
     assert "Hint: GPT for SQL" in prov.worker_rules("claude", dynamic=True, hints=["GPT for SQL"])

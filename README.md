@@ -153,11 +153,10 @@ never use up the ChatGPT allowance the hub shares. If usage can't be read, it st
 ## Requirements
 
 - **macOS** on Apple silicon or Intel. No Homebrew needed.
-- **Windows: not supported yet.** The router, workers and model providers are plain Python and the
-  provider keys use the OS credential store (Keychain on macOS, Windows Credential Manager through
-  `keyring` elsewhere), but setup, the always-on services (launchd), the `bin/` scripts (bash) and
-  `hermes.local` (Bonjour) are macOS-only today. A Windows port (PowerShell setup, Task Scheduler
-  services) is planned; until it ships, use a Mac. Linux is untested.
+- **Windows 10 / 11 (beta)** on x64 or Arm. Its own setup (`bin\setup.ps1`), background services
+  and `hub` (see [Install on Windows](#install-on-windows)). The whole test suite runs on Windows in
+  CI, but it hasn't had the long real-world use the Mac version has: report anything odd. Linux is
+  untested.
 - **git** and **Python 3** (Apple's free developer tools; setup offers to install them)
 - **[Hermes Agent](https://github.com/NousResearch/hermes-agent)**: the hub (`hermes`)
 - **At least one coding agent** (you pick at setup):
@@ -525,6 +524,40 @@ To stop sharing Tabbie over Tailscale: `/Applications/Tailscale.app/Contents/Mac
 **Why this is safe:** Tailscale Serve only answers devices signed in to your Tailscale account.
 Caddy also refuses anything that isn't a home-network or Tailscale address, and the WebUI still
 asks for your password. Nothing is opened on your router, and port 8787 is never exposed to the internet.
+
+
+### Install on Windows
+
+Open **PowerShell** (not as administrator) and paste:
+
+```powershell
+git clone https://github.com/aaronyaml/Tabbie.git $HOME\hermes   # %USERPROFILE%\hermes is required for now
+powershell -ExecutionPolicy Bypass -File $HOME\hermes\bin\setup.ps1
+```
+
+No Git yet? Setup can't clone itself: run `winget install Git.Git` first, then open a new PowerShell.
+`setup.ps1` installs [uv](https://docs.astral.sh/uv/) (which brings Python), then walks through the same
+steps as on a Mac, in the terminal, asking before each install or change. Tools come from their
+official sources: Hermes Agent and Claude Code from their PowerShell installers, Codex, Caddy and
+Node.js from their release downloads (Node checked against its published checksums), into your own
+user folders. No administrator rights.
+
+What's different from a Mac:
+
+- **Background services**: one small supervisor (`bin\tabbie-svc.pyw`) starts when you sign in to
+  Windows (your user's Run key) and keeps the WebUI, HTTPS proxy, helper and `hermes.local` running,
+  restarting any that stop; it also runs the nightly Dreamer at 03:30. `bin\hub.cmd` replaces
+  `bin/hub` (`hub health`, `hub restart`, `hub logs supervisor` …). Turn it all off with
+  `uv run --no-project python bin\tabbie-svc.pyw uninstall`.
+- **Hermes' own files** live in `%LOCALAPPDATA%\hermes` (Hermes Agent's Windows default), not `~/.hermes`.
+- **API keys** you add for other providers go to **Windows Credential Manager** (generic credentials
+  named `tabbie-provider/<provider>`).
+- **Certificate**: setup adds Caddy's local certificate to your user's trusted roots (Windows asks
+  you to confirm). The phone steps are the same as on a Mac.
+- **Firewall**: the first start may ask to let Python and Caddy through; allow **private networks
+  only**. Port 8787 stays on 127.0.0.1 as on a Mac.
+- Plugin folders are linked with directory junctions (Windows only allows symlinks with Developer
+  Mode).
 
 ---
 
