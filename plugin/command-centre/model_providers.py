@@ -206,7 +206,7 @@ def _keyring():
 
 def _security(script: str, timeout: int = 15) -> subprocess.CompletedProcess:
     """`security -i` reads its commands from stdin: the key never appears in a command line (ps)."""
-    return subprocess.run(["security", "-i"], input=script, capture_output=True, text=True, timeout=timeout)
+    return subprocess.run(["security", "-i"], input=script, capture_output=True, text=True, encoding="utf-8", errors="replace", timeout=timeout)
 
 
 def _q(s: str) -> str:
@@ -234,7 +234,7 @@ def get_key(pid: str) -> str | None:
     if _use_security():
         try:
             r = subprocess.run(["security", "find-generic-password", "-s", KEYCHAIN_SERVICE, "-a", pid, "-w"],
-                               capture_output=True, text=True, timeout=15)
+                               capture_output=True, text=True, encoding="utf-8", errors="replace", timeout=15)
         except (OSError, subprocess.SubprocessError):
             return None
         k = r.stdout.strip()
@@ -251,7 +251,7 @@ def delete_key(pid: str) -> None:
     if _use_security():
         try:
             subprocess.run(["security", "delete-generic-password", "-s", KEYCHAIN_SERVICE, "-a", pid],
-                           capture_output=True, text=True, timeout=15)
+                           capture_output=True, text=True, encoding="utf-8", errors="replace", timeout=15)
         except (OSError, subprocess.SubprocessError):
             pass
         return

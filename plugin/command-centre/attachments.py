@@ -216,7 +216,7 @@ class Manifest:
                 meta = out.with_suffix(".probe.json")
                 r = subprocess.run(["ffprobe", "-v", "quiet", "-print_format", "json",
                                     "-show_format", "-show_streams", str(src)],
-                                   timeout=60, capture_output=True, text=True)
+                                   timeout=60, capture_output=True, text=True, encoding="utf-8", errors="replace")
                 if r.returncode == 0:
                     meta.write_text(r.stdout, encoding="utf-8")
                     entry["derived"].append({"type": "media-metadata", "path": str(meta)})
@@ -235,7 +235,7 @@ class Manifest:
             root = out.resolve()
             for info in infos:
                 dest = (out / info.filename).resolve()
-                if not str(dest).startswith(str(root) + "/") and dest != root:
+                if not dest.is_relative_to(root):  # also catches C:\ and \\server names on Windows
                     raise ValueError(f"unsafe path in archive: {info.filename}")
                 if info.is_dir():
                     dest.mkdir(parents=True, exist_ok=True)

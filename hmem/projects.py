@@ -138,7 +138,7 @@ _GIT_SAFE = ("--no-optional-locks", "-c", "core.fsmonitor=false", "-c", "core.ho
 def _git_meta(p: Path) -> dict | None:
     def g(*a):
         try:
-            r = subprocess.run(["git", *_GIT_SAFE, "-C", str(p), *a], capture_output=True, text=True, timeout=5,
+            r = subprocess.run(["git", *_GIT_SAFE, "-C", str(p), *a], capture_output=True, text=True, encoding="utf-8", errors="replace", timeout=5,
                                env={**os.environ, "GIT_TERMINAL_PROMPT": "0"})
             return r.stdout.strip() if r.returncode == 0 else ""
         except (OSError, subprocess.SubprocessError):
@@ -156,7 +156,7 @@ def git_live(path: str) -> dict:
     """Branch / head / dirty count, read live (never stored: it changes every commit)."""
     def g(*a):
         try:
-            r = subprocess.run(["git", *_GIT_SAFE, "-C", path, *a], capture_output=True, text=True, timeout=5,
+            r = subprocess.run(["git", *_GIT_SAFE, "-C", path, *a], capture_output=True, text=True, encoding="utf-8", errors="replace", timeout=5,
                                env={**os.environ, "GIT_TERMINAL_PROMPT": "0"})
             return r.stdout.strip() if r.returncode == 0 else ""
         except (OSError, subprocess.SubprocessError):
@@ -502,7 +502,8 @@ def workspace_path(pid: str) -> Path:
 
 
 def webui_workspaces_file() -> Path:
-    return Path(os.environ.get("HERMES_WEBUI_STATE_DIR") or Path.home() / ".hermes" / "webui") / "workspaces.json"
+    from .paths import webui_state
+    return webui_state() / "workspaces.json"
 
 
 def label_webui_workspace(p: dict) -> bool:

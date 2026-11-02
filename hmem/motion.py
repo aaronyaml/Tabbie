@@ -21,10 +21,12 @@ import threading
 import time
 from pathlib import Path
 
+from .paths import hermes_home
+
 TEMPLATE = Path(__file__).resolve().parents[1] / "templates" / "motion-studio"
 MARKER = ".tabbie-studio"  # written into studios made from the template: {template version}
 _DOTFILES = {"gitignore": ".gitignore", "env.example": ".env.example"}  # kept dot-less in the repo
-EXTRA = [str(Path.home() / p) for p in (".local/bin", ".hermes/bin")] + ["/opt/homebrew/bin", "/usr/local/bin"]
+EXTRA = [str(Path.home() / ".local" / "bin"), str(hermes_home() / "bin")] + ["/opt/homebrew/bin", "/usr/local/bin"]
 
 
 def root() -> Path:
@@ -121,7 +123,7 @@ def sync_template(p: Path | None = None) -> list[str]:
             if not dst.exists():
                 dst.parent.mkdir(parents=True, exist_ok=True)
                 shutil.copy2(f, dst)
-                added.append(str(f.relative_to(TEMPLATE)))
+                added.append(f.relative_to(TEMPLATE).as_posix())
     doc, tdoc = p / "CLAUDE.md", TEMPLATE / "CLAUDE.md"
     try:
         text, ttext = doc.read_text(encoding="utf-8"), tdoc.read_text(encoding="utf-8")
@@ -356,7 +358,7 @@ def set_elevenlabs_key(key: str, check=_check_elevenlabs) -> tuple[int, dict]:
     lines.append(f"ELEVENLABS_API_KEY={key}")
     tmp = env.with_name(".env.tabbie-tmp")
     fd = os.open(tmp, os.O_WRONLY | os.O_CREAT | os.O_TRUNC, 0o600)
-    with os.fdopen(fd, "w") as f:
+    with os.fdopen(fd, "w", encoding="utf-8") as f:
         f.write("\n".join(lines) + "\n")
     os.replace(tmp, env)
     os.chmod(env, 0o600)
@@ -408,7 +410,7 @@ def status(create: bool = False) -> dict:
             # Music generation calls ElevenLabs' Music API, which needs the account's API key in the
             # studio's .env. The hosted ElevenLabs MCP (`hermes mcp login elevenlabs`) has no music tool.
             "linked": exists and _env_key(p, "ELEVENLABS_API_KEY"),
-            "mcp": (Path.home() / ".hermes" / "mcp-tokens" / "elevenlabs.json").is_file(),
+            "mcp": (hermes_home() / "mcp-tokens" / "elevenlabs.json").is_file(),
             "hint": "Generate audio needs ElevenLabs: connect it with your API key (elevenlabs.io → Developers → "
                     f"API keys), or add ELEVENLABS_API_KEY=<your key> to {_tilde(p)}/.env yourself.",
         },

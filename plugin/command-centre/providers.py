@@ -124,7 +124,7 @@ def _clean_env(drop: tuple[str, ...]) -> dict:
 
 def _run(cmd: list[str], *, cwd: str, env: dict, timeout: int, stdin: str | None = None) -> tuple[int, str, str]:
     proc = subprocess.Popen(procutil.argv(cmd), cwd=cwd, env=env, stdin=subprocess.PIPE if stdin is not None else subprocess.DEVNULL,
-                            stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True, **procutil.GROUP)
+                            stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True, encoding="utf-8", errors="replace", **procutil.GROUP)
     try:
         out, err = proc.communicate(stdin, timeout=timeout)
     except subprocess.TimeoutExpired:
@@ -144,7 +144,7 @@ def _run_stream(cmd: list[str], *, cwd: str, env: dict, timeout: int, stdin: str
     With live (a LiveInput), stdin stays open so the user's messages reach the worker mid-run."""
     import threading
     proc = subprocess.Popen(procutil.argv(cmd), cwd=cwd, env=env, stdin=subprocess.PIPE, stdout=subprocess.PIPE,
-                            stderr=subprocess.PIPE, text=True, bufsize=1, **procutil.GROUP)
+                            stderr=subprocess.PIPE, text=True, encoding="utf-8", errors="replace", bufsize=1, **procutil.GROUP)
     if on_start:
         on_start(proc)
     err_buf: list[str] = []
@@ -976,8 +976,8 @@ def claude_transcript_tail(cwd: str, session_id: str | None, max_chars: int = 80
 
 def git_state(cwd: str) -> str:
     try:
-        st = subprocess.run(["git", "status", "--short"], cwd=cwd, capture_output=True, text=True, timeout=20)
-        diff = subprocess.run(["git", "diff", "--stat"], cwd=cwd, capture_output=True, text=True, timeout=20)
+        st = subprocess.run(["git", "status", "--short"], cwd=cwd, capture_output=True, text=True, encoding="utf-8", errors="replace", timeout=20)
+        diff = subprocess.run(["git", "diff", "--stat"], cwd=cwd, capture_output=True, text=True, encoding="utf-8", errors="replace", timeout=20)
         return (st.stdout.strip()[:3000] + "\n" + diff.stdout.strip()[:2000]).strip() or "(clean)"
     except Exception:
         return "(not a git repo)"

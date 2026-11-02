@@ -28,6 +28,7 @@ def test_config_and_env_override(tmp_path, monkeypatch):
     cfg.mkdir(parents=True)
     (cfg / "motion.yaml").write_text("# mine\nstudio: ~/films  # my own studio\n", encoding="utf-8")
     monkeypatch.setenv("HOME", str(tmp_path / "home"))
+    monkeypatch.setenv("USERPROFILE", str(tmp_path / "home"))  # Windows expanduser reads this
     assert motion.studio_dir() == tmp_path / "home" / "films"
     (cfg / "motion.yaml").write_text("studio: studios/a\n", encoding="utf-8")
     assert motion.studio_dir() == tmp_path / "tabbie" / "studios" / "a"  # relative = inside Tabbie

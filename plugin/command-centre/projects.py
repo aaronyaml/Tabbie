@@ -16,7 +16,7 @@ import re
 import time
 from pathlib import Path
 
-from .common import STATE_DIR, load_projects_file, projects_file_lock, read_json, save_projects_file, write_json
+from .common import STATE_DIR, hermes_home, webui_state, load_projects_file, projects_file_lock, read_json, save_projects_file, write_json
 
 CURRENT_FILE = STATE_DIR / "current_project.json"
 GENERAL_DIR = Path.home() / "hermes" / "general"  # WebUI "General" workspace = no project
@@ -117,7 +117,7 @@ def create_workspace(name: str, folders: list[str], primary: str | None = None) 
 
 
 def _add_webui_workspace(path: str, label: str) -> None:
-    f = Path.home() / ".hermes" / "webui" / "workspaces.json"
+    f = webui_state() / "workspaces.json"
     ws = read_json(f, []) or []
     if not any(Path(w.get("path", "")).expanduser() == Path(path) for w in ws):
         ws.append({"path": path, "name": label})
@@ -176,7 +176,7 @@ _EXPLICIT = [
 
 _NOT_PROJECTS = {Path(p).resolve() for p in ("/", "/tmp", "/private/tmp", __import__("tempfile").gettempdir(),
                                              Path.home().anchor or "/", str(Path.home()),
-                                             str(Path.home() / ".hermes" / "hermes-agent"))}
+                                             str(hermes_home() / "hermes-agent"))}
 
 
 def _within(child: Path, parent: Path) -> bool:
@@ -226,7 +226,7 @@ def resolve(text: str, session_cwd: str | None) -> tuple[str | None, str]:
     return None, "unresolved"
 
 
-WEBUI_STATE = Path.home() / ".hermes" / "webui"
+WEBUI_STATE = webui_state()
 
 
 def webui_project_spaces(session_id: str) -> tuple[str | None, list[str]]:

@@ -16,6 +16,7 @@ import json
 import os
 import re
 import subprocess
+import sys
 import time
 import urllib.error
 import urllib.request
@@ -25,7 +26,8 @@ from pathlib import Path
 
 HOME = Path.home()
 CODEX_HOME = Path(os.environ.get("CODEX_HOME", HOME / ".codex"))
-HERMES_HOME = Path(os.environ.get("HERMES_HOME", HOME / ".hermes"))
+HERMES_HOME = Path(os.environ.get("HERMES_HOME") or (Path(os.environ["LOCALAPPDATA"]) / "hermes" if sys.platform == "win32"
+                                                     and os.environ.get("LOCALAPPDATA") else HOME / ".hermes"))
 CACHE_TTL = 60
 TIMEOUT = 8
 CLI_TIMEOUT = 20  # the higgsfield/elevenlabs CLIs are slow to start when the Mac is busy
@@ -145,7 +147,7 @@ def _claude_credentials() -> dict:
     import sys
     if sys.platform == "darwin":
         out = subprocess.run(["security", "find-generic-password", "-s", "Claude Code-credentials", "-w"],
-                             capture_output=True, text=True, timeout=5)
+                             capture_output=True, text=True, encoding="utf-8", errors="replace", timeout=5)
         if out.returncode == 0:
             return json.loads(out.stdout).get("claudeAiOauth") or {}
     f = HOME / ".claude" / ".credentials.json"
@@ -324,7 +326,7 @@ def parse_higgsfield(data: dict) -> list[dict]:
 
 def higgsfield_rows() -> list[dict]:
     try:
-        out = subprocess.run(["higgsfield", "account", "status", "--json"], capture_output=True, text=True,
+        out = subprocess.run(["higgsfield", "account", "status", "--json"], capture_output=True, text=True, encoding="utf-8", errors="replace",
                              timeout=CLI_TIMEOUT)
         if out.returncode != 0:
             raise RuntimeError("not logged in")
@@ -352,7 +354,7 @@ def elevenlabs_rows() -> list[dict]:
     slow = False
     try:
         out = subprocess.run(["elevenlabs", "user", "subscription", "get", "--format", "json"],
-                             capture_output=True, text=True, timeout=CLI_TIMEOUT)
+                             capture_output=True, text=True, encoding="utf-8", errors="replace", timeout=CLI_TIMEOUT)
         if out.returncode == 0:
             data = json.loads(out.stdout)
             if "character_limit" in data:

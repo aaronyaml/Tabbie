@@ -54,7 +54,7 @@ def have(cmd: str) -> bool:
 
 def sh(cmd: list, timeout: int = 20) -> tuple:
     try:
-        r = subprocess.run(cmd, capture_output=True, text=True, timeout=timeout, stdin=subprocess.DEVNULL)
+        r = subprocess.run(cmd, capture_output=True, text=True, encoding="utf-8", errors="replace", timeout=timeout, stdin=subprocess.DEVNULL)
         return r.returncode, (r.stdout or "") + (r.stderr or "")
     except (OSError, subprocess.TimeoutExpired) as exc:
         return 1, str(exc)
@@ -151,7 +151,7 @@ def job(cmd, label: str) -> str:
     def run():
         try:
             p = subprocess.Popen(cmd, cwd=str(ROOT), stdout=subprocess.PIPE, stderr=subprocess.STDOUT,
-                                 stdin=subprocess.DEVNULL, text=True, bufsize=1,
+                                 stdin=subprocess.DEVNULL, text=True, encoding="utf-8", errors="replace", bufsize=1,
                                  env={**os.environ, "NONINTERACTIVE": "1", "CI": "", "TERM": "dumb"})
             for line in p.stdout:
                 line = ANSI.sub("", line.rstrip("\n")).replace("\r", "")
@@ -189,7 +189,7 @@ def write_password(pw: str) -> None:
     lines.append("HERMES_WEBUI_PASSWORD=" + pw)
     tmp = ENV_FILE.with_name(".env.tmp")
     fd = os.open(str(tmp), os.O_WRONLY | os.O_CREAT | os.O_TRUNC, 0o600)
-    with os.fdopen(fd, "w") as f:
+    with os.fdopen(fd, "w", encoding="utf-8") as f:
         f.write("\n".join(lines) + "\n")
     os.replace(tmp, ENV_FILE)
 

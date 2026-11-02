@@ -70,7 +70,7 @@ def settings() -> dict:
 
 def _git(*args: str, timeout: int = 30) -> str:
     env = {**os.environ, "GIT_TERMINAL_PROMPT": "0"}  # a public repo never needs a login
-    out = subprocess.run(["git", "-C", str(ROOT), *args], capture_output=True, text=True,
+    out = subprocess.run(["git", "-C", str(ROOT), *args], capture_output=True, text=True, encoding="utf-8", errors="replace",
                          timeout=timeout, env=env)
     if out.returncode:
         msg = (out.stderr or out.stdout).strip()
@@ -204,7 +204,7 @@ AGENTS_DIR = Path.home() / "Library" / "LaunchAgents"
 
 
 def _launchctl(*args: str) -> subprocess.CompletedProcess:
-    return subprocess.run(["launchctl", *args], capture_output=True, text=True, timeout=30)
+    return subprocess.run(["launchctl", *args], capture_output=True, text=True, encoding="utf-8", errors="replace", timeout=30)
 
 
 def _loaded(label: str) -> bool:

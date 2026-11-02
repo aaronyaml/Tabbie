@@ -28,7 +28,7 @@ DIFF:
 
 def _git(cwd: str, *args: str) -> str:
     try:
-        r = subprocess.run(["git", *args], cwd=cwd, capture_output=True, text=True, timeout=30)
+        r = subprocess.run(["git", *args], cwd=cwd, capture_output=True, text=True, encoding="utf-8", errors="replace", timeout=30)
         return r.stdout if r.returncode == 0 else ""
     except (OSError, subprocess.SubprocessError):
         return ""
@@ -105,7 +105,7 @@ def run_review(cwd: str, diff: str, why: list[str], *, model: str, effort: str =
                                    sandbox="read-only", ephemeral=True)
         prompt = PROMPT.format(why=", ".join(why[:6]), diff=diff)
         try:
-            subprocess.run(cmd, cwd=cwd, input=prompt, capture_output=True, text=True, timeout=timeout,
+            subprocess.run(cmd, cwd=cwd, input=prompt, capture_output=True, text=True, encoding="utf-8", errors="replace", timeout=timeout,
                            env=_clean_env(_OPENAI_BILLING_VARS))
         except (OSError, subprocess.SubprocessError):
             return None

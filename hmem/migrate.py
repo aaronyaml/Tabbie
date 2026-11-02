@@ -18,6 +18,7 @@ from pathlib import Path
 
 from . import doc as D
 from . import proposals, security, store, trace as T
+from .paths import hermes_home
 
 CLAUDE_PROJECTS = T.CLAUDE_PROJECTS
 _TYPE = {"user": "preference", "feedback": "preference", "project": "fact", "reference": "reference"}
@@ -47,7 +48,7 @@ def _sources() -> list[tuple[Path, str | None]]:
         if f.name == "MEMORY.md":
             continue
         out.append((f, _project_for_dir(f.parent.parent.name)))
-    u = Path.home() / ".hermes" / "memories" / "USER.md"
+    u = hermes_home() / "memories" / "USER.md"
     if u.exists():
         out.append((u, None))
     return out

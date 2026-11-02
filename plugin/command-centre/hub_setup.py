@@ -20,9 +20,9 @@ MODELS = {"openai-codex": "gpt-6.1-sol", "anthropic": "claude-sonnet-5-5"}
 
 
 def _hermes(*args: str, timeout: int = 20) -> tuple[int, str]:
-    exe = shutil.which("hermes") or str(Path.home() / ".hermes" / "bin" / "hermes")
+    exe = shutil.which("hermes") or str(hermes_home() / "bin" / "hermes")
     try:
-        r = subprocess.run([exe, *args], capture_output=True, text=True, timeout=timeout, stdin=subprocess.DEVNULL)
+        r = subprocess.run([exe, *args], capture_output=True, text=True, encoding="utf-8", errors="replace", timeout=timeout, stdin=subprocess.DEVNULL)
         return r.returncode, (r.stdout or "").strip()
     except (OSError, subprocess.TimeoutExpired) as exc:
         return 1, str(exc)

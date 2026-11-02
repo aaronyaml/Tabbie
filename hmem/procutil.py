@@ -31,7 +31,7 @@ STOP_CODES = ((1, 0xC000013A, -1073741510) if WINDOWS
 
 def _run(cmd: list[str], timeout: int = 10) -> str:
     try:
-        return subprocess.run(cmd, capture_output=True, text=True, timeout=timeout).stdout
+        return subprocess.run(cmd, capture_output=True, text=True, encoding="utf-8", errors="replace", timeout=timeout).stdout
     except (OSError, subprocess.SubprocessError):
         return ""
 

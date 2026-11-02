@@ -418,7 +418,7 @@ def _claude_haiku(prompt: str, timeout: int = 180) -> str | None:
         try:
             r = subprocess.run(["claude", "-p", "--no-session-persistence", "--output-format", "json", "--tools", "",
                                 "--strict-mcp-config", "--mcp-config", '{"mcpServers":{}}', "--setting-sources", "project",
-                                "--model", "haiku"], input=prompt, capture_output=True, text=True, timeout=timeout,
+                                "--model", "haiku"], input=prompt, capture_output=True, text=True, encoding="utf-8", errors="replace", timeout=timeout,
                                cwd=cwd, env=env)
             out = json.loads(r.stdout)
         except Exception as e:
@@ -1001,7 +1001,7 @@ def phrase(f: dict, p: dict) -> dict | None:
             r = subprocess.run(["claude", "-p", "--no-session-persistence", "--output-format", "json", "--tools", "", "--strict-mcp-config",
                                 "--mcp-config", '{"mcpServers":{}}', "--setting-sources", "project",
                                 "--model", "haiku"], input=_PHRASE_PROMPT + json.dumps(data, ensure_ascii=False),
-                               capture_output=True, text=True, timeout=120, cwd=cwd, env=env)
+                               capture_output=True, text=True, encoding="utf-8", errors="replace", timeout=120, cwd=cwd, env=env)
             env_out = json.loads(r.stdout)
             txt = env_out.get("result", "")
             out = json.loads(re.search(r"\{.*\}", txt, re.S).group(0))

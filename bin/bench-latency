@@ -73,7 +73,7 @@ def limits_ok() -> tuple[bool, str]:
     msgs = []
     for agent in ("claude", "codex"):
         p = subprocess.run([str(ROOT / "bin" / "limit-gate"), agent, "--purpose", "work"], capture_output=True,
-                           text=True, input="", env=_env(), timeout=60)
+                           text=True, encoding="utf-8", errors="replace", input="", env=_env(), timeout=60)
         if p.returncode == 2:
             msgs.append(p.stderr.strip())
     return (not msgs), "; ".join(msgs)
@@ -172,7 +172,7 @@ def run_one(key: str) -> dict:
     spec = REQUESTS[key]
     t0 = time.time()
     p = subprocess.run(["hermes", "chat", "-q", spec["text"], "--oneshot", "-Q", *HUB_REASONING], cwd=SANDBOX, env=_env(),
-                       capture_output=True, text=True, timeout=1800)
+                       capture_output=True, text=True, encoding="utf-8", errors="replace", timeout=1800)
     t1 = time.time()
     out = p.stdout or ""
     req = _request_for(spec["text"], t0)

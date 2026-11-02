@@ -22,7 +22,10 @@ import sys
 import time
 from contextlib import contextmanager
 
-AGENT_DIR = os.path.expanduser(os.environ.get("HERMES_AGENT_DIR", "~/.hermes/hermes-agent"))
+AGENT_DIR = os.path.expanduser(os.environ.get("HERMES_AGENT_DIR") or os.path.join(
+    os.environ.get("HERMES_HOME") or (os.path.join(os.environ["LOCALAPPDATA"], "hermes")
+                                      if sys.platform == "win32" and os.environ.get("LOCALAPPDATA") else "~/.hermes"),
+    "hermes-agent"))
 if AGENT_DIR not in sys.path and os.path.isdir(AGENT_DIR):
     sys.path.insert(0, AGENT_DIR)
 

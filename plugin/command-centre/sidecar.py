@@ -70,10 +70,11 @@ if _HERMES_HOME not in sys.path:
 from hmem import api as projects_api  # noqa: E402  (Projects UI backend: /projects/*, /fs/*)
 from hmem import agents as agent_set  # noqa: E402  (config/agents.yaml: Claude Code, Codex or both)
 from hmem import motion as motion_studio  # noqa: E402  (Motion studio folder + linked providers)
+from hmem.paths import webui_state  # noqa: E402
 
 EXT_ID = "cc-agents"
 HOST, PORT = "127.0.0.1", int(os.environ.get("CC_SIDECAR_PORT", "8794"))
-WEBUI_STATE = Path(os.environ.get("HERMES_WEBUI_STATE_DIR", Path.home() / ".hermes" / "webui")).expanduser()
+WEBUI_STATE = webui_state()
 TOKEN_FILE = WEBUI_STATE / "sidecar-auth" / f"{EXT_ID}.token"
 _RID = re.compile(r"^\d{8}-\d{6}-[0-9a-f]{6}$")
 _SID = re.compile(r"^[A-Za-z0-9_.:-]{1,120}$")
@@ -562,7 +563,7 @@ def make_title(text: str) -> str:
         out = subprocess.run(
             [claude, "-p", "--model", "haiku", "--tools", "", "--strict-mcp-config", "--no-session-persistence",
              "--setting-sources", "", "--system-prompt", TITLE_PROMPT],
-            input=f"<message>\n{text}\n</message>", capture_output=True, text=True, timeout=30, cwd=cwd,
+            input=f"<message>\n{text}\n</message>", capture_output=True, text=True, encoding="utf-8", errors="replace", timeout=30, cwd=cwd,
         ).stdout
     return clean_title(out)
 

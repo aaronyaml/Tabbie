@@ -119,7 +119,7 @@ def _note(rdir: Path | None, **fields) -> None:
 
 def _changed_files(cwd: str) -> set[str]:
     try:
-        out = subprocess.run(["git", "status", "--porcelain"], cwd=cwd, capture_output=True, text=True, timeout=20)
+        out = subprocess.run(["git", "status", "--porcelain"], cwd=cwd, capture_output=True, text=True, encoding="utf-8", errors="replace", timeout=20)
         return {ln[3:].strip() for ln in out.stdout.splitlines() if ln.strip()} if out.returncode == 0 else set()
     except Exception:
         return set()

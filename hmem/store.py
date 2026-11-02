@@ -129,7 +129,7 @@ def _atomic_write(path: Path, text: str) -> None:
     path.parent.mkdir(parents=True, exist_ok=True)
     fd, tmp = tempfile.mkstemp(prefix=f".{path.name}.", dir=path.parent)
     try:
-        with os.fdopen(fd, "w") as f:
+        with os.fdopen(fd, "w", encoding="utf-8") as f:
             f.write(text)
             f.flush()
             os.fsync(f.fileno())
@@ -177,7 +177,7 @@ def append_event(kind: str, **fields) -> None:
 # ------------------------------------------------------------------ git
 
 def _git(*args: str, check: bool = True) -> subprocess.CompletedProcess:
-    return subprocess.run(["git", "-C", str(root()), *args], capture_output=True, text=True, check=check,
+    return subprocess.run(["git", "-C", str(root()), *args], capture_output=True, text=True, encoding="utf-8", errors="replace", check=check,
                           env={**os.environ, "GIT_TERMINAL_PROMPT": "0"})
 
 

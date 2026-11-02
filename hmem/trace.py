@@ -27,12 +27,13 @@ import re
 from pathlib import Path
 
 from . import security, store
+from .paths import hermes_home, webui_state
 
 HERMES = Path(os.environ.get("COMMAND_CENTRE_HOME", Path.home() / "hermes")).expanduser()
 CLAUDE_PROJECTS = Path(os.environ.get("HMEM_CLAUDE_PROJECTS", Path.home() / ".claude" / "projects")).expanduser()
 # Hermes WebUI chats with the hub (one JSON file per session). Most hub turns never become a worker
 # request, so without this source the user's own words in a project chat are never seen.
-WEBUI_SESSIONS = Path(os.environ.get("HMEM_WEBUI_SESSIONS", Path.home() / ".hermes" / "webui" / "sessions")).expanduser()
+WEBUI_SESSIONS = Path(os.environ.get("HMEM_WEBUI_SESSIONS") or webui_state() / "sessions").expanduser()
 MAX_TRACE_BYTES = 200_000
 MAX_LINE = 1_500_000  # longer transcript lines are images/blobs: skipped
 RESULT_CHARS = 400
@@ -63,7 +64,7 @@ def _known_secrets() -> list[str]:
     memory to redact exact occurrences; never written anywhere."""
     if _KNOWN["values"] is None:
         vals = set()
-        files = [Path.home() / ".hermes" / ".env", HERMES / "hermes-webui" / ".env"]
+        files = [hermes_home() / ".env", HERMES / "hermes-webui" / ".env"]
         pairs = list(os.environ.items())
         for f in files:
             try:

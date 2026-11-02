@@ -11,6 +11,7 @@ from pathlib import Path
 from typing import Any
 
 from .flockcompat import fcntl
+from hmem.paths import hermes_home, webui_state  # noqa: E402  (flockcompat put ~/hermes on sys.path)
 
 ROOT = Path(os.environ.get("COMMAND_CENTRE_HOME", Path.home() / "hermes")).expanduser()
 CONFIG_DIR = ROOT / "config"
@@ -50,7 +51,7 @@ def _dump_yaml(path: Path, data: dict) -> None:
         text = buf.getvalue()
     fd, tmp = tempfile.mkstemp(dir=path.parent, prefix=f".{path.name}.")  # never a half-written file
     try:
-        with os.fdopen(fd, "w") as f:
+        with os.fdopen(fd, "w", encoding="utf-8") as f:
             f.write(text)
         if path.exists():
             os.chmod(tmp, path.stat().st_mode & 0o777)
@@ -77,6 +78,7 @@ def save_projects_file(data: dict) -> None:
 def projects_file_lock():
     """Hold around load_projects_file() ... save_projects_file() so two writers don't drop each other's change."""
     lf = CONFIG_DIR / ".projects.yaml.lock"
+    CONFIG_DIR.mkdir(parents=True, exist_ok=True)
     with open(lf, "a", encoding="utf-8") as f:
         fcntl.flock(f, fcntl.LOCK_EX)
         try:
@@ -96,7 +98,7 @@ def write_json(path: Path, data: Any) -> None:
     """Atomic write so a crash never leaves half a state file."""
     path.parent.mkdir(parents=True, exist_ok=True)
     fd, tmp = tempfile.mkstemp(dir=path.parent, prefix=".tmp-")
-    with os.fdopen(fd, "w") as fh:
+    with os.fdopen(fd, "w", encoding="utf-8") as fh:
         json.dump(data, fh, indent=2, default=str)
     os.replace(tmp, path)
 
