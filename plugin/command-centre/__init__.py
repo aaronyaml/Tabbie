@@ -392,7 +392,7 @@ def _limit_block(r: Request, agent: str, model: str | None, *, offer: bool = Tru
                                           (load_config().get("dynamic_agents") or {}).get("models") or {},
                                           _codex_models_safe())
         og = limits_gate.check(other, peer["model"], purpose="work")
-        if offer and not og.blocked:
+        if offer and _handover_on() and not og.blocked:
             log_decision(event="limit_switch_auto", request=r.id, to=other, model=peer["model"])
             return {"switch": peer}
     r["status"] = "limit_blocked"
@@ -400,6 +400,11 @@ def _limit_block(r: Request, agent: str, model: str | None, *, offer: bool = Tru
     msg = _out_of_limits(g.message, og.message if og is not None and og.blocked else None)
     return {"request_id": r.id, "ok": False, "usage_limit": msg,
             "note": f"Nothing was started. Tell the user in one line: {msg}."}
+
+
+def _handover_on() -> bool:
+    """limits.handover (default on): a limit hit hands the same task to the other agent."""
+    return (load_config().get("limits") or {}).get("handover", True) is not False
 
 
 def _out_of_limits(first: str, second: str | None) -> str:
@@ -1199,7 +1204,7 @@ def _run_request(r: Request, feed=None, force: dict | None = None) -> dict:
         log_decision(event="claude_limit", request=r.id, detail=limit)
         mine = _limit_text("claude", limit, claude_model)
         theirs = None
-        if not force and agents().has("codex") and providers.linked("codex"):
+        if not force and _handover_on() and agents().has("codex") and providers.linked("codex"):
             # the same task carries on in Codex from where Claude stopped (takeover prompt), no question asked
             peer = executor_choice.peer_model("anthropic", claude_model or ecfg.get("model") or executor_choice.DEFAULT["model"],
                                               (cfg.get("dynamic_agents") or {}).get("models") or {}, _codex_models_safe())
@@ -1365,7 +1370,7 @@ def _astra_takeover(r: Request, reason: str, choice: dict | None = None, feed=No
         log_decision(event="codex_limit", request=r.id, detail=limit[:200])
         mine = _limit_text("codex", limit, res.get("model") or model)
         theirs = None
-        if choice and agents().has("claude") and providers.linked("claude"):
+        if choice and _handover_on() and agents().has("claude") and providers.linked("claude"):
             peer = executor_choice.peer_model("openai", res.get("model") or model,
                                               (cfg.get("dynamic_agents") or {}).get("models") or {}, _codex_models_safe())
             cg = limits_gate.check("claude", peer["model"], purpose="work", refresh=True)

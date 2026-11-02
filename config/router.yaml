@@ -47,6 +47,9 @@ executor:
 # they never use up the ChatGPT pool the hub shares. Unknown usage fails open (logged).
 # ---------------------------------------------------------------------------
 limits:
+  # handover: a job that hits Claude's or Codex's limit carries on in the other one (same task, no
+  # question); both out = one line with both reset times. false = stop and say when it resets.
+  handover: true
   block_at_pct: 95
   reserve_for_hub_pct: 90
 

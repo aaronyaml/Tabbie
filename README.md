@@ -782,6 +782,7 @@ executor:
   early_start: true
   relay: verbatim            # or hub (the hub model rewrites the answer)
 limits:
+  handover: true         # a limit hit moves the same task to the other agent (default on)
   block_at_pct: 95
   reserve_for_hub_pct: 90
 dynamic_agents:
