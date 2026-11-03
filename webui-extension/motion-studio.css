@@ -657,9 +657,13 @@ html.hx-gal-open #hxStudio { overflow: hidden; }
 .hxs-gal-h p { margin: 4px 0 0; font-size: 14px; color: var(--hx-text-2, #8a8a8e); line-height: 1.4; max-width: 640px; }
 .hxs-gal-g { display: grid; grid-template-columns: repeat(auto-fill, minmax(240px, 1fr)); gap: 16px; padding: 6px 4px 0; }
 .hxs-gal-load { grid-column: 1 / -1; }
-.hxs-sc { display: flex; flex-direction: column; padding: 0; border: 0; border-radius: 16px; background: transparent; text-align: left; cursor: pointer; outline: none; }
-.hxs-sc-m { position: relative; display: block; aspect-ratio: 16 / 9; border-radius: 14px; overflow: hidden; background: var(--hx-fill, rgba(127,127,127,.12));
+/* width: 100% on both: Safari doesn't stretch the children of a <button> flex container, the media box collapsed to 0 */
+.hxs-sc { display: flex; flex-direction: column; align-items: stretch; width: 100%; min-width: 0; padding: 0; border: 0; border-radius: 16px; background: transparent; text-align: left; cursor: pointer; outline: none; }
+.hxs-sc-m { position: relative; display: block; width: 100%; aspect-ratio: 16 / 9; border-radius: 14px; overflow: hidden; background: var(--hx-fill, rgba(127,127,127,.12));
   box-shadow: inset 0 0 0 1px rgba(127,127,127,.18); transition: transform .25s cubic-bezier(.22,1,.36,1), box-shadow .2s ease; }
+/* the card's frame also holds its height from content (a 16:9 padding box): Safari can collapse a span inside a
+   <button> flex container to 0 × 0, which hid every thumbnail; with aspect-ratio too the two agree exactly */
+.hxs-sc-m::before { content: ''; display: block; padding-top: 56.25%; }
 .hxs-sc-m img, .hxs-sc-m video { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; display: block; }
 .hxs-sc-m video { opacity: 0; transition: opacity .2s ease; }
 .hxs-sc-m.is-playing video { opacity: 1; }

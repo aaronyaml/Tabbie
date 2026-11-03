@@ -1943,6 +1943,8 @@ ${editSystem(s)}
   }
 
   const vOpening = () => `<section class="hxs-hero hxs-opening"><div class="hxs-buddy hxs-buddy-xl" data-buddy="zoetie" aria-hidden="true"></div><p>Opening the film…</p></section>`;
+  // what's typed on the new-film form survives re-renders (the gallery, projects loading) until the film starts
+  const NEWF = { title: '', brief: '' };
   function vHome() {
     if (needsInstall()) return vInstall();
     loadStyles();
@@ -1953,8 +1955,8 @@ ${editSystem(s)}
         <h1>What are we making?</h1>
         <p>Pick the track, mark the moments, approve the storyboard. ${NAME} builds the film in your motion studio.</p>
         <form class="hxs-new" data-form="new">
-          <input name="title" required maxlength="60" placeholder="Name the film, e.g. Acme launch" autocomplete="off">
-          <textarea name="brief" rows="2" maxlength="600" placeholder="One line on what it should do (optional)"></textarea>
+          <input name="title" required maxlength="60" placeholder="Name the film, e.g. Acme launch" autocomplete="off" value="${esc(NEWF.title)}">
+          <textarea name="brief" rows="2" maxlength="600" placeholder="One line on what it should do (optional)">${esc(NEWF.brief)}</textarea>
           ${styleChip(SL.draft || { id: 'auto' }, 'style-home')}
           <div class="hxs-fmt-row"><span>Format</span>${formatPicker({ id: FM.pick, width: FM.w, height: FM.h }, false, 'fmt-home')}</div>
           ${projectPicker()}
@@ -2721,7 +2723,7 @@ ${editSystem(s)}
         return say(text);
       }
       if (f.dataset.form === 'new') navPush = true;
-      if (f.dataset.form === 'new') return guard(() => createProject(String(fd.get('title')).trim(), String(fd.get('brief') || '').trim(), String(fd.get('ctx') || '')));
+      if (f.dataset.form === 'new') return guard(async () => { await createProject(String(fd.get('title')).trim(), String(fd.get('brief') || '').trim(), String(fd.get('ctx') || '')); NEWF.title = ''; NEWF.brief = ''; });
       if (f.dataset.form === 'gen') { if (audioLocked()) return; const pr = String(fd.get('prompt')).trim(), du = Math.max(5, Math.min(120, +fd.get('dur') || 20)); return startJob('generate-audio', () => { draftClear('gen'); return onGenerate(pr, du); }); }
       if (f.dataset.form === 'sb-rev') { const note = String(fd.get('note') || '').trim(); if (note) startJob('storyboard', () => { draftClear('sb-rev'); P.storyboard.status = 'revise'; return genStoryboard(note); }); return; }
       if (f.dataset.form === 'redo' && !canRedo()) return;
@@ -2736,6 +2738,7 @@ ${editSystem(s)}
       if (e.target.id === 'hxsElKey') { EL.key = e.target.value; return; }  // never into drafts
       if (e.target.matches('[data-fmt-home-w], [data-fmt-home-h]')) { FM[e.target.matches('[data-fmt-home-w]') ? 'w' : 'h'] = evenPx(e.target.value); return; }
       if (P && e.target.matches('[data-fmt-film-w], [data-fmt-film-h]')) { const k = e.target.matches('[data-fmt-film-w]') ? 'width' : 'height'; P.format = { ...fmtOf(), id: 'custom', [k]: evenPx(e.target.value) }; saveSoon('project', () => saveProject()); return; }
+      if (e.target.form && e.target.form.dataset.form === 'new' && (e.target.name === 'title' || e.target.name === 'brief')) { NEWF[e.target.name] = e.target.value; return; }
       if (e.target.form) draftSave(e.target);
       if (e.target.matches && e.target.matches('textarea[data-brief]')) { if (P) { P.brief = e.target.value; saveSoon('project', () => saveProject()); } return; }
       const qo = e.target.closest('.hxs-qc-other');

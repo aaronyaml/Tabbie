@@ -4,6 +4,7 @@ from __future__ import annotations
 import sys
 
 import json
+import shutil
 
 import pytest
 
@@ -181,6 +182,24 @@ def test_older_template_studio_gets_the_additions_once(tmp_path):
     r = rules.read_text(encoding="utf-8")
     assert r.count("## Transitions") == 1 and "## My own rule\nKeep it." in r and "MOTION_RULES.md (Transitions)" in added
     assert motion.sync_template(p) == []  # once
+
+
+def test_new_library_styles_reach_an_older_studio(tmp_path):
+    motion.ensure()
+    p = motion.studio_dir()
+    idx = p / "styles/index.json"
+    full = json.loads(idx.read_text(encoding="utf-8"))["order"]
+    mine = [x for x in full if x not in ("shape-lab", "midnight-gradient", "cloud-nine")] + ["my-style"]
+    for sid in ("shape-lab", "midnight-gradient", "cloud-nine"):
+        shutil.rmtree(p / "styles" / sid)
+    (p / "styles/my-style").mkdir(); (p / "styles/my-style/style.json").write_text("{}", encoding="utf-8")
+    idx.write_text(json.dumps({"schema": "motion.styles/1", "order": mine}), encoding="utf-8")
+    (p / motion.MARKER).write_text("template 4\n", encoding="utf-8")
+    added = motion.sync_template(p)
+    order = json.loads(idx.read_text(encoding="utf-8"))["order"]
+    assert order[: len(mine)] == mine and order[len(mine):] == ["shape-lab", "midnight-gradient", "cloud-nine"]
+    assert (p / "styles/cloud-nine/thumb.html").is_file() and "styles/index.json (+3 styles)" in added
+    assert [s["id"] for s in motion.styles(p)["styles"]][-3:] == ["shape-lab", "midnight-gradient", "cloud-nine"]
 
 
 def test_custom_studio_is_never_synced(tmp_path):

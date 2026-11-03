@@ -110,7 +110,7 @@ def sync_template(p: Path | None = None) -> list[str]:
     want = _ver(template_version())
     if not want or have >= want:
         return []
-    added = []
+    added, later = [], []
     for rel in ADDITIONS:
         src = TEMPLATE / rel
         if not src.is_dir():
@@ -122,10 +122,15 @@ def sync_template(p: Path | None = None) -> list[str]:
             if dst.name == "manifest.json" and dst.exists():
                 added += _merge_manifest(f, dst)
                 continue
+            if f.relative_to(TEMPLATE).as_posix() == "styles/index.json" and dst.exists():
+                later.append((f, dst))  # after the style folders are copied, so the new ids exist
+                continue
             if not dst.exists():
                 dst.parent.mkdir(parents=True, exist_ok=True)
                 shutil.copy2(f, dst)
                 added.append(f.relative_to(TEMPLATE).as_posix())
+    for f, dst in later:
+        added += _merge_style_order(f, dst)
     # sections a newer template added to its docs: appended once, the rest of the user's file untouched
     for name, head in (("CLAUDE.md", "## Sound effects"), ("MOTION_RULES.md", "## Transitions"), ("MOTION_RULES.md", "## Style")):
         doc, tdoc = p / name, TEMPLATE / name
@@ -139,6 +144,23 @@ def sync_template(p: Path | None = None) -> list[str]:
             pass
     marker.write_text(f"template {want}\n", encoding="utf-8")
     return added
+
+
+def _merge_style_order(src: Path, dst: Path) -> list[str]:
+    """New library styles join the studio's gallery order (after the studio's own); nothing is removed or reordered."""
+    try:
+        new, cur = json.loads(src.read_text(encoding="utf-8")), json.loads(dst.read_text(encoding="utf-8"))
+    except (OSError, ValueError):
+        return []
+    order = cur.get("order") if isinstance(cur, dict) else None
+    if not isinstance(order, list):
+        return []
+    extra = [x for x in (new.get("order") or []) if isinstance(x, str) and x not in order and (dst.parent / x / "style.json").is_file()]
+    if not extra:
+        return []
+    cur["order"] = order + extra
+    dst.write_text(json.dumps(cur), encoding="utf-8")
+    return [f"styles/index.json (+{len(extra)} styles)"]
 
 
 def _merge_manifest(src: Path, dst: Path) -> list[str]:
