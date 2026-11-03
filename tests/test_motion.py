@@ -189,17 +189,18 @@ def test_new_library_styles_reach_an_older_studio(tmp_path):
     p = motion.studio_dir()
     idx = p / "styles/index.json"
     full = json.loads(idx.read_text(encoding="utf-8"))["order"]
-    mine = [x for x in full if x not in ("shape-lab", "midnight-gradient", "cloud-nine")] + ["my-style"]
-    for sid in ("shape-lab", "midnight-gradient", "cloud-nine"):
+    new = full[-2:]  # pretend the library's last two styles are new since this studio was made
+    mine = [x for x in full if x not in new] + ["my-style"]
+    for sid in new:
         shutil.rmtree(p / "styles" / sid)
     (p / "styles/my-style").mkdir(); (p / "styles/my-style/style.json").write_text("{}", encoding="utf-8")
     idx.write_text(json.dumps({"schema": "motion.styles/1", "order": mine}), encoding="utf-8")
     (p / motion.MARKER).write_text("template 4\n", encoding="utf-8")
     added = motion.sync_template(p)
     order = json.loads(idx.read_text(encoding="utf-8"))["order"]
-    assert order[: len(mine)] == mine and order[len(mine):] == ["shape-lab", "midnight-gradient", "cloud-nine"]
-    assert (p / "styles/cloud-nine/thumb.html").is_file() and "styles/index.json (+3 styles)" in added
-    assert [s["id"] for s in motion.styles(p)["styles"]][-3:] == ["shape-lab", "midnight-gradient", "cloud-nine"]
+    assert order[: len(mine)] == mine and order[len(mine):] == new
+    assert (p / "styles" / new[-1] / "thumb.html").is_file() and "styles/index.json (+2 styles)" in added
+    assert [s["id"] for s in motion.styles(p)["styles"]][-2:] == new
 
 
 def test_custom_studio_is_never_synced(tmp_path):
