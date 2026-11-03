@@ -1009,7 +1009,8 @@
     if (live && !/^Starting$/.test(live) && seen[seen.length - 1] !== live) seen.push(live);
     return seen.slice(-5).map((n, i, l) => ({ name: n, done: i < l.length - 1, on: i === l.length - 1 }));
   }
-  function jobCard(it, top) {
+  // last: the newest step in the feed; a failed one gets Try again (render/revision run on Claude Code).
+  function jobCard(it, top, last) {
     const { j, st, r } = jobState(it);
     const name = JOBNAME[it.kind] || 'Studio step';
     const run = st === 'running' || st === 'waiting';
@@ -1028,7 +1029,7 @@
       : `<div class="hxs-jc-foot"><button type="button" class="hxs-quiet" data-act="stop-ask">Stop waiting…</button></div>`) : '';
     if (!run) {
       return `<div class="hxs-jc is-${esc(st)}"><div class="hxs-jc-top"><span class="hxs-jc-ic">${icon(st === 'done' ? 'CheckmarkCircle02Icon' : 'Alert02Icon', 16)}</span><span class="hxs-jc-title">${esc(name)}</span><span class="hxs-jc-st">${st === 'done' ? 'Done' : st === 'failed' ? 'Failed' : esc(st)}</span>${time}</div>
-        ${note ? `<p class="hxs-jc-n">${md(note)}</p>` : ''}${det}</div>`;
+        ${note ? `<p class="hxs-jc-n">${md(note)}</p>` : ''}${det}${last && st === 'failed' ? `<div class="hxs-jc-foot"><button type="button" class="hxs-ghost hxs-sm" data-act="retry-job" data-kind="${esc(it.kind)}" data-note="${esc(note.slice(0, 300))}"${active() || chatBusy() ? ' disabled' : ''}>${icon('RefreshIcon', 14)}<span>Try again</span></button></div>` : ''}</div>`;
     }
     return `<div class="hxs-jc is-${esc(st)}${top ? ' is-top' : ''}">
         <div class="hxs-jc-top"><span class="hxs-jc-title">${esc(name)}</span>${time}</div>
@@ -1054,8 +1055,9 @@
   function feedHTML(items) {
     if (!items.length) return `<div class="hxs-feed-empty">Ask ${NAME} anything about this film: an idea for the open, why a cut lands where it does, what to try next.</div>`;
     const busyJob = active();
+    const lastJob = [...items].reverse().find((x) => x.type === 'job');
     return items.map((it) => {
-      if (it.type === 'job') return jobCard(it) + (it.ask ? replyForm() : '');
+      if (it.type === 'job') return jobCard(it, false, it === lastJob) + (it.ask ? replyForm() : '');
       if (it.type === 'user') {
         const p = it.local;
         const st = !p ? '' : p.state === 'failed' ? `<span class="hxs-m-st is-bad">Couldn’t send · <button type="button" class="hxs-link" data-act="retry-msg" data-pid="${p.id}">Retry</button></span>`
@@ -1446,7 +1448,7 @@
     return `<div class="hxs-ed">
         <div class="hxs-player">${vid ? `<video class="hxs-video" src="${esc(vid)}" playsinline controls preload="metadata"></video>` : `<div class="hxs-player-empty">${host(running() ? 'Building the film. The preview shows up here as soon as there is a render; you can already select parts below.' : 'No render yet.')}</div>`}
           <audio class="hxs-audio" preload="metadata" src="${esc(vid ? '' : audioSrc())}"></audio></div>
-        <div class="hxs-transport"><button type="button" class="hxs-ib" data-act="play" aria-label="Play">${icon('PlayIcon', 18)}</button><span class="hxs-time">0:00.00</span><span class="hxs-badge hxs-st-${esc(status)}">${esc(status)}</span>${vid && !running() && ri.status === 'done' ? `<a class="hxs-dl" href="${esc(`${rawUrl(P.sessionId, out)}&download=1`)}" download>${icon('Download04Icon', 16)}<span>Download</span></a>` : ''}</div>
+        <div class="hxs-transport"><button type="button" class="hxs-ib" data-act="play" aria-label="Play">${icon('PlayIcon', 18)}</button><span class="hxs-time">0:00.00</span><span class="hxs-badge hxs-st-${esc(status)}">${esc(status)}</span>${!running() && status === 'failed' ? `<button type="button" class="hxs-ghost hxs-sm hxs-retry" data-act="retry-job" data-kind="render"${active() || chatBusy() ? ' disabled' : ''}>${icon('RefreshIcon', 14)}<span>Try again</span></button>` : ''}${vid && !running() && ri.status === 'done' ? `<a class="hxs-dl" href="${esc(`${rawUrl(P.sessionId, out)}&download=1`)}" download>${icon('Download04Icon', 16)}<span>Download</span></a>` : ''}</div>
         <div class="hxs-card hxs-ed-tl">${timelineHTML(['ruler', 'wave', 'actions', 'scenes', 'revisions'], { selectable: true })}
           <div class="hxs-legend">${TREATMENTS.map((t) => `<i style="background:${TCOL[t]}" title="${esc(TLABEL[t][1])}"></i><span title="${esc(TLABEL[t][1])}">${TLABEL[t][0]}</span>`).join('')}</div></div>
         <form class="hxs-card hxs-redo${n ? '' : ' is-idle'}${redoOk ? '' : ' is-locked'}" data-form="redo">
@@ -1832,6 +1834,13 @@
     view = 'editor'; P.step = 'editor';
     await dispatch('render', `The user APPROVED the storyboard in ${pdir()}/storyboard.json (version ${P.storyboard.version}). Build and render the film now with the /motion workflow: write the edit map from the storyboard's anchors (src/components/${P.project}/editMap.ts), export it with \`npm run editmap -- ${P.project}\` so audio/analysis/${P.project}/EDIT_MAP.json exists early, then render into output/. Keep ${pdir()}/render.json current: {"schema":"tabbie.motion-render/1","status":"rendering"|"done"|"failed","output":"output/<file>.mp4","updatedAt":"<ISO time>"} (output relative to the studio folder).`);
   }
+  // Try again on a failed step: a render re-runs the approved build; any other step is sent again with
+  // what went wrong, reusing whatever it had already made.
+  function retryJob(kind, note) {
+    const name = (JOBNAME[kind] || 'studio step').toLowerCase();
+    if (kind === 'render') return startJob('render', () => approve());
+    startJob(kind, () => dispatch(kind, `The last ${name} step failed${note ? ` (${note})` : ''}. Try it again: reuse what is already done, fix what stopped it, and finish the step.`));
+  }
   let redoAttach = null;
   // Redo needs a finished film: render.json done and no render/revision job running.
   const canRedo = () => !!(F.renderInfo && F.renderInfo.status === 'done') && !active();
@@ -1947,6 +1956,7 @@
       if (act === 'stop-ask') { stopAsk = (running() || {}).id || null; return paintJob(); }
       if (act === 'stop-no') { stopAsk = null; return paintJob(); }
       if (act === 'job-drop') { const j = running(); stopAsk = null; if (j) { j.status = 'failed'; j.note = 'Stopped waiting (Claude may still finish it in the background)'; j.endedAt = Date.now(); saveProject(); } return render(); }
+      if (act === 'retry-job') { retryJob(a.dataset.kind, a.dataset.note || ''); return; }
       if (act === 'retry-start') { const f = failedStart; failedStart = null; if (f) f.retry(); else render(); return; }
       if (act === 'dismiss-start') { failedStart = null; return render(); }
       if (act === 'unqueue') { const q = P.queued; delete P.queued; if (q && q.kind === 'analyze' && P.audio && P.audio.status === 'analysing') P.audio.status = 'trim'; saveProject(); return render(); }

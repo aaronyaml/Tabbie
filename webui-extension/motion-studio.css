@@ -241,6 +241,7 @@ html.hx-studio-open #hxStudio { display: block; position: fixed; top: 0; right: 
 .hxs-player-empty .hxs-say { background: rgba(255,255,255,.1); }
 .hxs-audio { display: none; }
 .hxs-transport { display: flex; align-items: center; gap: 10px; font-size: 13px; color: var(--hx-text-2, #8a8a8e); }
+.hxs-retry { display: inline-flex; align-items: center; gap: 6px; }
 .hxs-time { font-variant-numeric: tabular-nums; color: var(--hx-text, inherit); font-weight: 500; }
 .hxs-out { margin-left: auto; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; font-size: 12px; }
 .hxs-badge { display: inline-flex; align-items: center; height: 22px; padding: 0 9px; border-radius: 999px; font-size: 11.5px; font-weight: 600; text-transform: capitalize;

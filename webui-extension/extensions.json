@@ -251,11 +251,11 @@
       "scripts": [
         "motion.js?v=9",
         "motion-scrub.js?v=6",
-        "motion-studio.js?v=29"
+        "motion-studio.js?v=31"
       ],
       "stylesheets": [
         "motion.css?v=8",
-        "motion-studio.css?v=19"
+        "motion-studio.css?v=20"
       ]
     },
     {
