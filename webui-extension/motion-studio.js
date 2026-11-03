@@ -1122,6 +1122,60 @@
     const at = (j.at || 0) - 8000;
     return chat.reqs.find((r) => Date.parse(r.created) >= at) || null;
   };
+  // A worker step ("Bash: cat styles/x/STYLE.md; …", "Edit: src/…") as a plain action: never show raw commands.
+  function humanStep(raw) {
+    let t = String(raw || '').trim();
+    const tool = (/^(Read|Edit|MultiEdit|Write|Grep|Glob|WebFetch|WebSearch|Agent|Task|TodoWrite|Bash|Running|Tool)\s*:\s*/i.exec(t) || [])[1] || '';
+    t = t.replace(/^[A-Za-z]+\s*:\s*/, '');
+    const what = (x) => {
+      const n = String(x || '');
+      let m = /styles\/([a-z0-9-]+)\/(STYLE\.md|style\.json|thumb)/i.exec(n);
+      if (m) return `the ${(styleById(m[1]) || {}).name || m[1].replace(/-/g, ' ')} style`;
+      if (/storyboard\.json/i.test(n)) return 'the storyboard';
+      if (/BRAND\.md|\/brand\//i.test(n)) return 'the brand kit';
+      if (/CONTEXT\.md/i.test(n)) return 'the project notes';
+      if (/project\.json/i.test(n)) return 'the film settings';
+      if (/analysis|EDIT_MAP|editMap/i.test(n)) return 'the music analysis';
+      if (/keypoints/i.test(n)) return 'your keypoints';
+      if (/\.pdf\b/i.test(n)) return 'the brand guidelines';
+      if (/MOTION_RULES|CLAUDE\.md|motion-knowledge|SKILL\.md/i.test(n)) return 'the studio rules';
+      if (/tokens\.ts/i.test(n)) return 'the film’s colours and type';
+      if (/src\/(compositions|components)\//i.test(n)) return 'the scenes';
+      if (/sketch/i.test(n)) return 'your sketches';
+      if (/\.(png|jpe?g|webp|svg)\b/i.test(n)) return 'the images';
+      return 'the film’s files';
+    };
+    if (/^(Edit|MultiEdit|Write)$/i.test(tool)) return /src\/(compositions|components)/.test(t) ? 'Building the scenes' : `Updating ${what(t)}`;
+    if (/^Read$/i.test(tool)) return `Reading ${what(t)}`;
+    if (/^(Grep|Glob)$/i.test(tool)) return 'Looking through the files';
+    if (/^Web/i.test(tool)) return 'Looking something up';
+    if (/^TodoWrite$/i.test(tool)) return 'Planning the next steps';
+    // a shell command: the first meaningful part of a chain decides
+    const parts = t.split(/\s*(?:&&|\|\||;|\|)\s*/).map((x) => x.replace(/^(cd \S+|export \S+|set -\S+|nice( -n \d+)?|time)\s*/g, '').trim()).filter(Boolean);
+    for (const c of parts) {
+      const w = c.split(/\s+/)[0].toLowerCase().replace(/^.*\//, '');
+      if (/remotion render|npm run (render|build)\b|render\.mjs/i.test(c)) return 'Rendering the film';
+      if (/remotion still/i.test(c)) return 'Rendering preview frames';
+      if (/styles:build|styles_build/i.test(c)) return 'Building the style previews';
+      if (/editmap/i.test(c)) return 'Writing the edit map';
+      if (/music|elevenlabs/i.test(c)) return 'Making the music';
+      if (/analy[sz]e|audiolib|librosa|whisper/i.test(c)) return 'Listening to the track';
+      if (/^(unzip|tar|ditto)$/.test(w)) return 'Unpacking the brand kit';
+      if (/^(pdftotext|pdfinfo|mdls|qlmanage)$/.test(w)) return 'Reading the brand guidelines';
+      if (/^(cat|head|tail|less|more|sed|awk|jq)$/.test(w)) return `Reading ${what(c)}`;
+      if (/^(ls|find|grep|rg|tree|du|wc|stat|file)$/.test(w)) return 'Looking through the files';
+      if (/^(cp|mv|mkdir|rsync|ln|rm)$/.test(w)) return 'Organising the files';
+      if (/^(tsc|eslint)$/.test(w) || /npm run (lint|typecheck)|tsc --noEmit/.test(c)) return 'Checking the code';
+      if (/^(ffprobe|mediainfo)$/.test(w)) return 'Checking the video';
+      if (/^(ffmpeg|sox)$/.test(w)) return 'Processing the audio and video';
+      if (/^(magick|convert|sips|rsvg-convert)$/.test(w)) return 'Preparing the images';
+      if (/^(npm|npx|pnpm|yarn)$/.test(w) && /install|add\b/.test(c)) return 'Installing packages';
+      if (w === 'git') return 'Saving a checkpoint';
+      if (/^(python3?|node|uv|bun|deno)$/.test(w)) return /\.(json|md)\b/.test(c) ? `Reading ${what(c)}` : 'Running a quick check';
+      if (/^(echo|printf|true|test|sleep|date)$/.test(w)) continue;
+    }
+    return /\//.test(t) || /^[a-z]+\s/.test(t) ? 'Working on the film' : cap(t).slice(0, 90);
+  }
   function liveStatus(j) {
     if (j && j.starting) return j.kind === 'analyze' && local.uploading ? 'Uploading your track' : 'Starting';
     if (j && j.stage) return cap(j.stage);
@@ -1132,8 +1186,8 @@
     const sub = ag.filter((a) => a.parent && a.status === 'running').pop();
     if (sub && sub.name && sub.name !== 'subagent') return cap(sub.name);
     const main = ag.find((a) => !a.parent);
-    const st = main && main.status === 'running' && main.step ? String(main.step).replace(/^(Running|Tool|Bash):\s*/i, '') : '';
-    return st && !/^(done|starting|thinking|working)\b/i.test(st) ? cap(st).slice(0, 90) : '';
+    const st = main && main.status === 'running' && main.step ? String(main.step) : '';
+    return st && !/^(done|starting|thinking|working)\b/i.test(st) ? humanStep(st) : '';
   }
   // "Route: Claude — …", "- Done:/- Note:" prefixes and hermes-question blocks out; "Verified" lines aside.
   function cleanReply(text) {
