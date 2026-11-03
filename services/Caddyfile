@@ -137,6 +137,27 @@
 		file_server
 	}
 
+	# Tabbie's extension files are versioned (?v=…, bumped in extensions.json on every change), so a
+	# given URL never changes: the browser keeps them instead of refetching ~150 files from the WebUI
+	# on every load. Still behind the login; only successful replies are kept (a 302 to the login
+	# page or a 404 isn't).
+	@ext_versioned {
+		path /extensions/*
+		query v=*
+	}
+	handle @ext_versioned {
+		header {
+			Cache-Control "private, max-age=31536000, immutable"
+			match {
+				status 200
+			}
+			defer
+		}
+		reverse_proxy 127.0.0.1:8787 {
+			header_up X-Forwarded-Proto https
+		}
+	}
+
 	handle {
 		reverse_proxy 127.0.0.1:8787 {
 			flush_interval -1
