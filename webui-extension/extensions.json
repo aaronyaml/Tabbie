@@ -251,7 +251,7 @@
       "scripts": [
         "motion.js?v=9",
         "motion-scrub.js?v=6",
-        "motion-studio.js?v=59"
+        "motion-studio.js?v=60"
       ],
       "stylesheets": [
         "motion.css?v=8",

@@ -2202,13 +2202,23 @@ ${editSystem(s)}
     err = '';
     try { await fn(); } catch (e) { err = (e && e.message) || String(e); render(); }
   }
+  // every place a film keeps files under its slug (deleteFilm removes the film's own data from all of them)
+  const FILM_DIRS = (slug) => [`studio/${slug}`, `audio/analysis/${slug}`, `public/audio/music/${slug}`];
+  async function slugUsed(sid, slug) {
+    for (const path of FILM_DIRS(slug)) {
+      try { const r = await fetchT(`api/list?session_id=${encodeURIComponent(sid)}&path=${encodeURIComponent(path)}`, 8000); if (r.ok) return true; } catch (_) { return true; }  // can't tell: don't risk it
+    }
+    return false;
+  }
   async function createProject(title, brief, ctxId) {
-    let slug = slugify(title);
-    const taken = new Set(loadIdx().map((x) => x.project));
-    for (let i = 2; taken.has(slug); i++) slug = `${slugify(title)}-${i}`;
     await studioOk();
     const r = await post('api/session/new', { workspace: HOME });
     const sid = (r.session || r).session_id;
+    // a free name on disk, not just in this browser's list: a deleted or other-device film with the same title
+    // leaves folders behind, and reusing them would serve that film's audio and analysis to this one
+    const taken = new Set(loadIdx().map((x) => x.project));
+    let slug = slugify(title);
+    for (let i = 2; taken.has(slug) || await slugUsed(sid, slug); i++) slug = `${slugify(title)}-${i}`;
     try { await post('api/session/rename', { session_id: sid, title: `Motion · ${title}` }); } catch (_) {}
     P = { schema: 'tabbie.motion-studio/1', project: slug, title, brief, sessionId: sid, createdAt: new Date().toISOString(),
       step: 'audio', audio: null, mapping: null, sketches: [], sketchesDone: false, storyboard: { status: 'none' }, render: { status: 'none' }, jobs: [],
@@ -2285,6 +2295,10 @@ ${editSystem(s)}
     if (fsid) {
       const r = await fetchT('api/file/delete', 15000, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ session_id: fsid, path: `studio/${slug}`, recursive: true }) });
       filesGone = r.ok || r.status === 404;
+      // its track and analysis too, so nothing of it can turn up in a later film with the same name
+      if (filesGone) for (const path of FILM_DIRS(slug).slice(1)) {
+        try { await fetchT('api/file/delete', 15000, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ session_id: fsid, path, recursive: true }) }); } catch (_) {}
+      }
     }
     if (info) await post('api/session/delete', { session_id: x.sid });
     forgetSession(x.sid);
