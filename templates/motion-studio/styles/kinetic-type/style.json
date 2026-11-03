@@ -1,0 +1,545 @@
+{
+  "schema": "motion.style/2",
+  "id": "kinetic-type",
+  "number": "06",
+  "name": "Kinetic Type",
+  "tagline": "Hand-drawn cel energy: a word that bursts, plays and gets eaten by lightning.",
+  "description": "Frame-by-frame logotype animation on a grainy black ground: three inks (chalk, signal yellow, ultramarine), brushy dry-edged strokes, a hyperspace burst that becomes the word's arrival, letters snapped together from shape debris, one glyph that never stops playing, and a lightning stroke that eats it all. Animated on twos.",
+  "family": "core",
+  "mood": [
+    "playful",
+    "energetic",
+    "hand-made",
+    "loud"
+  ],
+  "bestFor": [
+    "logo stings and intros",
+    "creator and studio brands",
+    "music, events and drops",
+    "social openers"
+  ],
+  "avoidFor": [
+    "corporate, finance or medical trust stories",
+    "calm premium product films",
+    "data-heavy explainers"
+  ],
+  "references": [
+    "ref1"
+  ],
+  "palette": {
+    "bg": "#09080E",
+    "surface": "#15131D",
+    "ink": "#F4EFE3",
+    "muted": "#3B3946",
+    "hair": "rgba(244,239,227,0.10)",
+    "accent": "#F5B700",
+    "accent2": "#3A2FE0",
+    "night": "#050409",
+    "swatches": [
+      "#09080E",
+      "#F4EFE3",
+      "#F5B700",
+      "#3A2FE0",
+      "#3B3946"
+    ]
+  },
+  "type": {
+    "display": {
+      "family": "Bagel Fat One",
+      "google": "BagelFatOne",
+      "weights": [
+        "400"
+      ],
+      "case": "lower",
+      "tracking": -0.02,
+      "fallback": "\"Cooper Black\", \"Arial Rounded MT Bold\", system-ui, sans-serif"
+    },
+    "text": {
+      "family": "Bricolage Grotesque",
+      "google": "BricolageGrotesque",
+      "weights": [
+        "500",
+        "800"
+      ],
+      "case": "lower",
+      "tracking": -0.01,
+      "fallback": "system-ui, sans-serif"
+    },
+    "mono": {
+      "family": "DM Mono",
+      "google": "DMMono",
+      "weights": [
+        "400"
+      ]
+    }
+  },
+  "motion": {
+    "step": 2,
+    "durations": {
+      "instant": 2,
+      "fast": 4,
+      "standard": 8,
+      "slow": 14,
+      "cinematic": 24
+    },
+    "ease": {
+      "enter": [
+        0.12,
+        0.9,
+        0.3,
+        1.25
+      ],
+      "exit": [
+        0.7,
+        -0.3,
+        0.9,
+        0.4
+      ],
+      "move": [
+        0.8,
+        0,
+        0.2,
+        1
+      ],
+      "camera": [
+        0.9,
+        0,
+        0.6,
+        1
+      ],
+      "morph": "steps:3"
+    },
+    "springs": {
+      "letter": {
+        "damping": 9,
+        "stiffness": 320,
+        "mass": 0.6
+      },
+      "glyph": {
+        "damping": 7,
+        "stiffness": 420,
+        "mass": 0.5
+      },
+      "logo": {
+        "damping": 12,
+        "stiffness": 220,
+        "mass": 0.8
+      }
+    },
+    "blur": "smear"
+  },
+  "transitions": {
+    "signature": [
+      "radial hyperspace burst: streaks rush out of a lens-star and the zoom-through becomes the word's arrival",
+      "shape-debris assembly: diamonds, blocks and sparks fly in and snap into glyphs with a squash",
+      "stroke wipe: a speed line slices the word, a zig-zag lightning eats it, one four-point star twinkles out"
+    ],
+    "use": [
+      "zoom",
+      "object",
+      "match",
+      "motion",
+      "matte"
+    ],
+    "avoid": [
+      "crossfades",
+      "smooth tweened easing on ones",
+      "photography",
+      "more than three inks",
+      "glass and soft shadows"
+    ],
+    "overlapFrames": [
+      2,
+      4
+    ]
+  },
+  "camera": "Flat and locked: the 'camera' is drawn — radial streaks fake a zoom-through, hold frames shake by a pixel of boil; no real 3D camera moves.",
+  "texture": {
+    "grain": 0.14,
+    "notes": "Fine film grain re-seeded every drawing, dry broken brush edges via displacement that boils on twos, a faint vignette. No gradients except the star's glow."
+  },
+  "lighting": "Graphic, not lit: the only light is the lens-star twinkle and its soft chalk glow; everything else is flat ink on black.",
+  "sound": "Cartoon foley on the drawings: a rising whoosh into the burst, a stack of pops and ticks as debris lands, a tiny boing per squash, a crackle-zap for the lightning, a sparkle ting on the last star.",
+  "preview": {
+    "frames": 150,
+    "thumbFrame": 76,
+    "beats": [
+      {
+        "from": 0,
+        "to": 22,
+        "beat": "opening",
+        "label": "Scribble collapses into a lens-star"
+      },
+      {
+        "from": 18,
+        "to": 66,
+        "beat": "transformation",
+        "label": "Hyperspace burst, debris snaps into kazoo"
+      },
+      {
+        "from": 66,
+        "to": 132,
+        "beat": "transition",
+        "label": "The o plays; lightning eats the word"
+      },
+      {
+        "from": 126,
+        "to": 150,
+        "beat": "resolution",
+        "label": "One star drifts home into the scribble"
+      }
+    ]
+  },
+  "motionSummary": "Moves like cel animation on twos: a scribble pops into a star, the star bursts into hyperspace, debris snaps into the word, one letter never stops playing, lightning eats it all.",
+  "visual": {
+    "composition": [
+      "one heavy lowercase word centred and huge, alone on the black sky",
+      "bursts fill the frame edge to edge; holds shrink back to the word plus 2–4 sparks",
+      "no layout grid: the word's own slots are the grid; debris and sparks orbit it"
+    ],
+    "shapeLanguage": "drawn shapes with dry brush edges: four-point lens stars, diamonds, square tiles, spirals, zig-zags, scribble circles",
+    "contrast": "maximum: chalk, signal yellow and ultramarine flat inks on grainy near-black; yellow is energy, ultramarine its shadow"
+  },
+  "grammar": {
+    "pacing": "bursts then living holds: 0.6–1.3 s of chaos, 1.3–2 s of a word that fidgets; one word per beat",
+    "rhythm": "on twos (every drawing held 2 frames), snaps land on even frames and on the beat; boil never stops",
+    "easing": "snap-in with overshoot (enter y > 1), anticipation before exits (exit dips below 0), stepped substitutions (steps:3)",
+    "acceleration": "explosive starts, no slow-in: things arrive in 2–4 drawings and squash; exits wind up for one drawing then leave in 2–3",
+    "movement": [
+      "radial hyperspace burst from a lens-star",
+      "debris flying in and snapping into glyphs",
+      "squash and stretch on every landing",
+      "one glyph cycling substitutions while the rest holds",
+      "speed-line slice and zig-zag lightning eating the word",
+      "a four-point star twinkling and drifting"
+    ],
+    "density": "extremes: 20–40 drawn elements during a burst, 1 word + 1 playing glyph + 2–4 sparks during a hold",
+    "holds": "a hold is never still: boil ±1.5 px per drawing, one glyph plays, sparks pop on the beat"
+  },
+  "transitionPresets": [
+    {
+      "id": "hyperspace-burst",
+      "name": "Hyperspace burst",
+      "kind": "seamless-zoom",
+      "bridge": "a lens-star at frame centre",
+      "build": "the star flares for 2 drawings, then radial brush streaks (three inks + grey) rush outward, growing longer and thicker with distance; density peaks, then thins as the next scene's debris arrives through it",
+      "frames": [
+        24,
+        40
+      ],
+      "ease": "camera",
+      "overlap": 4,
+      "sound": "rising whoosh, a pop on the flare"
+    },
+    {
+      "id": "debris-snap",
+      "name": "Debris snap",
+      "kind": "object-morph",
+      "bridge": "the burst's own shapes (diamonds, blocks, sparks)",
+      "build": "each shape flies to a letter slot with a 2-frame stagger, the shape is replaced by the glyph on landing and the glyph squashes 1.28/0.70 → 0.90/1.14 → 1.04/0.97 → 1 over three drawings",
+      "frames": [
+        14,
+        24
+      ],
+      "ease": "enter",
+      "overlap": 2,
+      "sound": "a stack of pops and ticks, one boing per squash"
+    },
+    {
+      "id": "shape-match",
+      "name": "Shape match",
+      "kind": "match-cut",
+      "bridge": "a round (or square) shape shared by both scenes",
+      "build": "on one drawing the shape swaps identity: scribble circle → star → the 'o'; tile → letter → spiral; the rest of the frame changes around it",
+      "frames": [
+        4,
+        8
+      ],
+      "ease": "morph",
+      "overlap": 2,
+      "sound": "a tick on the swap"
+    },
+    {
+      "id": "impact-frame",
+      "name": "Impact frame",
+      "kind": "flash",
+      "bridge": "the beat",
+      "build": "one drawing (2 frames) of the whole frame in yellow with the outgoing word knocked out in ultramarine, then the next word is already there, mid-squash",
+      "frames": [
+        2,
+        4
+      ],
+      "ease": "morph",
+      "overlap": 0,
+      "sound": "a hard hit on the downbeat"
+    },
+    {
+      "id": "stroke-wipe",
+      "name": "Stroke wipe (lightning)",
+      "kind": "track-matte",
+      "bridge": "a speed line and a zig-zag lightning stroke",
+      "build": "a yellow speed line slices the word left → right (4 drawings), then a zig-zag lightning with an ultramarine echo sweeps across; the word is clipped away behind the bolt's tail",
+      "frames": [
+        18,
+        26
+      ],
+      "ease": "move",
+      "overlap": 2,
+      "sound": "crackle-zap travelling left → right"
+    },
+    {
+      "id": "star-carry",
+      "name": "Star carry",
+      "kind": "motion-continuity",
+      "bridge": "the last four-point star",
+      "build": "the one star left after an exit twinkles, then drifts on a short arc to where the next mark (or the opening scribble) will be drawn around it",
+      "frames": [
+        10,
+        18
+      ],
+      "ease": "move",
+      "overlap": 4,
+      "sound": "sparkle ting"
+    }
+  ],
+  "archetypes": [
+    {
+      "id": "burst-arrival",
+      "name": "Hyperspace arrival",
+      "purpose": "open with energy: the thing is born from a burst",
+      "composition": "a boiling scribble circle or lens-star at frame centre on black, then radial streaks edge to edge",
+      "elements": "scribble circle, lens-star with soft chalk glow, 24–40 radial brush streaks in three inks + grey",
+      "motion": "circle collapses into the star (10 f), star flares, streaks rush outward on twos",
+      "camera": "drawn zoom-through (streak length = speed); the frame never moves",
+      "frames": [
+        30,
+        45
+      ],
+      "enter": "star-carry",
+      "exit": "debris-snap"
+    },
+    {
+      "id": "debris-assembly",
+      "name": "Debris assembly",
+      "purpose": "build the word or logo out of scraps",
+      "composition": "letter slots across the centre; debris converging from all edges",
+      "elements": "diamonds, blocks and sparks that become glyphs; heavy rounded lowercase letters",
+      "motion": "2-frame stagger per letter, squash on landing, small sparks pop off each snap",
+      "camera": "locked",
+      "frames": [
+        18,
+        30
+      ],
+      "enter": "hyperspace-burst",
+      "exit": "shape-match"
+    },
+    {
+      "id": "living-hold",
+      "name": "Living hold",
+      "purpose": "let the word be read and give it a personality",
+      "composition": "the word centred and huge, 2–4 sparks around it, one glyph is the playground",
+      "elements": "the playing glyph cycles: yellow tilted tile with the letter knocked out → spiral → four-point star → ultramarine blob",
+      "motion": "a substitution every 6 f (steps:3), boil on every drawing, sparks twinkle on the beat",
+      "camera": "locked, 1 px boil",
+      "frames": [
+        40,
+        70
+      ],
+      "enter": "debris-snap",
+      "exit": "stroke-wipe"
+    },
+    {
+      "id": "word-swap",
+      "name": "Word swap on the beat",
+      "purpose": "say a short line one word at a time",
+      "composition": "one word per beat, centred; the shared round letter stays in place across words",
+      "elements": "2–4 short words; the round glyph is the anchor that never leaves",
+      "motion": "each word snaps in mid-squash; between words an impact frame or a shape match on the round glyph",
+      "camera": "locked",
+      "frames": [
+        24,
+        60
+      ],
+      "enter": "impact-frame",
+      "exit": "shape-match"
+    },
+    {
+      "id": "lightning-signoff",
+      "name": "Lightning sign-off",
+      "purpose": "leave with a bang and a twinkle",
+      "composition": "the word mid-frame, a speed line across its x-height, then an empty black frame with one star",
+      "elements": "speed line, zig-zag lightning with ultramarine echo, the last four-point star",
+      "motion": "slice → bolt eats the word left → right → the star twinkles out or carries on",
+      "camera": "locked",
+      "frames": [
+        20,
+        36
+      ],
+      "enter": "stroke-wipe",
+      "exit": null
+    }
+  ],
+  "sequence": {
+    "beats": [
+      {
+        "id": "opening",
+        "share": 0.15,
+        "purpose": "a spark of energy before anything is said",
+        "archetypes": [
+          "burst-arrival"
+        ],
+        "motion": "scribble → lens-star → hyperspace burst",
+        "transitionOut": "debris-snap"
+      },
+      {
+        "id": "development",
+        "share": 0.25,
+        "purpose": "the first word arrives and shows its personality",
+        "archetypes": [
+          "debris-assembly",
+          "living-hold"
+        ],
+        "motion": "debris snaps into the word; one glyph starts playing",
+        "transitionOut": "impact-frame"
+      },
+      {
+        "id": "escalation",
+        "share": 0.25,
+        "purpose": "the line, word by word on the beat",
+        "archetypes": [
+          "word-swap"
+        ],
+        "motion": "words snap in on downbeats; the round glyph carries across",
+        "transitionOut": "hyperspace-burst"
+      },
+      {
+        "id": "reveal",
+        "share": 0.2,
+        "purpose": "the name, built big and alive",
+        "archetypes": [
+          "debris-assembly",
+          "living-hold"
+        ],
+        "motion": "a second burst; the wordmark assembles and holds, playing",
+        "transitionOut": "stroke-wipe"
+      },
+      {
+        "id": "resolution",
+        "share": 0.15,
+        "purpose": "sign off",
+        "archetypes": [
+          "lightning-signoff"
+        ],
+        "motion": "lightning eats the word; one star twinkles",
+        "transitionOut": null
+      }
+    ],
+    "cutRhythm": "bursts then holds; every change lands on an even frame and on the beat; impact frames are 1 drawing; no fades, no soft cuts",
+    "lengthRange": [
+      4,
+      20
+    ]
+  },
+  "exampleSequence": {
+    "title": "10 s creator-brand sting",
+    "durationFrames": 300,
+    "scenes": [
+      {
+        "n": 1,
+        "archetype": "burst-arrival",
+        "beat": "opening",
+        "frames": [
+          0,
+          36
+        ],
+        "action": "a chalk scribble circle boils, collapses into a lens-star, the star blows open into a hyperspace burst",
+        "transitionOut": "debris-snap"
+      },
+      {
+        "n": 2,
+        "archetype": "debris-assembly",
+        "beat": "development",
+        "frames": [
+          36,
+          96
+        ],
+        "action": "diamonds and blocks fly out of the streaks and snap into 'make', each letter squashing; the 'a' starts flipping to a yellow tile",
+        "transitionOut": "impact-frame"
+      },
+      {
+        "n": 3,
+        "archetype": "word-swap",
+        "beat": "escalation",
+        "frames": [
+          96,
+          156
+        ],
+        "action": "yellow impact frame on the downbeat; 'some' snaps in, then 'noise', the 'o' held in place as the shared shape",
+        "transitionOut": "shape-match"
+      },
+      {
+        "n": 4,
+        "archetype": "living-hold",
+        "beat": "reveal",
+        "frames": [
+          156,
+          246
+        ],
+        "action": "the 'o' becomes the 'o' of 'kazoo', the rest of the wordmark snaps around it; the second 'o' cycles tile → spiral → star → blob, sparks pop",
+        "transitionOut": "stroke-wipe"
+      },
+      {
+        "n": 5,
+        "archetype": "lightning-signoff",
+        "beat": "resolution",
+        "frames": [
+          246,
+          300
+        ],
+        "action": "a speed line slices 'kazoo', lightning eats it left → right, one star twinkles and drifts to centre",
+        "transitionOut": null
+      }
+    ]
+  },
+  "elements": {
+    "text": "heavy rounded lowercase, one word at a time; letters snap in from debris with a squash and boil on every drawing; leave by being eaten by a stroke, never by fading",
+    "logo": "assembled from debris; one glyph of it keeps playing during the hold; signs off with lightning and a single star",
+    "icons": "only as drawn shapes (stars, tiles, spirals, blobs) that double as glyph substitutions",
+    "images": "none; if a product must appear, as a flat ink drawing or a silhouette knocked out of a yellow tile",
+    "ui": "avoid; if needed, redraw a UI element as a flat ink shape that bursts or gets eaten like a word",
+    "shapes": "four-point stars, diamonds, square tiles, spirals, zig-zags, scribble circles; all with dry brush edges and boil",
+    "background": "grainy near-black with a faint vignette; grain re-seeded every drawing; never a colour field except the 1-drawing impact frame",
+    "particles": "drawn sparks and debris only: they arrive with bursts, pop on beats during holds, and become letters"
+  },
+  "audio": {
+    "drive": [
+      "beat-driven",
+      "impact-driven",
+      "cartoon foley"
+    ],
+    "sync": "snaps, impact frames and word swaps on downbeats; the burst rides a riser into the drop; the lightning lands on the last hit; sparks on hi-hats",
+    "sfx": "rising whoosh, pops and ticks per debris, boing per squash, crackle-zap, sparkle ting"
+  },
+  "live": {
+    "seconds": 6,
+    "rest": 0.56,
+    "beats": [
+      {
+        "at": 0,
+        "label": "Scribble pops into a star"
+      },
+      {
+        "at": 0.12,
+        "label": "Hyperspace burst"
+      },
+      {
+        "at": 0.26,
+        "label": "Debris snaps into kazoo, the o plays"
+      },
+      {
+        "at": 0.74,
+        "label": "Lightning eats it, one star home"
+      }
+    ]
+  }
+}

@@ -1,0 +1,529 @@
+{
+  "schema": "motion.style/2",
+  "id": "digital-brutalism",
+  "number": "02",
+  "name": "Digital Brutalism",
+  "tagline": "Black, white, scanlines and a machine that types back.",
+  "description": "Raw screen culture: pure black and paper white, CRT scanlines, dot-matrix display type set huge and cropped, ASCII fields, a barrel-warped image plane, coordinate read-outs, rolling counters that glitch between digits, typewriter captions with a block cursor and polarity-inversion cuts. Stepped, stuttering timing.",
+  "family": "core",
+  "mood": [
+    "raw",
+    "technical",
+    "rebellious",
+    "nocturnal"
+  ],
+  "bestFor": [
+    "dev tools and AI products",
+    "launch numbers and milestones",
+    "music, fashion and underground brands",
+    "creative-tech announcements"
+  ],
+  "avoidFor": [
+    "warm heritage or family brands",
+    "wellness and calm lifestyle",
+    "luxury that needs softness"
+  ],
+  "references": [
+    "ref5"
+  ],
+  "palette": {
+    "bg": "#000000",
+    "surface": "#0E0E0E",
+    "ink": "#F2F2EE",
+    "muted": "#6B6B6B",
+    "hair": "rgba(242,242,238,0.16)",
+    "accent": "#FF4A1C",
+    "accent2": "#FFB25A",
+    "night": "#000000",
+    "paper": "#F2F2EE",
+    "swatches": [
+      "#000000",
+      "#F2F2EE",
+      "#6B6B6B",
+      "#FF4A1C",
+      "#FFB25A"
+    ]
+  },
+  "type": {
+    "display": {
+      "family": "Doto",
+      "google": "Doto",
+      "weights": [
+        "500",
+        "700",
+        "900"
+      ],
+      "case": "upper",
+      "tracking": -0.02,
+      "fallback": "\"Courier New\", monospace"
+    },
+    "text": {
+      "family": "Space Mono",
+      "google": "SpaceMono",
+      "weights": [
+        "400",
+        "700"
+      ],
+      "case": "lower",
+      "tracking": 0.02,
+      "fallback": "ui-monospace, monospace"
+    },
+    "mono": {
+      "family": "IBM Plex Mono",
+      "google": "IBMPlexMono",
+      "weights": [
+        "400",
+        "600"
+      ]
+    }
+  },
+  "motion": {
+    "step": 1,
+    "durations": {
+      "instant": 1,
+      "fast": 3,
+      "standard": 6,
+      "slow": 12,
+      "cinematic": 24
+    },
+    "ease": {
+      "enter": "steps:5",
+      "exit": "steps:3",
+      "move": "steps:8",
+      "camera": [
+        0.7,
+        0,
+        0.3,
+        1
+      ],
+      "morph": "steps:4"
+    },
+    "springs": {
+      "snap": {
+        "damping": 40,
+        "stiffness": 900,
+        "mass": 0.4
+      },
+      "plane": {
+        "damping": 30,
+        "stiffness": 160,
+        "mass": 1
+      }
+    },
+    "blur": "smear"
+  },
+  "transitions": {
+    "signature": [
+      "polarity inversion: the whole frame flips white ↔ black on a cut, usually after a 3-frame glitch pair",
+      "resolution cascade: image → ordered dither → halftone dots → ASCII glyphs → dot-matrix letters",
+      "rolling counter with pixelated glitch frames between digits, landing on a held number"
+    ],
+    "use": [
+      "match",
+      "matte",
+      "zoom",
+      "perspective",
+      "motion"
+    ],
+    "avoid": [
+      "crossfades",
+      "soft springs",
+      "gradients and glass",
+      "smooth eases on type",
+      "colour beyond black, white and one hot flash"
+    ],
+    "overlapFrames": [
+      0,
+      3
+    ]
+  },
+  "camera": "Screen-space: the image lives on a curved, barrel-warped plane with a slight perspective; moves are short stepped jumps or a slow drift of the plane, punctuated by smear frames.",
+  "texture": {
+    "grain": 0.06,
+    "scanlines": true,
+    "halftone": true,
+    "notes": "CRT scanlines on everything (3 px pitch), ordered Bayer dither, pixelation and slice-offset glitch frames, horizontal smear frames, a hard vignette on the curved plane."
+  },
+  "lighting": "Emissive only: the screen is the light. Flash-photo highlights in hot red/orange burned into the dither; type is pure white on black or pure black on white.",
+  "sound": "Machine room: keyboard clacks per typed word, CRT whine, short digital crunches on glitch frames, a sub thump on polarity cuts, counter ticks accelerating into a hold.",
+  "preview": {
+    "frames": 150,
+    "thumbFrame": 84,
+    "beats": [
+      {
+        "from": 0,
+        "to": 24,
+        "beat": "opening",
+        "label": "A line types behind the cursor"
+      },
+      {
+        "from": 22,
+        "to": 68,
+        "beat": "transformation",
+        "label": "Glitch, flip to white, counter slams"
+      },
+      {
+        "from": 66,
+        "to": 124,
+        "beat": "transition",
+        "label": "Flip back, plane scans in and cascades to STATIC"
+      },
+      {
+        "from": 118,
+        "to": 150,
+        "beat": "resolution",
+        "label": "Smear to black, the cursor alone"
+      }
+    ]
+  },
+  "motionSummary": "Moves like a machine thinking: a line types, the frame glitches and flips polarity, a counter rolls and slams to a hold, an image dithers into dots, glyphs and finally letters.",
+  "visual": {
+    "composition": [
+      "two scales only: one huge cropped dot-matrix word or number, or one small typed mono line",
+      "machine chrome in the corners (coordinates, buffer counters, crosshairs), never in the middle",
+      "images live on a curved, barrel-warped screen plane with a hairline edge"
+    ],
+    "shapeLanguage": "pixels, dots, scanlines, square cells, block cursors, dashed crosshairs; hard edges, no radii except the plane's barrel curve",
+    "contrast": "absolute: pure black vs paper white, whole-frame polarity flips; one hot flash ramp only inside dithered images"
+  },
+  "grammar": {
+    "pacing": "stutter: a calm typed line (1–1.5 s), a 2–3-frame glitch burst, a hard flip, a held number (1–2 s); repeat",
+    "rhythm": "stepped and mechanical: states snap (steps:N), never tween; glitch frames in pairs; cuts in 3-frame groups",
+    "easing": "stepped eases for enter/exit/morph; power-accelerating counters that slam into a hold; only the image plane drifts smoothly",
+    "acceleration": "counters and scans accelerate to the stop (no settle); cuts are instantaneous; smear frames carry exits",
+    "movement": [
+      "word-by-word typewriter with a block cursor",
+      "rolling digit reels landing on a held number",
+      "row-by-row scan-in of an image plane",
+      "resolution cascade: dither → halftone → ASCII → dot letters",
+      "slice-offset glitch pairs and polarity inversion",
+      "horizontal smear frames"
+    ],
+    "density": "one thing at a time; the chrome ticks in the corners while the main element holds",
+    "holds": "held numbers and typed lines hold dead still except for the blinking cursor and ticking read-outs"
+  },
+  "transitionPresets": [
+    {
+      "id": "polarity-flip",
+      "name": "Polarity flip",
+      "kind": "flash",
+      "bridge": "the whole frame",
+      "build": "a 2-frame slice/pixel glitch pair on the outgoing frame, then a hard cut where black and white swap; the next scene is already set in the new polarity",
+      "frames": [
+        2,
+        4
+      ],
+      "ease": "exit",
+      "overlap": 0,
+      "sound": "digital crunch, then a sub thump on the flip"
+    },
+    {
+      "id": "resolution-cascade",
+      "name": "Resolution cascade",
+      "kind": "destruction-rebuild",
+      "bridge": "the image's own cells",
+      "build": "an image on the curved plane dithers (Bayer), cells switch to halftone dots, then ASCII glyphs, then the cells inside a word mask become dot-matrix letters; each cell switches on its own stepped schedule so the change ripples",
+      "frames": [
+        30,
+        54
+      ],
+      "ease": "morph",
+      "overlap": 0,
+      "sound": "rising crunch texture per stage, a click on the last stage"
+    },
+    {
+      "id": "scan-in",
+      "name": "Scan-in",
+      "kind": "track-matte",
+      "bridge": "the screen's rows",
+      "build": "the next layer appears row by row top-down (6–10 stepped rows), like a CRT painting the frame; the previous layer stays until overwritten",
+      "frames": [
+        6,
+        10
+      ],
+      "ease": "enter",
+      "overlap": 0,
+      "sound": "CRT whine sweep"
+    },
+    {
+      "id": "glitch-pair",
+      "name": "Glitch pair cut",
+      "kind": "rhythmic-cut",
+      "bridge": "the beat",
+      "build": "two frames of slice-offset and pixelation on the outgoing shot, then a straight cut on the next beat; cuts come in 3-frame groups",
+      "frames": [
+        2,
+        3
+      ],
+      "ease": "exit",
+      "overlap": 0,
+      "sound": "two short crunches"
+    },
+    {
+      "id": "cursor-match",
+      "name": "Cursor match",
+      "kind": "match-cut",
+      "bridge": "the block cursor",
+      "build": "the block cursor stays fixed while the frame changes around it, then becomes a pixel, a dot, or the first cell of the next word",
+      "frames": [
+        4,
+        8
+      ],
+      "ease": "morph",
+      "overlap": 2,
+      "sound": "a keyboard clack"
+    },
+    {
+      "id": "smear-exit",
+      "name": "Smear exit",
+      "kind": "motion-continuity",
+      "bridge": "horizontal motion",
+      "build": "3–6 frames of horizontal smear (60–140 px streaks) carry the outgoing layer sideways; the next scene enters from the smear's direction or from black",
+      "frames": [
+        3,
+        6
+      ],
+      "ease": "move",
+      "overlap": 2,
+      "sound": "tape-stop crunch"
+    }
+  ],
+  "archetypes": [
+    {
+      "id": "typed-line",
+      "name": "Typed line",
+      "purpose": "say one thing plainly",
+      "composition": "one small lowercase mono line centred or flush left on black, block cursor, a dim ASCII field, coordinates in a corner",
+      "elements": "words typed one by one (4 f per word), blinking block cursor (8 f), ticking read-outs",
+      "motion": "word-by-word typewriter; nothing else moves",
+      "camera": "locked to the screen grid",
+      "frames": [
+        20,
+        45
+      ],
+      "enter": "cursor-match",
+      "exit": "polarity-flip"
+    },
+    {
+      "id": "counter-slam",
+      "name": "Counter slam",
+      "purpose": "make a number land",
+      "composition": "a huge cropped dot-matrix number on paper white, a dashed crosshair tracking a point, a typed caption under it",
+      "elements": "digit reels, glitch frames between digits, a '+' that appears on landing, a coordinate tag",
+      "motion": "reels roll with a power ease and slam into the held value; caption types after",
+      "camera": "locked",
+      "frames": [
+        40,
+        70
+      ],
+      "enter": "polarity-flip",
+      "exit": "polarity-flip"
+    },
+    {
+      "id": "curved-plane",
+      "name": "Curved image plane",
+      "purpose": "show the image (product, person, place) as screen material",
+      "composition": "a barrel-warped plane filling ~85 % of the frame, slight perspective, hairline edge",
+      "elements": "a flash photo rendered as ordered dither in the hot ramp; scanlines; vignette",
+      "motion": "scan-in row by row, then a slow tilt/drift of the plane (the only smooth move in the style)",
+      "camera": "the plane tilts 5–10° and eases flat",
+      "frames": [
+        30,
+        60
+      ],
+      "enter": "scan-in",
+      "exit": "resolution-cascade"
+    },
+    {
+      "id": "glyph-word",
+      "name": "Glyph word",
+      "purpose": "turn the image into the name",
+      "composition": "the plane's cells: a dot-matrix word built from the image's own cells, dim ASCII flickering around it",
+      "elements": "halftone dots, ASCII ramp, round dot letters",
+      "motion": "the resolution cascade ripples cell by cell; the word holds while the surrounding ASCII flickers",
+      "camera": "plane settles flat",
+      "frames": [
+        30,
+        60
+      ],
+      "enter": "resolution-cascade",
+      "exit": "smear-exit"
+    },
+    {
+      "id": "terminal-out",
+      "name": "Terminal sign-off",
+      "purpose": "end on the machine",
+      "composition": "black frame, the name or URL typed small, the block cursor blinking alone",
+      "elements": "typed mono line, cursor, one read-out",
+      "motion": "type, hold, the cursor blinks 3 times; last frame = cursor alone",
+      "camera": "locked",
+      "frames": [
+        30,
+        50
+      ],
+      "enter": "smear-exit",
+      "exit": null
+    }
+  ],
+  "sequence": {
+    "beats": [
+      {
+        "id": "opening",
+        "share": 0.15,
+        "purpose": "a line from the machine",
+        "archetypes": [
+          "typed-line"
+        ],
+        "motion": "cursor blinks, a line types word by word",
+        "transitionOut": "polarity-flip"
+      },
+      {
+        "id": "development",
+        "share": 0.25,
+        "purpose": "the proof, as a number",
+        "archetypes": [
+          "counter-slam"
+        ],
+        "motion": "reels roll, glitch between digits, slam to the held number",
+        "transitionOut": "polarity-flip"
+      },
+      {
+        "id": "escalation",
+        "share": 0.2,
+        "purpose": "the thing itself, as screen material",
+        "archetypes": [
+          "curved-plane"
+        ],
+        "motion": "scan-in, dithered flash image, slow tilt; glitch-pair cuts between 2–3 images",
+        "transitionOut": "resolution-cascade"
+      },
+      {
+        "id": "reveal",
+        "share": 0.25,
+        "purpose": "the image becomes the name",
+        "archetypes": [
+          "glyph-word"
+        ],
+        "motion": "dither → dots → ASCII → dot letters; hold the word",
+        "transitionOut": "smear-exit"
+      },
+      {
+        "id": "resolution",
+        "share": 0.15,
+        "purpose": "back to the terminal",
+        "archetypes": [
+          "terminal-out"
+        ],
+        "motion": "black, a typed URL, the cursor alone",
+        "transitionOut": null
+      }
+    ],
+    "cutRhythm": "stutter: calm typed lines between 2–3-frame glitch groups; polarity flips on downbeats; no crossfades, every change is a hard cut, a scan or a cascade",
+    "lengthRange": [
+      6,
+      30
+    ]
+  },
+  "exampleSequence": {
+    "title": "12 s dev-tool launch",
+    "durationFrames": 360,
+    "scenes": [
+      {
+        "n": 1,
+        "archetype": "typed-line",
+        "beat": "opening",
+        "frames": [
+          0,
+          54
+        ],
+        "action": "black; 'noise is a material.' types word by word behind a block cursor over a dim ASCII field; x/y read-outs tick",
+        "transitionOut": "polarity-flip"
+      },
+      {
+        "n": 2,
+        "archetype": "counter-slam",
+        "beat": "development",
+        "frames": [
+          54,
+          138
+        ],
+        "action": "glitch pair, flip to white: 48210 rolls up on dot-matrix reels with glitch frames, slams, '+' appears; 'nodes online right now' types under it",
+        "transitionOut": "polarity-flip"
+      },
+      {
+        "n": 3,
+        "archetype": "curved-plane",
+        "beat": "escalation",
+        "frames": [
+          138,
+          210
+        ],
+        "action": "flip to black; the curved plane scans in row by row, a dithered flash photo in red/orange, the plane tilts slowly",
+        "transitionOut": "resolution-cascade"
+      },
+      {
+        "n": 4,
+        "archetype": "glyph-word",
+        "beat": "reveal",
+        "frames": [
+          210,
+          300
+        ],
+        "action": "the photo's cells cascade to halftone dots, ASCII, then 'STATIC' in round dot letters made of the same cells; hold",
+        "transitionOut": "smear-exit"
+      },
+      {
+        "n": 5,
+        "archetype": "terminal-out",
+        "beat": "resolution",
+        "frames": [
+          300,
+          360
+        ],
+        "action": "smear frames sideways to black; 'static.dev' types; the cursor blinks alone",
+        "transitionOut": null
+      }
+    ]
+  },
+  "elements": {
+    "text": "typed word by word with a block cursor, or appears in one stepped snap; huge dot-matrix for numbers and names; never eases, never fades",
+    "logo": "built from the image's own cells (dot letters) or typed as a mono line; the cursor is its sign-off",
+    "icons": "pixel glyphs on a cell grid, or ASCII; they appear in one step",
+    "images": "only on the curved plane, dithered in the hot ramp; they scan in and cascade out to dots and glyphs",
+    "ui": "shown as raw screen: monospace read-outs, brackets, progress counters; no cards or shadows",
+    "shapes": "cells, dots, scanlines, crosshairs, brackets; hard square edges",
+    "background": "pure black or paper white, flipped as whole-frame polarity cuts; scanlines on everything",
+    "particles": "none as such; dither cells, ASCII glyphs and glitch slices are the only 'particles'"
+  },
+  "audio": {
+    "drive": [
+      "syncopated",
+      "glitch-percussive",
+      "keystroke-driven"
+    ],
+    "sync": "typed words on keyboard clacks; glitch pairs on off-beat hits; polarity flips on downbeats with a sub thump; counter ticks accelerate into the slam",
+    "sfx": "keyboard clacks, CRT whine, digital crunches, sub thumps, counter ticks, tape-stop crunch on smears"
+  },
+  "live": {
+    "seconds": 6,
+    "rest": 0.8,
+    "beats": [
+      {
+        "at": 0,
+        "label": "A line types"
+      },
+      {
+        "at": 0.14,
+        "label": "Flip to white, counter slams"
+      },
+      {
+        "at": 0.45,
+        "label": "Flip back, plane cascades to STATIC"
+      },
+      {
+        "at": 0.9,
+        "label": "Smear, cursor alone"
+      }
+    ]
+  }
+}

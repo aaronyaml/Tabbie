@@ -8,6 +8,8 @@ A different folder (e.g. an existing studio of your own) can be named in config/
 
 status() is what the sidecar's /motion/status serves: booleans and hints only, never a key or token.
 films() is /motion/films: the films in <studio>/studio, so any browser finds them without a file-API session.
+styles() / style_media() are /motion/styles and /motion/style-media: the studio's style library (styles/) for the
+Motion panel's gallery, falling back to the template's library when the studio has none.
 Stdlib only (setup runs on the computer's built-in Python 3.9).
 """
 from __future__ import annotations
@@ -89,7 +91,7 @@ def ensure(path: Path | None = None) -> dict:
 # A studio is the user's once created, so updates never overwrite it. Things a newer template adds that a
 # film can't break (the sound-effects library and its code) are copied in once: only missing files, and
 # manifest entries the studio doesn't have yet. Studios not made from the template are never touched.
-ADDITIONS = ("public/audio/sfx", "src/audio")
+ADDITIONS = ("public/audio/sfx", "src/audio", "styles")
 
 
 def _ver(text: str) -> int:
@@ -125,7 +127,7 @@ def sync_template(p: Path | None = None) -> list[str]:
                 shutil.copy2(f, dst)
                 added.append(f.relative_to(TEMPLATE).as_posix())
     # sections a newer template added to its docs: appended once, the rest of the user's file untouched
-    for name, head in (("CLAUDE.md", "## Sound effects"), ("MOTION_RULES.md", "## Transitions")):
+    for name, head in (("CLAUDE.md", "## Sound effects"), ("MOTION_RULES.md", "## Transitions"), ("MOTION_RULES.md", "## Style")):
         doc, tdoc = p / name, TEMPLATE / name
         try:
             text, ttext = doc.read_text(encoding="utf-8"), tdoc.read_text(encoding="utf-8")
@@ -277,7 +279,7 @@ def install() -> dict:
 
 # ── the films in <studio>/studio (the panel's home list) ──────────────────────────────────────
 def films(p: Path | None = None) -> dict:
-    """{films: [{project, title, step, updatedAt, sessionId?}]}, newest first, read from each film's
+    """{films: [{project, title, step, updatedAt, sessionId?, for?: {id, name}}]}, newest first, read from each film's
     project.json (written by the Motion panel). The folder name is the project; unreadable ones are skipped."""
     d = (p or studio_dir()) / "studio"
     out = []
@@ -296,9 +298,111 @@ def films(p: Path | None = None) -> dict:
              "updatedAt": str(pj.get("updatedAt") or pj.get("createdAt") or "")}
         if isinstance(pj.get("sessionId"), str) and pj["sessionId"]:
             f["sessionId"] = pj["sessionId"]
+        c = pj.get("context")
+        if isinstance(c, dict) and isinstance(c.get("project"), str) and c["project"]:
+            f["for"] = {"id": c["project"], "name": str(c.get("name") or c["project"])}  # the Tabbie project it's made for
         out.append(f)
     out.sort(key=lambda f: f["updatedAt"], reverse=True)
     return {"films": out}
+
+
+# ── the style library (gallery) ────────────────────────────────────────────────────────────────
+_STYLE_ID = re.compile(r"^[a-z0-9][a-z0-9-]{0,47}$")
+_HEX = re.compile(r"^#[0-9A-Fa-f]{6}$")
+_MEDIA = {"thumb": ("thumb.jpg", "image/jpeg"), "preview": ("preview.mp4", "video/mp4"),
+          "html": ("thumb.html", "text/plain; charset=utf-8")}  # the live thumbnail (HTML/CSS on the palette variables), as text: the panel puts it in a sandboxed frame, never served as a page
+MEDIA_MAX = 500 * 1024  # the WebUI proxy's response cap is 512 KB; styles:build keeps previews under it
+
+
+def _styles_root(p: Path | None = None) -> Path:
+    s = (p or studio_dir()) / "styles"
+    return s if (s / "index.json").is_file() else TEMPLATE / "styles"
+
+
+def styles(p: Path | None = None) -> dict:
+    """{styles: [...]} in the library's order: what the gallery card and preview need from each style.json
+    (name, tagline, description, swatches, type, motion summary, transitions) + which media exist."""
+    d = _styles_root(p)
+    try:
+        order = json.loads((d / "index.json").read_text(encoding="utf-8")).get("order") or []
+    except (OSError, ValueError, AttributeError):
+        order = []
+    out = []
+    for sid in order:
+        if not isinstance(sid, str) or not _STYLE_ID.match(sid):
+            continue
+        try:
+            st = json.loads((d / sid / "style.json").read_text(encoding="utf-8"))
+        except (OSError, ValueError):
+            continue
+        if not isinstance(st, dict):
+            continue
+        ty, mo, pal = st.get("type") or {}, st.get("motion") or {}, st.get("palette") or {}
+        fam = lambda k: (ty.get(k) or {}).get("family", "") if isinstance(ty.get(k), dict) else ""
+        out.append({
+            "id": sid, "number": str(st.get("number") or ""), "name": str(st.get("name") or sid),
+            "tagline": str(st.get("tagline") or ""), "description": str(st.get("description") or ""),
+            "family": str(st.get("family") or "core"), "mood": list(st.get("mood") or [])[:6],
+            "bestFor": list(st.get("bestFor") or [])[:6], "avoidFor": list(st.get("avoidFor") or [])[:4],
+            "swatches": [c for c in (pal.get("swatches") or []) if isinstance(c, str)][:6],
+            "bg": str(pal.get("bg") or ""), "ink": str(pal.get("ink") or ""), "accent": str(pal.get("accent") or ""),
+            # the colour roles a film can recolour (project.json style.overrides.palette); solid hex only
+            "palette": {k: v for k, v in list(pal.items())[:12] if k != "swatches" and isinstance(v, str) and _HEX.match(v)},
+            "display": fam("display"), "text": fam("text"),
+            "step": int(mo.get("step") or 1) if str(mo.get("step") or "1").isdigit() else 1,
+            "signature": list((st.get("transitions") or {}).get("signature") or [])[:4],
+            "camera": str(st.get("camera") or ""), "sound": str(st.get("sound") or ""),
+            "fonts": [{"family": f["family"], "weights": [str(w) for w in (f.get("weights") or [])][:4]}
+                      for f in (ty.get(k) for k in ("display", "text", "mono")) if isinstance(f, dict) and f.get("family")],
+            **_edit_system(st),
+            "thumb": (d / sid / "thumb.jpg").is_file(), "preview": (d / sid / "preview.mp4").is_file(),
+            "html": (d / sid / "thumb.html").is_file(),
+        })
+    return {"styles": out}
+
+
+def _txt(v, n=400) -> str:
+    return str(v)[:n] if isinstance(v, (str, int, float)) else ""
+
+
+def _edit_system(st: dict) -> dict:
+    """motion.style/2: how the style moves, cuts and sequences (what the gallery's detail view explains)."""
+    g, seq, ex = st.get("grammar") or {}, st.get("sequence") or {}, st.get("exampleSequence") or {}
+    lst = lambda v: v if isinstance(v, list) else []
+    arch = {a.get("id"): a for a in lst(st.get("archetypes")) if isinstance(a, dict)}
+    pre = {p.get("id"): p for p in lst(st.get("transitionPresets")) if isinstance(p, dict)}
+    name = lambda m, k: _txt((m.get(k) or {}).get("name") or k or "", 80)
+    live = st.get("live") if isinstance(st.get("live"), dict) else {}
+    return {
+        "motionSummary": _txt(st.get("motionSummary")),
+        "grammar": {k: _txt(g.get(k)) for k in ("pacing", "rhythm", "easing", "acceleration", "density", "holds")} | {"movement": [_txt(x, 160) for x in lst(g.get("movement"))][:8]},
+        "presets": [{"id": _txt(p.get("id"), 60), "name": _txt(p.get("name"), 80), "kind": _txt(p.get("kind"), 40), "bridge": _txt(p.get("bridge"), 200), "build": _txt(p.get("build"))} for p in pre.values()][:8],
+        "archetypes": [{"id": _txt(a.get("id"), 60), "name": _txt(a.get("name"), 80), "purpose": _txt(a.get("purpose"), 200), "composition": _txt(a.get("composition"), 300), "motion": _txt(a.get("motion"), 300)} for a in arch.values()][:6],
+        "sequence": [{"id": _txt(b.get("id"), 40), "share": float(b.get("share") or 0) if isinstance(b.get("share"), (int, float)) else 0, "purpose": _txt(b.get("purpose"), 200),
+                      "archetypes": [name(arch, x) for x in lst(b.get("archetypes"))][:3], "out": name(pre, b.get("transitionOut")) if b.get("transitionOut") else ""}
+                     for b in lst(seq.get("beats")) if isinstance(b, dict)][:7],
+        "cutRhythm": _txt(seq.get("cutRhythm")),
+        "example": {"title": _txt(ex.get("title"), 120), "scenes": [{"archetype": name(arch, sc.get("archetype")), "beat": _txt(sc.get("beat"), 40), "action": _txt(sc.get("action"), 300),
+                    "out": name(pre, sc.get("transitionOut")) if sc.get("transitionOut") else ""} for sc in lst(ex.get("scenes")) if isinstance(sc, dict)][:7]},
+        "elements": {k: _txt(v, 300) for k, v in (st.get("elements") or {}).items() if isinstance(v, str)} if isinstance(st.get("elements"), dict) else {},
+        "audio": {"drive": [_txt(x, 40) for x in lst((st.get("audio") or {}).get("drive"))][:5], "sync": _txt((st.get("audio") or {}).get("sync"))} if isinstance(st.get("audio"), dict) else {},
+        "live": {"seconds": float(live.get("seconds") or 6), "rest": float(live.get("rest") or 0),
+                 "beats": [{"at": float(b.get("at") or 0), "label": _txt(b.get("label"), 60)} for b in lst(live.get("beats")) if isinstance(b, dict)][:6]},
+    }
+
+
+def style_media(sid: str, kind: str, p: Path | None = None) -> tuple[bytes, str] | None:
+    """A style's thumb.jpg or preview.mp4 as (bytes, content type); None when missing, unknown or too big."""
+    if not _STYLE_ID.match(sid or "") or kind not in _MEDIA:
+        return None
+    name, ctype = _MEDIA[kind]
+    f = _styles_root(p) / sid / name
+    try:
+        if not f.is_file() or f.stat().st_size > MEDIA_MAX:
+            return None
+        return f.read_bytes(), ctype
+    except OSError:
+        return None
 
 
 # ── what's linked (for the Generate buttons) ──────────────────────────────────────────────────

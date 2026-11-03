@@ -1,0 +1,566 @@
+{
+  "schema": "motion.style/2",
+  "id": "industrial-brand",
+  "number": "05",
+  "name": "Industrial Brand",
+  "tagline": "One mark, a hundred surfaces, cut on the beat.",
+  "description": "Identity-system film for heavy, physical brands: vermilion, near-black and concrete, the mark stamped onto real applications (cladding, webbing straps, container steel, labels, construction drawings), cut as a rhythmic 4–5-frame montage that lands on a long, still hold. The edit is the animation; the mark is the continuity.",
+  "family": "core",
+  "mood": [
+    "robust",
+    "systematic",
+    "confident",
+    "rhythmic",
+    "matter-of-fact"
+  ],
+  "bestFor": [
+    "logistics, transport and infrastructure brands",
+    "identity / rebrand reveals",
+    "B2B industrial and manufacturing",
+    "architecture and construction",
+    "workwear and hardware"
+  ],
+  "avoidFor": [
+    "soft lifestyle or wellness brands",
+    "UI-led app walkthroughs",
+    "intimate storytelling"
+  ],
+  "references": [
+    "ref2"
+  ],
+  "palette": {
+    "bg": "#E9E4E2",
+    "surface": "#F4F1EF",
+    "ink": "#121214",
+    "muted": "#8C8784",
+    "hair": "rgba(18,18,20,0.35)",
+    "accent": "#FF5233",
+    "accent2": "#3A3A3C",
+    "night": "#121214",
+    "concrete": "#D6D0CC",
+    "steel": "#5B5B5E",
+    "rust": "#C63F25",
+    "swatches": [
+      "#FF5233",
+      "#121214",
+      "#3A3A3C",
+      "#D6D0CC",
+      "#E9E4E2"
+    ]
+  },
+  "type": {
+    "display": {
+      "family": "Archivo",
+      "google": "Archivo",
+      "weights": [
+        "500",
+        "700",
+        "800"
+      ],
+      "case": "lower",
+      "tracking": -0.04,
+      "fallback": "\"Helvetica Neue\", Arial, sans-serif"
+    },
+    "text": {
+      "family": "Archivo",
+      "google": "Archivo",
+      "weights": [
+        "500",
+        "700",
+        "800"
+      ],
+      "case": "sentence",
+      "tracking": -0.01,
+      "fallback": "\"Helvetica Neue\", Arial, sans-serif"
+    },
+    "mono": {
+      "family": "IBM Plex Mono",
+      "google": "IBMPlexMono",
+      "weights": [
+        "400",
+        "500"
+      ],
+      "case": "upper",
+      "tracking": 0.08
+    }
+  },
+  "motion": {
+    "step": 1,
+    "durations": {
+      "instant": 1,
+      "fast": 4,
+      "standard": 5,
+      "slow": 12,
+      "cinematic": 45
+    },
+    "ease": {
+      "enter": [
+        0.16,
+        1,
+        0.3,
+        1
+      ],
+      "exit": [
+        0.7,
+        0,
+        0.84,
+        0
+      ],
+      "move": [
+        0.77,
+        0,
+        0.18,
+        1
+      ],
+      "camera": [
+        0.5,
+        0,
+        0.2,
+        1
+      ],
+      "morph": [
+        0.85,
+        0,
+        0.15,
+        1
+      ]
+    },
+    "springs": {
+      "stamp": {
+        "damping": 40,
+        "stiffness": 600,
+        "mass": 0.5
+      },
+      "panel": {
+        "damping": 34,
+        "stiffness": 260,
+        "mass": 1
+      },
+      "logo": {
+        "damping": 38,
+        "stiffness": 180,
+        "mass": 1.2
+      }
+    },
+    "blur": "none"
+  },
+  "transitions": {
+    "signature": [
+      "rhythmic hard-cut montage: a new still application every 4–5 frames on a 16th-note pulse, the mark held in the same zone of frame",
+      "the montage lands on a long, still hold where only hairlines draw and labels type on",
+      "colour-block cut: orange field → black panel → concrete, the block edges aligned across shots"
+    ],
+    "use": [
+      "match",
+      "object",
+      "matte",
+      "push"
+    ],
+    "avoid": [
+      "crossfades",
+      "floaty camera moves",
+      "springy bounce",
+      "glow and gradients",
+      "cuts off the beat"
+    ],
+    "overlapFrames": [
+      0,
+      0
+    ]
+  },
+  "camera": "Locked off. Applications are stills shot square-on or from below (architecture), extreme crops; the edit carries the motion. Inside a hold at most a 1–2 % creep.",
+  "texture": {
+    "grain": 0.06,
+    "paper": false,
+    "notes": "Matte print and real materials: corrugated steel, webbing with stitched edges, raw concrete, overcast daylight. Fine static grain; no glow, no gloss."
+  },
+  "lighting": "Hard raking daylight from one side, deep matte shadows; overcast sky on architecture; never studio-glossy.",
+  "sound": "A dry 110–120 BPM pulse with a hit on every cut (mechanical clacks, ratchet ticks, a shutter); the hold drops to a low drone and one heavy thud when the mark lands.",
+  "preview": {
+    "frames": 150,
+    "thumbFrame": 128,
+    "beats": [
+      {
+        "from": 0,
+        "to": 18,
+        "beat": "opening",
+        "label": "Orange panel, cladding, drawing: the mark holds its zone"
+      },
+      {
+        "from": 18,
+        "to": 90,
+        "beat": "transformation",
+        "label": "Hard-cut montage on the 4/5-frame pulse"
+      },
+      {
+        "from": 90,
+        "to": 112,
+        "beat": "transition",
+        "label": "Lands on the hold: the drawing draws, the block wipes in"
+      },
+      {
+        "from": 112,
+        "to": 150,
+        "beat": "resolution",
+        "label": "Caption types, hold, cut back to the panel"
+      }
+    ]
+  },
+  "motionSummary": "Moves like a stamping press: a hard-cut montage of applications every 4–5 frames with the mark locked in one zone, then a dead-still hold where the construction drawing draws itself and a colour block slams in.",
+  "visual": {
+    "composition": [
+      "the mark owns one zone of frame (centre) at a near-constant size in every shot; the world changes around it",
+      "extreme crops of real applications shot square-on or from below; nothing floats",
+      "colour blocks on one shared grid so block edges align across cuts",
+      "frame furniture on every shot: edge-rotated mono captions and an index (APP. 07 / 20)"
+    ],
+    "shapeLanguage": "hard rectangles, columns and thirds; the mark's stem-block-slab geometry; 1 px construction hairlines and circles; no radii, no soft shapes",
+    "contrast": "maximal and flat: vermilion as a material against near-black and concrete; no gradients-as-decoration, no glow"
+  },
+  "grammar": {
+    "pacing": "two speeds only: a montage at the pulse (a new still every 4–5 frames for 2–3 s) and a dead-still hold (1.5–2 s); nothing in between",
+    "rhythm": "mechanical, beat-cut on a 16th-note pulse (5/4/5/4 frames ≈ 115 BPM); hard steps(1) cuts, never eased",
+    "easing": "cuts have no ease; inside a hold, drafting moves use ease.move (hairlines draw), colour blocks ease.enter (6–8 frames, no overshoot), the stamp spring is critically damped",
+    "acceleration": "instant: a cut is 0 frames; drafting accelerates hard and stops dead like a plotter; the only slow thing is a 1–2 % creep across a hold",
+    "movement": [
+      "hard-cut montage of stills (the edit is the animation)",
+      "hairlines and circles drawing on around the mark",
+      "colour block sliding in along the grid",
+      "mono captions typing on character by character",
+      "re-crop of the same application as a push (no camera)"
+    ],
+    "density": "inside a montage shot: zero moving parts; inside a hold: one drafting process at a time",
+    "holds": "the montage always lands on a long still hold where the mark sits and only drafting moves; the hold is where the brand is read"
+  },
+  "transitionPresets": [
+    {
+      "id": "mark-match-cut",
+      "name": "Match cut on the mark",
+      "kind": "match-cut",
+      "bridge": "the mark, same position and size in both shots",
+      "build": "hard cut on the pulse; the surface under the mark changes (steel → webbing → cladding), the mark itself does not move, so the cut is invisible on the mark and loud everywhere else",
+      "frames": [
+        0,
+        1
+      ],
+      "ease": "enter",
+      "overlap": 0,
+      "sound": "one mechanical hit per cut (ratchet tick, latch, shutter)"
+    },
+    {
+      "id": "pulse-montage",
+      "name": "Pulse montage",
+      "kind": "rhythmic-cut",
+      "bridge": "the beat grid and the mark's zone",
+      "build": "a string of still applications alternating 5 and 4 frames on a 16th-note pulse for 2–3 s; tones alternate light/dark so every cut reads",
+      "frames": [
+        45,
+        90
+      ],
+      "ease": "enter",
+      "overlap": 0,
+      "sound": "16th-note clacks on a dry 110–120 BPM loop"
+    },
+    {
+      "id": "land-on-hold",
+      "name": "Land on the hold",
+      "kind": "rhythmic-cut",
+      "bridge": "the mark, which stays put while the montage stops",
+      "build": "the last montage cut lands on a downbeat and everything freezes; on the next beat the construction drawing starts drawing around the mark",
+      "frames": [
+        1,
+        4
+      ],
+      "ease": "move",
+      "overlap": 0,
+      "sound": "the pulse drops out; one heavy thud as the mark lands, a low drone under the hold"
+    },
+    {
+      "id": "block-wipe",
+      "name": "Colour-block wipe",
+      "kind": "wipe",
+      "bridge": "a grid line of the drawing",
+      "build": "an orange column (and a black base) slides in from the frame edge along a grid line, edge-aligned, and frames the wordmark",
+      "frames": [
+        6,
+        8
+      ],
+      "ease": "enter",
+      "overlap": 0,
+      "sound": "a dry slide and a latch on arrival"
+    },
+    {
+      "id": "recrop-push",
+      "name": "Re-crop push",
+      "kind": "push-pull",
+      "bridge": "the same application",
+      "build": "hard cut to a tighter crop of the same still (facade → facade tight, container → rivet row); the push is in the edit, not the camera",
+      "frames": [
+        0,
+        1
+      ],
+      "ease": "camera",
+      "overlap": 0,
+      "sound": "a shutter click"
+    },
+    {
+      "id": "construction-zoom",
+      "name": "Construction zoom",
+      "kind": "seamless-zoom",
+      "bridge": "the construction circle around the mark",
+      "build": "fixed-point zoom into the drawing's circle until it lands on a real application of the mark at the same size (drawing → cladding)",
+      "frames": [
+        12,
+        18
+      ],
+      "ease": "camera",
+      "overlap": 0,
+      "sound": "a short mechanical wind-up into a clack"
+    }
+  ],
+  "archetypes": [
+    {
+      "id": "application-still",
+      "name": "Application still",
+      "purpose": "prove the mark survives a real surface",
+      "composition": "one extremely cropped application (container side, webbing strap, cladding from below, cargo label), the mark in its zone, edge captions and index",
+      "elements": "the mark, the material, one mono caption",
+      "motion": "none inside the shot; it lasts 4–5 frames",
+      "camera": "locked; square-on or from below",
+      "frames": [
+        4,
+        5
+      ],
+      "enter": "mark-match-cut",
+      "exit": "mark-match-cut"
+    },
+    {
+      "id": "colour-block",
+      "name": "Colour-block field",
+      "purpose": "state the palette as material",
+      "composition": "orange field with an inset black panel, or thirds orange / black / concrete with hex labels; the mark in its zone",
+      "elements": "flat blocks, the mark, the wordmark small at a block edge",
+      "motion": "none in the montage; as an opener it holds 1 s",
+      "camera": "locked",
+      "frames": [
+        4,
+        30
+      ],
+      "enter": "mark-match-cut",
+      "exit": "pulse-montage"
+    },
+    {
+      "id": "giant-letter",
+      "name": "Cropped letterform",
+      "purpose": "show the typeface as an object",
+      "composition": "one lowercase letter of the wordmark at 1500 px+, bleeding off two edges, the mark small in its zone",
+      "elements": "the letter, the mark, a type caption",
+      "motion": "none",
+      "camera": "locked",
+      "frames": [
+        4,
+        12
+      ],
+      "enter": "mark-match-cut",
+      "exit": "mark-match-cut"
+    },
+    {
+      "id": "construction-hold",
+      "name": "Construction hold",
+      "purpose": "let the system be read",
+      "composition": "concrete ground, the mark solid in its zone, grid lines through its edges, circles and dimension ticks in the accent",
+      "elements": "hairlines, circles, dimension labels (100 U, R 18, 22.6°), LOGOMARK CONSTRUCTION caption",
+      "motion": "hairlines draw on in a stagger (ease.move), labels appear on the beat, 1–2 % creep",
+      "camera": "locked, 1–2 % creep toward the mark",
+      "frames": [
+        45,
+        75
+      ],
+      "enter": "land-on-hold",
+      "exit": "block-wipe"
+    },
+    {
+      "id": "system-lockup",
+      "name": "System lockup",
+      "purpose": "name the brand and stop",
+      "composition": "the drawing on the left, an orange column with a black base on the right grid line; the wordmark sits on the black base, the descriptor at the top of the column",
+      "elements": "wordmark, mono descriptor typed on, symbol / grid caption",
+      "motion": "block wipes in, descriptor types character by character, then nothing",
+      "camera": "locked",
+      "frames": [
+        45,
+        90
+      ],
+      "enter": "block-wipe",
+      "exit": null
+    }
+  ],
+  "sequence": {
+    "beats": [
+      {
+        "id": "opening",
+        "share": 0.08,
+        "purpose": "the palette and the mark, flat and loud",
+        "archetypes": [
+          "colour-block"
+        ],
+        "motion": "one colour-block field holds a beat; the mark is already in its zone",
+        "transitionOut": "pulse-montage"
+      },
+      {
+        "id": "montage",
+        "share": 0.37,
+        "purpose": "the mark survives everything",
+        "archetypes": [
+          "application-still",
+          "giant-letter",
+          "colour-block"
+        ],
+        "motion": "a still every 4–5 frames, light/dark alternating, the mark never leaves its zone",
+        "transitionOut": "land-on-hold"
+      },
+      {
+        "id": "hold",
+        "share": 0.22,
+        "purpose": "read the system",
+        "archetypes": [
+          "construction-hold"
+        ],
+        "motion": "dead still; the construction drawing draws itself, labels land on beats",
+        "transitionOut": "construction-zoom"
+      },
+      {
+        "id": "burst",
+        "share": 0.13,
+        "purpose": "proof at scale",
+        "archetypes": [
+          "application-still",
+          "giant-letter"
+        ],
+        "motion": "a second, shorter montage of tighter re-crops on the same pulse",
+        "transitionOut": "block-wipe"
+      },
+      {
+        "id": "lockup",
+        "share": 0.2,
+        "purpose": "name it",
+        "archetypes": [
+          "system-lockup"
+        ],
+        "motion": "the colour block wipes in on the grid, the descriptor types, hold to the end",
+        "transitionOut": null
+      }
+    ],
+    "cutRhythm": "hard cuts only, on a 16th-note pulse: 5/4/5/4 frames (≈115 BPM) for 2–3 s, then a 1.5–2 s still hold; a cut never falls off the pulse and never dissolves",
+    "lengthRange": [
+      10,
+      40
+    ]
+  },
+  "exampleSequence": {
+    "title": "15 s identity reveal",
+    "durationFrames": 450,
+    "scenes": [
+      {
+        "n": 1,
+        "archetype": "colour-block",
+        "beat": "opening",
+        "frames": [
+          0,
+          30
+        ],
+        "action": "orange field, black panel, the halden mark lands in its zone with a thud; HEAVY CARGO & TERMINAL SERVICES in mono",
+        "transitionOut": "pulse-montage"
+      },
+      {
+        "n": 2,
+        "archetype": "application-still",
+        "beat": "montage",
+        "frames": [
+          30,
+          165
+        ],
+        "action": "30 stills at 5/4 frames: cladding, strap at −32°, container steel, giant 'h', cargo label, strap at +24°, thirds with hex codes; index counts APP. 01 → 20",
+        "transitionOut": "land-on-hold"
+      },
+      {
+        "n": 3,
+        "archetype": "construction-hold",
+        "beat": "hold",
+        "frames": [
+          165,
+          255
+        ],
+        "action": "everything stops; grid lines and circles draw around the mark, 100 U / R 18 / 22.6° land on beats",
+        "transitionOut": "construction-zoom"
+      },
+      {
+        "n": 4,
+        "archetype": "giant-letter",
+        "beat": "burst",
+        "frames": [
+          255,
+          330
+        ],
+        "action": "zoom through the construction circle onto the facade; a tighter burst of re-crops (facade tight, rivet row, 'd' on black)",
+        "transitionOut": "block-wipe"
+      },
+      {
+        "n": 5,
+        "archetype": "system-lockup",
+        "beat": "lockup",
+        "frames": [
+          330,
+          450
+        ],
+        "action": "orange column slides in on the grid, black base, 'halden' sits on it, descriptor types; hold 2 s",
+        "transitionOut": null
+      }
+    ]
+  },
+  "elements": {
+    "text": "lowercase heavy wordmark that never animates in (it is stamped, present on the cut); mono uppercase captions type on character by character only inside holds; edge captions rotated 90°",
+    "logo": "the mark is the continuity: same zone, near-same size across every cut; it never moves, scales or spins inside a shot; it lands with a critically damped stamp at most",
+    "icons": "none; pictograms only as construction diagrams or stencil marks on materials",
+    "images": "still photographs or renders of real applications (steel, webbing, cladding, labels), desaturated so orange is loudest; each lasts 4–5 frames",
+    "ui": "none; if a screen appears it is just another application still",
+    "shapes": "colour blocks on the grid (columns, thirds, inset panels) that wipe in edge-aligned; hairline circles and dimension ticks that draw on",
+    "background": "flat colour fields or the material itself; concrete for holds; never a gradient wash",
+    "particles": "none; fine static grain only"
+  },
+  "audio": {
+    "drive": [
+      "beat-driven",
+      "mechanical",
+      "impact-driven"
+    ],
+    "sync": "every cut on a 16th note of a dry 110–120 BPM pulse; the hold starts on a downbeat where the pulse drops out; the mark's landing gets one heavy thud",
+    "sfx": "ratchet ticks, latches, shutter clicks, a dry slide for block wipes, a low drone under holds, one heavy thud"
+  },
+  "live": {
+    "seconds": 6,
+    "rest": 0.8,
+    "beats": [
+      {
+        "at": 0,
+        "label": "Panel: the mark in its zone"
+      },
+      {
+        "at": 0.03,
+        "label": "Hard-cut montage on the pulse"
+      },
+      {
+        "at": 0.35,
+        "label": "Lands on the hold: drawing draws"
+      },
+      {
+        "at": 0.45,
+        "label": "Block wipes in, caption types"
+      },
+      {
+        "at": 0.92,
+        "label": "Cut back to the panel"
+      }
+    ]
+  }
+}

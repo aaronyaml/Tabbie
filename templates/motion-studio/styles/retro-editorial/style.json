@@ -1,0 +1,520 @@
+{
+  "schema": "motion.style/2",
+  "id": "retro-editorial",
+  "number": "03",
+  "name": "Retro Editorial",
+  "tagline": "A tiled wall that re-tiles itself: heritage packaging, stamps and engraved ink.",
+  "description": "Warm heritage editorial: a teal tiled wall with dark grout is the permanent set, and every scene change re-tiles it tile by tile in a scattered mosaic. Cream paper, brick red, sand and navy ink; perforated stamps, engraved illustration, a soft serif wordmark with spaced small caps; objects drift slowly with soft contact shadows.",
+  "family": "core",
+  "mood": [
+    "warm",
+    "nostalgic",
+    "crafted",
+    "unhurried"
+  ],
+  "bestFor": [
+    "food, drink and packaging brands",
+    "heritage and craft stories",
+    "hospitality and travel",
+    "editorial and print launches"
+  ],
+  "avoidFor": [
+    "fast tech launches",
+    "dark, edgy or nightlife brands",
+    "data-heavy product UI"
+  ],
+  "references": [
+    "ref3"
+  ],
+  "palette": {
+    "bg": "#3E93A9",
+    "surface": "#F1E6CF",
+    "ink": "#1E3A6B",
+    "muted": "#7C8C8A",
+    "hair": "#13191C",
+    "accent": "#B5382A",
+    "accent2": "#E8C98E",
+    "night": "#13191C",
+    "paper": "#F1E6CF",
+    "tile": "#3E93A9",
+    "swatches": [
+      "#3E93A9",
+      "#B5382A",
+      "#E8C98E",
+      "#F1E6CF",
+      "#1E3A6B"
+    ]
+  },
+  "type": {
+    "display": {
+      "family": "Fraunces",
+      "google": "Fraunces",
+      "weights": [
+        "400",
+        "600"
+      ],
+      "case": "lower",
+      "tracking": -0.02,
+      "fallback": "\"Cooper\", Georgia, serif"
+    },
+    "text": {
+      "family": "DM Sans",
+      "google": "DMSans",
+      "weights": [
+        "500",
+        "700"
+      ],
+      "case": "small-caps",
+      "tracking": 0.32,
+      "fallback": "system-ui, sans-serif"
+    }
+  },
+  "motion": {
+    "step": 1,
+    "durations": {
+      "instant": 4,
+      "fast": 8,
+      "standard": 16,
+      "slow": 30,
+      "cinematic": 60
+    },
+    "ease": {
+      "enter": [
+        0.25,
+        0.8,
+        0.3,
+        1
+      ],
+      "exit": [
+        0.55,
+        0,
+        0.75,
+        0.3
+      ],
+      "move": [
+        0.45,
+        0,
+        0.25,
+        1
+      ],
+      "camera": [
+        0.4,
+        0,
+        0.6,
+        1
+      ],
+      "morph": "steps:2"
+    },
+    "springs": {
+      "paper": {
+        "damping": 28,
+        "stiffness": 90,
+        "mass": 1.4
+      },
+      "stamp": {
+        "damping": 24,
+        "stiffness": 120,
+        "mass": 1.1
+      }
+    },
+    "blur": "none"
+  },
+  "transitions": {
+    "signature": [
+      "mosaic re-tile: the wall changes colour tile by tile in a scattered, clustered order (~2 frames per tile), never a cut",
+      "deck fan: stamps slide out from under each other like cards and gather back",
+      "slow drift in 3/4 view with soft contact shadows while the wall re-tiles behind"
+    ],
+    "use": [
+      "matte",
+      "object",
+      "push",
+      "match"
+    ],
+    "avoid": [
+      "glitch",
+      "fast whip moves",
+      "neon and gradients",
+      "hard cuts on the wall",
+      "motion blur"
+    ],
+    "overlapFrames": [
+      8,
+      16
+    ]
+  },
+  "camera": "Almost still: a locked frontal view of the wall with objects drifting a few pixels and degrees; occasional top-down flat lay. Never handheld, never fast.",
+  "texture": {
+    "grain": 0.05,
+    "paper": true,
+    "notes": "Glazed ceramic tiles with slight per-tile tone variation and a soft sheen, dark grout lines, paper fibre on stamps, engraved line illustration, a warm vignette."
+  },
+  "lighting": "Soft warm daylight from the upper left, long gentle contact shadows under paper and tins, a faint sheen across the glaze.",
+  "sound": "Warm and analogue: soft tile clicks in clusters as the wall re-tiles, paper slides and stamp thuds, a light acoustic or bossa bed, room tone.",
+  "preview": {
+    "frames": 150,
+    "thumbFrame": 80,
+    "beats": [
+      {
+        "from": 0,
+        "to": 28,
+        "beat": "opening",
+        "label": "One stamp drifts on the teal wall"
+      },
+      {
+        "from": 28,
+        "to": 72,
+        "beat": "transformation",
+        "label": "The wall re-tiles to red and sand, the deck fans"
+      },
+      {
+        "from": 58,
+        "to": 118,
+        "beat": "transition",
+        "label": "limona rises; the wall re-tiles back, the deck gathers"
+      },
+      {
+        "from": 116,
+        "to": 150,
+        "beat": "resolution",
+        "label": "One stamp drifts home"
+      }
+    ]
+  },
+  "motionSummary": "Moves like a slow shop window: the tiled wall re-tiles itself tile by tile into each new scene while stamps drift, fan out like a deck and gather back.",
+  "visual": {
+    "composition": [
+      "the tiled wall is always the set; scenes are colour-block layouts snapped to whole tiles",
+      "one hero object (stamp, tin, label) on a third in 3/4 or slight rotation, the wordmark on the opposite side",
+      "small spaced-caps folios in the corners; generous wall around everything"
+    ],
+    "shapeLanguage": "square tiles with dark grout, perforated stamp edges, oval and rectangular frames with double rules, engraved line work, guilloche rosettes",
+    "contrast": "warm and medium: teal, brick red and sand fields with cream paper and navy ink; contrast comes from paper on wall, not light"
+  },
+  "grammar": {
+    "pacing": "unhurried: scenes of 3–6 s, one change at a time, holds long enough to read a label twice",
+    "rhythm": "smooth drift on ones, punctuated by the wall's clustered tile-by-tile re-tiling (quantised to 2 f per tile)",
+    "easing": "ease-out enters, gentle ease-in exits, heavy damped springs (paper, stamp); no overshoot, no snap",
+    "acceleration": "everything starts and stops softly over 0.5–1 s; the only quick thing is a single tile flipping",
+    "movement": [
+      "mosaic re-tile of the wall in scattered clusters",
+      "slow 3/4 drift and ±2° rotation of the hero object",
+      "stamps fanning out from under each other and gathering",
+      "wordmark rising letter by letter out of a baseline mask",
+      "top-down flat lay: a tin lid lifts"
+    ],
+    "density": "low: the wall (changing in clusters) plus 1–3 paper objects; never more than one object moving fast",
+    "holds": "long: the drift never stops but the composition holds 1.5–3 s after each re-tile"
+  },
+  "transitionPresets": [
+    {
+      "id": "mosaic-retile",
+      "name": "Mosaic re-tile",
+      "kind": "track-matte",
+      "bridge": "the tiled wall",
+      "build": "each tile switches to the next scene's colour (or image) on its own frame, quantised to 2 f, in 2×2-ish clusters spreading from a corner with scatter; ~20 % of tiles pass through sand for 4 f; 22–26 f per wipe",
+      "frames": [
+        22,
+        30
+      ],
+      "ease": "morph",
+      "overlap": 12,
+      "sound": "clusters of soft ceramic clicks"
+    },
+    {
+      "id": "deck-fan",
+      "name": "Deck fan",
+      "kind": "object-morph",
+      "bridge": "the hero stamp",
+      "build": "two or three stamps slide out from under the hero like a fanned deck (offset and rotate 4–9°), each 4 f behind the last, with soft shadows; reversed, they gather back under it",
+      "frames": [
+        20,
+        28
+      ],
+      "ease": "enter",
+      "overlap": 8,
+      "sound": "paper slides, a soft thud as the deck settles"
+    },
+    {
+      "id": "drift-through",
+      "name": "Drift through",
+      "kind": "motion-continuity",
+      "bridge": "the hero object",
+      "build": "the object keeps drifting (a few px and degrees) at constant speed while the wall re-tiles behind it, so the scene changes without the subject stopping",
+      "frames": [
+        30,
+        60
+      ],
+      "ease": "camera",
+      "overlap": 30,
+      "sound": "room tone, the click clusters behind"
+    },
+    {
+      "id": "shape-match",
+      "name": "Printed match cut",
+      "kind": "match-cut",
+      "bridge": "a shape printed in both scenes (oval, stamp frame, tile, pattern ribbon)",
+      "build": "cut (or re-tile) on the frame where the shared shape sits in the same place: a stamp's oval frame becomes a tin label's oval, a tile becomes a stamp",
+      "frames": [
+        2,
+        8
+      ],
+      "ease": "move",
+      "overlap": 0,
+      "sound": "a stamp thud"
+    },
+    {
+      "id": "engraving-zoom",
+      "name": "Into the engraving",
+      "kind": "seamless-zoom",
+      "bridge": "a stamp's engraved texture",
+      "build": "a slow push into the engraving until its line work fills the frame and its ink colour becomes the next tile colour; use once per film at most",
+      "frames": [
+        40,
+        60
+      ],
+      "ease": "camera",
+      "overlap": 10,
+      "sound": "a soft rising pad"
+    }
+  ],
+  "archetypes": [
+    {
+      "id": "hero-on-wall",
+      "name": "Hero on the wall",
+      "purpose": "introduce the product as a crafted object",
+      "composition": "teal wall, one stamp or tin on a third in 3/4 with a soft contact shadow, a folio in small caps",
+      "elements": "hero object, engraved illustration, perforations, folio",
+      "motion": "slow drift and ±2° rotation over the whole shot",
+      "camera": "locked frontal on the wall",
+      "frames": [
+        60,
+        120
+      ],
+      "enter": "mosaic-retile",
+      "exit": "mosaic-retile"
+    },
+    {
+      "id": "colour-field",
+      "name": "Colour-block field",
+      "purpose": "change mood or chapter",
+      "composition": "the wall re-tiled into a colour-block layout (red field with a sand column, a sand block behind the hero), snapped to whole tiles",
+      "elements": "tiles, the hero carried across, a spaced-caps line",
+      "motion": "the re-tile itself, then a hold; the hero drifts through",
+      "camera": "locked",
+      "frames": [
+        45,
+        90
+      ],
+      "enter": "mosaic-retile",
+      "exit": "deck-fan"
+    },
+    {
+      "id": "stamp-deck",
+      "name": "Stamp deck",
+      "purpose": "show the range (flavours, products, editions)",
+      "composition": "three stamps fanned from one point, each a variant, on a colour field",
+      "elements": "stamps with numerals and engraving, shadows",
+      "motion": "fan out 4 f apart, hold, gather back",
+      "camera": "locked, or a top-down flat lay",
+      "frames": [
+        45,
+        90
+      ],
+      "enter": "deck-fan",
+      "exit": "deck-fan"
+    },
+    {
+      "id": "wordmark-wall",
+      "name": "Wordmark on the wall",
+      "purpose": "name it",
+      "composition": "soft-serif lowercase wordmark large in cream on the field, spaced-caps line above and below, the hero opposite",
+      "elements": "wordmark, 'since 1920'-style line, a small rosette or rule",
+      "motion": "letters rise out of a baseline mask 2 f apart, slowly; caps track in",
+      "camera": "locked",
+      "frames": [
+        60,
+        120
+      ],
+      "enter": "mosaic-retile",
+      "exit": "mosaic-retile"
+    },
+    {
+      "id": "flat-lay",
+      "name": "Flat lay",
+      "purpose": "detail and craft (opening a tin, a label close-up)",
+      "composition": "top-down on a cream or sand tile field, the object square to frame",
+      "elements": "tin, lid, label, engraved pattern",
+      "motion": "a lid lifts and slides off; a label turns 90°",
+      "camera": "top-down, locked",
+      "frames": [
+        45,
+        90
+      ],
+      "enter": "shape-match",
+      "exit": "engraving-zoom"
+    }
+  ],
+  "sequence": {
+    "beats": [
+      {
+        "id": "opening",
+        "share": 0.2,
+        "purpose": "the object, quietly",
+        "archetypes": [
+          "hero-on-wall"
+        ],
+        "motion": "one stamp drifts on the teal wall",
+        "transitionOut": "mosaic-retile"
+      },
+      {
+        "id": "development",
+        "share": 0.25,
+        "purpose": "the world and the range",
+        "archetypes": [
+          "colour-field",
+          "stamp-deck"
+        ],
+        "motion": "the wall re-tiles to red and sand; the deck fans out",
+        "transitionOut": "shape-match"
+      },
+      {
+        "id": "detail",
+        "share": 0.2,
+        "purpose": "craft up close",
+        "archetypes": [
+          "flat-lay"
+        ],
+        "motion": "top-down: a lid lifts, a label turns",
+        "transitionOut": "mosaic-retile"
+      },
+      {
+        "id": "reveal",
+        "share": 0.2,
+        "purpose": "the name",
+        "archetypes": [
+          "wordmark-wall"
+        ],
+        "motion": "wordmark rises on the field, caps track in",
+        "transitionOut": "mosaic-retile"
+      },
+      {
+        "id": "resolution",
+        "share": 0.15,
+        "purpose": "back where it began",
+        "archetypes": [
+          "hero-on-wall"
+        ],
+        "motion": "the wall re-tiles back to teal, the deck gathers, one stamp drifts",
+        "transitionOut": null
+      }
+    ],
+    "cutRhythm": "almost no cuts: the wall re-tiles instead (about one re-tile per 3–6 s); a straight cut only as a printed match cut into a flat lay",
+    "lengthRange": [
+      12,
+      45
+    ]
+  },
+  "exampleSequence": {
+    "title": "20 s preserves brand film",
+    "durationFrames": 600,
+    "scenes": [
+      {
+        "n": 1,
+        "archetype": "hero-on-wall",
+        "beat": "opening",
+        "frames": [
+          0,
+          105
+        ],
+        "action": "teal wall; a cream stamp with an engraved lemon drifts in 3/4, '25' in red, 'limona · conservas · 1931' along its foot",
+        "transitionOut": "mosaic-retile"
+      },
+      {
+        "n": 2,
+        "archetype": "stamp-deck",
+        "beat": "development",
+        "frames": [
+          105,
+          240
+        ],
+        "action": "the wall re-tiles from the top-right into brick red with a sand column; two more stamps (sand, red) fan out from under the first",
+        "transitionOut": "shape-match"
+      },
+      {
+        "n": 3,
+        "archetype": "flat-lay",
+        "beat": "detail",
+        "frames": [
+          240,
+          360
+        ],
+        "action": "the stamp's oval frame match-cuts to a tin's oval label, top-down; the lid lifts and slides off",
+        "transitionOut": "mosaic-retile"
+      },
+      {
+        "n": 4,
+        "archetype": "wordmark-wall",
+        "beat": "reveal",
+        "frames": [
+          360,
+          495
+        ],
+        "action": "the wall re-tiles to red; 'limona' rises letter by letter in cream, 'since 1920' tracks in above",
+        "transitionOut": "mosaic-retile"
+      },
+      {
+        "n": 5,
+        "archetype": "hero-on-wall",
+        "beat": "resolution",
+        "frames": [
+          495,
+          600
+        ],
+        "action": "the wall re-tiles back to teal from the bottom-left; the deck gathers; one stamp drifts home",
+        "transitionOut": null
+      }
+    ]
+  },
+  "elements": {
+    "text": "soft-serif lowercase wordmark rising letter by letter from a baseline mask; spaced small caps tracking in; never typed, never glitched",
+    "logo": "printed: on a stamp, a label or large on the wall; arrives by rising, leaves by sinking or under a re-tile",
+    "icons": "engraved vignettes and stamp numerals rather than icons",
+    "images": "printed things (stamps, labels, tins, posters) with paper fibre and soft contact shadows; engraved illustration multiplied into paper",
+    "ui": "avoid; if needed, printed as a label or a stamp, never a screen",
+    "shapes": "tiles, perforated stamps, double-rule frames, ovals, guilloche rosettes, ribbons with a repeating pattern",
+    "background": "the glazed tiled wall, always; it changes only by re-tiling, never by a cut",
+    "particles": "none"
+  },
+  "audio": {
+    "drive": [
+      "ambient",
+      "phrase-synced",
+      "foley-led"
+    ],
+    "sync": "re-tiles start on phrase starts and their click clusters follow the strum; stamp landings on soft downbeats; long holds over sustained chords",
+    "sfx": "ceramic tile clicks in clusters, paper slides, stamp thuds, a tin lid, room tone; acoustic or bossa bed"
+  },
+  "live": {
+    "seconds": 8,
+    "rest": 0.5,
+    "beats": [
+      {
+        "at": 0,
+        "label": "One stamp drifts on teal"
+      },
+      {
+        "at": 0.18,
+        "label": "Wall re-tiles to red and sand"
+      },
+      {
+        "at": 0.3,
+        "label": "Deck fans, limona rises"
+      },
+      {
+        "at": 0.62,
+        "label": "Re-tiles back, deck gathers"
+      }
+    ]
+  }
+}

@@ -28,6 +28,8 @@ GET /motion/status, POST /motion/ensure -> the Motion studio folder (created fro
                                        npm install in the background) and whether ElevenLabs / Higgsfield are
                                        linked (booleans + how-to hints only; hmem/motion.py)
 GET /motion/films                    -> the films in <studio>/studio from their project.json (Motion panel home)
+GET /motion/styles                   -> the studio's style library (styles/*/style.json) for the gallery
+GET /motion/style-media?id=&f=thumb|preview -> a style's thumb.jpg / preview.mp4 (under the proxy's 512 KB cap)
 POST /motion/elevenlabs {key}        -> save the user's ElevenLabs API key in the studio's .env (never echoed)
 POST /motion/install                 -> install what Motion is missing (Node.js, studio, packages) in the
                                        background; progress in /motion/status "install"
@@ -799,6 +801,11 @@ class Handler(BaseHTTPRequestHandler):
                 return self._send(200, motion_studio.status())
             if u.path == "/motion/films":
                 return self._send(200, motion_studio.films())
+            if u.path == "/motion/styles":
+                return self._send(200, motion_studio.styles())
+            if u.path == "/motion/style-media":
+                got = motion_studio.style_media(q.get("id", ""), q.get("f", ""))
+                return self._send_bytes(*got) if got else self._send(404, {"error": "not found"})
             if u.path == "/update":
                 return self._send(200, update_payload(q.get("force") == "1"))
             if u.path == "/title":

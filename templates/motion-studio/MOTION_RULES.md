@@ -1,6 +1,6 @@
-# Motion rules: product-film house style
+# Motion rules: the craft
 
-Calm, confident, precise. The product is the hero; motion explains it.
+The product is the hero; motion explains it. These rules hold in every style; the look comes from the film's style.
 
 ## Decide before you animate
 For every shot, hit and transition, know: what it says, where the eye goes in and out, what the viewer
@@ -12,18 +12,30 @@ should feel, and why it moves. Movement without a reason is removed. Stillness i
 - 15–30 s for a social spot, up to 60 s for a launch film.
 
 ## Look
-- Light, clean backgrounds (off-white or soft grey), generous space, one accent: the product's brand colour.
-- Real product UI, sharp and large. Never invent screens or redesign the product.
-- One typeface family (the product's, else the system sans), two or three sizes, tight headline tracking,
-  sentence case, few words per card (≤ 6 on screen at once).
-- Soft, realistic shadows and depth; no glows, bevels, lens flares or stock "tech" textures.
+- The film's style decides the look (see Style below). In every style: real product UI, sharp and large, never
+  invented screens or a redesigned product; type readable, few words per card (≤ 6 on screen at once).
 
 ## Motion
-- Ease everything: spring with high damping for arrivals, ease-in-out for camera moves; nothing linear
-  except continuous drifts.
+- Ease with the style's curves and springs (style.json `motion`); stepped timing (on twos, `steps:N`) only when
+  the style calls for it; never plain linear except continuous drifts.
 - Camera: slow push-ins and gentle parallax; one move per shot. Shake only on a genuinely heavy hit.
 - Text arrives in one gesture (fade + small rise or a mask wipe), holds long enough to read twice, leaves quietly.
 - At most three flashes per second, and few at all. Big hits are rare.
+
+## Style
+Every film is made in one style from the library in `styles/` (`styles/index.json`; each style has `style.json`
+tokens and a `STYLE.md` motion language: look, type, colour, curves, timing, transitions, camera, texture, sound).
+The style overrides any generic look or motion default here; the craft rules (decide before you animate, story,
+continuity, music sync, checks) still hold.
+- Use the style in the film's `project.json` (`"style": {"id": …}`). When it's `auto` or missing, read the brief,
+  the brand and any references, compare at least three distinct styles, pick one and record the pick, the reason
+  and the runners-up. Never fall back to one style silently.
+- Brand colours and fonts map onto the style's colour roles (bg, ink, accent …); the style's colour logic stays.
+- A blend borrows palette, type or texture from a second style; the base style's motion stays in charge.
+- Changing the style keeps the content (brief, script, scenes, audio); only the look and motion are redrawn.
+- Reference videos are analysed visually: extract frames (contact sheet, shot starts, frames around every cut,
+  consecutive-frame bursts inside shots), look at them, and write what makes the look and motion distinctive,
+  which frames you inspected and what frames can't show.
 
 ## Transitions: one continuous film
 The film plays as one choreographed move through one world: scenes never just appear and disappear.
@@ -40,7 +52,7 @@ The film plays as one choreographed move through one world: scenes never just ap
   like one constant move.
 - Never by default: abrupt cuts, plain fades or crossfades, preset wipes. A hard cut is fine when the rhythm, the
   story or an impact calls for it; say why in the plan.
-- One transition family per film, two or three signature moves, the biggest at the story peak. Type stays readable
+- One transition family per film (the style's vocabulary), two or three signature moves, the biggest at the story peak. Type stays readable
   before and after every move.
 
 ## Music

@@ -186,3 +186,54 @@ def test_older_template_studio_gets_the_additions_once(tmp_path):
 def test_custom_studio_is_never_synced(tmp_path):
     p = motion.studio_dir(); p.mkdir(parents=True); (p / "mine.txt").write_text("x", encoding="utf-8")
     assert motion.sync_template(p) == [] and sorted(x.name for x in p.iterdir()) == ["mine.txt"]
+
+
+def _style(d, sid, **kw):
+    (d / sid).mkdir(parents=True, exist_ok=True)
+    st = {"id": sid, "number": "01", "name": sid.title(), "tagline": "t", "palette": {"swatches": ["#000", "#fff"], "bg": "#FFFFFF", "accent": "#22C55E", "hair": "rgba(0,0,0,.1)"},
+          "type": {"display": {"family": "Inter Tight"}, "text": {"family": "Inter"}}, "motion": {"step": 2},
+          "transitions": {"signature": ["a", "b"]},
+          "transitionPresets": [{"id": "wipe", "name": "Bar wipe", "kind": "wipe", "build": "bars"}],
+          "archetypes": [{"id": "a", "name": "Title", "purpose": "say it"}],
+          "sequence": {"beats": [{"id": "opening", "share": 0.5, "archetypes": ["a"], "transitionOut": "wipe"}, {"id": "outro", "share": 0.5, "archetypes": ["a"]}]},
+          "live": {"seconds": 5, "rest": 0.4, "beats": [{"at": 0, "label": "Open"}]}, **kw}
+    (d / sid / "style.json").write_text(json.dumps(st), encoding="utf-8")
+
+
+def test_styles_follow_the_library_order(tmp_path):
+    studio = tmp_path / "s"
+    d = studio / "styles"
+    _style(d, "beta")
+    _style(d, "alpha")
+    (d / "alpha" / "thumb.jpg").write_bytes(b"\xff\xd8jpg")
+    (d / "index.json").write_text(json.dumps({"order": ["alpha", "beta", "missing", "../evil"]}), encoding="utf-8")
+    got = motion.styles(studio)["styles"]
+    assert [s["id"] for s in got] == ["alpha", "beta"]
+    a = got[0]
+    assert a["display"] == "Inter Tight" and a["step"] == 2 and a["swatches"] == ["#000", "#fff"]
+    assert a["thumb"] is True and a["preview"] is False
+    assert a["palette"] == {"bg": "#FFFFFF", "accent": "#22C55E"}  # editable roles: solid hex only
+    # the edit system: beats name their archetypes and outgoing transition, the live preview its timing
+    assert a["sequence"][0] == {"id": "opening", "share": 0.5, "purpose": "", "archetypes": ["Title"], "out": "Bar wipe"}
+    assert a["sequence"][1]["out"] == "" and a["presets"][0]["kind"] == "wipe" and a["live"]["seconds"] == 5
+    assert motion.style_media("alpha", "thumb", studio) == (b"\xff\xd8jpg", "image/jpeg")
+    assert motion.style_media("alpha", "preview", studio) is None  # not built yet
+    assert motion.style_media("../alpha", "thumb", studio) is None
+    assert motion.style_media("alpha", "style", studio) is None
+    (d / "alpha" / "thumb.html").write_text("<div></div>", encoding="utf-8")
+    assert motion.style_media("alpha", "html", studio) == (b"<div></div>", "text/plain; charset=utf-8")
+    assert motion.styles(studio)["styles"][0]["html"] is True
+    assert motion.styles(studio)["styles"][0]["fonts"][0]["family"] == "Inter Tight"
+
+
+def test_styles_fall_back_to_the_template_library(tmp_path):
+    got = motion.styles(tmp_path / "empty")["styles"]
+    assert got and all(s["id"] for s in got)  # the template ships the library
+
+
+def test_style_media_respects_the_proxy_cap(tmp_path):
+    studio = tmp_path / "s"
+    _style(studio / "styles", "big")
+    (studio / "styles" / "index.json").write_text('{"order":["big"]}', encoding="utf-8")
+    (studio / "styles" / "big" / "preview.mp4").write_bytes(b"0" * (motion.MEDIA_MAX + 1))
+    assert motion.style_media("big", "preview", studio) is None

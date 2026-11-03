@@ -1,0 +1,563 @@
+{
+  "schema": "motion.style/2",
+  "id": "nature-organic",
+  "number": "04",
+  "name": "Nature Organic",
+  "tagline": "Forest, moss and a lime sun that keeps growing.",
+  "description": "Identity film for brands rooted in land and long horizons: deep forest green, signal lime and mint paper, real nature photography collaged with collateral, a contemporary serif with a grotesk companion, and a radiating sunburst of lime bars as the motion idea. Opens on a moodboard that resolves into one photograph, then a softer rhythmic montage.",
+  "family": "core",
+  "mood": [
+    "grounded",
+    "optimistic",
+    "warm",
+    "considered",
+    "alive"
+  ],
+  "bestFor": [
+    "sustainability, climate and impact brands",
+    "sustainable finance and funds",
+    "food, agriculture and outdoor",
+    "annual reviews and summits",
+    "wellbeing with substance"
+  ],
+  "avoidFor": [
+    "hard tech and dev tools",
+    "nightlife and luxury",
+    "aggressive sales pushes"
+  ],
+  "references": [
+    "ref6"
+  ],
+  "palette": {
+    "bg": "#E9F7EC",
+    "surface": "#F6FBF4",
+    "ink": "#0E3B2C",
+    "muted": "#5E7D6E",
+    "hair": "rgba(14,59,44,0.18)",
+    "accent": "#8BE04E",
+    "accent2": "#1F6B47",
+    "night": "#082419",
+    "wood": "#A47A4F",
+    "paper": "#F1EEE4",
+    "moss": "#4E7A2E",
+    "swatches": [
+      "#0E3B2C",
+      "#8BE04E",
+      "#E9F7EC",
+      "#1F6B47",
+      "#A47A4F"
+    ]
+  },
+  "type": {
+    "display": {
+      "family": "Fraunces",
+      "google": "Fraunces",
+      "weights": [
+        "400",
+        "500"
+      ],
+      "case": "sentence",
+      "tracking": -0.03,
+      "fallback": "Georgia, \"Times New Roman\", serif"
+    },
+    "text": {
+      "family": "Hanken Grotesk",
+      "google": "HankenGrotesk",
+      "weights": [
+        "400",
+        "500",
+        "600"
+      ],
+      "case": "sentence",
+      "tracking": -0.01,
+      "fallback": "system-ui, sans-serif"
+    },
+    "mono": {
+      "family": "DM Mono",
+      "google": "DMMono",
+      "weights": [
+        "400"
+      ],
+      "case": "upper",
+      "tracking": 0.06
+    }
+  },
+  "motion": {
+    "step": 1,
+    "durations": {
+      "instant": 2,
+      "fast": 6,
+      "standard": 12,
+      "slow": 22,
+      "cinematic": 40
+    },
+    "ease": {
+      "enter": [
+        0.2,
+        0.9,
+        0.3,
+        1
+      ],
+      "exit": [
+        0.55,
+        0,
+        0.75,
+        0.2
+      ],
+      "move": [
+        0.6,
+        0,
+        0.3,
+        1
+      ],
+      "camera": [
+        0.55,
+        0.05,
+        0.25,
+        1
+      ],
+      "morph": [
+        0.7,
+        0,
+        0.2,
+        1
+      ]
+    },
+    "springs": {
+      "leaf": {
+        "damping": 20,
+        "stiffness": 120,
+        "mass": 1
+      },
+      "chip": {
+        "damping": 24,
+        "stiffness": 260,
+        "mass": 0.7
+      },
+      "logo": {
+        "damping": 30,
+        "stiffness": 110,
+        "mass": 1.3
+      }
+    },
+    "blur": "none"
+  },
+  "transitions": {
+    "signature": [
+      "moodboard grid resolves into one full-bleed photograph (seamless zoom into a tile)",
+      "radiance: lime bars grow outward from the mark, a forest disc opens behind them and becomes the next scene",
+      "a softer rhythmic montage (cuts every 5–7 frames) of collateral, ending by pulling back out of a tile into the grid"
+    ],
+    "use": [
+      "zoom",
+      "matte",
+      "object",
+      "match",
+      "push"
+    ],
+    "avoid": [
+      "crossfades",
+      "glitch",
+      "neon glow",
+      "hard pulse faster than 4 frames",
+      "stock-nature clichés (sunrise lens flares, drone swoops)"
+    ],
+    "overlapFrames": [
+      6,
+      12
+    ]
+  },
+  "camera": "Gentle and natural: slow push-ins on photography, a seamless zoom into and out of moodboard tiles, nothing handheld; holds breathe with a 1–3 % drift.",
+  "texture": {
+    "grain": 0.03,
+    "paper": true,
+    "notes": "Real nature photography (moss, bark, hills, leaf macro), uncoated paper, embossing, wood; soft natural light. Fine grain, no gloss."
+  },
+  "lighting": "Soft overcast or low morning sun, misty depth; collateral lit like a still-life on a table.",
+  "sound": "Warm organic percussion (wood, shaker, soft claps) at ~100–115 BPM, air and birdsong beds, a rising shimmer under the sunburst; never synthetic risers.",
+  "preview": {
+    "frames": 150,
+    "thumbFrame": 88,
+    "beats": [
+      {
+        "from": 0,
+        "to": 22,
+        "beat": "opening",
+        "label": "Moodboard: the brand's world around the mark"
+      },
+      {
+        "from": 22,
+        "to": 56,
+        "beat": "transformation",
+        "label": "Seamless zoom into the hills tile"
+      },
+      {
+        "from": 56,
+        "to": 100,
+        "beat": "transition",
+        "label": "Bars radiate, the forest disc opens, 'of Growth' rises"
+      },
+      {
+        "from": 100,
+        "to": 150,
+        "beat": "resolution",
+        "label": "Soft montage, then pull back out of the moss tile to the board"
+      }
+    ]
+  },
+  "motionSummary": "Moves like growth: a moodboard breathes, the camera sinks into one photograph, lime bars radiate out of the mark as a forest disc opens behind them, a soft montage of collateral, then the camera drifts back out to the board.",
+  "visual": {
+    "composition": [
+      "open wide on a loose moodboard cluster around the mark, generous mint space between tiles",
+      "one photograph becomes the frame; the mark keeps the place it had in the tile",
+      "the sunburst is centred on the mark or rises from a corner; headlines crop off an edge",
+      "collateral laid like a still-life (cards on bark, books, chips), slight angles, never a 3D fly-through"
+    ],
+    "shapeLanguage": "rounded tiles and chips (14–36 px radius), circles and discs, radiating butt-ended bars of alternating lengths, the seed-shaped mark",
+    "contrast": "soft natural photography against flat forest and lime; lime is light (bars, chips, the mark on dark), forest is ground, mint is paper; no glow"
+  },
+  "grammar": {
+    "pacing": "patient: long camera moves (20–30 frames) and holds of 1–2 s, with one softer montage section that cuts every 5–7 frames",
+    "rhythm": "smooth on ones; continuous camera between beats, a gentle beat-cut only in the montage",
+    "easing": "camera moves on a long ease-in-out (ease.camera); growth eases out (ease.enter) and keeps creeping; discs open with ease.morph; tiles settle with springs.leaf, never bouncy",
+    "acceleration": "organic: things start almost imperceptibly, swell, and keep moving slowly instead of stopping (bars turn ≤0.15°/frame on holds, photos push 1–3 %)",
+    "movement": [
+      "seamless fixed-point zoom into a moodboard tile and back out of another",
+      "radiance: bars growing outward from the mark, staggered by length",
+      "circular disc matte opening behind the bars",
+      "cropped serif headline rising from the bottom edge",
+      "tiles settling in a stagger (fast arrival, long settle)"
+    ],
+    "density": "medium-low: one growth idea at a time, with a slow ambient move (push, turn) underneath",
+    "holds": "every hold breathes: a 1–3 % push or a slow turn of the sun; nothing in this style is fully still"
+  },
+  "transitionPresets": [
+    {
+      "id": "tile-zoom",
+      "name": "Zoom into the tile",
+      "kind": "seamless-zoom",
+      "bridge": "a 16:9 photo tile on the moodboard",
+      "build": "fixed-point log zoom about the point that maps the tile onto the frame; the tile grows straight into full bleed with no drift and the mark lands where it sat in the tile",
+      "frames": [
+        20,
+        30
+      ],
+      "ease": "camera",
+      "overlap": 0,
+      "sound": "a soft air swell under the move, birdsong rising"
+    },
+    {
+      "id": "radiance-disc",
+      "name": "Radiance disc",
+      "kind": "track-matte",
+      "bridge": "the mark at the centre of the photograph",
+      "build": "lime bars grow outward from the mark (ease.enter, staggered by length) while a forest disc opens behind them (ease.morph) and becomes the poster ground; the mark flips to mint on the disc",
+      "frames": [
+        20,
+        30
+      ],
+      "ease": "morph",
+      "overlap": 8,
+      "sound": "a rising shimmer that blooms as the disc fills"
+    },
+    {
+      "id": "rise-handover",
+      "name": "Rise handover",
+      "kind": "motion-continuity",
+      "bridge": "the outward motion of the bars",
+      "build": "as the bars finish growing, a cropped serif headline rises from the bottom edge on the same ease, carrying the energy into type",
+      "frames": [
+        12,
+        18
+      ],
+      "ease": "enter",
+      "overlap": 6,
+      "sound": "a warm wooden knock as the headline settles"
+    },
+    {
+      "id": "soft-montage",
+      "name": "Soft montage",
+      "kind": "rhythmic-cut",
+      "bridge": "the mark's consistent placement and the lime",
+      "build": "hard cuts every 5–7 frames through collateral stills (type specimen, numerals in lime chips, lime field, embossed card), alternating light and dark grounds; never faster than 4 frames",
+      "frames": [
+        18,
+        60
+      ],
+      "ease": "enter",
+      "overlap": 0,
+      "sound": "a soft wooden knock or shaker on each cut, 100–115 BPM"
+    },
+    {
+      "id": "radius-match",
+      "name": "Radius match",
+      "kind": "match-cut",
+      "bridge": "a round form of the same radius",
+      "build": "hard cut from the sunburst disc to a round object of the same radius in the same place (enamel pin, round chip, the sun)",
+      "frames": [
+        0,
+        2
+      ],
+      "ease": "morph",
+      "overlap": 0,
+      "sound": "a small metallic tick"
+    },
+    {
+      "id": "tile-pullback",
+      "name": "Pull back to the board",
+      "kind": "seamless-zoom",
+      "bridge": "a full-bleed photo that is one of the board's tiles",
+      "build": "cut to a photo that is a tile at full zoom, then reverse the fixed-point zoom out to the moodboard while the other tiles settle in from below in a stagger",
+      "frames": [
+        20,
+        30
+      ],
+      "ease": "camera",
+      "overlap": 0,
+      "sound": "a long exhale of air, birdsong settling"
+    }
+  ],
+  "archetypes": [
+    {
+      "id": "moodboard",
+      "name": "Moodboard cluster",
+      "purpose": "show the brand's whole world at once",
+      "composition": "loose cluster of photo tiles, lime and forest chips with numerals, an 'Aa' tile and wood, the mark with a tiny sun at its heart, mint space between",
+      "elements": "photo tiles, chips (96%, $4.2B, 12k ha), type tile, the mark, a mono label",
+      "motion": "tiles settle in a stagger; the little sun breathes; otherwise still",
+      "camera": "locked, then the fixed-point zoom",
+      "frames": [
+        30,
+        60
+      ],
+      "enter": "tile-pullback",
+      "exit": "tile-zoom"
+    },
+    {
+      "id": "photo-hero",
+      "name": "Full-bleed photograph",
+      "purpose": "ground the brand in real land",
+      "composition": "one nature photograph (hills, moss, bark, leaf) full bleed, the mark small on it where it sat in the tile, the name below",
+      "elements": "photo, the mark, the name in the serif",
+      "motion": "a slow 2–4 % push; the name rises softly",
+      "camera": "slow push-in",
+      "frames": [
+        30,
+        60
+      ],
+      "enter": "tile-zoom",
+      "exit": "radiance-disc"
+    },
+    {
+      "id": "radiance-poster",
+      "name": "Radiance poster",
+      "purpose": "the identity's big idea: growth radiating from the mark",
+      "composition": "forest disc filling the frame, lime bars radiating from the mark at centre, a cropped serif headline ('of Growth') along the bottom, a grotesk line at top-left",
+      "elements": "sunburst bars, the mark in mint, headline, one sentence",
+      "motion": "bars grow then keep turning slowly; headline rises; hold breathes",
+      "camera": "continuing slow push",
+      "frames": [
+        40,
+        75
+      ],
+      "enter": "radiance-disc",
+      "exit": "soft-montage"
+    },
+    {
+      "id": "collateral-still",
+      "name": "Collateral still",
+      "purpose": "prove the system across materials",
+      "composition": "one piece of collateral per shot: type specimen, a numeral in a lime chip on forest, a lime field with a corner sunburst, an embossed card on bark",
+      "elements": "the mark in its usual place, numerals in chips, specimen type",
+      "motion": "none inside the shot in a montage; a 1–2 % drift when held",
+      "camera": "locked",
+      "frames": [
+        5,
+        7
+      ],
+      "enter": "soft-montage",
+      "exit": "soft-montage"
+    },
+    {
+      "id": "radiant-lockup",
+      "name": "Radiant lockup",
+      "purpose": "sign off with warmth",
+      "composition": "the mark and 'Meadowline' on forest or lime, the sun's bars around it turning slowly, one line of copy",
+      "elements": "mark, name, line, sunburst",
+      "motion": "bars grow a last time and keep turning; line rises; long hold",
+      "camera": "1–3 % breathing drift",
+      "frames": [
+        45,
+        90
+      ],
+      "enter": "radius-match",
+      "exit": null
+    }
+  ],
+  "sequence": {
+    "beats": [
+      {
+        "id": "opening",
+        "share": 0.18,
+        "purpose": "the brand's world in one look",
+        "archetypes": [
+          "moodboard"
+        ],
+        "motion": "tiles settle around the mark; a breath of stillness",
+        "transitionOut": "tile-zoom"
+      },
+      {
+        "id": "immersion",
+        "share": 0.17,
+        "purpose": "step into the land",
+        "archetypes": [
+          "photo-hero"
+        ],
+        "motion": "the tile becomes the frame; slow push; the name appears",
+        "transitionOut": "radiance-disc"
+      },
+      {
+        "id": "radiance",
+        "share": 0.22,
+        "purpose": "the idea: growth radiates",
+        "archetypes": [
+          "radiance-poster"
+        ],
+        "motion": "bars grow out of the mark, the forest disc opens, the headline rises (rise-handover) and holds, turning",
+        "transitionOut": "soft-montage"
+      },
+      {
+        "id": "montage",
+        "share": 0.2,
+        "purpose": "the system across materials",
+        "archetypes": [
+          "collateral-still"
+        ],
+        "motion": "collateral every 5–7 frames, then one breathing hold",
+        "transitionOut": "radius-match"
+      },
+      {
+        "id": "resolution",
+        "share": 0.23,
+        "purpose": "sign off and come home",
+        "archetypes": [
+          "radiant-lockup",
+          "moodboard"
+        ],
+        "motion": "the round chip matches into the lockup; bars turn; or pull back out of a tile to the board",
+        "transitionOut": null
+      }
+    ],
+    "cutRhythm": "mostly continuous: zooms and mattes carry the big changes; one soft montage cuts every 5–7 frames on a warm 100–115 BPM pulse; never faster than 4 frames, never a crossfade",
+    "lengthRange": [
+      15,
+      45
+    ]
+  },
+  "exampleSequence": {
+    "title": "20 s annual review",
+    "durationFrames": 600,
+    "scenes": [
+      {
+        "n": 1,
+        "archetype": "moodboard",
+        "beat": "opening",
+        "frames": [
+          0,
+          90
+        ],
+        "action": "photo tiles, 96% / $4.2B / 12k ha chips and an 'Aa' tile settle around the Meadowline mark; its little sun breathes",
+        "transitionOut": "tile-zoom"
+      },
+      {
+        "n": 2,
+        "archetype": "photo-hero",
+        "beat": "immersion",
+        "frames": [
+          90,
+          180
+        ],
+        "action": "the camera sinks into the hills tile until it is the frame; the mark sits on the hills, 'Meadowline' rises",
+        "transitionOut": "radiance-disc"
+      },
+      {
+        "n": 3,
+        "archetype": "radiance-poster",
+        "beat": "radiance",
+        "frames": [
+          180,
+          312
+        ],
+        "action": "lime bars grow out of the mark, the forest disc opens, 'of Growth' rises cropped along the bottom; hold, turning",
+        "transitionOut": "soft-montage"
+      },
+      {
+        "n": 4,
+        "archetype": "collateral-still",
+        "beat": "montage",
+        "frames": [
+          312,
+          432
+        ],
+        "action": "type specimen, 96% chip on forest, lime field with corner sunburst, card on bark — a cut every 6 frames, then a 1 s hold on the 96% chip",
+        "transitionOut": "radius-match"
+      },
+      {
+        "n": 5,
+        "archetype": "radiant-lockup",
+        "beat": "resolution",
+        "frames": [
+          432,
+          600
+        ],
+        "action": "the round chip matches into the sun; mark + 'Meadowline' + 'Capital that grows back'; bars turn; hold 2 s",
+        "transitionOut": null
+      }
+    ]
+  },
+  "elements": {
+    "text": "serif headlines rise from the bottom edge and stay cropped; grotesk sentences fade-rise softly; mono labels are static",
+    "logo": "the mark keeps its place from tile to photo to poster; it never moves on its own, the world grows around it; it flips colour (lime ↔ mint) as the disc passes",
+    "icons": "none; numerals in lime chips do that job",
+    "images": "real nature photography (hills, moss, bark, leaf macro), untinted, soft light; enters by zoom, breathes with a slow push",
+    "ui": "rare: a social profile or a site as one more collateral still",
+    "shapes": "rounded tiles and chips that settle in a stagger; discs that open as mattes; radiating bars that grow and slowly turn",
+    "background": "mint paper or forest ground; photography as the frame; never a gradient wash",
+    "particles": "none; fine paper grain only"
+  },
+  "audio": {
+    "drive": [
+      "ambient",
+      "organic percussion",
+      "swell-driven"
+    ],
+    "sync": "zooms and the disc ride long swells (they start before the beat and bloom on it); montage cuts on 8ths of a warm 100–115 BPM groove; holds sit on air and birdsong",
+    "sfx": "wood blocks, shakers, soft claps, an air swell under zooms, a rising shimmer under the radiance, a soft wooden knock per montage cut"
+  },
+  "live": {
+    "seconds": 7,
+    "rest": 0.5,
+    "beats": [
+      {
+        "at": 0,
+        "label": "Moodboard around the mark"
+      },
+      {
+        "at": 0.14,
+        "label": "Zoom into the hills tile"
+      },
+      {
+        "at": 0.33,
+        "label": "Bars radiate, the forest disc opens"
+      },
+      {
+        "at": 0.6,
+        "label": "Soft montage of collateral"
+      },
+      {
+        "at": 0.72,
+        "label": "Pull back out to the board"
+      }
+    ]
+  }
+}

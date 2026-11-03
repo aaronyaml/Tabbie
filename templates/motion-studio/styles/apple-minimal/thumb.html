@@ -1,0 +1,59 @@
+<!-- Live gallery preview: a 6 s mini-edit in CSS (contract: docs/motion-knowledge/09-styles.md §5). Every element runs
+     on one shared timeline (--T) offset by --rest, so the paused card shows the characteristic moment and hover plays
+     the edit: caption types → pill grows into the card → canvas tilts, satellites, press + toast → folds home. -->
+<style>
+.s{--T:6s;position:absolute;inset:0;background:var(--bg);overflow:hidden;font-family:var(--display);color:var(--ink)}
+.s *{box-sizing:border-box;animation-duration:var(--T);animation-iteration-count:infinite;animation-delay:calc(-1 * var(--rest, 0s));animation-fill-mode:both}
+.line{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;font-weight:600;font-size:4.6vw;letter-spacing:-.035em;white-space:nowrap}
+.line>span{display:inline-block;overflow:visible;flex:none;animation-timing-function:cubic-bezier(.4,0,.1,1)}
+.line>span:nth-child(1){animation-name:w1}.line>span:nth-child(2){animation-name:w2}.line>span:nth-child(3){animation-name:w3}.line>span:nth-child(4){animation-name:w4}.line>span:nth-child(5){animation-name:w5}
+@keyframes w1{0%,0%{opacity:0;filter:blur(.8vw);transform:translateY(1.4vw);max-width:0;margin-right:0}4%,19%{opacity:1;filter:none;transform:none;max-width:24vw;margin-right:1.3vw}26%,100%{opacity:0;filter:blur(.6vw);max-width:0;margin-right:0}}
+@keyframes w2{0%,2%{opacity:0;filter:blur(.8vw);transform:translateY(1.4vw);max-width:0;margin-right:0}6%,19%{opacity:1;filter:none;transform:none;max-width:24vw;margin-right:1.3vw}26%,100%{opacity:0;filter:blur(.6vw);max-width:0;margin-right:0}}
+@keyframes w3{0%,4%{opacity:0;filter:blur(.8vw);transform:translateY(1.4vw);max-width:0;margin-right:0}8%,19%{opacity:1;filter:none;transform:none;max-width:24vw;margin-right:1.3vw}26%,100%{opacity:0;filter:blur(.6vw);max-width:0;margin-right:0}}
+@keyframes w4{0%,6%{opacity:0;filter:blur(.8vw);transform:translateY(1.4vw);max-width:0;margin-right:0}10%,19%{opacity:1;filter:none;transform:none;max-width:24vw;margin-right:1.3vw}26%,100%{opacity:0;filter:blur(.6vw);max-width:0;margin-right:0}}
+@keyframes w5{0%,8%{opacity:0;filter:blur(.8vw);transform:translateY(1.4vw);max-width:0;margin-right:0}12%,19%{opacity:1;filter:none;transform:none;max-width:24vw;margin-right:1.3vw}26%,100%{opacity:0;filter:blur(.6vw);max-width:0;margin-right:0}}
+.stage{position:absolute;inset:0;perspective:120vw}
+.tilt{position:absolute;inset:0;transform-style:preserve-3d;animation-name:tl;animation-timing-function:cubic-bezier(.45,.05,.15,1)}
+@keyframes tl{0%,40%{transform:none}52%,74%{transform:rotateX(9deg) rotateY(-12deg) translateZ(-2vw)}84%,100%{transform:none}}
+/* the container: caret → pill → card → pill → caret */
+.box{position:relative;flex:none;border-radius:2.4vw;overflow:hidden;animation-name:bx;animation-timing-function:cubic-bezier(.4,0,.1,1)}
+@keyframes bx{
+ 0%,12%{width:.35vw;height:4vw;border-radius:.2vw;background:var(--ink);box-shadow:none}
+ 16%,22%{width:10vw;height:5.4vw;border-radius:3vw;background:var(--accent);box-shadow:none}
+ 32%,80%{width:46vw;height:27vw;border-radius:2.4vw;background:var(--surface);box-shadow:0 3vw 6vw color-mix(in srgb,var(--ink) 12%,transparent),0 0 0 .12vw color-mix(in srgb,var(--ink) 8%,transparent)}
+ 90%{width:10vw;height:5.4vw;border-radius:3vw;background:var(--accent);box-shadow:none}
+ 96%,100%{width:.35vw;height:4vw;border-radius:.2vw;background:var(--ink);box-shadow:none}}
+.key{position:absolute;inset:0;display:grid;place-items:center;color:var(--surface);font-weight:600;font-size:3.6vw;letter-spacing:-.03em;animation-name:ky}
+@keyframes ky{0%,15%{opacity:0}17%,22%{opacity:1}26%,100%{opacity:0}}
+.in{position:absolute;left:0;top:0;width:46vw;height:27vw;padding:3vw;animation-name:cn}
+@keyframes cn{0%,28%{opacity:0}34%,78%{opacity:1}84%,100%{opacity:0}}
+.in small{font:500 1.5vw var(--text);color:var(--muted)}
+.in b{display:block;font-weight:600;font-size:8.4vw;letter-spacing:-.045em;margin-top:1.2vw;line-height:1}
+.share{position:absolute;right:3vw;top:2.6vw;background:var(--ink);color:var(--surface);font:600 1.3vw var(--text);padding:.7vw 1.6vw;border-radius:9vw;animation-name:pr}
+@keyframes pr{0%,61%{transform:scale(1)}63%{transform:scale(.94)}65%{transform:scale(1.02)}67%,100%{transform:scale(1)}}
+.chart{position:absolute;left:3vw;right:3vw;bottom:2.6vw;height:6vw}
+.chart path{stroke:var(--accent);stroke-width:.5vw;fill:none;stroke-linecap:round;stroke-dasharray:100;animation:dw var(--T) cubic-bezier(.22,1,.36,1) infinite both;animation-delay:calc(-1 * var(--rest, 0s))}
+@keyframes dw{0%,32%{stroke-dashoffset:100}52%,100%{stroke-dashoffset:0}}
+.sat{position:absolute;width:17vw;height:9vw;border-radius:1.8vw;background:color-mix(in srgb,var(--surface) 85%,transparent);box-shadow:0 2vw 4vw color-mix(in srgb,var(--ink) 10%,transparent),0 0 0 .12vw color-mix(in srgb,var(--ink) 7%,transparent);padding:1.6vw}
+.sat small{font:400 1.2vw var(--text);color:var(--muted)}.sat b{display:block;font-weight:600;font-size:3.6vw;letter-spacing:-.03em}
+.s1{left:8vw;top:8vw;animation-name:s1;animation-timing-function:cubic-bezier(.22,1,.36,1)}.s2{right:7vw;top:32vw;animation-name:s2;animation-timing-function:cubic-bezier(.22,1,.36,1)}
+@keyframes s1{0%,44%{opacity:0;transform:translate3d(-4vw,0,0)}52%,72%{opacity:1;transform:translate3d(0,0,6vw)}78%,100%{opacity:0;transform:translate3d(-3vw,0,0)}}
+@keyframes s2{0%,47%{opacity:0;transform:translate3d(4vw,0,0)}55%,72%{opacity:1;transform:translate3d(0,0,10vw)}78%,100%{opacity:0;transform:translate3d(3vw,0,0)}}
+.cur{position:absolute;width:3vw;height:3vw;animation-name:cu;animation-timing-function:cubic-bezier(.65,0,.35,1)}
+.cur path{fill:var(--ink);stroke:var(--surface);stroke-width:1.4}
+@keyframes cu{0%,50%{opacity:0;left:62vw;top:44vw}53%{opacity:1;left:62vw;top:44vw}61%{left:66.5vw;top:17.5vw;transform:scale(1)}63%{transform:scale(.88)}66%,70%{opacity:1;left:66.5vw;top:17.5vw;transform:scale(1)}74%,100%{opacity:0;left:66vw;top:22vw}}
+.toast{position:absolute;left:34vw;top:41vw;display:flex;gap:1.2vw;align-items:center;background:var(--surface);border-radius:1.6vw;padding:1.1vw 1.8vw;box-shadow:0 1.6vw 3vw color-mix(in srgb,var(--ink) 12%,transparent);font:600 1.4vw var(--text);animation-name:to;animation-timing-function:cubic-bezier(.34,1.4,.64,1)}
+.toast i{width:2.4vw;height:2.4vw;border-radius:50%;background:var(--accent);display:grid;place-items:center;color:var(--surface);font-style:normal;font-size:1.4vw}
+@keyframes to{0%,63%{opacity:0;transform:translate3d(0,3vw,12vw)}67%,73%{opacity:1;transform:translate3d(0,0,12vw)}78%,100%{opacity:0;transform:translate3d(0,1vw,12vw)}}
+.glow{position:absolute;left:10vw;right:10vw;bottom:-30vw;height:44vw;border-radius:50%;background:radial-gradient(closest-side,color-mix(in srgb,var(--accent) 45%,transparent),transparent);filter:blur(3vw);animation-name:gw}
+@keyframes gw{0%,58%{opacity:0;transform:translateY(8vw)}66%,74%{opacity:1;transform:none}84%,100%{opacity:0;transform:translateY(6vw)}}
+</style>
+<div class="s" style="--rest:3.84s"><div class="glow"></div>
+<div class="stage"><div class="tilt">
+<div class="sat s1"><small>Design</small><b>98%</b></div>
+<div class="line"><span>Everything</span><span>your</span><span>team</span><span>ships,</span><span>in one</span><div class="box"><div class="key">view.</div><div class="in"><small>Shipped this quarter</small><span class="share">Share</span><b>12,480</b>
+<svg class="chart" viewBox="0 0 100 20" preserveAspectRatio="none"><path pathLength="100" d="M0 18 C 12 16, 20 8, 32 11 S 52 4, 62 7 S 84 0, 100 2"/></svg></div></div></div>
+<div class="sat s2"><small>Reviews</small><b>1.2k</b></div>
+<div class="toast"><i>✓</i>Shared with the team</div>
+</div></div>
+<svg class="cur" viewBox="0 0 24 24"><path d="M4 2 L4 20 L9 15 L12.5 22 L15.5 20.6 L12 14 L19 14 Z"/></svg></div>

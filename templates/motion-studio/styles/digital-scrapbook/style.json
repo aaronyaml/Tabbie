@@ -1,0 +1,564 @@
+{
+  "schema": "motion.style/2",
+  "id": "digital-scrapbook",
+  "number": "07",
+  "name": "Digital Scrapbook",
+  "tagline": "An archive of a life, popping in on twos.",
+  "description": "Personal, nostalgic manifesto film: soft grey paper with a breathing vignette, huge tight grotesk cropped over dashed guides, captions typed word by word with a block cursor, 8-bit pixel keepsakes orbiting and popping in with spark bursts and ink puffs on twos, a cyan lens flare sweeping from the edge, red ballpoint scribbles, red flash frames and thermal-camera silhouettes.",
+  "family": "extended",
+  "mood": [
+    "personal",
+    "nostalgic",
+    "curious",
+    "playful",
+    "a little chaotic"
+  ],
+  "bestFor": [
+    "creator and personal brands",
+    "manifestos and channel intros",
+    "culture, music and gaming",
+    "archives, journaling and memory apps",
+    "Gen-Z social campaigns"
+  ],
+  "avoidFor": [
+    "corporate finance and B2B",
+    "luxury and premium product reveals",
+    "safety-critical or medical messaging"
+  ],
+  "references": [
+    "ref7"
+  ],
+  "palette": {
+    "bg": "#E7E6E8",
+    "surface": "#F2F1F3",
+    "ink": "#0B0B0C",
+    "muted": "#6E6D72",
+    "hair": "rgba(11,11,12,0.45)",
+    "accent": "#E4312B",
+    "accent2": "#1FA4FF",
+    "night": "#0B0B0C",
+    "spark": "#FF7A1A",
+    "coin": "#F4C21B",
+    "heat1": "#8C0D12",
+    "heat2": "#FF5A0F",
+    "heat3": "#FFC22E",
+    "swatches": [
+      "#E7E6E8",
+      "#0B0B0C",
+      "#E4312B",
+      "#1FA4FF",
+      "#FF5A0F"
+    ]
+  },
+  "type": {
+    "display": {
+      "family": "Bricolage Grotesque",
+      "google": "BricolageGrotesque",
+      "weights": [
+        "700",
+        "800"
+      ],
+      "case": "lower",
+      "tracking": -0.06,
+      "fallback": "\"Helvetica Neue\", Arial, sans-serif"
+    },
+    "text": {
+      "family": "Manrope",
+      "google": "Manrope",
+      "weights": [
+        "700",
+        "800"
+      ],
+      "case": "lower",
+      "tracking": -0.03,
+      "fallback": "system-ui, sans-serif"
+    },
+    "mono": {
+      "family": "Silkscreen",
+      "google": "Silkscreen",
+      "weights": [
+        "400"
+      ],
+      "case": "upper",
+      "tracking": 0.02
+    }
+  },
+  "motion": {
+    "step": 2,
+    "durations": {
+      "instant": 2,
+      "fast": 4,
+      "standard": 8,
+      "slow": 14,
+      "cinematic": 28
+    },
+    "ease": {
+      "enter": [
+        0.12,
+        0.9,
+        0.25,
+        1.15
+      ],
+      "exit": [
+        0.6,
+        0,
+        0.9,
+        0.3
+      ],
+      "move": [
+        0.5,
+        0,
+        0.3,
+        1
+      ],
+      "camera": [
+        0.4,
+        0,
+        0.2,
+        1
+      ],
+      "morph": "steps:4"
+    },
+    "springs": {
+      "pop": {
+        "damping": 9,
+        "stiffness": 320,
+        "mass": 0.6
+      },
+      "drift": {
+        "damping": 14,
+        "stiffness": 60,
+        "mass": 1
+      },
+      "type": {
+        "damping": 18,
+        "stiffness": 420,
+        "mass": 0.5
+      }
+    },
+    "blur": "smear"
+  },
+  "transitions": {
+    "signature": [
+      "pop-in on twos: an object appears with an orange spark burst or a black ink puff, overshooting in 2-frame steps",
+      "a cyan four-point lens flare sweeps in from the frame edge and whites out into the next scene",
+      "red flash frame with a white zig-zag scribble burst (2–4 frames) as a hard cut",
+      "exposure ramp: a dark silhouette heats up through a black→red→orange→yellow gradient map"
+    ],
+    "use": [
+      "object",
+      "match",
+      "matte",
+      "push",
+      "zoom"
+    ],
+    "avoid": [
+      "smooth corporate easing",
+      "crossfades",
+      "glossy 3D",
+      "clean vector icons instead of pixel or hand-drawn ones"
+    ],
+    "overlapFrames": [
+      0,
+      4
+    ]
+  },
+  "camera": "A flat scrapbook page: no camera moves beyond small drifts and focus pulls (objects blur in and out of depth); energy comes from cuts, pops and doodles.",
+  "texture": {
+    "grain": 0.08,
+    "paper": true,
+    "notes": "Soft grey paper, a heavy vignette that breathes, film grain, ballpoint ink, pixel-art with hard black outlines, thermal imagery, smear frames."
+  },
+  "lighting": "Flat paper light under a dark vignette; black scenes lit only by thermal colour and lens flare.",
+  "sound": "Lo-fi: tape hiss, typewriter/keyboard clicks for each typed word, 8-bit blips on each pop, a camera-flash zap on the red frame, a soft synth pad under the thermal shot.",
+  "preview": {
+    "frames": 150,
+    "thumbFrame": 80,
+    "beats": [
+      {
+        "from": 0,
+        "to": 18,
+        "beat": "opening",
+        "label": "'what do' huge over dashed guides"
+      },
+      {
+        "from": 18,
+        "to": 54,
+        "beat": "transformation",
+        "label": "Caption types; a cyan flare sweeps and whites out"
+      },
+      {
+        "from": 54,
+        "to": 90,
+        "beat": "transition",
+        "label": "Keepsakes pop into the ring on twos; red flash frame"
+      },
+      {
+        "from": 90,
+        "to": 150,
+        "beat": "resolution",
+        "label": "Heat portrait, the pen circles a letter, 'what do' pops back"
+      }
+    ]
+  },
+  "motionSummary": "Moves like a hand-animated diary on twos: words type behind a block cursor, keepsakes pop in with spark bursts, a cyan flare whites out the page, a red flash frame cuts, a silhouette heats up, and the pen circles what matters.",
+  "visual": {
+    "composition": [
+      "a flat paper page under a breathing vignette; black pages for the inner world",
+      "huge cropped lowercase type over dashed guides that bleed off both edges",
+      "keepsakes in a loose orbiting ring with depth of field, never a tidy grid",
+      "doodles on top: red ballpoint circles, zig-zags, a pixel-font handle in a corner"
+    ],
+    "shapeLanguage": "hard-outlined 8-bit sprites (crisp pixels), wobbly ballpoint strokes, four-point flare stars, jagged scribble bursts, a solid block cursor",
+    "contrast": "soft grey paper and near-black with spot colours that each mean one thing: red = pen and flash, cyan = flare, orange = sparks, the heat map only on black"
+  },
+  "grammar": {
+    "pacing": "fast scene changes (≈8 per 10 s, scenes 15–35 frames) but each scene is internally animated; flash frames 2–4 frames; short holds that are never dead",
+    "rhythm": "stepped, on twos (motion.step 2): every drawn thing changes every 2nd frame; typing per word on 3–5-frame steps; cursor blinks on 8-frame cycles",
+    "easing": "pops overshoot in discrete steps (0.55 → 1.3 → 0.9 → 1.0 over 6 frames); ease.enter overshoots by design; morphs are steps:4; nothing glides",
+    "acceleration": "snappy and hand-made: objects arrive in one step, wobble twice and stop; drifts are slow and on twos; smear frames replace motion blur",
+    "movement": [
+      "word-by-word typing behind a block cursor",
+      "pop-in with spark burst or ink puff, staggered 3 frames",
+      "orbiting ring with focus falloff",
+      "flare sweeping from the frame edge",
+      "exposure ramp into a heat map",
+      "ballpoint strokes drawing on with a wobble"
+    ],
+    "density": "busy but readable: one hero action per scene (typing, popping, sweeping) with 1–2 ambient wobbles (vignette, cursor, ring)",
+    "holds": "short (10–20 frames); held frames keep a cursor blinking, a ring turning or a vignette breathing"
+  },
+  "transitionPresets": [
+    {
+      "id": "typed-carry",
+      "name": "Typed carry",
+      "kind": "typographic",
+      "bridge": "the sentence being typed",
+      "build": "a caption keeps typing across a hard cut; the cursor jumps to the new scene and the next word lands there",
+      "frames": [
+        4,
+        12
+      ],
+      "ease": "move",
+      "overlap": 4,
+      "sound": "the keyboard click continues straight through the cut"
+    },
+    {
+      "id": "flare-sweep",
+      "name": "Flare sweep",
+      "kind": "wipe",
+      "bridge": "a cyan four-point lens flare",
+      "build": "the flare enters from the frame edge, sweeps across while growing, blooms and whites out the page; the next scene is there when the white drops (light-matte wipe)",
+      "frames": [
+        12,
+        16
+      ],
+      "ease": "camera",
+      "overlap": 2,
+      "sound": "a tape-warble whoosh that peaks at the white"
+    },
+    {
+      "id": "pop-build",
+      "name": "Pop build",
+      "kind": "destruction-rebuild",
+      "bridge": "the empty page",
+      "build": "the next scene is built object by object: each pops in on twos with an orange spark burst or a black ink puff, staggered 3 frames",
+      "frames": [
+        12,
+        30
+      ],
+      "ease": "enter",
+      "overlap": 0,
+      "sound": "an 8-bit blip per pop, pitch rising"
+    },
+    {
+      "id": "flash-frame",
+      "name": "Red flash frame",
+      "kind": "flash",
+      "bridge": "nothing: a hard cut with an exclamation mark",
+      "build": "2–4 frames of solid red with a white zig-zag scribble burst, two drawings alternating on twos, then hard cut to the next scene",
+      "frames": [
+        2,
+        4
+      ],
+      "ease": "enter",
+      "overlap": 0,
+      "sound": "a camera-flash zap"
+    },
+    {
+      "id": "heat-ramp",
+      "name": "Heat ramp",
+      "kind": "object-morph",
+      "bridge": "a silhouette on black",
+      "build": "the silhouette's luminance ramps through the gradient map black → deep red → orange → yellow until it reads as a thermal image",
+      "frames": [
+        12,
+        18
+      ],
+      "ease": "enter",
+      "overlap": 0,
+      "sound": "a warm pad swelling in"
+    },
+    {
+      "id": "sprite-match",
+      "name": "Sprite match",
+      "kind": "match-cut",
+      "bridge": "a sprite or letter with the next scene's shape",
+      "build": "hard cut from a keepsake or letter to a scene built on the same shape and colour in the same place (heart → red flash, coin → sun)",
+      "frames": [
+        0,
+        2
+      ],
+      "ease": "morph",
+      "overlap": 0,
+      "sound": "a short blip"
+    }
+  ],
+  "archetypes": [
+    {
+      "id": "big-word",
+      "name": "Cropped manifesto word",
+      "purpose": "hook with a half-question",
+      "composition": "two huge lowercase words ('what do') cropped off the right edge over two dashed guides, the last letters greyed",
+      "elements": "display type, dashed guides, the handle",
+      "motion": "letters pop in on twos; the guides crawl; the word drifts left",
+      "camera": "flat page, slow drift",
+      "frames": [
+        16,
+        30
+      ],
+      "enter": "pop-build",
+      "exit": "typed-carry"
+    },
+    {
+      "id": "typed-caption",
+      "name": "Typed thought",
+      "purpose": "say the thought, word by word",
+      "composition": "one small bold lowercase sentence on paper, left-aligned, a block cursor at its end; the vignette tightens while it types",
+      "elements": "caption, cursor, vignette",
+      "motion": "words land on 3–5-frame steps, cursor blinks on 8-frame cycles",
+      "camera": "locked",
+      "frames": [
+        24,
+        40
+      ],
+      "enter": "typed-carry",
+      "exit": "flare-sweep"
+    },
+    {
+      "id": "keepsake-ring",
+      "name": "Keepsake ring",
+      "purpose": "show what was kept",
+      "composition": "6–8 pixel sprites in a loose orbiting ring, front ones sharp, back ones blurred; a typed caption below",
+      "elements": "sprites, spark bursts and ink puffs, caption",
+      "motion": "pops staggered 3 frames, ring turns slowly on twos",
+      "camera": "flat, focus falloff toward the back",
+      "frames": [
+        24,
+        36
+      ],
+      "enter": "flare-sweep",
+      "exit": "flash-frame"
+    },
+    {
+      "id": "heat-portrait",
+      "name": "Heat portrait",
+      "purpose": "the inner, human beat",
+      "composition": "a profile silhouette on black heating up into a thermal map, a white typed caption beside it",
+      "elements": "silhouette, gradient map, white caption",
+      "motion": "exposure ramp, a slow drift on twos",
+      "camera": "locked with a small drift",
+      "frames": [
+        20,
+        32
+      ],
+      "enter": "flash-frame",
+      "exit": "typed-carry"
+    },
+    {
+      "id": "doodle-end",
+      "name": "Doodled end card",
+      "purpose": "sign off by hand",
+      "composition": "loose letters scattered and drifting, a red ballpoint loop circling one, the handle; or the big word back",
+      "elements": "letters, pen strokes, handle",
+      "motion": "letters drift and rotate on twos, the pen draws with a wobble",
+      "camera": "flat page",
+      "frames": [
+        24,
+        48
+      ],
+      "enter": "typed-carry",
+      "exit": null
+    }
+  ],
+  "sequence": {
+    "beats": [
+      {
+        "id": "hook",
+        "share": 0.12,
+        "purpose": "a half-question, huge",
+        "archetypes": [
+          "big-word"
+        ],
+        "motion": "the word pops in letter by letter over crawling guides",
+        "transitionOut": "typed-carry"
+      },
+      {
+        "id": "thought",
+        "share": 0.22,
+        "purpose": "the full thought",
+        "archetypes": [
+          "typed-caption"
+        ],
+        "motion": "the caption types word by word; the vignette closes in",
+        "transitionOut": "flare-sweep"
+      },
+      {
+        "id": "archive",
+        "share": 0.24,
+        "purpose": "the things kept",
+        "archetypes": [
+          "keepsake-ring"
+        ],
+        "motion": "keepsakes pop into the ring with bursts; it turns; caption types",
+        "transitionOut": "flash-frame"
+      },
+      {
+        "id": "inner",
+        "share": 0.2,
+        "purpose": "the person behind it",
+        "archetypes": [
+          "heat-portrait"
+        ],
+        "motion": "red flash, then the silhouette heats up; white caption",
+        "transitionOut": "typed-carry"
+      },
+      {
+        "id": "sign-off",
+        "share": 0.22,
+        "purpose": "close by hand",
+        "archetypes": [
+          "doodle-end",
+          "big-word"
+        ],
+        "motion": "letters drift, the pen circles one, the handle; the big word may pop back to loop",
+        "transitionOut": null
+      }
+    ],
+    "cutRhythm": "fast: ≈8 cuts per 10 s, scenes 15–35 frames, cuts land on clicks and snares; flash frames 2–4 frames; inside every scene the drawing runs on twos",
+    "lengthRange": [
+      10,
+      30
+    ]
+  },
+  "exampleSequence": {
+    "title": "15 s manifesto intro",
+    "durationFrames": 450,
+    "scenes": [
+      {
+        "n": 1,
+        "archetype": "big-word",
+        "beat": "hook",
+        "frames": [
+          0,
+          54
+        ],
+        "action": "'what do' pops in letter by letter over crawling dashed guides; the last letters grey and cropped",
+        "transitionOut": "typed-carry"
+      },
+      {
+        "n": 2,
+        "archetype": "typed-caption",
+        "beat": "hook",
+        "frames": [
+          54,
+          150
+        ],
+        "action": "'what do you keep when everything changes?' types word by word, the vignette tightens",
+        "transitionOut": "flare-sweep"
+      },
+      {
+        "n": 3,
+        "archetype": "keepsake-ring",
+        "beat": "archive",
+        "frames": [
+          150,
+          258
+        ],
+        "action": "coin, heart, cassette, plant, pad, floppy, star, camera pop in with sparks and ink puffs; 'the small things.'",
+        "transitionOut": "flash-frame"
+      },
+      {
+        "n": 4,
+        "archetype": "heat-portrait",
+        "beat": "inner",
+        "frames": [
+          258,
+          348
+        ],
+        "action": "3 red frames with a white zig-zag; a profile heats up into a thermal map; 'you keep them.'",
+        "transitionOut": "typed-carry"
+      },
+      {
+        "n": 5,
+        "archetype": "doodle-end",
+        "beat": "sign-off",
+        "frames": [
+          348,
+          450
+        ],
+        "action": "k-e-p-t drift loose, a red ballpoint loop circles the k, @lost.and.kept; hold on the blinking cursor",
+        "transitionOut": null
+      }
+    ]
+  },
+  "elements": {
+    "text": "display words pop in letter by letter (stepped overshoot); captions type word by word with a block cursor and can continue across cuts; nothing fades in",
+    "logo": "a handle or pixel mark that pops in with a burst and then sits in a corner; on the end card it is doodled around",
+    "icons": "original 8-bit sprites with hard black outlines only; never vector or emoji icons",
+    "images": "rare: a silhouette or photo treated as thermal, posterised or grainy; enters by heat ramp or flash cut",
+    "ui": "none, or a tiny pixel-font label",
+    "shapes": "ballpoint loops and zig-zags that draw on with a wobble; flare stars; scribble bursts; dashed guide lines that crawl",
+    "background": "grey paper with a breathing vignette; black for inner scenes; red for one flash frame",
+    "particles": "spark bursts (orange lines) and ink puffs (black blobs) on pops, 4–8 frames, on twos"
+  },
+  "audio": {
+    "drive": [
+      "syncopated",
+      "lo-fi",
+      "foley-driven"
+    ],
+    "sync": "typed words on keyboard clicks, pops on 8-bit blips locked to off-beats, the flash frame on a snare or zap, the flare on a tape whoosh; scenes cut on clicks",
+    "sfx": "tape hiss, keyboard clicks, 8-bit blips, a camera-flash zap, a tape-warble whoosh, a warm pad under the thermal shot"
+  },
+  "live": {
+    "seconds": 6,
+    "rest": 0.48,
+    "beats": [
+      {
+        "at": 0,
+        "label": "'what do' over dashed guides"
+      },
+      {
+        "at": 0.1,
+        "label": "Caption types, cursor blinks"
+      },
+      {
+        "at": 0.27,
+        "label": "Cyan flare sweeps, whites out"
+      },
+      {
+        "at": 0.34,
+        "label": "Keepsakes pop in on twos"
+      },
+      {
+        "at": 0.58,
+        "label": "Red flash, heat portrait"
+      },
+      {
+        "at": 0.84,
+        "label": "Pen circles, the word pops back"
+      }
+    ]
+  }
+}

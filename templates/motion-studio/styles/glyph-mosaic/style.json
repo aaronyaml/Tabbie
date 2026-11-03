@@ -1,0 +1,528 @@
+{
+  "schema": "motion.style/2",
+  "id": "glyph-mosaic",
+  "number": "09",
+  "name": "Glyph Mosaic",
+  "tagline": "Everything is made of tiny printed glyphs: they swarm, re-resolve and spiral into new forms.",
+  "description": "A generative print system in motion: images, marks and words are built from a grid of small CMYK glyph tiles (rings, crosses, dots, pixel diamonds) on warm paper. The mosaic re-resolves between coarse and fine, glyphs re-pattern in waves, the field swirls into a radial vortex around a silhouette and the camera zooms through a single glyph into the next form. One continuous shot, no cuts.",
+  "family": "extended",
+  "mood": [
+    "playful",
+    "intelligent",
+    "generative",
+    "crafted",
+    "hypnotic"
+  ],
+  "bestFor": [
+    "AI, data and generative products",
+    "design tools and creative software",
+    "brand identities built on a mark or monogram",
+    "music, culture and festival visuals",
+    "tech launches that want warmth, not neon"
+  ],
+  "avoidFor": [
+    "serious finance, legal or medical",
+    "photo-led lifestyle and food",
+    "fast hard-sell retail"
+  ],
+  "references": [
+    "references/snapgram-ref-2.mp4"
+  ],
+  "palette": {
+    "bg": "#F3F0E6",
+    "surface": "#FBF9F3",
+    "ink": "#151515",
+    "muted": "#9A978C",
+    "hair": "rgba(21,21,21,0.12)",
+    "accent": "#E2187F",
+    "accent2": "#21B4D6",
+    "accent3": "#F2DE1B",
+    "accent4": "#26B86A",
+    "night": "#151515",
+    "paper": "#F3F0E6",
+    "swatches": [
+      "#F3F0E6",
+      "#E2187F",
+      "#21B4D6",
+      "#F2DE1B",
+      "#151515"
+    ]
+  },
+  "type": {
+    "display": {
+      "family": "Space Grotesk",
+      "google": "SpaceGrotesk",
+      "weights": [
+        "500",
+        "700"
+      ],
+      "case": "sentence",
+      "tracking": -0.03,
+      "fallback": "\"Helvetica Neue\", Arial, sans-serif"
+    },
+    "text": {
+      "family": "Space Mono",
+      "google": "SpaceMono",
+      "weights": [
+        "400",
+        "700"
+      ],
+      "case": "lower",
+      "tracking": 0.02,
+      "fallback": "ui-monospace, Menlo, monospace"
+    }
+  },
+  "motion": {
+    "step": 1,
+    "durations": {
+      "instant": 2,
+      "fast": 6,
+      "standard": 12,
+      "slow": 24,
+      "cinematic": 45
+    },
+    "ease": {
+      "enter": [
+        0.22,
+        1,
+        0.36,
+        1
+      ],
+      "exit": [
+        0.64,
+        0,
+        0.78,
+        0
+      ],
+      "move": [
+        0.65,
+        0,
+        0.35,
+        1
+      ],
+      "camera": [
+        0.7,
+        0,
+        0.3,
+        1
+      ],
+      "morph": [
+        0.45,
+        0,
+        0.55,
+        1
+      ]
+    },
+    "springs": {
+      "glyph": {
+        "damping": 14,
+        "stiffness": 180,
+        "mass": 0.6
+      }
+    },
+    "blur": "none"
+  },
+  "transitions": {
+    "signature": [
+      "re-resolve: the mosaic regrids coarse ↔ fine and the silhouette becomes a new shape, every glyph easing to its new cell",
+      "vortex bloom: the field around the form spirals outward into concentric rings and folds back in",
+      "glyph zoom: the camera pushes into one glyph until it fills the frame, its parts become the next mosaic"
+    ],
+    "use": [
+      "morph",
+      "zoom",
+      "object",
+      "match"
+    ],
+    "avoid": [
+      "hard cuts",
+      "photography",
+      "drop shadows and gradients",
+      "heavy text blocks",
+      "motion blur"
+    ],
+    "overlapFrames": [
+      6,
+      18
+    ]
+  },
+  "camera": "Mostly locked off and flat. The only camera move is a slow scale: the field breathes in and out, and a seamless push into a single glyph (scale 1 → 20+) carries one form into the next.",
+  "texture": {
+    "grain": 0.06,
+    "paper": true,
+    "notes": "Warm off-white paper with fine grain. Glyphs are flat process colours printed with multiply and a hair of misregistration (1–2 px offset of a cyan or magenta ring), so overlaps mix like ink."
+  },
+  "lighting": "None. Flat ink on paper; depth comes only from glyph size and density.",
+  "sound": "Continuous and textural: a soft pulsing synth bed with granular ticks and chimes as glyphs flip; ripples and blooms ride swells rather than hits; no hard drops.",
+  "preview": {
+    "frames": 150,
+    "thumbFrame": 62,
+    "beats": [
+      {
+        "from": 0,
+        "to": 30,
+        "beat": "opening",
+        "label": "Glyph monogram, fine grid"
+      },
+      {
+        "from": 30,
+        "to": 70,
+        "beat": "transformation",
+        "label": "Re-resolves into a bust, vortex blooms"
+      },
+      {
+        "from": 70,
+        "to": 112,
+        "beat": "transition",
+        "label": "Push into one glyph, it splits in four"
+      },
+      {
+        "from": 112,
+        "to": 150,
+        "beat": "resolution",
+        "label": "Glyphs regrid back to the monogram"
+      }
+    ]
+  },
+  "motionSummary": "Moves like a living print: thousands of tiny glyphs re-pattern in waves, re-resolve into new shapes, spiral into a vortex and carry you through a single glyph into the next form.",
+  "visual": {
+    "composition": [
+      "one centred form (a mark, a silhouette, a word) made of glyph tiles on a lot of empty paper",
+      "or a full-bleed field of glyph rings radiating around a negative-space silhouette",
+      "scale contrast: tiny dense glyphs at the core, big sparse glyphs at the edge"
+    ],
+    "shapeLanguage": "a small kit of geometric glyphs on a grid: rings, dotted rings, plus and x crosses, 4- and 8-dot clusters, pixel diamonds, pie and fan segments; all round-ended and flat",
+    "contrast": "low-key paper with bright process colours (magenta, cyan, yellow, green) and black; colour clusters by region (cyan floor, magenta face, yellow edge light) like a halftone separation"
+  },
+  "grammar": {
+    "pacing": "continuous and fluid: one long transformation after another, 1–3 s each, with short 10–20 f holds where the form reads",
+    "rhythm": "wave-driven: changes ripple across the grid from a point (centre or an edge) with a per-glyph stagger of 0.5–2 f, so the whole field shimmers",
+    "easing": "smooth in-out for regrids and camera ([0.65,0,0.35,1]); soft spring for single glyphs popping or flipping; never linear, never bouncy on the whole field",
+    "acceleration": "slow start, long glide, soft landing; the vortex accelerates outward then decelerates as it settles",
+    "movement": [
+      "re-resolve: the grid pitch changes (coarse ↔ fine) and each glyph eases to its new cell",
+      "glyph flip: a tile swaps to another glyph in a wave",
+      "radial vortex: the field rotates and expands in concentric rings around the form",
+      "seamless push into a single glyph",
+      "breathing scale of the whole field (±4 %)",
+      "colour wave: process colours travel across the mosaic"
+    ],
+    "density": "high inside forms, near zero outside; the frame's emptiness is part of the look",
+    "holds": "short (10–20 f) at each readable form, never dead: glyphs keep flickering subtly"
+  },
+  "transitionPresets": [
+    {
+      "id": "re-resolve",
+      "name": "Re-resolve",
+      "kind": "object-morph",
+      "bridge": "the glyph grid itself",
+      "build": "sample the next shape on the same grid; glyphs inside both shapes ease to their new cell (12–24 f, ease.morph), glyphs only in the old shape shrink to 0, new ones grow from 0, with a 0.5–1 f stagger by distance from the centre",
+      "frames": [
+        14,
+        30
+      ],
+      "ease": "morph",
+      "overlap": 10,
+      "sound": "a granular shimmer that rises and settles"
+    },
+    {
+      "id": "vortex-bloom",
+      "name": "Vortex bloom",
+      "kind": "seamless-zoom",
+      "bridge": "concentric rings around the form",
+      "build": "glyphs are laid on polar rings around the silhouette; the rings scale out from 0.2 to fill the frame while rotating 30–60°, outer rings larger and sparser; to close, reverse it and the rings fold back into the form",
+      "frames": [
+        24,
+        45
+      ],
+      "ease": "camera",
+      "overlap": 12,
+      "sound": "a soft swell with a rising chime"
+    },
+    {
+      "id": "glyph-zoom",
+      "name": "Glyph zoom",
+      "kind": "seamless-zoom",
+      "bridge": "one glyph",
+      "build": "pick one glyph at the form's focal point; scale the whole field up around it (×1 → ×25, ease.camera) until that glyph fills the frame; its parts (dots, arms, ring) separate into a small set that becomes the next composition",
+      "frames": [
+        20,
+        36
+      ],
+      "ease": "camera",
+      "overlap": 8,
+      "sound": "a whoosh that closes into a single bell tone"
+    },
+    {
+      "id": "glyph-wave",
+      "name": "Glyph wave",
+      "kind": "rhythmic-cut",
+      "bridge": "the tiles in place",
+      "build": "every glyph flips to a different glyph or colour in a wave from one edge or from the centre, 1 f stagger per cell, each flip a 4 f scale-down/scale-up",
+      "frames": [
+        10,
+        20
+      ],
+      "ease": "enter",
+      "overlap": 0,
+      "sound": "a run of tiny ticks like rain on glass"
+    },
+    {
+      "id": "split-scatter",
+      "name": "Split and scatter",
+      "kind": "motion-continuity",
+      "bridge": "a glyph's parts",
+      "build": "a single large glyph splits into 4–8 parts that slide apart on the grid (12 f) and each becomes a new glyph group; reversed, groups gather into one",
+      "frames": [
+        12,
+        24
+      ],
+      "ease": "move",
+      "overlap": 4,
+      "sound": "a soft pluck per part"
+    }
+  ],
+  "archetypes": [
+    {
+      "id": "glyph-mark",
+      "name": "Glyph mark",
+      "purpose": "the brand mark, monogram or word built from glyphs",
+      "composition": "one centred form, 30–45 % of the frame height, on empty paper; colours by region",
+      "elements": "the mark sampled onto a fine glyph grid, a small mono caption below",
+      "motion": "glyphs pop in on a centre-out wave, then shimmer; a caption types on",
+      "camera": "locked, slow breathing scale",
+      "frames": [
+        30,
+        75
+      ],
+      "enter": "re-resolve",
+      "exit": "re-resolve"
+    },
+    {
+      "id": "glyph-portrait",
+      "name": "Glyph portrait",
+      "purpose": "a person, a product or an object as a mosaic",
+      "composition": "a centred silhouette (bust, device, object) in glyph tiles; tones by glyph density, colour by region",
+      "elements": "silhouette sampled from an image or SVG, 600–2,500 glyphs",
+      "motion": "regrids from coarse to fine as it resolves; colour waves pass across it",
+      "camera": "locked, ±4 % breathing",
+      "frames": [
+        30,
+        60
+      ],
+      "enter": "re-resolve",
+      "exit": "vortex-bloom"
+    },
+    {
+      "id": "vortex-field",
+      "name": "Vortex field",
+      "purpose": "the big, immersive moment: energy, scale, many things at once",
+      "composition": "a full-bleed field of concentric glyph rings around a negative-space silhouette at the centre; glyphs grow toward the edge",
+      "elements": "polar rings of glyphs, a white silhouette cut-out, colour bands (cyan floor, magenta, yellow edge)",
+      "motion": "the rings rotate slowly, ripples travel outward, glyphs flip in waves",
+      "camera": "slow push or pull",
+      "frames": [
+        45,
+        120
+      ],
+      "enter": "vortex-bloom",
+      "exit": "vortex-bloom"
+    },
+    {
+      "id": "glyph-hero",
+      "name": "Glyph hero",
+      "purpose": "one idea in one big symbol",
+      "composition": "a single large glyph in the centre (25–35 % of the frame), or a 2 × 2 set of glyphs",
+      "elements": "one glyph at hero size with visible print overlap (magenta ring, black pixel cross, cyan dots)",
+      "motion": "rotates a quarter turn, its ring colour cycles through the process colours, parts pulse",
+      "camera": "locked",
+      "frames": [
+        20,
+        45
+      ],
+      "enter": "glyph-zoom",
+      "exit": "split-scatter"
+    },
+    {
+      "id": "glyph-caption",
+      "name": "Glyph caption",
+      "purpose": "the message and the call to action",
+      "composition": "a short word or line in the display face, or spelled in large glyph pixels, with a mono line below",
+      "elements": "display word, mono caption, a few loose glyphs as punctuation",
+      "motion": "letters assemble from glyphs on a wave; loose glyphs settle around",
+      "camera": "locked",
+      "frames": [
+        30,
+        60
+      ],
+      "enter": "re-resolve",
+      "exit": "re-resolve"
+    }
+  ],
+  "sequence": {
+    "beats": [
+      {
+        "id": "opening",
+        "share": 0.18,
+        "purpose": "the mark, small and precise",
+        "archetypes": [
+          "glyph-mark"
+        ],
+        "motion": "glyphs pop in centre-out and shimmer",
+        "transitionOut": "re-resolve"
+      },
+      {
+        "id": "development",
+        "share": 0.22,
+        "purpose": "what it is: a person, product or object",
+        "archetypes": [
+          "glyph-portrait"
+        ],
+        "motion": "the mark re-resolves into the portrait, coarse to fine",
+        "transitionOut": "vortex-bloom"
+      },
+      {
+        "id": "escalation",
+        "share": 0.25,
+        "purpose": "scale and energy",
+        "archetypes": [
+          "vortex-field"
+        ],
+        "motion": "the field blooms out to full bleed and spirals",
+        "transitionOut": "glyph-zoom"
+      },
+      {
+        "id": "reveal",
+        "share": 0.15,
+        "purpose": "the one idea",
+        "archetypes": [
+          "glyph-hero"
+        ],
+        "motion": "push into one glyph; it holds as a hero symbol",
+        "transitionOut": "split-scatter"
+      },
+      {
+        "id": "resolution",
+        "share": 0.2,
+        "purpose": "the name and the line",
+        "archetypes": [
+          "glyph-caption",
+          "glyph-mark"
+        ],
+        "motion": "glyph groups gather into the caption, then the mark",
+        "transitionOut": "re-resolve"
+      }
+    ],
+    "cutRhythm": "no cuts: one continuous shot; changes every 1–3 s carried by re-resolves, blooms and zooms; short 10–20 f holds on each readable form",
+    "lengthRange": [
+      10,
+      30
+    ]
+  },
+  "exampleSequence": {
+    "title": "15 s AI-product launch",
+    "durationFrames": 450,
+    "scenes": [
+      {
+        "n": 1,
+        "archetype": "glyph-mark",
+        "beat": "opening",
+        "frames": [
+          0,
+          75
+        ],
+        "action": "the product's monogram builds from glyphs on a centre-out wave: magenta stem, yellow edge, cyan base; a mono caption 'made of everything' types below",
+        "transitionOut": "re-resolve"
+      },
+      {
+        "n": 2,
+        "archetype": "glyph-portrait",
+        "beat": "development",
+        "frames": [
+          75,
+          165
+        ],
+        "action": "the monogram regrids into a coarse bust, then resolves fine; a colour wave passes from cyan to magenta",
+        "transitionOut": "vortex-bloom"
+      },
+      {
+        "n": 3,
+        "archetype": "vortex-field",
+        "beat": "escalation",
+        "frames": [
+          165,
+          285
+        ],
+        "action": "rings bloom out around the bust's white silhouette to full bleed; ripples run outward, glyphs flip in waves, the field turns 40°",
+        "transitionOut": "glyph-zoom"
+      },
+      {
+        "n": 4,
+        "archetype": "glyph-hero",
+        "beat": "reveal",
+        "frames": [
+          285,
+          360
+        ],
+        "action": "push into one pixel-cross glyph at the heart until it fills the frame; its ring cycles magenta → cyan → green",
+        "transitionOut": "split-scatter"
+      },
+      {
+        "n": 5,
+        "archetype": "glyph-caption",
+        "beat": "resolution",
+        "frames": [
+          360,
+          450
+        ],
+        "action": "the hero splits into four glyph groups that gather into the product name; the monogram settles beside it",
+        "transitionOut": "re-resolve"
+      }
+    ]
+  },
+  "elements": {
+    "text": "short; display face for one word or name, mono for captions; letters can be spelled in glyph pixels; type assembles from glyphs and dissolves back into them",
+    "logo": "sampled onto the glyph grid and built from tiles; at the end it may resolve to its true vector form for a beat",
+    "icons": "become hero glyphs: pure geometry in process colours, rotating and splitting",
+    "images": "never shown as photos: sampled into glyph portraits by brightness (density) and region (colour)",
+    "ui": "sparingly: a device silhouette made of glyphs, or a screen as a glyph grid with one live area",
+    "shapes": "the glyph kit only: rings, crosses, dots, pixel diamonds, segments",
+    "background": "warm paper, empty; the vortex field is the only full-bleed background",
+    "particles": "the glyphs are the particles: loose ones drift and settle, never sparks or dust"
+  },
+  "audio": {
+    "drive": [
+      "ambient",
+      "textural",
+      "swell-driven"
+    ],
+    "sync": "regrids and blooms start on a phrase and ride a swell; glyph waves follow hi-hat or granular runs; the glyph zoom lands on a bell or chord change",
+    "sfx": "granular shimmer for regrids, tiny ticks for glyph waves, soft swells and a rising chime for blooms, a single bell tone at the end of a glyph zoom"
+  },
+  "live": {
+    "seconds": 7,
+    "rest": 0.6,
+    "beats": [
+      {
+        "at": 0,
+        "label": "Glyph monogram"
+      },
+      {
+        "at": 0.18,
+        "label": "Re-resolves into a bust"
+      },
+      {
+        "at": 0.32,
+        "label": "Vortex blooms and turns"
+      },
+      {
+        "at": 0.6,
+        "label": "Zoom into one glyph"
+      },
+      {
+        "at": 0.84,
+        "label": "Splits, regrids to the monogram"
+      }
+    ]
+  }
+}

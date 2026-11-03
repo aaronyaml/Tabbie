@@ -1,0 +1,528 @@
+{
+  "schema": "motion.style/2",
+  "id": "swiss-international",
+  "number": "08",
+  "name": "Swiss International",
+  "tagline": "The grid is the story: flush-left grotesk, red, black and white on visible modules.",
+  "description": "International Typographic Style in motion: a strict modular grid shown as hairlines, huge flush-left ragged-right grotesk, objective geometry and numbers, red/black/white blocks that slide along grid lines and snap module by module, and bar wipes that fill the grid row by row or column by column.",
+  "family": "extended",
+  "mood": [
+    "rational",
+    "confident",
+    "clear",
+    "timeless"
+  ],
+  "bestFor": [
+    "architecture, design and culture institutions",
+    "events, exhibitions and posters",
+    "data and infrastructure brands",
+    "annual reports and editorial"
+  ],
+  "avoidFor": [
+    "cosy lifestyle and food brands",
+    "playful kids or gaming",
+    "luxury that needs mystery"
+  ],
+  "references": [],
+  "palette": {
+    "bg": "#F3F1EC",
+    "surface": "#FFFFFF",
+    "ink": "#111111",
+    "muted": "#8A8883",
+    "hair": "rgba(17,17,17,0.13)",
+    "accent": "#E30613",
+    "accent2": "#111111",
+    "night": "#111111",
+    "paper": "#F3F1EC",
+    "swatches": [
+      "#F3F1EC",
+      "#111111",
+      "#E30613",
+      "#8A8883",
+      "#FFFFFF"
+    ]
+  },
+  "type": {
+    "display": {
+      "family": "Archivo",
+      "google": "Archivo",
+      "weights": [
+        "500",
+        "800",
+        "900"
+      ],
+      "case": "sentence",
+      "tracking": -0.045,
+      "fallback": "\"Helvetica Neue\", Helvetica, Arial, sans-serif"
+    },
+    "text": {
+      "family": "Hanken Grotesk",
+      "google": "HankenGrotesk",
+      "weights": [
+        "400",
+        "500",
+        "700"
+      ],
+      "case": "sentence",
+      "tracking": 0,
+      "fallback": "\"Helvetica Neue\", Helvetica, Arial, sans-serif"
+    }
+  },
+  "motion": {
+    "step": 1,
+    "durations": {
+      "instant": 2,
+      "fast": 6,
+      "standard": 10,
+      "slow": 18,
+      "cinematic": 30
+    },
+    "ease": {
+      "enter": [
+        0.16,
+        1,
+        0.3,
+        1
+      ],
+      "exit": [
+        0.7,
+        0,
+        0.84,
+        0
+      ],
+      "move": [
+        0.8,
+        0,
+        0.2,
+        1
+      ],
+      "camera": [
+        0.65,
+        0,
+        0.35,
+        1
+      ],
+      "morph": "steps:6"
+    },
+    "springs": {
+      "block": {
+        "damping": 40,
+        "stiffness": 420,
+        "mass": 0.8
+      }
+    },
+    "blur": "none"
+  },
+  "transitions": {
+    "signature": [
+      "bar wipe on the grid: bars fill row by row (or column by column) with a 1–2 frame stagger, the layout changes underneath, the bars retract",
+      "modular slide: blocks move along grid lines and snap module by module to the next layout",
+      "type enters from a baseline mask, flush left on a column edge"
+    ],
+    "use": [
+      "matte",
+      "push",
+      "object",
+      "match"
+    ],
+    "avoid": [
+      "crossfades",
+      "rotation and perspective",
+      "blur, glow and texture",
+      "centred type",
+      "decorative easing with bounce"
+    ],
+    "overlapFrames": [
+      2,
+      6
+    ]
+  },
+  "camera": "No camera. The frame is the page: everything moves in its plane along the grid; at most a straight cut-in to a module that then becomes the page.",
+  "texture": {
+    "grain": 0,
+    "paper": false,
+    "notes": "Flat ink on off-white paper. The only 'texture' is the visible grid: 1 px hairlines for column and row edges, column indices in the margin."
+  },
+  "lighting": "None. Flat, objective colour; no shadows, gradients or glows.",
+  "sound": "Precise and dry: a clean tick per module step, a short filtered swipe per bar, a soft low thud when a block lands; minimal, metronomic music.",
+  "preview": {
+    "frames": 150,
+    "thumbFrame": 56,
+    "beats": [
+      {
+        "from": 0,
+        "to": 22,
+        "beat": "opening",
+        "label": "Poster: red block, Raster"
+      },
+      {
+        "from": 22,
+        "to": 66,
+        "beat": "transformation",
+        "label": "Bars fill row by row, 12 is set underneath"
+      },
+      {
+        "from": 66,
+        "to": 108,
+        "beat": "transition",
+        "label": "Blocks slide module by module into Form"
+      },
+      {
+        "from": 108,
+        "to": 150,
+        "beat": "resolution",
+        "label": "Column bars set the poster again"
+      }
+    ]
+  },
+  "motionSummary": "Moves like a page re-setting itself: bars sweep the grid row by row, the layout changes underneath, blocks slide module by module into the next poster.",
+  "visual": {
+    "composition": [
+      "a visible 12 × 6 modular grid; every element starts and ends on a column edge",
+      "asymmetric: one large colour block, one huge word or number, one small information column, many empty modules",
+      "flush left, ragged right; nothing centred"
+    ],
+    "shapeLanguage": "rectangles, squares, circles and rules sized in whole modules; 1 px hairlines; no radii except true circles",
+    "contrast": "high and flat: ink and signal red on off-white paper, large confident blocks, no shadows or gradients"
+  },
+  "grammar": {
+    "pacing": "metronomic: a move (6–20 f), then a hold (20–30 f), then the next move; one layout per bar of music",
+    "rhythm": "mechanical and quantised: positions and sizes step in whole modules; bars stagger 1–2 f per row or column",
+    "easing": "decisive in-out for moves ([0.8,0,0.2,1]), fast ease-out entries, ease-in exits; no bounce, no overshoot",
+    "acceleration": "hard acceleration and a clean stop on the module; no drift, no settle",
+    "movement": [
+      "bar wipe filling the grid row by row or column by column",
+      "blocks sliding along grid lines and snapping module by module",
+      "a circle squaring into a band module by module",
+      "type rising from a baseline mask, flush left on a column edge",
+      "numbers stepping (counts, dates, module sizes)"
+    ],
+    "density": "low and orderly: 1–2 blocks move at once; the grid stays still",
+    "holds": "every layout holds as a finished poster for 0.7–1 s before it changes"
+  },
+  "transitionPresets": [
+    {
+      "id": "bar-wipe-rows",
+      "name": "Bar wipe (rows)",
+      "kind": "wipe",
+      "bridge": "the grid's rows",
+      "build": "ink bars extend across each row left → right, 1–2 f apart, 6 f each; when every row is covered the layout is swapped underneath; the bars retract toward the right in the same order; gutters stay visible as paper lines",
+      "frames": [
+        16,
+        24
+      ],
+      "ease": "move",
+      "overlap": 4,
+      "sound": "a short filtered swipe per bar"
+    },
+    {
+      "id": "bar-wipe-cols",
+      "name": "Bar wipe (columns)",
+      "kind": "track-matte",
+      "bridge": "the grid's columns",
+      "build": "red (or ink) bars drop down each column, 1 f apart, the next layout is set under them, the bars retract downward; used to return or to change chapter",
+      "frames": [
+        16,
+        24
+      ],
+      "ease": "move",
+      "overlap": 4,
+      "sound": "a run of ticks, one per column"
+    },
+    {
+      "id": "modular-slide",
+      "name": "Modular slide",
+      "kind": "object-morph",
+      "bridge": "a block shared by both layouts",
+      "build": "the block resizes and travels along grid lines into its place in the next layout, rounded to whole modules every frame so it steps column by column; a circle squares into a band the same way",
+      "frames": [
+        16,
+        24
+      ],
+      "ease": "move",
+      "overlap": 6,
+      "sound": "a clean tick per module step, a low thud on landing"
+    },
+    {
+      "id": "module-push",
+      "name": "Module push",
+      "kind": "push-pull",
+      "bridge": "the page",
+      "build": "the whole layout pushes sideways one module-width at a time (stepped), the next page following on the same grid",
+      "frames": [
+        8,
+        16
+      ],
+      "ease": "move",
+      "overlap": 0,
+      "sound": "ticks per module"
+    },
+    {
+      "id": "number-match",
+      "name": "Number match",
+      "kind": "match-cut",
+      "bridge": "a number, rule or circle in both layouts",
+      "build": "cut where the shared element sits on the same column edge: a number becomes a module count, a rule becomes a bar, a circle becomes the next layout's dot",
+      "frames": [
+        2,
+        6
+      ],
+      "ease": "enter",
+      "overlap": 0,
+      "sound": "one tick"
+    },
+    {
+      "id": "module-zoom",
+      "name": "Module zoom",
+      "kind": "seamless-zoom",
+      "bridge": "one module",
+      "build": "a straight scale into one module until its edges leave the frame; its contents are the next page, set on the same grid (scale only, no blur)",
+      "frames": [
+        14,
+        20
+      ],
+      "ease": "camera",
+      "overlap": 4,
+      "sound": "a dry rising swipe"
+    }
+  ],
+  "archetypes": [
+    {
+      "id": "poster",
+      "name": "Poster",
+      "purpose": "state the subject as a typographic poster",
+      "composition": "a red block of whole modules, a huge flush-left word on the bottom rows, a small information column on a column edge",
+      "elements": "display word, info column (place, dates), column indices, red block",
+      "motion": "type rises from its baseline mask; the info column sets line by line",
+      "camera": "none",
+      "frames": [
+        30,
+        60
+      ],
+      "enter": "bar-wipe-cols",
+      "exit": "bar-wipe-rows"
+    },
+    {
+      "id": "number-plate",
+      "name": "Number plate",
+      "purpose": "make one fact the image",
+      "composition": "a black half-page with one geometric form (red circle), a huge number flush left in the other half, a red rule",
+      "elements": "number, unit label, circle, rule",
+      "motion": "the number rises from its baseline; the rule extends on the grid",
+      "camera": "none",
+      "frames": [
+        30,
+        60
+      ],
+      "enter": "bar-wipe-rows",
+      "exit": "modular-slide"
+    },
+    {
+      "id": "module-layout",
+      "name": "Module layout",
+      "purpose": "explain: several facts in a strict structure",
+      "composition": "blocks re-arranged into a new layout (a red band, a 4 × 2 black module), body text in ragged-right columns",
+      "elements": "band with a word, small black module with a number, 2–3 text columns",
+      "motion": "blocks step into place module by module; text columns set one after the other",
+      "camera": "none",
+      "frames": [
+        40,
+        70
+      ],
+      "enter": "modular-slide",
+      "exit": "bar-wipe-cols"
+    },
+    {
+      "id": "data-grid",
+      "name": "Data grid",
+      "purpose": "show quantities objectively",
+      "composition": "bars or squares sized in whole modules, one in red, labels flush left beneath",
+      "elements": "module bars, numerals, hairline axis",
+      "motion": "bars grow module by module in sequence; the red one last",
+      "camera": "none",
+      "frames": [
+        40,
+        70
+      ],
+      "enter": "module-push",
+      "exit": "number-match"
+    },
+    {
+      "id": "colophon",
+      "name": "Colophon",
+      "purpose": "sign off",
+      "composition": "the name flush left on a column edge, one rule, a small block of details; mostly empty modules",
+      "elements": "wordmark, rule, details",
+      "motion": "rule extends, name rises, details set; hold",
+      "camera": "none",
+      "frames": [
+        40,
+        60
+      ],
+      "enter": "bar-wipe-cols",
+      "exit": null
+    }
+  ],
+  "sequence": {
+    "beats": [
+      {
+        "id": "opening",
+        "share": 0.18,
+        "purpose": "the subject as a poster",
+        "archetypes": [
+          "poster"
+        ],
+        "motion": "type rises flush left, the red block sits on the grid",
+        "transitionOut": "bar-wipe-rows"
+      },
+      {
+        "id": "development",
+        "share": 0.22,
+        "purpose": "the key number",
+        "archetypes": [
+          "number-plate"
+        ],
+        "motion": "bars wipe, the number plate is set underneath",
+        "transitionOut": "modular-slide"
+      },
+      {
+        "id": "explanation",
+        "share": 0.25,
+        "purpose": "the facts, structured",
+        "archetypes": [
+          "module-layout",
+          "data-grid"
+        ],
+        "motion": "blocks slide module by module into new layouts",
+        "transitionOut": "module-push"
+      },
+      {
+        "id": "reveal",
+        "share": 0.15,
+        "purpose": "the one result",
+        "archetypes": [
+          "data-grid"
+        ],
+        "motion": "the red bar steps up last and holds",
+        "transitionOut": "bar-wipe-cols"
+      },
+      {
+        "id": "resolution",
+        "share": 0.2,
+        "purpose": "the name and the details",
+        "archetypes": [
+          "colophon"
+        ],
+        "motion": "a column wipe sets the colophon; hold",
+        "transitionOut": null
+      }
+    ],
+    "cutRhythm": "changes on the bar: a move, a hold, a move; wipes and slides replace cuts; straight cuts only as match cuts on a shared column edge",
+    "lengthRange": [
+      10,
+      40
+    ]
+  },
+  "exampleSequence": {
+    "title": "15 s exhibition announcement",
+    "durationFrames": 450,
+    "scenes": [
+      {
+        "n": 1,
+        "archetype": "poster",
+        "beat": "opening",
+        "frames": [
+          0,
+          90
+        ],
+        "action": "'Raster' rises flush left on the bottom rows, a red 4-module block top right, 'Ausstellung / Halle 8 / 14.3.—2.5.' sets in the info column",
+        "transitionOut": "bar-wipe-rows"
+      },
+      {
+        "n": 2,
+        "archetype": "number-plate",
+        "beat": "development",
+        "frames": [
+          90,
+          180
+        ],
+        "action": "ink bars fill the rows; under them a black half-page with a red circle and a huge '12' ('Spalten'); the bars retract",
+        "transitionOut": "modular-slide"
+      },
+      {
+        "n": 3,
+        "archetype": "module-layout",
+        "beat": "explanation",
+        "frames": [
+          180,
+          285
+        ],
+        "action": "the circle squares into a red band carrying 'Form', the black half shrinks to a 4 × 2 module with '08', body text sets in three columns",
+        "transitionOut": "module-push"
+      },
+      {
+        "n": 4,
+        "archetype": "data-grid",
+        "beat": "reveal",
+        "frames": [
+          285,
+          360
+        ],
+        "action": "the page pushes one module left; six bars step up module by module, the red one last: '128 × 137'",
+        "transitionOut": "bar-wipe-cols"
+      },
+      {
+        "n": 5,
+        "archetype": "colophon",
+        "beat": "resolution",
+        "frames": [
+          360,
+          450
+        ],
+        "action": "red column bars drop and retract; 'Raster und Form' flush left, a rule, 'Halle 8 · Di—So 10—18'; hold",
+        "transitionOut": null
+      }
+    ]
+  },
+  "elements": {
+    "text": "flush left on a column edge, rising from a baseline mask; size and weight jumps for hierarchy; exits by an ease-in drop behind the same mask or under a bar",
+    "logo": "a wordmark set in the display grotesk flush left, or a module-sized mark; it is set like type, never animated as an object",
+    "icons": "pure geometry in whole modules (circle, square, bar, arrow); they step into place",
+    "images": "objective photography cropped to modules, black-and-white or a single red duotone; revealed by a bar wipe",
+    "ui": "redrawn as grid modules and rules; no rounded cards or shadows",
+    "shapes": "rectangles, circles, rules and bars in whole modules; they slide and resize along grid lines",
+    "background": "flat off-white paper with the grid shown as hairlines and column indices; never changes colour except under a full bar wipe",
+    "particles": "none"
+  },
+  "audio": {
+    "drive": [
+      "metronomic",
+      "beat-quantised",
+      "minimal"
+    ],
+    "sync": "every move starts on a beat and lasts a whole number of beats subdivisions; module steps on 16ths as ticks; holds of one bar",
+    "sfx": "dry ticks per module, short filtered swipes per bar, a low thud on a block landing; minimal electronic music or silence"
+  },
+  "live": {
+    "seconds": 6,
+    "rest": 0.36,
+    "beats": [
+      {
+        "at": 0,
+        "label": "Poster: Raster"
+      },
+      {
+        "at": 0.14,
+        "label": "Row bars, 12 set underneath"
+      },
+      {
+        "at": 0.47,
+        "label": "Blocks slide into Form"
+      },
+      {
+        "at": 0.8,
+        "label": "Column bars, poster again"
+      }
+    ]
+  }
+}

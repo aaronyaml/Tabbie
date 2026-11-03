@@ -1,0 +1,537 @@
+{
+  "schema": "motion.style/2",
+  "id": "apple-minimal",
+  "number": "01",
+  "name": "Premium Minimal",
+  "tagline": "Floating glass, white space, one confident accent.",
+  "description": "Apple-grade product film: white canvas, near-black type, the brand colour as a single accent, glass and real depth, springs you feel but never see bounce, and UI choreography that becomes the next scene.",
+  "family": "core",
+  "mood": [
+    "calm",
+    "precise",
+    "confident",
+    "premium"
+  ],
+  "bestFor": [
+    "apps and SaaS launches",
+    "product reveals",
+    "feature walkthroughs",
+    "hardware"
+  ],
+  "avoidFor": [
+    "raw, rebellious or underground brands",
+    "heritage and craft stories"
+  ],
+  "references": [
+    "ref4"
+  ],
+  "palette": {
+    "bg": "#FBFBFB",
+    "surface": "#FFFFFF",
+    "ink": "#0A0A0A",
+    "muted": "#7A7A7A",
+    "hair": "rgba(10,10,10,0.08)",
+    "accent": "#22C55E",
+    "accent2": "#2F6BFF",
+    "night": "#050506",
+    "swatches": [
+      "#FBFBFB",
+      "#0A0A0A",
+      "#7A7A7A",
+      "#22C55E",
+      "#E9F9EF"
+    ]
+  },
+  "type": {
+    "display": {
+      "family": "Inter Tight",
+      "google": "InterTight",
+      "weights": [
+        "500",
+        "600",
+        "700"
+      ],
+      "case": "sentence",
+      "tracking": -0.035,
+      "fallback": "\"SF Pro Display\", -apple-system, system-ui, sans-serif"
+    },
+    "text": {
+      "family": "Inter",
+      "google": "Inter",
+      "weights": [
+        "400",
+        "500",
+        "600"
+      ],
+      "case": "sentence",
+      "tracking": -0.01,
+      "fallback": "-apple-system, system-ui, sans-serif"
+    },
+    "mono": {
+      "family": "JetBrains Mono",
+      "google": "JetBrainsMono",
+      "weights": [
+        "400",
+        "600"
+      ]
+    }
+  },
+  "motion": {
+    "step": 1,
+    "durations": {
+      "instant": 3,
+      "fast": 5,
+      "standard": 9,
+      "slow": 16,
+      "cinematic": 30
+    },
+    "ease": {
+      "enter": [
+        0.22,
+        1,
+        0.36,
+        1
+      ],
+      "exit": [
+        0.64,
+        0,
+        0.78,
+        0
+      ],
+      "move": [
+        0.65,
+        0,
+        0.35,
+        1
+      ],
+      "camera": [
+        0.45,
+        0.05,
+        0.15,
+        1
+      ],
+      "morph": [
+        0.4,
+        0,
+        0.1,
+        1
+      ]
+    },
+    "springs": {
+      "button": {
+        "damping": 22,
+        "stiffness": 380,
+        "mass": 0.6
+      },
+      "card": {
+        "damping": 26,
+        "stiffness": 220,
+        "mass": 0.9
+      },
+      "logo": {
+        "damping": 30,
+        "stiffness": 140,
+        "mass": 1.2
+      }
+    },
+    "blur": "velocity"
+  },
+  "transitions": {
+    "signature": [
+      "container transform: an inline chip or card grows into the next scene",
+      "camera push into a UI element that becomes full-screen",
+      "type assembles word by word, letters settling out of depth blur"
+    ],
+    "use": [
+      "push",
+      "object",
+      "zoom",
+      "match",
+      "perspective",
+      "matte"
+    ],
+    "avoid": [
+      "crossfades",
+      "glitch",
+      "hard cuts without rhythm"
+    ],
+    "overlapFrames": [
+      4,
+      8
+    ]
+  },
+  "camera": "Shallow 2.5D: slow push-ins on floating UI, a slight tilt of the canvas for depth, settles with a long ease; never handheld.",
+  "texture": {
+    "grain": 0,
+    "notes": "Clean. Glass blur, soft wide shadows, a brand-coloured light bloom rising from the frame edge on key beats."
+  },
+  "lighting": "Soft studio key, contact shadows, coloured light passing through glass on accent moments.",
+  "sound": "Tactile clicks and soft settles, restrained air sweeps that peak at seams, a clean confirmation chime; music with space.",
+  "preview": {
+    "frames": 150,
+    "thumbFrame": 96,
+    "beats": [
+      {
+        "from": 0,
+        "to": 40,
+        "beat": "opening",
+        "label": "Caret types the line"
+      },
+      {
+        "from": 40,
+        "to": 66,
+        "beat": "transformation",
+        "label": "Pill grows into the card"
+      },
+      {
+        "from": 60,
+        "to": 104,
+        "beat": "transition",
+        "label": "Canvas tilts, satellites in, Share pressed"
+      },
+      {
+        "from": 104,
+        "to": 150,
+        "beat": "resolution",
+        "label": "Folds home to the caret"
+      }
+    ]
+  },
+  "motionSummary": "Moves like a product interface: a caret types, a word becomes a window, the canvas tilts into depth, then everything folds back home.",
+  "visual": {
+    "composition": [
+      "one focal point, centred or on a strong third",
+      "lots of negative space; empty is intentional",
+      "UI floats on a quiet white set; depth by layering, never clutter"
+    ],
+    "shapeLanguage": "rounded rectangles and pills (container radius 24–46 px), hairline borders, soft wide shadows",
+    "contrast": "low-contrast white set, near-black type, the accent as the only saturated colour; light bloom on key beats"
+  },
+  "grammar": {
+    "pacing": "calm scene tempo with snappy UI response: one idea per beat, holds of 0.5–1.2 s on key numbers",
+    "rhythm": "smooth, on ones; springs on anything touched; continuous camera across scenes",
+    "easing": "enter ease-out, exit ease-in, state change ease-in-out; springs with 2–5 % overshoot on buttons, cards, toasts",
+    "acceleration": "fast response (80–250 ms) then a long settle; camera moves accelerate gently and settle for 0.5–1 s",
+    "movement": [
+      "container transform (layout interpolation)",
+      "2.5D canvas tilt and push-in",
+      "word-by-word type from depth blur",
+      "cursor on curved paths, press compression",
+      "toasts and rows springing in"
+    ],
+    "density": "low: 1–3 elements moving at once; the rest holds still",
+    "holds": "every beat lands and holds long enough to read twice"
+  },
+  "transitionPresets": [
+    {
+      "id": "container-transform",
+      "name": "Container transform",
+      "kind": "object-morph",
+      "bridge": "an inline chip, pill or card",
+      "build": "the container interpolates position, size and radius into the next scene's frame; old content fades out in the first third, new content in during the last third",
+      "frames": [
+        16,
+        24
+      ],
+      "ease": "morph",
+      "overlap": 6,
+      "sound": "soft air sweep peaking mid-move, tactile settle"
+    },
+    {
+      "id": "push-through-ui",
+      "name": "Push through the UI",
+      "kind": "push-pull",
+      "bridge": "a UI element the camera pushes into",
+      "build": "camera pushes in (log zoom) until the element fills the frame and becomes the next scene; the bezel or card edge leaves frame",
+      "frames": [
+        18,
+        30
+      ],
+      "ease": "camera",
+      "overlap": 8,
+      "sound": "low air rise, click on arrival"
+    },
+    {
+      "id": "type-assembly",
+      "name": "Type assembly",
+      "kind": "typographic",
+      "bridge": "the next line's letters",
+      "build": "letters arrive scattered in depth with blur and settle into the word while the previous line drifts back and blurs out",
+      "frames": [
+        10,
+        16
+      ],
+      "ease": "enter",
+      "overlap": 4,
+      "sound": "soft ticks per word"
+    },
+    {
+      "id": "fold-home",
+      "name": "Fold home",
+      "kind": "object-morph",
+      "bridge": "the card that opened the scene",
+      "build": "satellites and toasts leave first (exit ease), the card folds back into its pill, the pill into the caret",
+      "frames": [
+        16,
+        24
+      ],
+      "ease": "morph",
+      "overlap": 6,
+      "sound": "reverse air sweep, a final soft click"
+    },
+    {
+      "id": "tilt-reveal",
+      "name": "Tilt reveal",
+      "kind": "perspective",
+      "bridge": "the canvas plane",
+      "build": "the whole canvas tilts 8–14° into depth, revealing satellites at other Z depths by parallax",
+      "frames": [
+        20,
+        28
+      ],
+      "ease": "camera",
+      "overlap": 0,
+      "sound": "barely-there whoosh"
+    }
+  ],
+  "archetypes": [
+    {
+      "id": "caption-type",
+      "name": "Kinetic caption",
+      "purpose": "say the promise in a few words",
+      "composition": "one line centred on white, the key word in an accent pill",
+      "elements": "words enter one by one from depth blur; a caret leads them",
+      "motion": "type on ones, pill springs in last",
+      "camera": "locked",
+      "frames": [
+        30,
+        60
+      ],
+      "enter": "type-assembly",
+      "exit": "container-transform"
+    },
+    {
+      "id": "hero-ui",
+      "name": "Floating hero UI",
+      "purpose": "show the product doing the thing",
+      "composition": "one glass card or device on white, real UI, generous margins",
+      "elements": "numbers count up, a chart line draws, rows lift",
+      "motion": "slow push-in, content animates inside the card",
+      "camera": "slow push-in with a long settle",
+      "frames": [
+        45,
+        90
+      ],
+      "enter": "container-transform",
+      "exit": "push-through-ui"
+    },
+    {
+      "id": "depth-stack",
+      "name": "Depth stack",
+      "purpose": "show breadth: everything around the core feature",
+      "composition": "tilted canvas, the hero card in front, 2–3 satellites at other depths",
+      "elements": "satellites float in with parallax, values in each",
+      "motion": "canvas tilt, gentle parallax drift",
+      "camera": "tilt + parallax",
+      "frames": [
+        40,
+        70
+      ],
+      "enter": "tilt-reveal",
+      "exit": "fold-home"
+    },
+    {
+      "id": "interaction",
+      "name": "Interaction beat",
+      "purpose": "prove it's real and responsive",
+      "composition": "close on a control: a button, toggle or row",
+      "elements": "cursor moves on a curve, pauses, presses; the button compresses; a toast springs up",
+      "motion": "curved cursor path, press 1.00 → 0.96 → 1.01 → 1.00, toast spring",
+      "camera": "locked or a tiny push to the press",
+      "frames": [
+        30,
+        50
+      ],
+      "enter": "push-through-ui",
+      "exit": "container-transform"
+    },
+    {
+      "id": "end-lockup",
+      "name": "End lockup",
+      "purpose": "name + one line",
+      "composition": "logo mark and wordmark centred, one line below, accent bloom from the bottom edge",
+      "elements": "mark resolves from the last pill; line types in",
+      "motion": "logo spring, bloom rises",
+      "camera": "locked",
+      "frames": [
+        45,
+        75
+      ],
+      "enter": "fold-home",
+      "exit": null
+    }
+  ],
+  "sequence": {
+    "beats": [
+      {
+        "id": "opening",
+        "share": 0.15,
+        "purpose": "one quiet line sets up the promise",
+        "archetypes": [
+          "caption-type"
+        ],
+        "motion": "caret, word-by-word type, the key word lands in a pill",
+        "transitionOut": "container-transform"
+      },
+      {
+        "id": "development",
+        "share": 0.3,
+        "purpose": "the product does the thing",
+        "archetypes": [
+          "hero-ui"
+        ],
+        "motion": "the pill becomes the hero card; numbers count, the chart draws",
+        "transitionOut": "tilt-reveal"
+      },
+      {
+        "id": "escalation",
+        "share": 0.2,
+        "purpose": "breadth and proof",
+        "archetypes": [
+          "depth-stack",
+          "interaction"
+        ],
+        "motion": "canvas tilts, satellites float in, a cursor presses, a toast springs up",
+        "transitionOut": "push-through-ui"
+      },
+      {
+        "id": "reveal",
+        "share": 0.15,
+        "purpose": "the moment it clicks",
+        "archetypes": [
+          "hero-ui",
+          "interaction"
+        ],
+        "motion": "accent bloom rises behind the key result; the biggest number holds",
+        "transitionOut": "fold-home"
+      },
+      {
+        "id": "resolution",
+        "share": 0.2,
+        "purpose": "name it and leave",
+        "archetypes": [
+          "end-lockup"
+        ],
+        "motion": "everything folds home into the mark; one line; hold",
+        "transitionOut": null
+      }
+    ],
+    "cutRhythm": "no hard cuts: one continuous camera and container chain; scene changes land on phrase starts",
+    "lengthRange": [
+      15,
+      45
+    ]
+  },
+  "exampleSequence": {
+    "title": "20 s feature launch",
+    "durationFrames": 600,
+    "scenes": [
+      {
+        "n": 1,
+        "archetype": "caption-type",
+        "beat": "opening",
+        "frames": [
+          0,
+          75
+        ],
+        "action": "'Everything your team ships, in one view.' types in; 'view.' lands in a green pill",
+        "transitionOut": "container-transform"
+      },
+      {
+        "n": 2,
+        "archetype": "hero-ui",
+        "beat": "development",
+        "frames": [
+          75,
+          240
+        ],
+        "action": "the pill grows into the dashboard card; 12,480 counts up, the chart line draws",
+        "transitionOut": "tilt-reveal"
+      },
+      {
+        "n": 3,
+        "archetype": "depth-stack",
+        "beat": "escalation",
+        "frames": [
+          240,
+          345
+        ],
+        "action": "canvas tilts; Design 98 % and Reviews 1.2k float in at depth",
+        "transitionOut": "push-through-ui"
+      },
+      {
+        "n": 4,
+        "archetype": "interaction",
+        "beat": "reveal",
+        "frames": [
+          345,
+          450
+        ],
+        "action": "push to the Share button; cursor presses; 'Shared with the team' springs up; green bloom",
+        "transitionOut": "fold-home"
+      },
+      {
+        "n": 5,
+        "archetype": "end-lockup",
+        "beat": "resolution",
+        "frames": [
+          450,
+          600
+        ],
+        "action": "everything folds into the pill, the pill becomes the logo mark; one line; hold 1.5 s",
+        "transitionOut": null
+      }
+    ]
+  },
+  "elements": {
+    "text": "sentence case, word by word from depth blur; key word in an accent pill; leaves by drifting back and blurring",
+    "logo": "resolves from the last container (pill → mark); springs with the logo spring; never spins",
+    "icons": "line icons in UI weight; scale-in with a small spring; no bounce loops",
+    "images": "real product UI only, sharp and large; device renders with real proportions",
+    "ui": "glass or white cards with hairline borders; contents animate inside (counters, charts, rows); every press compresses",
+    "shapes": "pills and rounded rects that become windows (mattes); no decorative shapes",
+    "background": "quiet white set; the accent arrives as light (a bloom from the frame edge), never a fill",
+    "particles": "none"
+  },
+  "audio": {
+    "drive": [
+      "tactile",
+      "voiceover-locked",
+      "phrase-synced"
+    ],
+    "sync": "scene changes on phrase starts and downbeats; UI hits (press, toast) on light percussion; leave space for VO",
+    "sfx": "clicks, soft settles, air sweeps peaking at seams, one confirmation chime"
+  },
+  "live": {
+    "seconds": 6,
+    "rest": 0.64,
+    "beats": [
+      {
+        "at": 0,
+        "label": "Caret types the line"
+      },
+      {
+        "at": 0.14,
+        "label": "Pill grows into the card"
+      },
+      {
+        "at": 0.42,
+        "label": "Tilt, satellites, press, toast"
+      },
+      {
+        "at": 0.8,
+        "label": "Folds home to the caret"
+      }
+    ]
+  }
+}

@@ -1,0 +1,118 @@
+<!-- Live gallery preview: a 6 s mini-edit in CSS (contract: docs/motion-knowledge/09-styles.md §5). One shared timeline
+     (--T) offset by --rest. A reel of 14 still applications hard-cuts (steps(1)) on a 5/4/5/4-frame pulse with the
+     mark locked in one zone → lands on a dead-still hold where the construction drawing draws itself, an orange
+     column wipes in on the grid and the descriptor types on → one beat of the opening panel closes the loop. -->
+<style>
+.s{--T:6s;position:absolute;inset:0;background:var(--ink);overflow:hidden;font-family:var(--display);color:var(--ink)}
+.s *{box-sizing:border-box;animation-duration:var(--T);animation-iteration-count:infinite;animation-delay:calc(-1 * var(--rest, 0s));animation-fill-mode:both}
+/* the reel: one slot per shot, hard cuts on the pulse (frames 0,5,9,14,… of 180), hold from 35 %, panel again at 91.7 % */
+.reel{position:absolute;inset:0;animation-name:rl;animation-timing-function:steps(1)}
+@keyframes rl{0%{transform:translateY(0)}2.778%{transform:translateY(-100%)}5%{transform:translateY(-200%)}7.778%{transform:translateY(-300%)}10%{transform:translateY(-400%)}12.778%{transform:translateY(-500%)}15%{transform:translateY(-600%)}17.778%{transform:translateY(-700%)}20%{transform:translateY(-800%)}22.778%{transform:translateY(-900%)}25%{transform:translateY(-1000%)}27.778%{transform:translateY(-1100%)}30%{transform:translateY(-1200%)}32.778%{transform:translateY(-1300%)}35%{transform:translateY(-1400%)}91.667%,100%{transform:translateY(0)}}
+.sh{position:absolute;left:0;width:100%;height:100%;overflow:hidden;background:var(--bg)}
+.mk{position:absolute;left:44vw;top:18.5vw;width:12vw;height:12vw;overflow:visible}
+.mono{position:absolute;font:500 1.1vw/1.3 var(--mono);letter-spacing:.08em;text-transform:uppercase;white-space:pre}
+.ed{position:absolute;left:2.4vw;bottom:3vw;transform:rotate(-90deg);transform-origin:0 0;font:500 .95vw var(--mono);letter-spacing:.12em;white-space:nowrap;opacity:.85}
+.ix{position:absolute;right:4.4vw;bottom:2.6vw;font:500 .95vw var(--mono);letter-spacing:.1em;opacity:.85}
+.dk .ed,.dk .ix{color:var(--surface)}.lt .ed,.lt .ix{color:var(--ink)}
+.wm{position:absolute;font-weight:700;letter-spacing:-.045em;line-height:1}
+/* applications */
+.pan{position:absolute;left:31.25vw;top:7.8vw;width:37.5vw;height:40.6vw}
+.fac{position:absolute;inset:-6vw -4vw 0;transform:perspective(60vw) rotateX(14deg);transform-origin:50% 100%;
+ background:repeating-linear-gradient(90deg,var(--concrete) 0 2.6vw,color-mix(in srgb,var(--concrete) 70%,var(--steel)) 2.6vw 2.8vw,color-mix(in srgb,var(--concrete) 88%,var(--ink)) 2.8vw 3.4vw)}
+.fac::after{content:"";position:absolute;inset:0;background:linear-gradient(100deg,color-mix(in srgb,var(--surface) 25%,transparent),transparent 45%,color-mix(in srgb,var(--ink) 30%,transparent))}
+.sky{position:absolute;inset:0;background:linear-gradient(180deg,color-mix(in srgb,var(--surface) 70%,var(--steel)),var(--surface))}
+.win{position:absolute;left:6vw;top:40vw;width:88vw;height:5vw;background:repeating-linear-gradient(90deg,var(--ink) 0 9vw,transparent 9vw 11vw)}
+.strap{position:absolute;left:-33vw;top:15.6vw;width:166vw;height:17.7vw;overflow:hidden;
+ background:repeating-linear-gradient(0deg,var(--accent) 0 .32vw,color-mix(in srgb,var(--accent) 82%,var(--night)) .32vw .46vw);box-shadow:0 2vw 3vw color-mix(in srgb,var(--night) 45%,transparent)}
+.strap::before,.strap::after{content:"";position:absolute;left:0;right:0;top:1.1vw;border-top:.16vw dashed var(--rust)}.strap::after{top:auto;bottom:1.1vw}
+.strap b{position:absolute;left:0;top:2.2vw;font-weight:800;font-size:11vw;line-height:1;letter-spacing:-.05em;color:var(--ink);white-space:nowrap}
+.sq{position:absolute;left:42.2vw;top:16.7vw;width:15.6vw;height:15.6vw;background:var(--accent)}
+.box{position:absolute;inset:0;background:repeating-linear-gradient(90deg,var(--rust) 0 1vw,var(--accent) 1vw 2.2vw,color-mix(in srgb,var(--accent) 85%,var(--surface)) 2.2vw 2.8vw,color-mix(in srgb,var(--rust) 75%,var(--night)) 2.8vw 3.3vw)}
+.box::after{content:"";position:absolute;inset:0;background:linear-gradient(100deg,color-mix(in srgb,var(--surface) 14%,transparent),transparent 40%,color-mix(in srgb,var(--night) 35%,transparent))}
+.bar{position:absolute;top:0;width:.9vw;height:100%;background:linear-gradient(90deg,var(--steel),color-mix(in srgb,var(--steel) 40%,var(--surface)) 40%,var(--steel));z-index:1}
+.big{position:absolute;font-weight:800;line-height:1;letter-spacing:-.06em}
+.lab{position:absolute;left:32.8vw;top:9vw;width:39.6vw;height:31.2vw;background:var(--surface);transform:rotate(-4deg);box-shadow:.9vw 1.6vw 0 color-mix(in srgb,var(--ink) 18%,transparent)}
+.lab i{position:absolute;left:0;right:0;top:0;height:1.4vw;background:var(--accent)}
+.lab u{position:absolute;left:2vw;top:22vw;width:35vw;height:6vw;background:repeating-linear-gradient(90deg,var(--ink) 0 .2vw,transparent .2vw .5vw,var(--ink) .5vw .9vw,transparent .9vw 1.1vw,var(--ink) 1.1vw 1.2vw,transparent 1.2vw 1.6vw)}
+.th{position:absolute;top:0;width:33.34%;height:100%}
+/* the hold */
+.creep{position:absolute;inset:0;transform-origin:50vw 24.5vw;animation-name:cr;animation-timing-function:cubic-bezier(.5,0,.2,1)}
+@keyframes cr{0%,35%{transform:none}91.667%,100%{transform:scale(1.015)}}
+.cons{position:absolute;inset:0;width:100%;height:100%;overflow:visible}
+.cons .h{fill:none;stroke:var(--ink);stroke-width:.09;stroke-opacity:.6;stroke-dasharray:1;stroke-dashoffset:1;animation-timing-function:cubic-bezier(.77,0,.18,1)}
+.cons .d1{animation-name:d1}.cons .d2{animation-name:d2}.cons .d3{animation-name:d3}
+@keyframes d1{0%,35.5%{stroke-dashoffset:1}44%,100%{stroke-dashoffset:0}}
+@keyframes d2{0%,37.5%{stroke-dashoffset:1}46%,100%{stroke-dashoffset:0}}
+@keyframes d3{0%,40%{stroke-dashoffset:1}50%,100%{stroke-dashoffset:0}}
+.cons .tk{stroke:var(--accent);stroke-width:.16;fill:none;animation-name:tk;animation-timing-function:steps(1)}
+@keyframes tk{0%,47%{opacity:0}47.5%,100%{opacity:1}}
+.dim{color:var(--accent);animation-name:tk;animation-timing-function:steps(1)}
+.dim2{animation-name:tk2;animation-timing-function:steps(1)}
+@keyframes tk2{0%,50%{opacity:0}50.5%,100%{opacity:1}}
+.col{position:absolute;left:78vw;top:0;width:22vw;height:100%;background:var(--accent);transform-origin:50% 0;animation-name:cl;animation-timing-function:cubic-bezier(.16,1,.3,1)}
+@keyframes cl{0%,42%{transform:scaleY(0)}46%,100%{transform:scaleY(1)}}
+.base{position:absolute;left:78vw;bottom:0;width:22vw;height:15.6vw;background:var(--ink);overflow:hidden;transform-origin:50% 100%;animation-name:bs;animation-timing-function:cubic-bezier(.16,1,.3,1)}
+@keyframes bs{0%,43.5%{transform:scaleY(0)}47.5%,100%{transform:scaleY(1)}}
+.base .wm{left:2.6vw;bottom:3vw;font-size:5vw;color:var(--surface)}
+.ty{position:absolute;left:80.6vw;overflow:hidden;white-space:nowrap;font:500 1.15vw var(--mono);letter-spacing:.08em;color:var(--ink);width:0}
+.t1{top:3.6vw;animation-name:t1;animation-timing-function:steps(13)}.t2{top:5.3vw;animation-name:t2;animation-timing-function:steps(17)}
+@keyframes t1{0%,48%{width:0}55%,100%{width:calc(13 * (1ch + .08em))}}
+@keyframes t2{0%,55%{width:0}63%,100%{width:calc(17 * (1ch + .08em))}}
+</style>
+<div class="s" style="--rest:4.8s">
+<svg width="0" height="0" style="position:absolute"><symbol id="ib-m" viewBox="-4 -4 108 108"><rect x="0" y="0" width="28" height="100"/><path d="M40 40 H100 V100 H72 V64 H40 Z"/><path d="M52 0 H100 L88 26 H40 Z"/></symbol></svg>
+<div class="reel">
+<!-- 01 panel -->
+<div class="sh dk" style="top:0;background:var(--accent)"><div class="pan" style="background:var(--ink)"></div><div class="mono" style="left:33.8vw;top:10.6vw;font-size:1.5vw;color:var(--surface)">HEAVY CARGO &amp;
+TERMINAL SERVICES</div><svg class="mk" style="fill:var(--surface)"><use href="#ib-m"/></svg><div class="wm" style="left:33.8vw;top:42.6vw;font-size:2.4vw;color:var(--surface)">halden</div><div class="ed">HALDEN &mdash; HEAVY CARGO SYSTEMS</div><div class="ix">APP. 01 / 14</div></div>
+<!-- 02 cladding from below -->
+<div class="sh lt" style="top:100%"><div class="sky"></div><div class="fac"><div class="win"></div></div><svg class="mk" style="fill:var(--ink);mix-blend-mode:multiply"><use href="#ib-m"/></svg><div class="wm" style="left:58vw;top:22.6vw;font-size:4.4vw;color:var(--ink);mix-blend-mode:multiply">halden</div><div class="ed">HALDEN &mdash; HEAVY CARGO SYSTEMS</div><div class="ix">APP. 02 / 14</div></div>
+<!-- 03 construction drawing -->
+<div class="sh lt" style="top:200%;background:var(--concrete)"><svg class="cons" viewBox="0 0 100 56.25" preserveAspectRatio="none"><g style="fill:none;stroke:var(--ink);stroke-width:.09;stroke-opacity:.6"><path d="M0 18.5H100M0 23.3H100M0 26.2H100M0 30.5H100M44 0V56.25M47.4 0V56.25M48.8 0V56.25M52.6 0V56.25M56 0V56.25"/><circle cx="50" cy="24.5" r="8.6"/><circle cx="45.7" cy="20.2" r="1.7"/><circle cx="54.3" cy="28.3" r="2.2"/></g></svg><svg class="mk" style="fill:none;stroke:var(--ink);stroke-width:.7"><use href="#ib-m"/></svg><div class="mono" style="left:6vw;top:5.5vw">LOGOMARK
+CONSTRUCTION</div><div class="ed">HALDEN &mdash; HEAVY CARGO SYSTEMS</div><div class="ix">APP. 03 / 14</div></div>
+<!-- 04 webbing strap &minus;32&deg; -->
+<div class="sh dk" style="top:300%;background:linear-gradient(150deg,color-mix(in srgb,var(--accent2) 70%,var(--surface)),var(--accent2) 45%,var(--night))"><div class="strap" style="transform:rotate(-32deg)"><b>halden    halden    halden    halden</b></div><div class="sq" style="transform:rotate(-32deg)"></div><svg class="mk" style="fill:var(--ink);transform:rotate(-32deg)"><use href="#ib-m"/></svg><div class="ed">HALDEN &mdash; HEAVY CARGO SYSTEMS</div><div class="ix">APP. 04 / 14</div></div>
+<!-- 05 container steel -->
+<div class="sh dk" style="top:400%"><div class="box"></div><i class="bar" style="left:22vw"></i><i class="bar" style="left:36vw"></i><i class="bar" style="left:64vw"></i><i class="bar" style="left:78vw"></i><svg class="mk" style="fill:var(--surface);z-index:2"><use href="#ib-m"/></svg><div class="mono" style="left:58.5vw;top:22.4vw;font-size:1.4vw;color:var(--surface);z-index:2">HLDU 204871 3
+22G1  MAX 30 480 KG</div><div class="ed">HALDEN &mdash; HEAVY CARGO SYSTEMS</div><div class="ix">APP. 05 / 14</div></div>
+<!-- 06 giant letter -->
+<div class="sh lt" style="top:500%"><div class="big" style="left:53vw;top:-27vw;font-size:104vw;color:var(--ink)">h</div><svg class="mk" style="fill:var(--accent)"><use href="#ib-m"/></svg><div class="mono" style="left:6vw;top:44.8vw">PRIMARY TYPEFACE
+LETTER SPACING &minus;4%</div><div class="ed">HALDEN &mdash; HEAVY CARGO SYSTEMS</div><div class="ix">APP. 06 / 14</div></div>
+<!-- 07 black, symbolism -->
+<div class="sh dk" style="top:600%;background:var(--ink)"><svg class="mk" style="fill:var(--accent);left:45.6vw;top:20vw;width:8.8vw;height:8.8vw"><use href="#ib-m"/></svg><i style="position:absolute;left:49.3vw;top:14.9vw;width:1.5vw;height:1.5vw;background:var(--accent)"></i><i style="position:absolute;left:41.5vw;top:31.5vw;width:1.5vw;height:1.5vw;background:var(--accent)"></i><i style="position:absolute;left:57.1vw;top:31.5vw;width:1.5vw;height:1.5vw;background:var(--accent)"></i><div class="mono" style="left:46.5vw;top:46vw;color:var(--muted);font-size:.9vw">LOAD &middot; LIFT &middot; MOVE</div><div class="ed">HALDEN &mdash; HEAVY CARGO SYSTEMS</div><div class="ix">APP. 07 / 14</div></div>
+<!-- 08 cargo label -->
+<div class="sh lt" style="top:700%;background:linear-gradient(160deg,var(--concrete),color-mix(in srgb,var(--concrete) 80%,var(--steel)))"><div class="lab"><i></i><div class="mono" style="left:19.5vw;top:3.6vw;font-size:1vw">FROM  TERMINAL 04
+TO    BAY 12 / NORTH
+GROSS 1 240 KG</div><u></u></div><svg class="mk" style="fill:var(--ink);left:44.8vw;top:19.3vw;width:10.4vw;height:10.4vw"><use href="#ib-m"/></svg><div class="ed">HALDEN &mdash; HEAVY CARGO SYSTEMS</div><div class="ix">APP. 08 / 14</div></div>
+<!-- 09 thirds -->
+<div class="sh dk" style="top:800%"><i class="th" style="left:0;background:var(--accent)"></i><i class="th" style="left:33.33%;background:var(--ink)"></i><i class="th" style="left:66.66%;background:var(--concrete)"></i><svg class="mk" style="fill:var(--surface)"><use href="#ib-m"/></svg><div class="mono" style="left:6vw;top:47vw;color:var(--ink)">ORANGE</div><div class="mono" style="left:39.4vw;top:47vw;color:var(--surface)">BLACK</div><div class="mono" style="left:72.7vw;top:47vw;color:var(--ink)">CONCRETE</div><div class="ed">HALDEN &mdash; HEAVY CARGO SYSTEMS</div></div>
+<!-- 10 cladding, re-cropped tight (the push is in the edit) -->
+<div class="sh lt" style="top:900%"><div class="sky"></div><div class="fac" style="inset:-30vw -40vw -20vw;transform:perspective(60vw) rotateX(14deg) scale(1.5)"><div class="win" style="top:60vw"></div></div><svg class="mk" style="fill:var(--ink);mix-blend-mode:multiply;left:42.2vw;top:16.7vw;width:15.6vw;height:15.6vw"><use href="#ib-m"/></svg><div class="ed">HALDEN &mdash; HEAVY CARGO SYSTEMS</div><div class="ix">APP. 10 / 14</div></div>
+<!-- 11 strap +24&deg; (answers the &minus;32&deg; diagonal) -->
+<div class="sh dk" style="top:1000%;background:linear-gradient(210deg,color-mix(in srgb,var(--accent2) 70%,var(--surface)),var(--accent2) 45%,var(--night))"><div class="strap" style="transform:rotate(24deg)"><b>halden    halden    halden    halden</b></div><div class="sq" style="transform:rotate(24deg)"></div><svg class="mk" style="fill:var(--ink);transform:rotate(24deg)"><use href="#ib-m"/></svg><div class="ed">HALDEN &mdash; HEAVY CARGO SYSTEMS</div><div class="ix">APP. 11 / 14</div></div>
+<!-- 12 panel inverse -->
+<div class="sh dk" style="top:1100%;background:var(--ink)"><div class="pan" style="background:var(--accent)"></div><div class="mono" style="left:33.8vw;top:10.6vw;font-size:1.5vw;color:var(--ink)">HEAVY CARGO &amp;
+TERMINAL SERVICES</div><svg class="mk" style="fill:var(--ink)"><use href="#ib-m"/></svg><div class="ed">HALDEN &mdash; HEAVY CARGO SYSTEMS</div><div class="ix">APP. 12 / 14</div></div>
+<!-- 13 giant letter on black -->
+<div class="sh dk" style="top:1200%;background:var(--ink)"><div class="big" style="left:-13.5vw;top:-47vw;font-size:104vw;color:var(--accent)">d</div><svg class="mk" style="fill:var(--surface)"><use href="#ib-m"/></svg><div class="mono" style="left:6vw;top:46vw;color:var(--surface)">ARCHIVO 800 / DISPLAY</div><div class="ed">HALDEN &mdash; HEAVY CARGO SYSTEMS</div><div class="ix">APP. 13 / 14</div></div>
+<!-- 14 container, cropped tight -->
+<div class="sh dk" style="top:1300%"><div class="box" style="background-size:180% 100%"></div><i class="bar" style="left:15.6vw;width:1.4vw"></i><i class="bar" style="left:78vw;width:1.4vw"></i><svg class="mk" style="fill:var(--surface);z-index:2;left:41.7vw;top:16.2vw;width:16.6vw;height:16.6vw"><use href="#ib-m"/></svg><div class="mono" style="left:61.5vw;top:22vw;font-size:2vw;color:var(--surface);z-index:2">HLDU 204871 3
+22G1  MAX 30 480 KG</div><div class="ed">HALDEN &mdash; HEAVY CARGO SYSTEMS</div><div class="ix">APP. 14 / 14</div></div>
+<!-- the hold: drawing draws itself, the column wipes in on the grid line, the descriptor types -->
+<div class="sh lt" style="top:1400%"><div class="creep">
+<svg class="cons" viewBox="0 0 100 56.25" preserveAspectRatio="none">
+<path class="h d1" pathLength="1" d="M0 18.5H78"/><path class="h d1" pathLength="1" d="M0 30.5H78"/><path class="h d2" pathLength="1" d="M0 23.3H78"/><path class="h d2" pathLength="1" d="M0 26.2H78"/>
+<path class="h d1" pathLength="1" d="M44 0V56.25"/><path class="h d2" pathLength="1" d="M47.4 0V56.25"/><path class="h d2" pathLength="1" d="M52.6 0V56.25"/><path class="h d1" pathLength="1" d="M56 0V56.25"/>
+<circle class="h d3" pathLength="1" cx="50" cy="24.5" r="8.6"/><circle class="h d3" pathLength="1" cx="45.7" cy="20.2" r="1.7"/><circle class="h d3" pathLength="1" cx="54.3" cy="28.3" r="2.2"/><path class="h d3" pathLength="1" d="M50.2 18.5 L38 40"/>
+<path class="tk" d="M44 34H56M44 33.2V34.8M56 33.2V34.8M40.8 18.5V30.5M40 18.5H41.6M40 30.5H41.6"/></svg>
+<svg class="mk" style="fill:var(--accent)"><use href="#ib-m"/></svg>
+<div class="mono dim" style="left:48.4vw;top:35.4vw;font-size:.9vw">100 U</div><div class="mono dim" style="left:34.6vw;top:23.9vw;font-size:.9vw">100 U</div>
+<div class="mono dim2" style="left:57.2vw;top:27.6vw;font-size:.9vw">R 18</div><div class="mono dim2" style="left:31.8vw;top:40vw;font-size:.9vw">22.6&deg;</div>
+<div class="mono dim2" style="left:6vw;top:5.5vw">LOGOMARK
+CONSTRUCTION</div><div class="mono dim2" style="left:6vw;top:46vw;font-size:.9vw">SYMBOL / 01
+GRID 100 U</div>
+</div>
+<div class="col"></div><div class="base"><div class="wm">halden</div></div>
+<div class="ty t1">HEAVY CARGO &amp;</div><div class="ty t2">TERMINAL SERVICES</div>
+<div class="ed">HALDEN &mdash; HEAVY CARGO SYSTEMS</div></div>
+</div></div>
