@@ -44,6 +44,7 @@ def _project(d: dict) -> dict:
 def _public(p: dict, h: str | None = None) -> dict:
     out = {k: p.get(k) for k in ("id", "name", "slug", "description", "status", "created_at", "updated_at", "version",
                                  "primary_folder", "instructions", "webui_project_id", "dreamer", "memory_keys")}
+    out["colours"] = p.get("colours") or []
     out["folders"] = [{**f, "display": projects.tilde(f["path"])} for f in p.get("folders", [])]
     out["workspace"] = str(projects.workspace_path(p["id"]))
     if h:
@@ -346,7 +347,7 @@ def _post(path: str, b: dict) -> dict:
     p = _project(b)
     h = b.get("hash") if isinstance(b.get("hash"), str) else None
     if path == "/projects/update":
-        fields = {k: b[k] for k in ("name", "description", "instructions", "webui_project_id", "dreamer", "memory_keys")
+        fields = {k: b[k] for k in ("name", "description", "instructions", "webui_project_id", "dreamer", "memory_keys", "colours")
                   if k in b}
         return _with_hash(projects.update(p["id"], expected_hash=h, **fields))
     if path == "/projects/folder/add":

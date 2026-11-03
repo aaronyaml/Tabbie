@@ -380,8 +380,33 @@ def mutate(pid: str, fn, *, expected_hash: str | None, actor: str = "user", mess
     return {**p, "hash": nh}
 
 
+_HEX = re.compile(r"#[0-9A-Fa-f]{6}")
+_ROLE = re.compile(r"[a-z][a-z0-9]{0,15}")
+MAX_COLOURS = 24
+
+
+def clean_colours(v) -> list[dict]:
+    """Saved colour profiles for this project's films: [{id, name, colors: {role: #RRGGBB}, at}], newest first.
+    Roles are the style palette roles (bg, ink, accent …); a film applies the ones its style has."""
+    if not isinstance(v, list):
+        raise ProjectError("colours must be a list")
+    out, seen = [], set()
+    for x in v[:MAX_COLOURS]:
+        if not isinstance(x, dict):
+            raise ProjectError("bad colour profile")
+        name = re.sub(r"\s+", " ", str(x.get("name") or "")).strip()[:40]
+        pid = str(x.get("id") or "")
+        cols = x.get("colors") if isinstance(x.get("colors"), dict) else {}
+        cols = {str(k): str(c).upper() for k, c in cols.items() if _ROLE.fullmatch(str(k)) and _HEX.fullmatch(str(c))}
+        if not name or not re.fullmatch(r"[a-z0-9-]{4,40}", pid) or not cols or pid in seen:
+            raise ProjectError("a colour profile needs an id, a name and at least one colour")
+        seen.add(pid)
+        out.append({"id": pid, "name": name, "colors": dict(list(cols.items())[:16]), "at": str(x.get("at") or "")[:32]})
+    return out
+
+
 def update(pid: str, *, expected_hash: str | None, actor: str = "user", **fields) -> dict:
-    allowed = {"name", "description", "instructions", "webui_project_id", "dreamer", "memory_keys"}
+    allowed = {"name", "description", "instructions", "webui_project_id", "dreamer", "memory_keys", "colours"}
     bad = set(fields) - allowed
     if bad:
         raise ProjectError(f"can't change {', '.join(sorted(bad))}")
@@ -405,6 +430,8 @@ def update(pid: str, *, expected_hash: str | None, actor: str = "user", **fields
             cur = p.setdefault("dreamer", json.loads(json.dumps(DREAMER_DEFAULTS)))
             if "after_sessions" in d:
                 cur["after_sessions"] = max(3, min(500, int(d["after_sessions"])))
+        if "colours" in fields:
+            p["colours"] = clean_colours(fields["colours"])
         if "memory_keys" in fields:
             keys = [str(k) for k in fields["memory_keys"] or []]
             offered = {c["key"] for c in legacy_candidates(p)}  # archived projects keep their claims

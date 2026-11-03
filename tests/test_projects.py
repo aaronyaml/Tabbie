@@ -544,3 +544,14 @@ def test_dreamer_applies_its_own_proposals_when_on(env, monkeypatch):
     assert good["proposal_id"] in done and vague["proposal_id"] in done and ext["proposal_id"] not in done
     assert [p["proposal_id"] for p in env.proposals.list_("pending")] == [ext["proposal_id"]]
     assert env.proposals.list_("approved")[0]["decided_by"] == "auto-policy"
+
+
+def test_colour_profiles_are_validated_and_kept(env):
+    p = env.projects.create("Brandy", folders=[str(env.repo("brandy"))])
+    prof = [{"id": "cp-launch", "name": "  Launch  ", "colors": {"accent": "#ff5a1f", "bg": "#0B0B0C", "bad role!": "#000000", "ink": "red"}}]
+    out = env.projects.update(p["id"], expected_hash=None, colours=prof)
+    assert out["colours"] == [{"id": "cp-launch", "name": "Launch", "colors": {"accent": "#FF5A1F", "bg": "#0B0B0C"}, "at": ""}]
+    for bad in ("nope", [{"id": "cp-x", "name": "", "colors": {"bg": "#000000"}}], [{"id": "cp-x", "name": "X", "colors": {}}],
+                [{"id": "cp-a1", "name": "A", "colors": {"bg": "#000000"}}] * 2):
+        with pytest.raises(env.projects.ProjectError):
+            env.projects.update(p["id"], expected_hash=None, colours=bad)
