@@ -782,7 +782,9 @@ the moments, approve a storyboard, and Claude Code (or Codex) builds and renders
 [Remotion](https://www.remotion.dev). `/motion <brief>` in any chat does the same from a prompt.
 
 - **Model**: the Storyboard step has a model picker (e.g. Opus 5.5, Sonnet 5.5, GPT-6.1 Sol, plus
-  effort). That model draws the storyboard and builds the film; it can be changed until you approve.
+  effort). That model draws the storyboard and writes the film. The render itself (and any revision
+  that re-renders) always runs on Claude Code: Remotion renders in a headless Chrome, which Codex's
+  macOS sandbox won't start. The reply says so in a Note line. With only Codex enabled, renders fail.
 
 - **Not installed yet?** Opening Motion shows a **Download Motion studio** button instead of the new-film
   form. It installs whatever's missing in the background (Node.js, the studio folder, its packages; about

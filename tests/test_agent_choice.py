@@ -109,3 +109,19 @@ def test_motion_command_installs_motion_first(monkeypatch):
     monkeypatch.setattr(cc, "log_decision", lambda **kw: None)
     out = cc._route_motion("s1", "/motion advertise to students", "/motion advertise to students")
     assert started and "isn't installed" in out and "installing Node.js" in out and "Do not call any tools" in out
+
+
+def test_motion_render_steps_run_on_claude(monkeypatch, tmp_path):
+    """Codex's sandbox can't start Remotion's Chrome: studio render/revision steps go to Claude Code,
+    other studio steps (storyboard, music) and other folders stay on the picked model."""
+    monkeypatch.setenv("TABBIE_MOTION_STUDIO", str(tmp_path / "motion"))
+    assert cc._in_motion_studio(str(tmp_path / "motion" / "studio" / "film"))
+    assert not cc._in_motion_studio(str(tmp_path / "app"))
+
+    class R:
+        def __init__(self, text):
+            self.data = {"raw_message": text}
+    job = lambda kind: f'/motion [studio:{kind} job={kind}-1] Motion studio project "Ad". render it, rendered frames'  # noqa: E731
+    assert cc._renders(R(job("render"))) and cc._renders(R(job("revision")))
+    assert not any(cc._renders(R(job(k))) for k in ("storyboard", "analyze", "generate-audio"))
+    assert cc._renders(R("can you re-render the ending")) and not cc._renders(R("make the logo bigger"))

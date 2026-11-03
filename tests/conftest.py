@@ -39,3 +39,14 @@ def _isolated_agents(tmp_path, monkeypatch):
         sys.path.insert(0, root)
     from hmem import agents
     monkeypatch.setattr(agents, "path", lambda: tmp_path / "config" / "agents.yaml")
+
+
+@pytest.fixture(autouse=True)
+def _isolated_worker_slots(tmp_path, monkeypatch):
+    """Claude worker slot locks in a temp dir: a real job running on this computer must not make a test
+    see every slot busy (and fall back to Codex)."""
+    import sys
+    for name in ("command_centre.providers", "cc.providers"):
+        m = sys.modules.get(name)
+        if m is not None and hasattr(m, "LOCKS_DIR"):
+            monkeypatch.setattr(m, "LOCKS_DIR", tmp_path / "locks")

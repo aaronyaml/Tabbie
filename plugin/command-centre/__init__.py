@@ -615,6 +615,27 @@ def _left_unfinished(result: str, run: AgentRun) -> bool:
     return bg and bool(_UNFINISHED_RX.search(result[-600:]))
 
 
+_STUDIO_JOB = re.compile(r"\[studio:([a-z-]+) job=")
+_RENDER_WORD = re.compile(r"\b(re-?)?render(s|ing)?\b", re.I)
+
+
+def _renders(r: Request) -> bool:
+    """A Motion step that renders the film: the studio's render/revision jobs (its other jobs mention
+    rendering too, so the job kind decides), or a plain studio chat that asks to render."""
+    text = str(r.data.get("raw_message") or r.data.get("original_prompt") or "")
+    job = _STUDIO_JOB.search(text)
+    return job.group(1) in ("render", "revision") if job else bool(_RENDER_WORD.search(text))
+
+
+def _in_motion_studio(cwd: str) -> bool:
+    _hmem()
+    from hmem import motion as motion_studio
+    try:
+        return Path(cwd).resolve().is_relative_to(motion_studio.studio_dir().resolve())
+    except (OSError, ValueError):
+        return False
+
+
 def _cwd(r: Request) -> str:
     """Where the worker runs: the project, else this chat's own folder (kept across its requests, so a
     follow-up like "make it blue" finds the previous work and can resume the same worker session)."""
@@ -1085,11 +1106,25 @@ def _run_request(r: Request, feed=None, force: dict | None = None) -> dict:
     # a linked model provider (DeepSeek, an API key, Ollama...): no subscription limits, its own sessions
     endpoint = choice["provider"] if executor_choice.is_endpoint(choice["provider"]) else None
     on_claude = executor_choice.worker_of(choice["provider"]) == "claude"
+    # Motion studio renders: Remotion renders in a headless Chrome, which Codex's macOS sandbox won't
+    # start, so a render or revision step runs on Claude Code whatever the picker says. Storyboard, music
+    # and chat stay on the picked model. Codex itself stays sandboxed.
+    studio_note = None
+    studio = (_in_motion_studio(cwd) and _renders(r) and agents().has("claude")
+              and not (answer and q.get("source") == "astra"))
+    if studio and not on_claude:
+        d = executor_choice.DEFAULT
+        info = executor_choice.model_info(d["provider"], d["model"]) or {"name": d["model"]}
+        studio_note = (f"Note: Claude Code rendered this, not {choice['name']}: Motion renders in a browser "
+                       "that Codex's sandbox can't start.")
+        log_decision(event="motion_render_on_claude", request=r.id, picked=choice["model"])
+        choice = {**choice, **d, "name": info["name"], "worker": executor_choice.WORKER_NAME["claude"]}
+        endpoint, on_claude = None, True
     picked = None if on_claude else choice
     if answer and q.get("source") == "astra":
         chosen_run = (r.data.get("executor") or {}).get("chosen")
         return _astra_takeover(r, reason="resumed with your answers", choice=picked if chosen_run else None, feed=feed)
-    if session_state(r["session_id"]).get("takeover") and not answer and agents().has("codex") and not force:
+    if session_state(r["session_id"]).get("takeover") and not answer and agents().has("codex") and not force and not studio:
         return _astra_takeover(r, reason="takeover mode is on for this session", feed=feed)
     if picked and not answer:  # the user picked an OpenAI model for this conversation: Codex executes
         return _astra_takeover(r, reason=r["route_reason"], choice=picked, feed=feed, offer=not force)
@@ -1108,7 +1143,7 @@ def _run_request(r: Request, feed=None, force: dict | None = None) -> dict:
                                        "effort": claude_effort}, feed=feed, offer=False)
     if blocked:
         return blocked
-    if (not force and not answer and not endpoint and ecfg.get("busy_fallback", True) and agents().has("codex")
+    if (not force and not answer and not endpoint and not studio and ecfg.get("busy_fallback", True) and agents().has("codex")
             and providers.WorkerSlot.all_busy(ecfg.get("max_parallel", 1), r["session_id"])):
         # every Claude slot is running another chat's job: its GPT equivalent starts now instead of queueing
         peer = executor_choice.peer_model("anthropic", claude_model or ecfg.get("model") or executor_choice.DEFAULT["model"],
@@ -1203,6 +1238,9 @@ def _run_request(r: Request, feed=None, force: dict | None = None) -> dict:
         if extra:
             clean = (clean or (res.get("result") or "")).rstrip() + "\n\n" + extra
             res["result"] = (res.get("result") or "").rstrip() + "\n\n" + extra
+    if studio_note and res.get("ok") and not asked:
+        clean = (clean or (res.get("result") or "")).rstrip() + "\n" + studio_note
+        res["result"] = (res.get("result") or "").rstrip() + "\n" + studio_note
     with run.lock:
         run.finish_main(bool(res.get("ok")), step=None if res.get("ok") else res.get("error"),
                         stopped=bool(res.get("stopped_by_user")))
