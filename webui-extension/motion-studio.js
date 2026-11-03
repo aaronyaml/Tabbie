@@ -2080,11 +2080,12 @@ ${editSystem(s)}
   }
 
   function vStoryboard() {
-    const sb = F.storyboard, st = (P.storyboard && P.storyboard.status) || 'none';
+    const sb = F.storyboard, reopened = canReopen(), st = reopened ? 'ready' : (P.storyboard && P.storyboard.status) || 'none';
     const busy = blocked();
     loadModel();
     const frames = (sb && sb.frames) || [];
     const line = busy ? 'Drawing it up. Each card is a moment on the track.'
+      : reopened && frames.length ? 'The build was stopped before the film was finished. Tell me what to change, or approve it again to rebuild.'
       : frames.length ? (st === 'approved' ? 'Approved. The film is being built in the editor.' : 'Here’s the plan. Approve it and I’ll build the film, or tell me what to change.')
         : (F.analysis ? 'I have the track and the moments. Ready when you are.' : 'I’m still listening to the track; you can ask for the storyboard now and I’ll use the analysis when it lands.');
     loadStyles();
@@ -2127,11 +2128,11 @@ ${editSystem(s)}
     if (!redoOk) { sel.events.clear(); sel.ranges = []; }
     const n = sel.events.size + sel.ranges.length;
     const revs = (F.revisions && F.revisions.revisions) || [];
-    const status = running() ? (running().kind === 'revision' ? 'Re-rendering' : 'Rendering') : (ri && ri.status) || 'waiting';
+    const status = running() ? (running().kind === 'revision' ? 'Re-rendering' : 'Rendering') : ri && ri.status === 'rendering' ? 'stopped' : (ri && ri.status) || 'waiting';  // render.json still says rendering after Stop waiting
     return `<div class="hxs-ed">
         <div class="hxs-player" style="aspect-ratio:${fmtOf().width} / ${fmtOf().height};width:min(100%, calc(52vh * ${fmtOf().width} / ${fmtOf().height}))">${vid ? `<video class="hxs-video" src="${esc(vid)}" playsinline controls preload="metadata"></video>` : `<div class="hxs-player-empty">${host(running() ? 'Building the film. The preview shows up here as soon as there is a render; you can already select parts below.' : 'No render yet.')}</div>`}
           <audio class="hxs-audio" preload="metadata" src="${esc(vid ? '' : audioSrc())}"></audio></div>
-        <div class="hxs-transport"><button type="button" class="hxs-ib" data-act="play" aria-label="Play">${icon('PlayIcon', 18)}</button><span class="hxs-time">0:00.00</span><span class="hxs-badge hxs-st-${esc(status)}">${esc(status)}</span>${!running() && status === 'failed' ? `<button type="button" class="hxs-ghost hxs-sm hxs-retry" data-act="retry-job" data-kind="render"${active() || chatBusy() ? ' disabled' : ''}>${icon('RefreshIcon', 14)}<span>Try again</span></button>` : ''}${vid && !running() && ri.status === 'done' ? `<a class="hxs-dl" href="${esc(`${rawUrl(P.sessionId, out)}&download=1`)}" download>${icon('Download04Icon', 16)}<span>Download</span></a>` : ''}</div>
+        <div class="hxs-transport"><button type="button" class="hxs-ib" data-act="play" aria-label="Play">${icon('PlayIcon', 18)}</button><span class="hxs-time">0:00.00</span><span class="hxs-badge hxs-st-${esc(status)}">${esc(status)}</span>${!running() && status === 'failed' ? `<button type="button" class="hxs-ghost hxs-sm hxs-retry" data-act="retry-job" data-kind="render"${active() || chatBusy() ? ' disabled' : ''}>${icon('RefreshIcon', 14)}<span>Try again</span></button>` : ''}${!running() && canReopen() ? `<button type="button" class="hxs-ghost hxs-sm" data-go="storyboard">${icon('ArrowLeft01Icon', 14)}<span>Change storyboard</span></button>` : ''}${vid && !running() && ri.status === 'done' ? `<a class="hxs-dl" href="${esc(`${rawUrl(P.sessionId, out)}&download=1`)}" download>${icon('Download04Icon', 16)}<span>Download</span></a>` : ''}</div>
         <div class="hxs-card hxs-ed-tl">${timelineHTML(['ruler', 'wave', 'actions', 'scenes', 'revisions'], { selectable: true })}
           <div class="hxs-legend">${TREATMENTS.map((t) => `<i style="background:${TCOL[t]}" title="${esc(TLABEL[t][1])}"></i><span title="${esc(TLABEL[t][1])}">${TLABEL[t][0]}</span>`).join('')}</div></div>
         <form class="hxs-card hxs-redo${n ? '' : ' is-idle'}${redoOk ? '' : ' is-locked'}" data-form="redo">
@@ -2589,6 +2590,9 @@ ${editSystem(s)}
   let redoAttach = null;
   // Redo needs a finished film: render.json done and no render/revision job running.
   const canRedo = () => !!(F.renderInfo && F.renderInfo.status === 'done') && !active();
+  // An approved storyboard opens again for changes while there's no finished film and nothing is running
+  // (the build was stopped or failed). Approving it again starts a fresh build.
+  const canReopen = () => !!(P && P.storyboard && P.storyboard.status === 'approved') && !(F.renderInfo && F.renderInfo.status === 'done') && !active();
   async function submitRedo(instruction, treatment) {
     if (!(F.renderInfo && F.renderInfo.status === 'done') || running()) throw new Error('You can pick parts to redo once the film is finished.');
     const dur = durationMs();
