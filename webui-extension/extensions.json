@@ -34,7 +34,7 @@
         "apple-skin.js?v=12"
       ],
       "stylesheets": [
-        "apple-skin.css?v=15"
+        "apple-skin.css?v=17"
       ]
     },
     {
@@ -218,7 +218,7 @@
         "home.js?v=8"
       ],
       "stylesheets": [
-        "home.css?v=5"
+        "home.css?v=6"
       ]
     },
     {
@@ -251,11 +251,11 @@
       "scripts": [
         "motion.js?v=9",
         "motion-scrub.js?v=6",
-        "motion-studio.js?v=62"
+        "motion-studio.js?v=64"
       ],
       "stylesheets": [
         "motion.css?v=8",
-        "motion-studio.css?v=36"
+        "motion-studio.css?v=38"
       ]
     },
     {

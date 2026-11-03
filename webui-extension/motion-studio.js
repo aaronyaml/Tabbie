@@ -1304,8 +1304,8 @@
     const det = !top && !run && (agents.length || more.length) ? `<details class="hxs-jc-d"><summary>Details</summary>${agents.length ? `<ul>${[...new Set(agents.map((a) => agentLabel(a.name)))].map((x) => `<li>${esc(x)}</li>`).join('')}</ul>` : ''}${more.length ? `<p>${more.map(md).join('<br>')}</p>` : ''}</details>` : '';
     const stopping = top && stopAsk && stopAsk === (j && j.id);
     const foot = top && run && j && !j.starting ? (stopping
-      ? `<div class="hxs-jc-ask"><span>Stop waiting for this step? ${NAME} stops tracking it here and unlocks the buttons. This does not cancel Claude, which may still finish it in the background.</span><span class="hxs-jc-askb"><button type="button" class="hxs-ghost hxs-sm" data-act="stop-no">Keep going</button><button type="button" class="hxs-ghost hxs-sm hxs-danger" data-act="job-drop">Stop waiting</button></span></div>`
-      : `<div class="hxs-jc-foot"><button type="button" class="hxs-quiet" data-act="stop-ask">Stop waiting…</button></div>`) : '';
+      ? `<div class="hxs-jc-ask"><span>Stop this step? Claude stops straight away; anything it already made stays.</span><span class="hxs-jc-askb"><button type="button" class="hxs-ghost hxs-sm" data-act="stop-no">Keep going</button><button type="button" class="hxs-ghost hxs-sm hxs-danger" data-act="job-drop">Stop</button></span></div>`
+      : `<div class="hxs-jc-foot"><button type="button" class="hxs-quiet" data-act="stop-ask">Stop…</button></div>`) : '';
     if (!run) {
       return `<div class="hxs-jc is-${esc(st)}"><div class="hxs-jc-top"><span class="hxs-jc-ic">${icon(st === 'done' ? 'CheckmarkCircle02Icon' : 'Alert02Icon', 16)}</span><span class="hxs-jc-title">${esc(name)}</span><span class="hxs-jc-st">${st === 'done' ? 'Done' : st === 'failed' ? 'Failed' : esc(st)}</span>${time}</div>
         ${note ? `<p class="hxs-jc-n">${md(note)}</p>` : ''}${det}${last && st === 'failed' ? `<div class="hxs-jc-foot"><button type="button" class="hxs-ghost hxs-sm" data-act="retry-job" data-kind="${esc(it.kind)}" data-note="${esc(note.slice(0, 300))}"${active() || chatBusy() ? ' disabled' : ''}>${icon('RefreshIcon', 14)}<span>Try again</span></button></div>` : ''}</div>`;
@@ -1540,7 +1540,7 @@
   function shell(inner) {
     const steps = P ? `<nav class="hxs-steps" aria-label="Steps">${STEPS.map(([k, l], i) => {
       const idx = STEPS.findIndex((s) => s[0] === view), on = k === view, done = i < reach();
-      return `<button type="button" class="hxs-step${on ? ' is-on' : ''}${done ? ' is-done' : ''}" data-go="${k}"${i > reach() ? ' disabled' : ''}><i>${done && !on ? icon('Tick02Icon', 12) : i + 1}</i><span>${l}</span></button>`;
+      return `<button type="button" class="hxs-step${on ? ' is-on' : ''}${done ? ' is-done' : ''}" data-go="${k}" aria-label="${l}"${on ? ' aria-current="step"' : ''}${i > reach() ? ' disabled' : ''}><i>${done && !on ? icon('Tick02Icon', 12) : i + 1}</i><span>${l}</span></button>`;
     }).join('')}</nav>` : '';
     return `<header class="hxs-top">
         <button type="button" class="hxs-ib hxs-menu" data-act="menu" aria-label="Menu">${icon('Menu01Icon', 20)}</button>
@@ -2587,6 +2587,12 @@ ${editSystem(s)}
     if (kind === 'render') return startJob('render', () => approve());
     startJob(kind, () => dispatch(kind, `The last ${name} step failed${note ? ` (${note})` : ''}. Try it again: reuse what is already done, fix what stopped it, and finish the step.`));
   }
+  // Stop kills the film's running Claude worker (the sidecar's POST /worker/stop, as the chat's Agents Stop),
+  // so nothing keeps building in the background.
+  async function stopWorker() {
+    try { await post('api/extensions/cc-agents/sidecar/worker/stop', { session: P.sessionId }); }
+    catch (e) { err = 'Couldn’t reach Claude to stop it. It may still finish in the background.'; render(); }
+  }
   let redoAttach = null;
   // Redo needs a finished film: render.json done and no render/revision job running.
   const canRedo = () => !!(F.renderInfo && F.renderInfo.status === 'done') && !active();
@@ -2720,7 +2726,7 @@ ${editSystem(s)}
       if (act === 'sb-approve') return startJob('render', () => approve());
       if (act === 'stop-ask') { stopAsk = (running() || {}).id || null; return paintJob(); }
       if (act === 'stop-no') { stopAsk = null; return paintJob(); }
-      if (act === 'job-drop') { const j = running(); stopAsk = null; if (j) { j.status = 'failed'; j.note = 'Stopped waiting (Claude may still finish it in the background)'; j.endedAt = Date.now(); saveProject(); } return render(); }
+      if (act === 'job-drop') { const j = running(); stopAsk = null; if (j) { j.status = 'failed'; j.note = 'Stopped by you'; j.endedAt = Date.now(); saveProject(); stopWorker(); } return render(); }
       if (act === 'retry-job') { retryJob(a.dataset.kind, a.dataset.note || ''); return; }
       if (act === 'retry-start') { const f = failedStart; failedStart = null; if (f) f.retry(); else render(); return; }
       if (act === 'dismiss-start') { failedStart = null; return render(); }
