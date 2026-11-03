@@ -396,7 +396,7 @@
     return wrap;
   }
 
-  const TABS = [['folders', 'Folders', 'Folder01Icon'], ['sessions', 'Sessions', 'Clock01Icon'], ['memory', 'Memory', 'Brain01Icon'],
+  const TABS = [['folders', 'Folders', 'Folder01Icon'], ['motion', 'Motion', 'Video01Icon'], ['sessions', 'Sessions', 'Clock01Icon'], ['memory', 'Memory', 'Brain01Icon'],
                 ['dreamer', 'Dreamer', 'Moon02Icon'], ['skills', 'Skills', 'SparklesIcon'], ['instructions', 'Instructions', 'FileTextIcon'],
                 ['architecture', 'Architecture', 'Layers01Icon'], ['settings', 'Settings', 'Settings02Icon']];
 
@@ -440,7 +440,7 @@
     const body = h('section', { class: 'hxp-body' });
     const d = S.cache[S.tab];
     if (d && d.error) body.append(h('p', { class: 'hxp-err', text: d.error }));
-    else body.append(({ folders: tabFolders, sessions: tabSessions, memory: tabMemory, dreamer: tabDreamer, skills: tabSkills,
+    else body.append(({ folders: tabFolders, motion: tabMotion, sessions: tabSessions, memory: tabMemory, dreamer: tabDreamer, skills: tabSkills,
                         instructions: tabInstructions, architecture: tabArchitecture, settings: tabSettings })[S.tab](p, d));
     main.append(body);
     wrap.append(main);
@@ -496,6 +496,38 @@
         btn('hxp-ghost hxp-sm', 'Include', () => act(() => call('/projects/update', { id: p.id, hash: p.hash, memory_keys: [...(p.memory_keys || []), c.key] }).then(() => loadProject(p.id, true)), 'Included'))));
     }
     out.append(h('p', { class: 'hxp-foot', text: `Workers run in the primary folder and can open the others. Each folder’s own CLAUDE.md and .hermes/ notes stay with that repo.` }));
+    return out;
+  }
+
+  // Motion films made for this project: they read its folders (read only) and reuse its saved colours
+  function tabMotion(p) {
+    const st = window.hxStudio;
+    const out = h('div', { class: 'hxp-mo' });
+    if (!st || !st.filmsFor) { out.append(h('p', { class: 'hxp-muted', text: 'The motion studio isn’t loaded.' })); return out; }
+    const open = (o) => { close(); st.open({ push: true, ...o }); };
+    out.append(h('div', { class: 'hxp-mo-h' },
+      h('p', { class: 'hxp-muted', text: p.folders.length ? 'Films for this project are grounded in its folders: the product, its copy and its brand. Colour profiles you save in a film are kept here for the next one.' : 'Add a folder first: a film reads the project’s product, copy and brand from it.' }),
+      btn('hxp-primary', 'New film', () => open({ home: true, forProject: p.id }), 'Add01Icon', { disabled: p.status !== 'active' || null })));
+    const cols = p.colours || [];
+    if (cols.length) {
+      out.append(h('div', { class: 'hxp-mo-cols' }, h('b', { text: 'Saved colours' }),
+        h('div', { class: 'hxp-mo-cl' }, ...cols.map((c) => h('span', { class: 'hxp-mo-c', title: Object.entries(c.colors).map(([k, v]) => `${k} ${v}`).join(' · ') },
+          h('i', null, ...Object.values(c.colors).slice(0, 5).map((v) => { const e = h('em'); e.style.background = /^#[0-9A-F]{6}$/i.test(v) ? v : 'transparent'; return e; })),
+          h('span', { text: c.name }))))));
+    }
+    const list = h('div', { class: 'hxp-list' }, h('p', { class: 'hxp-muted', text: 'Loading…' }));
+    out.append(list);
+    st.filmsFor(p.id).then((films) => {
+      list.textContent = '';
+      if (!films.length) { list.append(h('p', { class: 'hxp-muted', text: 'No films for this project yet.' })); return; }
+      for (const f of films) {
+        list.append(h('button', { type: 'button', class: 'hxp-item hxp-click', onclick: () => open({ sid: f.sid }) },
+          h('span', { class: 'hxp-i', icon: 'Video01Icon', size: 18 }),
+          h('div', { class: 'hxp-item-b' }, h('div', { class: 'hxp-item-t' }, h('span', { class: 'hxp-clip', text: f.title })),
+            h('div', { class: 'hxp-meta' }, h('span', { text: f.step || 'audio' }), f.at ? h('span', { text: ago(new Date(f.at).toISOString()) }) : null)),
+          h('span', { class: 'hxp-i', icon: 'ArrowRight01Icon', size: 16 })));
+      }
+    }).catch(() => { list.textContent = ''; list.append(h('p', { class: 'hxp-err', text: 'Couldn’t list the films.' })); });
     return out;
   }
 

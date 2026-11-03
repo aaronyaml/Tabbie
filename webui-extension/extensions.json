@@ -251,21 +251,21 @@
       "scripts": [
         "motion.js?v=9",
         "motion-scrub.js?v=6",
-        "motion-studio.js?v=33"
+        "motion-studio.js?v=54"
       ],
       "stylesheets": [
         "motion.css?v=8",
-        "motion-studio.css?v=21"
+        "motion-studio.css?v=34"
       ]
     },
     {
       "id": "projects",
       "name": "Projects (multi-folder, memory, Dreamer)",
       "scripts": [
-        "projects.js?v=11"
+        "projects.js?v=12"
       ],
       "stylesheets": [
-        "projects.css?v=7"
+        "projects.css?v=8"
       ]
     },
     {

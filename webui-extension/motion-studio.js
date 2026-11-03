@@ -77,6 +77,12 @@
   const msToFrame = (ms) => Math.floor((ms * FPS) / 1000 + 0.5); // the studio's frame policy (round-half-up)
   const AUDIO_ACCEPT = '.mp3,.wav,.m4a,.aac,.flac,.aif,.aiff,.ogg,.opus,.mp4,.mov,.m4v,.webm';
   const IMAGE_ACCEPT = '.png,.jpg,.jpeg,.heic,.webp,.gif';
+  // a brand kit: logos, fonts, guidelines, product images, or one zip of all of it
+  const BRAND_ACCEPT = '.svg,.png,.jpg,.jpeg,.webp,.pdf,.ai,.eps,.ttf,.otf,.woff,.woff2,.zip,.json,.ase,.txt,.md';
+  const brandKind = (n) => { const e = (String(n).split('.').pop() || '').toLowerCase();
+    return /^(ttf|otf|woff2?)$/.test(e) ? 'font' : e === 'zip' ? 'kit' : /^(pdf|txt|md)$/.test(e) ? 'guide' : /^(json|ase)$/.test(e) ? 'colours' : /^(svg|ai|eps)$/.test(e) || /logo|mark|icon|wordmark/i.test(n) ? 'logo' : 'image'; };
+  const BRAND_LABEL = { logo: 'Logo', font: 'Font', guide: 'Guidelines', colours: 'Colours', kit: 'Brand kit', image: 'Image' };
+  const BRAND_ICON = { logo: 'StarIcon', font: 'FileTextIcon', guide: 'FileTextIcon', colours: 'AiMagicIcon', kit: 'FileZipIcon', image: 'Image01Icon' };
   const fmt = (ms) => { const s = Math.max(0, ms) / 1000; return `${Math.floor(s / 60)}:${(s % 60).toFixed(2).padStart(5, '0')}`; };
   const slugify = (t) => String(t).toLowerCase().normalize('NFKD').replace(/[^\w\s-]/g, '').trim().replace(/[\s_]+/g, '-').replace(/-+/g, '-').slice(0, 40) || 'film';
   const uid = (p) => `${p}${Date.now().toString(36)}${Math.random().toString(36).slice(2, 5)}`;
@@ -220,7 +226,7 @@
   const saveIdx = (l) => { try { localStorage.setItem(IDX, JSON.stringify(l.slice(0, 100))); } catch (_) {} };
   function indexPut(p) {
     const l = loadIdx().filter((x) => x.project !== p.project);
-    l.unshift({ project: p.project, title: p.title, sid: p.sessionId, step: p.step, at: Date.now() });
+    l.unshift({ project: p.project, title: p.title, sid: p.sessionId, step: p.step, at: Date.now(), ...(p.context && p.context.project ? { ctx: p.context.project, ctxName: p.context.name || '' } : {}) });
     saveIdx(l);
     if (window.hxMotion) window.hxMotion.remember(p.sessionId);
   }
@@ -265,7 +271,7 @@
           const f = await src.get(x.project);
           if (!f || !f.sessionId) return x;
           if (f.sessionId !== x.sid && window.hxMotion) window.hxMotion.remember(f.sessionId);
-          return { ...x, sid: f.sessionId, title: f.title || x.title, step: f.step || x.step };
+          return { ...x, sid: f.sessionId, title: f.title || x.title, step: f.step || x.step, ...(f.for ? { ctx: f.for.id, ctxName: f.for.name || '' } : {}) };
         }));
       }
       if (keep.length !== all.length || src.server) saveIdx(keep);
@@ -278,6 +284,172 @@
       }
       if (view === 'home') render();
     } catch (_) {}
+  }
+
+  // ── Tabbie Projects: a film can be made for one (a startup, an app). Its folders become the film's context. ──
+  const PJ = { list: null, loading: null, pick: '' };
+  function loadProjects() {
+    if (PJ.list || PJ.loading) return PJ.loading;
+    PJ.loading = fetchT('api/extensions/cc-agents/sidecar/projects', 10000).then((r) => (r.ok ? r.json() : null))
+      .then((d) => { PJ.list = (d && Array.isArray(d.projects) ? d.projects : []).filter((x) => x.status !== 'archived'); })
+      .catch(() => { PJ.list = null; }).finally(() => { PJ.loading = null; if (SL.open) paintGallery(); if (view === 'home') render(); });
+    return PJ.loading;
+  }
+  async function projectContext(id) {
+    try {
+      const r = await fetchT(`api/extensions/cc-agents/sidecar/projects/get?id=${encodeURIComponent(id)}`, 10000);
+      const p = r.ok ? await r.json() : null;
+      if (!p || !p.id) return null;
+      return { project: p.id, name: p.name || p.id, description: p.description || '', workspace: p.workspace || '',
+        primary: p.primary_folder || '', folders: (p.folders || []).map((f) => ({ id: f.id, label: f.label || f.id, path: f.path })) };
+    } catch (_) { return null; }
+  }
+  // the job text for a film made for a project: what to read, what never to touch
+  function contextBrief() {
+    const c = P && P.context;
+    if (!c || !c.project) return 'This is a studio step: no product source is needed, don\'t ask which app. ';
+    const q = (x) => String(x || '').replace(/"/g, '\'');
+    const fs = (c.folders || []).map((f) => `${q(f.label)} (${q(f.path)})${f.id === c.primary ? ' — primary' : ''}`).join('; ');
+    return `This film is for the user's project "${q(c.name)}"${c.description ? ` — ${q(c.description)}` : ''} (Tabbie project id ${c.project}). `
+      + `Its folders are the film's context: ${fs || 'none linked yet'}. They are READ ONLY for this job: never edit, commit, install or run anything in them. `
+      + `Before the first creative step, ground the film in the real product: README and docs, landing-page and marketing copy, the product name, tagline, audience and features (never invent ones it doesn't have), the brand (logo SVG/PNG, app icon, colours and fonts from theme/tailwind/CSS files), real UI screens, screenshots and illustrations. `
+      + `The project's memory can help too (\`hmem search "<words>" --project ${c.project}\` where Tabbie's hmem CLI is available). Copy any asset you use into public/${P.project}/ (never reference the project folders from the film). Keep a short note of what you learnt in ${pdir()}/CONTEXT.md and reuse it in later steps instead of re-reading everything. `;
+  }
+  // Saved colour profiles live on the Tabbie project (registry field "colours"), so every film for it can reuse them.
+  const CP = { pid: '', list: [], hash: '', loading: null, naming: false, err: '' };
+  const ctxPid = () => (P ? (P.context && P.context.project) || '' : (SL.forHome ? PJ.pick : '')) || '';
+  const ctxName = () => (P && P.context ? P.context.name : ((PJ.list || []).find((x) => x.id === PJ.pick) || {}).name) || 'this project';
+  function loadColours(force) {
+    const pid = ctxPid();
+    if (!pid) { CP.pid = ''; CP.list = []; return null; }
+    if (CP.pid === pid && !force) return CP.loading;
+    CP.pid = pid; CP.err = '';
+    CP.loading = fetchT(`api/extensions/cc-agents/sidecar/projects/get?id=${encodeURIComponent(pid)}`, 10000).then((r) => (r.ok ? r.json() : null))
+      .then((d) => { if (CP.pid !== pid || !d) return; CP.list = Array.isArray(d.colours) ? d.colours : []; CP.hash = d.hash || ''; })
+      .catch(() => {}).finally(() => { CP.loading = null; if (SL.open) paintGallery(); });
+    return CP.loading;
+  }
+  // any project's profiles (fresh read for the hash, then update): used by the gallery and the end-of-edit card
+  async function saveProjectColours(pid, fn) {
+    const g = await fetchT(`api/extensions/cc-agents/sidecar/projects/get?id=${encodeURIComponent(pid)}`, 10000);
+    const cur = g.ok ? await g.json() : null;
+    if (!cur) throw new Error('Could not reach the project.');
+    const r = await fetch('api/extensions/cc-agents/sidecar/projects/update', { method: 'POST', credentials: 'same-origin', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ id: pid, hash: cur.hash, colours: fn(Array.isArray(cur.colours) ? cur.colours : []) }) });
+    const d = await r.json().catch(() => ({}));
+    const old = /can't change colours/.test(d.error || '') || (r.ok && !Array.isArray(d.colours));  // a helper from before colours existed drops the field
+    if (old) throw new Error('Not saved: Tabbie\'s helper is out of date and needs a restart. Saving for all films works now.');
+    if (!r.ok) throw new Error(d.error || 'Could not save the colours to the project.');
+    if (CP.pid === pid) { CP.list = d.colours || []; CP.hash = d.hash || ''; }
+    const row = (PJ.list || []).find((x) => x.id === pid);
+    if (row) row.colours = d.colours || [];
+  }
+  const saveColours = (fn) => saveProjectColours(CP.pid, fn);
+  // global profiles (every film can use them) live in the studio: studio/colours.json
+  const GC = { list: null, loading: null };
+  const gcSid = () => (P && P.sessionId) || (loadIdx()[0] || {}).sid || '';
+  function loadGlobal(force) {
+    const sid = gcSid();
+    if (!sid || (GC.list && !force) || GC.loading) return GC.loading;
+    GC.loading = readJSON(sid, 'studio/colours.json').then((d) => { GC.list = d && Array.isArray(d.profiles) ? d.profiles : []; })
+      .finally(() => { GC.loading = null; if (SL.open) paintGallery(); else if (P && view === 'editor') render(); });
+    return GC.loading;
+  }
+  async function saveGlobal(fn) {
+    const sid = gcSid();
+    if (!sid) throw new Error('Open a film first, so the studio is reachable.');
+    const d = await readJSON(sid, 'studio/colours.json');
+    const list = fn(d && Array.isArray(d.profiles) ? d.profiles : []).slice(0, 48);
+    await writeJSON(sid, 'studio/colours.json', { schema: 'tabbie.motion-colours/1', profiles: list });
+    GC.list = list;
+  }
+  // save a profile to "global" or a project id; same name in the same place replaces it
+  function saveProfile(dest, name, colors) {
+    const item = { id: `cp-${Date.now().toString(36)}`, name, colors, at: new Date().toISOString() };
+    const put = (l) => [item, ...l.filter((x) => String(x.name).toLowerCase() !== name.toLowerCase())].slice(0, 24);
+    return dest === 'global' ? saveGlobal(put) : saveProjectColours(dest, put);
+  }
+  const deleteProfile = (dest, id) => (dest === 'global' ? saveGlobal((l) => l.filter((x) => x.id !== id)) : saveProjectColours(dest, (l) => l.filter((x) => x.id !== id)));
+  // the shared "name it, choose where" form
+  const SV = { open: '', err: '', ok: '' };
+  function saveForm(key) {
+    loadProjects();
+    const def = ctxPid() || 'global';
+    return `<div class="hxs-cp-name" data-sv="${key}"><input type="text" data-cp-name maxlength="40" placeholder="Name, e.g. Launch, Dark mode" autocomplete="off">
+      <select data-cp-dest aria-label="Save to"><option value="global"${def === 'global' ? ' selected' : ''}>All films</option>${(PJ.list || []).map((x) => `<option value="${esc(x.id)}"${def === x.id ? ' selected' : ''}>${esc(x.name || x.id)}</option>`).join('')}</select>
+      <button type="button" class="hxs-primary hxs-sm" data-cp-ok>Save</button><button type="button" class="hxs-ghost hxs-sm" data-cp-cancel>Cancel</button></div>`;
+  }
+  // the profile row inside the gallery's Colours section
+  // a profile's chip leads with its accents: they're what tells profiles apart
+  const chipSwatches = (c) => [...new Set(['accent', 'accent2', 'accent3', 'bg', 'ink', ...Object.keys(c)].filter((k) => c[k]).map((k) => c[k]))].slice(0, 5);
+  function colourProfiles(s) {
+    const pid = ctxPid();
+    if (pid) loadColours();
+    loadGlobal();
+    const roles = Object.keys(s.palette || {}), any = Object.keys(SL.colors).length;
+    const fits = (c) => Object.keys(c.colors || {}).filter((k) => roles.includes(k));
+    const chips = (list, dest) => list.map((c) => { const n = fits(c); return `<span class="hxs-cp${n.length ? '' : ' is-off'}"><button type="button" data-cp="${esc(c.id)}" data-cp-from="${esc(dest)}"${n.length ? '' : ' disabled title="None of these colour roles are in this style"'}>
+        <i>${chipSwatches(c.colors).map((v) => `<em style="background:${esc(v)}"></em>`).join('')}</i><span>${esc(c.name)}</span></button><button type="button" class="hxs-cp-x" data-cp-del="${esc(c.id)}" data-cp-from="${esc(dest)}" aria-label="Delete ${esc(c.name)}" title="Delete">×</button></span>`; }).join('');
+    loadProjects();
+    const groups = (PJ.list || []).map((x) => ({ id: x.id, name: x.name || x.id, list: x.id === pid && CP.pid === pid ? CP.list : (x.colours || []) }))
+      .filter((g) => g.list.length).sort((a, b) => (b.id === pid) - (a.id === pid));
+    const gc = chips(GC.list || [], 'global'), pc = groups.length;
+    return `<div class="hxs-cps"><div class="hxs-cps-h"><b>Saved colours</b>${any && SV.open !== 'gal' ? '<button type="button" class="hxs-link" data-cp-save="gal">Save these</button>' : ''}</div>
+      ${SV.open === 'gal' ? saveForm('gal') : ''}
+      ${groups.map((g) => `<span class="hxs-cps-t">${esc(g.name)}</span><div class="hxs-cp-l">${chips(g.list, g.id)}</div>`).join('')}
+      ${gc ? `${pc ? '<span class="hxs-cps-t">All films</span>' : ''}<div class="hxs-cp-l">${gc}</div>` : ''}
+      ${!pc && !gc ? `<p class="hxs-note">${any ? 'Save these colours for a project or for all films, and reuse them in one tap.' : 'Change a colour, then save it to reuse in other films.'}</p>` : ''}
+      ${SV.ok ? `<p class="hxs-note">${esc(SV.ok)}</p>` : ''}${SV.err ? `<p class="hxs-note is-bad">${esc(SV.err)}</p>` : ''}</div>`;
+  }
+  // Save / Cancel / Enter for the shared form; `colours()` gives the hex roles to save
+  function onSaveClick(t, scope, colours, repaint) {
+    const sv = t.closest('[data-cp-save]');
+    if (sv) { SV.open = sv.dataset.cpSave; SV.err = ''; SV.ok = ''; repaint(); const i = scope.querySelector('[data-cp-name]'); if (i) i.focus(); return true; }
+    if (t.closest('[data-cp-cancel]')) { SV.open = ''; repaint(); return true; }
+    if (!t.closest('[data-cp-ok]')) return false;
+    const box = t.closest('[data-sv]'), i = box.querySelector('[data-cp-name]'), name = ((i && i.value) || '').trim(), dest = box.querySelector('[data-cp-dest]').value;
+    if (!name) { if (i) { i.classList.add('is-bad'); i.focus(); } return true; }
+    const c = colours();
+    for (const k of Object.keys(c)) if (!isHex(c[k])) delete c[k];
+    SV.open = ''; SV.err = ''; SV.ok = '';
+    const where = dest === 'global' ? 'all films' : (((PJ.list || []).find((x) => x.id === dest) || {}).name || 'the project');
+    saveProfile(dest, name, c).then(() => { SV.ok = `Saved “${name}” for ${where}.`; }).catch((e2) => { SV.err = e2.message; }).finally(() => repaint());
+    repaint();
+    return true;
+  }
+  function projectPicker() {
+    loadProjects();
+    const l = PJ.list || [];
+    if (!l.length) return '';
+    return `<label class="hxs-pj"><span>${icon('Briefcase01Icon', 16)}For</span><select name="ctx" data-pj>
+      <option value="">No project</option>${l.map((x) => `<option value="${esc(x.id)}"${PJ.pick === x.id ? ' selected' : ''}>${esc(x.name || x.id)}</option>`).join('')}</select></label>`;
+  }
+
+  // ── formats: the film's frame. Every job composes natively for it and fills it edge to edge. ──
+  const FORMATS = [['16:9', 1920, 1080, 'Landscape'], ['9:16', 1080, 1920, 'Vertical'], ['1:1', 1080, 1080, 'Square'],
+    ['4:5', 1080, 1350, 'Portrait'], ['4:3', 1440, 1080, 'Classic'], ['21:9', 2520, 1080, 'Cinema']];
+  const FM = { pick: '16:9', w: 1920, h: 1080 };
+  const fmtOf = (x) => { const f = x || (P && P.format); return f && f.width && f.height ? f : { id: '16:9', width: 1920, height: 1080 }; };
+  const fmtMake = (id, w, h) => { const k = FORMATS.find((x) => x[0] === id); return k ? { id, width: k[1], height: k[2] } : { id: 'custom', width: w, height: h }; };
+  const evenPx = (v) => Math.max(240, Math.min(4096, Math.round((+v || 0) / 2) * 2));
+  // the format line every creative job gets (storyboard, render, revisions)
+  function formatBrief() {
+    const f = fmtOf(), r = f.width / f.height;
+    const shape = r > 1.2 ? 'landscape' : r < 0.85 ? 'vertical' : 'square';
+    const prev = P.format && P.format.previous && F.storyboard && F.storyboard.frames && F.storyboard.frames.length
+      ? ` The format changed from ${P.format.previous} to ${f.id === 'custom' ? `${f.width}×${f.height}` : f.id}: recompose every storyboard frame for the new frame (same moments, story and anchors), and bump "version".` : '';
+    return ` Format: ${f.width}×${f.height} (${f.id === 'custom' ? 'custom' : f.id}, ${shape}), 30 fps. Register the film's Composition at exactly ${f.width}×${f.height} and render at that size. `
+      + `Compose natively for this frame: layouts, type sizes, grids, camera framing and every transition designed for ${shape}, using useVideoConfig() width/height (never hard-coded 1920×1080). `
+      + `FILL THE WHOLE FRAME edge to edge in every frame: no letterbox or pillarbox bars, no empty bands, no 16:9 layout scaled or centred inside it; backgrounds, fields and textures always reach all four edges. `
+      + `${shape === 'vertical' ? 'Keep essential text and the mark inside the central safe zone (top 12 % and bottom 18 % free of key copy for platform UI); stack content vertically and go bigger, not wider. ' : shape === 'square' ? 'Centre-weighted compositions; stack or grid content, keep 6 % margins for key copy. ' : ''}`
+      + `Before finishing, check stills from the start, middle and end at ${f.width}×${f.height}: content and background must reach all edges and nothing important may be cropped; ffprobe the render to confirm ${f.width}×${f.height}.${prev}`;
+  }
+  function formatPicker(cur, locked, act) {
+    const f = fmtOf(cur);
+    const box = (w, h) => { const m = Math.max(w, h); return `<i style="width:${Math.round((w / m) * 18)}px;height:${Math.round((h / m) * 18)}px"></i>`; };
+    return `<div class="hxs-fmt" role="group" aria-label="Format">${FORMATS.map(([id, w, h, name]) => `<button type="button" class="${f.id === id ? 'is-on' : ''}" data-${act}="${id}" title="${name} · ${w}×${h}"${locked ? ' disabled' : ''}>${box(w, h)}<span>${id}</span></button>`).join('')}
+      <button type="button" class="${f.id === 'custom' ? 'is-on' : ''}" data-${act}="custom"${locked ? ' disabled' : ''}>${box(f.id === 'custom' ? f.width : 5, f.id === 'custom' ? f.height : 4)}<span>${f.id === 'custom' ? `${f.width}×${f.height}` : 'Custom'}</span></button></div>
+      ${f.id === 'custom' && !locked ? `<div class="hxs-fmt-c"><label>W <input type="number" min="240" max="4096" step="2" value="${f.width}" data-${act}-w></label><label>H <input type="number" min="240" max="4096" step="2" value="${f.height}" data-${act}-h></label><span>px</span></div>` : ''}`;
   }
 
   // ── state ─────────────────────────────────────────────────────────────────────────────────────
@@ -356,11 +528,12 @@
       return null;
     }
     const id = `${kind}-${Date.now().toString(36)}`;
+    const fb = /audio|trim|analy/.test(kind) ? '' : formatBrief() + brandBrief();
     const msg = `/motion [studio:${kind} job=${id}] Motion studio project "${P.title}" (slug ${P.project}; its files are in ${HOME}/${pdir()}/). `
       + `${text} When this step is finished, write ${HOME}/${pdir()}/jobs/${id}.json as {"status":"done","note":"<one line>"} `
       + `(or {"status":"failed","note":"<why>"}). While you work you may keep that file as {"status":"running","stage":"<what you're doing now, a few plain words>"}; add "progress" (0 to 1) only when you can measure it, e.g. rendered/total frames. `
-      + `This is a studio step: no product source is needed, don't ask which app. `
-      + `This film is a NEW, standalone piece: build it from scratch in src/compositions/${P.project}/ (and src/components/${P.project}/). Never open, copy or adapt earlier films (other folders in src/compositions/ or src/components/, other studio/ projects, output/), even for the same product. Only the product's brand assets (logo, colours, fonts, real UI screens) and the studio's generic primitives (src/effects, camera, transitions, src/audio/sync) may be used.`;
+      + contextBrief()
+      + `This film is a NEW, standalone piece: build it from scratch in src/compositions/${P.project}/ (and src/components/${P.project}/). Never open, copy or adapt earlier films (other folders in src/compositions/ or src/components/, other studio/ projects, output/), even for the same product. Only the product's brand assets (logo, colours, fonts, real UI screens) and the studio's generic primitives (src/effects, camera, transitions, src/audio/sync) may be used.${fb}`;
     const box = document.getElementById('msg');
     if (!box || typeof window.send !== 'function') throw new Error('Composer not ready.');
     box.value = msg;
@@ -483,7 +656,7 @@
     if (trimming()) return trimSrcUrl();
     if (local.audioUrl && !F.analysis) return local.audioUrl;
     if (P && F.analysis && canonical.path) return rawUrl(P.sessionId, canonical.path);
-    if (P && P.audio && P.audio.path) return rawUrl(P.sessionId, P.audio.path);
+    if (P && P.audio && P.audio.path) return rawUrl(P.sessionId, studioRel(P.audio.path));
     if (P && F.analysis && F.analysis.source && F.analysis.source.path) return rawUrl(P.sessionId, F.analysis.source.path);
     return local.audioUrl || '';
   }
@@ -559,10 +732,16 @@
   const PRESETS = [['full', 'Full track'], [15000, '15s'], [30000, '30s'], [60000, '60s']];
   const FADES = [0, 50, 300];
   const fmtMs = (ms) => (window.hxScrub ? window.hxScrub.fmt(ms) : fmt(ms));
+  // Studio-relative path. Jobs sometimes write it relative to the film folder ("../../public/…") or absolute.
+  function studioRel(x) {
+    if (!x) return x;
+    const s = String(x).replace(/\\/g, '/'), i = s.indexOf('/public/');
+    return /^(\.\.?\/)+/.test(s) || s.startsWith('/') ? (i >= 0 ? s.slice(i + 1) : s.replace(/^(\.\.?\/)+/, '')) : s;
+  }
   function trimSource() {
     const a = P && P.audio;
     if (!a) return null;
-    return a.sourcePath || (a.trim && a.trim.source) || (!a.trim && a.path && !/\/edit\.wav$/.test(a.path) ? a.path : null);
+    return studioRel(a.sourcePath || (a.trim && a.trim.source) || (!a.trim && a.path && !/\/edit\.wav$/.test(a.path) ? a.path : null));
   }
   function trimming() {
     const a = P && P.audio;
@@ -658,7 +837,7 @@
     if (t.fadeInMs) af.push(`afade=t=in:st=0:d=${S(t.fadeInMs)}`);
     if (t.fadeOutMs) af.push(`afade=t=out:st=${S(len - t.fadeOutMs)}:d=${S(t.fadeOutMs)}`);
     const out = `public/audio/music/${P.project}/edit.wav`;
-    P.audio = { ...P.audio, sourcePath: P.audio.sourcePath || src, trim: t, status: 'analysing', path: null };
+    P.audio = { ...P.audio, sourcePath: studioRel(P.audio.sourcePath) || src, trim: t, status: 'analysing', path: null };
     if (F.keypoints && (F.keypoints.points || []).length) { F.keypoints.points = []; kpSel = null; saveKeypoints(); }
     local.retrim = false; TR.init = false;
     await saveProject();
@@ -1300,6 +1479,7 @@
   // Locks: the track once the film is past Mapping, the sketches once a storyboard was asked for.
   // Locked steps stay viewable (the track still plays, the sketches still show). To change them: a new film.
   const audioLocked = () => !!P && (!!P.sketchesDone || (P.furthest || 0) >= 2 || STEPS.findIndex((x) => x[0] === P.step) >= 2);
+  const brandLocked = () => !!P && ((P.storyboard && P.storyboard.status === 'approved') || active());
   const sketchesLocked = () => !!P && ((P.storyboard && /^(requested|ready|approved|revise)$/.test(P.storyboard.status || '')) || (P.jobs || []).some((j) => j.kind === 'storyboard'));
   const lockNote = (t) => `<p class="hxs-lock">${icon('LockPasswordIcon', 16)}<span>${t}</span></p>`;
   // How far the flow can go: audio -> mapping -> sketches -> storyboard -> editor (after approval).
@@ -1312,9 +1492,387 @@
     return 4;
   }
 
+  // ── the style gallery (sidecar GET …/motion/styles + style-media; hmem/motion.py styles()) ─────────
+  // A film is made in one style from the studio's library (styles/<id>/style.json + STYLE.md). The choice lives
+  // in project.json "style": {id: 'auto' | '<id>' | 'custom', blend?: {id, take}, custom?: {description, references}}.
+  // 'auto' = Zoetie recommends one from the brief (the storyboard job writes storyboard.json "style" + reason +
+  // alternatives; one tap switches). Changing the style keeps everything else; the storyboard is redrawn in it.
+  // The gallery is one persistent element (like the chat dock) so re-renders never restart its previews.
+  const SL = { list: null, loading: null, open: false, pick: null, preview: null, blend: '', take: ['palette'], custom: '', refs: [], draft: null, colors: {} };
+  const smedia = (id, f) => `${SIDE}style-media?id=${encodeURIComponent(id)}&f=${f}`;
+  const styleById = (id) => (SL.list || []).find((s) => s.id === id) || null;
+  // colours are the user's: every role in a style's palette can be recoloured per film (style.overrides.palette);
+  // the style keeps its colour logic (which role goes where), the film uses these values
+  const ROLE = { bg: 'Background', surface: 'Surface', ink: 'Text', muted: 'Secondary text', accent: 'Accent', accent2: 'Second accent', night: 'Dark' };
+  const roleName = (k) => ROLE[k] || cap(k.replace(/([a-z])([A-Z0-9])/g, '$1 $2').toLowerCase());
+  const isHex = (v) => /^#[0-9a-f]{6}$/i.test(v || '');
+  const overColors = (sel) => (sel && sel.overrides && sel.overrides.palette) || {};
+  const shownSwatches = (s, sel, n = 5) => {  // the colours a film in this style will actually use
+    const o = overColors(sel);
+    if (!Object.keys(o).length) return (s.swatches || []).slice(0, n);
+    const p = { ...(s.palette || {}), ...o };
+    return ['bg', 'ink', 'accent', 'accent2', 'surface', 'muted'].map((k) => p[k]).filter(Boolean).slice(0, n);
+  };
+  function loadStyles() {
+    if (SL.list || SL.loading) return SL.loading;
+    SL.failed = false;
+    SL.loading = fetchT(`${SIDE}styles`, 20000).then((r) => (r.ok ? r.json() : null)).then((d) => {
+      if (d && Array.isArray(d.styles)) SL.list = d.styles; else SL.failed = true;
+    }).catch(() => { SL.failed = true; }).finally(() => { SL.loading = null; render(); paintGallery(); });  // a failure isn't kept: the next open asks again
+    return SL.loading;
+  }
+  // the style this film is in right now: the user's pick, else Zoetie's recommendation once the storyboard has one
+  const filmStyle = () => (P && P.style) || { id: 'auto' };
+  const effStyle = () => { const s = filmStyle(); return s.id === 'auto' ? ((F.storyboard && F.storyboard.style) || 'auto') : s.id; };
+  const archName = (id) => { const s = styleById(effStyle()); const a = s && (s.archetypes || []).find((x) => x.id === id); return a ? a.name : id || ''; };
+  const swatches = (s, n = 5, sel) => shownSwatches(s, sel, n).map((c) => `<i style="background:${esc(c)}"></i>`).join('');
+  function styleChip(sel, act) {  // the compact "Style" control (home form, Storyboard card)
+    const id = sel.id, s = styleById(id);
+    const label = id === 'auto' ? `${NAME} recommends` : id === 'custom' ? 'Custom style' : s ? s.name : id;
+    const sub = id === 'auto' ? 'Picked from your brief' : id === 'custom' ? (sel.custom && sel.custom.description) || 'Your references' : s ? s.tagline : '';
+    const th = s && s.html ? liveSlot(s, overColors(sel)) : s && s.thumb ? `<img src="${smedia(s.id, 'thumb')}" alt="" loading="lazy">` : `<span class="hxs-sc-ph${id === 'custom' ? ' is-custom' : ''}">${icon(id === 'custom' ? 'AiMagicIcon' : 'SparklesIcon', 18)}</span>`;
+    return `<button type="button" class="hxs-schip" data-act="${act}"><span class="hxs-schip-m">${th}</span>
+      <span class="hxs-schip-t"><em>Style</em><b>${esc(label)}${sel.blend && sel.blend.id && styleById(sel.blend.id) ? ` <small>+ ${esc(styleById(sel.blend.id).name)}</small>` : ''}</b><span>${esc(sub)}</span></span>
+      <span class="hxs-schip-c">${s ? `<span class="hxs-sw">${swatches(s, 4, sel.id === s.id ? sel : null)}</span>` : ''}${icon('ArrowRight01Icon', 16)}</span></button>`;
+  }
+  function styleCard(storyboardLocked) {  // Storyboard step: the film's style + Zoetie's recommendation
+    const sel = filmStyle(), rec = F.storyboard && F.storyboard.style, drawn = F.storyboard && F.storyboard.frames && F.storyboard.frames.length ? rec : null;
+    const alts = (F.storyboard && Array.isArray(F.storyboard.styleAlternatives) ? F.storyboard.styleAlternatives : []).filter((x) => styleById(x) && x !== effStyle()).slice(0, 3);
+    const recNote = sel.id === 'auto' && rec && styleById(rec) ? `<p class="hxs-note">${NAME} picked <b>${esc(styleById(rec).name)}</b>${F.storyboard.styleReason ? `: ${esc(F.storyboard.styleReason)}` : ''}</p>` : '';
+    const changed = drawn && effStyle() !== 'auto' && effStyle() !== drawn && styleById(drawn) ? `<p class="hxs-note hxs-style-chg">${icon('RefreshIcon', 14)}<span>The storyboard is in ${esc(styleById(drawn).name)}. Redraw it in ${esc((styleById(effStyle()) || {}).name || 'the new style')}; the moments, story and copy stay.</span><button type="button" class="hxs-ghost hxs-sm" data-act="sb-restyle"${blocked() ? ' disabled' : ''}>Redraw</button></p>` : '';
+    return `<div class="hxs-card hxs-style-card">${styleChip(sel.id === 'auto' && rec && styleById(rec) ? { ...sel, id: rec } : sel, storyboardLocked ? 'style-info' : 'style-open')}${recNote}
+      ${alts.length && !storyboardLocked ? `<div class="hxs-style-alts"><span>Also a fit:</span>${alts.map((x) => `<button type="button" class="hxs-ghost hxs-sm" data-style-use="${esc(x)}">${esc(styleById(x).name)}</button>`).join('')}</div>` : ''}${changed}</div>`;
+  }
+  // Live thumbnails: each style's styles/<id>/thumb.html (HTML/CSS whose colours are the palette roles as CSS
+  // variables) runs in a sandboxed frame (no scripts; same origin only so the panel can set the variables).
+  // Recolouring a film repaints them instantly; hovering plays their CSS animation. No thumb.html: the rendered jpg.
+  const HTML = {};
+  const htmlFor = (id) => HTML[id] || (HTML[id] = fetchT(smedia(id, 'html'), 15000).then((r) => (r.ok ? r.text() : '')).catch(() => { delete HTML[id]; return ''; }));
+  const cssFont = (f, fb) => (f ? `'${String(f).replace(/'/g, '')}', ${fb}` : fb);
+  function liveVars(s, over) {
+    const p = { ...(s.palette || {}), ...(over || {}) }, f = s.fonts || [];
+    const v = Object.entries(p).filter(([k, c]) => /^[a-z][a-z0-9]*$/i.test(k) && isHex(c)).map(([k, c]) => `--${k}:${c}`);
+    v.push(`--display:${cssFont(s.display, 'system-ui, sans-serif')}`, `--text:${cssFont(s.text || s.display, 'system-ui, sans-serif')}`,
+      `--mono:${cssFont((f[2] || {}).family, 'ui-monospace, Menlo, monospace')}`);
+    return v.join(';');
+  }
+  const fontLinks = (s) => (s.fonts || []).map((f) => {
+    const w = (f.weights || []).filter((x) => /^\d{3}$/.test(x)).sort();
+    return `<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=${encodeURIComponent(f.family).replace(/%20/g, '+')}${w.length ? `:wght@${w.join(';')}` : ''}&display=swap">`;
+  }).join('');
+  const liveSlot = (s, over, cls = '') => `<span class="hxs-live${cls}" data-live="${esc(s.id)}" data-over="${esc(JSON.stringify(over || {}))}"></span>`;
+  // fill every empty live slot in `scope` (after a paint), and keep its colours current
+  function hydrateLive(scope) {
+    if (!scope) return;
+    scope.querySelectorAll('.hxs-live[data-live]').forEach((el) => {
+      const s = styleById(el.dataset.live);
+      if (!s || !s.html || el.querySelector('iframe')) return;
+      let over = {};
+      try { over = JSON.parse(el.dataset.over || '{}'); } catch (_) {}
+      htmlFor(s.id).then((frag) => {
+        if (!frag || !el.isConnected || el.querySelector('iframe')) return;
+        const f = document.createElement('iframe');
+        f.setAttribute('sandbox', 'allow-same-origin');
+        f.setAttribute('tabindex', '-1');
+        f.setAttribute('aria-hidden', 'true');
+        f.srcdoc = `<!doctype html><html style="${esc(liveVars(s, over))}"${el.classList.contains('is-play') && !reducedMotion() ? ' class="play from-start"' : ''}><head><meta charset="utf-8">${fontLinks(s)}<style>html,body{margin:0;width:100%;height:100%;overflow:hidden}body{position:relative}*{box-sizing:border-box}html:not(.play) *,html:not(.play) *::before,html:not(.play) *::after{animation-play-state:paused!important}html.from-start .s{--rest:0s!important}html.reset *,html.reset *::before,html.reset *::after{animation:none!important}</style></head><body>${frag}</body></html>`;
+        f.addEventListener('load', () => el.classList.add('is-ready'), { once: true });
+        el.appendChild(f);
+      });
+    });
+  }
+  function recolorLive(id, over, scope) {
+    const s = styleById(id);
+    if (!s) return;
+    (scope ? [...scope.querySelectorAll(`.hxs-live[data-live="${CSS.escape(id)}"]`)] : []).forEach((el) => { el.dataset.over = JSON.stringify(over || {}); });
+    const css = liveVars(s, over);
+    (scope ? [...scope.querySelectorAll(`.hxs-live[data-live="${CSS.escape(id)}"] iframe`)] : []).forEach((f) => { try { f.contentDocument.documentElement.style.cssText = css; } catch (_) {} });
+  }
+  // Hover plays the edit from its first frame; leaving puts the card back on its resting thumbnail (not a pause).
+  // Both restart the CSS animations: --rest 0 + play from the start, or the style's --rest, paused.
+  function playLive(el, on) {
+    const f = el && el.querySelector('.hxs-live iframe, iframe');
+    let doc = null;
+    try { doc = f && f.contentDocument; } catch (_) {}
+    if (!doc || !doc.documentElement) return;
+    const h = doc.documentElement, run = !!on && !reducedMotion();
+    h.classList.toggle('from-start', run);
+    h.classList.toggle('play', run);
+    h.classList.add('reset');
+    void h.offsetWidth;  // restyle with no animations, so they start again from their (new) delay
+    h.classList.remove('reset');
+  }
+  // the live preview's phases under each card; while it plays, a playhead and the current phase follow its clock
+  const beatStrip = (s) => {
+    const L = s.live || {}, b = (L.beats || []).filter((x) => x.label);
+    if (!s.html || !b.length) return '';
+    return `<span class="hxs-bs" data-bs="${esc(s.id)}" style="--T:${+L.seconds || 6}s;--rest:${((+L.rest || 0) * (+L.seconds || 6)).toFixed(2)}s">
+      <span class="hxs-bs-t">${b.map((x, i) => `<i style="left:${(x.at * 100).toFixed(1)}%;width:${(((b[i + 1] ? b[i + 1].at : 1) - x.at) * 100).toFixed(1)}%"></i>`).join('')}<em></em></span>
+      <span class="hxs-bs-l">${esc((b.filter((x) => x.at <= (+L.rest || 0)).pop() || b[0]).label)}</span></span>`;
+  };
+  const clocks = new Map();
+  function beatClock(card, on) {
+    const bs = card && card.querySelector('.hxs-bs');
+    if (!bs) return;
+    clearInterval(clocks.get(bs)); clocks.delete(bs);
+    bs.classList.remove('is-play');
+    void bs.offsetWidth;  // restart the playhead from 0
+    bs.classList.toggle('is-play', !!on && !reducedMotion());
+    const s = styleById(bs.dataset.bs), L = (s && s.live) || {}, T = (+L.seconds || 6) * 1000, b = (L.beats || []).filter((x) => x.label);
+    const lab = bs.querySelector('.hxs-bs-l'), t0 = performance.now();  // playback always starts at the edit's first frame
+    const tick = () => { const f = ((performance.now() - t0) % T) / T; const cur = b.filter((x) => x.at <= f + 1e-6).pop() || b[0]; if (cur && lab.textContent !== cur.label) lab.textContent = cur.label; };
+    if (on && !reducedMotion()) { tick(); clocks.set(bs, setInterval(tick, 120)); } else if (b.length) { const r = +L.rest || 0; lab.textContent = (b.filter((x) => x.at <= r).pop() || b[0]).label; }
+  }
+  let gal = null;
+  function ensureGallery() {
+    if (gal) return gal;
+    gal = document.createElement('div');
+    gal.className = 'hxs-gal-wrap';
+    gal.addEventListener('click', onGalleryClick);
+    gal.addEventListener('input', (e) => {
+      if (e.target.matches('[data-custom]')) SL.custom = e.target.value;
+      if (e.target.matches('[data-col]')) setColor(e.target.dataset.col, e.target.value, e.target);
+      if (e.target.matches('[data-col-hex]')) { let v = e.target.value.trim(); if (/^[0-9a-f]{6}$/i.test(v)) v = '#' + v; if (isHex(v)) setColor(e.target.dataset.colHex, v, e.target); }
+    });
+    gal.addEventListener('change', (e) => {
+      if (e.target.matches('[data-blend]')) { SL.blend = e.target.value; paintGallery(); }
+      if (e.target.matches('[data-take]')) { const k = e.target.value; SL.take = e.target.checked ? [...new Set([...SL.take, k])] : SL.take.filter((x) => x !== k); }
+      if (e.target.matches('[data-refs]')) { SL.refs = [...SL.refs, ...Array.from(e.target.files || [])].slice(0, 6); paintGallery(); }
+    });
+    // previews play on hover (desktop) or when a card is focused; never all at once, never preloaded
+    const MQ = '.hxs-sc-m[data-vid], .hxs-sc-m:has(.hxs-live)';
+    gal.addEventListener('pointerover', (e) => { const m = e.target.closest && e.target.closest('.hxs-sc-m'); if (m && m.matches(MQ) && e.pointerType === 'mouse') playIn(m); });
+    gal.addEventListener('pointerout', (e) => { const m = e.target.closest && e.target.closest('.hxs-sc-m'); if (m && m.matches(MQ) && !m.contains(e.relatedTarget)) stopIn(m); });
+    gal.addEventListener('focusin', (e) => { const c = e.target.closest && e.target.closest('.hxs-sc'); const m = c && c.querySelector('.hxs-sc-m'); if (m && m.matches(MQ)) playIn(m); });
+    gal.addEventListener('focusout', (e) => { const c = e.target.closest && e.target.closest('.hxs-sc'); const m = c && c.querySelector('.hxs-sc-m'); if (m && m.matches(MQ) && !c.contains(e.relatedTarget)) stopIn(m); });
+    gal.addEventListener('keydown', (e) => { if (e.key === 'Enter' && e.target.matches('[data-cp-name]')) { e.preventDefault(); const b = gal.querySelector('[data-cp-ok]'); if (b) b.click(); return; } if (e.key === 'Escape') { e.stopPropagation(); if (SL.preview) { SL.preview = null; paintGallery(); } else closeGallery(); } });
+    return gal;
+  }
+  // a colour change repaints only its own row (no full repaint, so the picker stays open while dragging)
+  function setColor(k, v, from) {
+    const s = styleById(SL.preview), base = s && s.palette && s.palette[k];
+    v = v.toUpperCase();
+    if (base && base.toUpperCase() === v) delete SL.colors[k]; else SL.colors[k] = v;
+    const row = from.closest('.hxs-col');
+    row.classList.toggle('is-set', !!SL.colors[k]);
+    row.querySelector('.hxs-col-w').style.background = v;
+    const hex = row.querySelector('[data-col-hex]'), pick = row.querySelector('[data-col]');
+    if (hex !== from) hex.value = v;
+    if (pick !== from) pick.value = v.toLowerCase();
+    recolorLive(SL.preview, SL.colors, gal);
+    const h = gal.querySelector('.hxs-gp-col-h'), any = Object.keys(SL.colors).length;
+    if (h && !!h.querySelector('[data-col-reset]') !== !!any) h.lastElementChild.outerHTML = any ? '<button type="button" class="hxs-ghost hxs-sm" data-col-reset>Reset to the style’s</button>' : '<span>Tap a colour to change it</span>';
+    const cps = gal.querySelector('.hxs-cps'), st = styleById(SL.preview);
+    if (cps && st && !SV.open && !!cps.querySelector('[data-cp-save]') !== !!any) cps.outerHTML = colourProfiles(st);
+  }
+  function playIn(m) {
+    beatClock(m.closest('.hxs-sc'), true);
+    if (m.querySelector('.hxs-live')) return playLive(m, true);
+    if (reducedMotion() || m.querySelector('video')) return;
+    const v = document.createElement('video');
+    Object.assign(v, { muted: true, loop: true, playsInline: true, preload: 'auto', src: m.dataset.vid });
+    v.setAttribute('aria-hidden', 'true');
+    v.addEventListener('playing', () => m.classList.add('is-playing'), { once: true });
+    m.appendChild(v);
+    v.play().catch(() => {});
+  }
+  function stopIn(m) { beatClock(m.closest('.hxs-sc'), false); if (m.querySelector('.hxs-live')) return playLive(m, false); const v = m.querySelector('video'); m.classList.remove('is-playing'); if (v) { v.pause(); v.removeAttribute('src'); v.load(); v.remove(); } }
+  function openGallery(forHome) {
+    const cur = forHome ? (SL.draft || { id: 'auto' }) : filmStyle();
+    Object.assign(SL, { open: true, forHome: !!forHome, pick: cur.id, preview: null, blend: (cur.blend && cur.blend.id) || '', take: (cur.blend && cur.blend.take) || ['palette'],
+      custom: (cur.custom && cur.custom.description) || '', refs: [], colors: { ...overColors(cur) }, colorsFor: cur.id });
+    loadStyles();
+    SV.open = ''; SV.err = ''; SV.ok = '';
+    if (!PJ.loading) { PJ.list = null; loadProjects(); }  // fresh: sets saved in another tab show up
+    paintGallery();
+    const f = gal && gal.querySelector('.hxs-sc.is-on, .hxs-sc');
+    if (f) f.focus({ preventScroll: true });
+  }
+  function closeGallery() { SL.open = false; SL.preview = null; paintGallery(); }
+  function galleryCard(s) {
+    const on = SL.pick === s.id;
+    return `<button type="button" class="hxs-sc${on ? ' is-on' : ''}" data-style="${esc(s.id)}" aria-pressed="${on}">
+      <span class="hxs-sc-m"${!s.html && s.preview ? ` data-vid="${smedia(s.id, 'preview')}"` : ''} style="background:${esc(s.bg || '#888')}">${s.html ? liveSlot(s, s.id === SL.colorsFor ? SL.colors : {}) : s.thumb ? `<img src="${smedia(s.id, 'thumb')}" alt="" loading="lazy" decoding="async">` : ''}
+${on ? `<span class="hxs-sc-ok">${icon('Tick02Icon', 14)}</span>` : ''}</span>
+      ${beatStrip(s)}
+      <span class="hxs-sc-b"><b><i class="hxs-sc-no">${esc(s.number)}</i>${esc(s.name)}</b><span>${esc(s.motionSummary || s.tagline)}</span>
+        <span class="hxs-sc-f"><span class="hxs-sw">${swatches(s)}</span><em>${esc(s.display)}${s.step > 1 ? ' · on twos' : ''}</em></span></span></button>`;
+  }
+  function galleryPreview(s) {
+    const others = (SL.list || []).filter((x) => x.id !== s.id);
+    return `<div class="hxs-gp" role="dialog" aria-label="${esc(s.name)}">
+      <div class="hxs-gp-mw"><div class="hxs-gp-m" style="background:${esc(s.bg || '#111')}">${s.html && !SL.sample ? liveSlot(s, SL.colors, ' is-play') : s.preview ? `<video src="${smedia(s.id, 'preview')}" muted loop playsinline autoplay preload="auto"${s.thumb ? ` poster="${smedia(s.id, 'thumb')}"` : ''}></video>` : s.thumb ? `<img src="${smedia(s.id, 'thumb')}" alt="">` : ''}</div>
+        ${s.html && !SL.sample ? beatStrip(s).replace('class="hxs-bs"', 'class="hxs-bs is-play"') : ''}
+        ${s.html && s.preview ? `<div class="hxs-seg hxs-gp-seg" role="group" aria-label="Preview"><button type="button" class="${SL.sample ? '' : 'is-on'}" data-sample="0">Your colours</button><button type="button" class="${SL.sample ? 'is-on' : ''}" data-sample="1">Motion sample</button></div>` : ''}</div>
+      <div class="hxs-gp-b">
+        <div class="hxs-gp-h"><span class="hxs-sc-n">${esc(s.number)}</span><h3>${esc(s.name)}</h3></div>
+        <p class="hxs-gp-d">${esc(s.description)}</p>
+${editSystem(s)}
+        <div class="hxs-gp-col"><div class="hxs-gp-col-h"><b>Colours</b>${Object.keys(SL.colors).length ? '<button type="button" class="hxs-ghost hxs-sm" data-col-reset>Reset to the style’s</button>' : '<span>Tap a colour to change it</span>'}</div>
+          <div class="hxs-gp-cols">${Object.entries(s.palette || {}).map(([k, v]) => { const cur = SL.colors[k] || v; return `<label class="hxs-col${SL.colors[k] ? ' is-set' : ''}">
+            <span class="hxs-col-w" style="background:${esc(cur)}"><input type="color" data-col="${esc(k)}" value="${esc(cur.toLowerCase())}" aria-label="${esc(roleName(k))} colour"></span>
+            <span class="hxs-col-t"><b>${esc(roleName(k))}</b><input type="text" data-col-hex="${esc(k)}" value="${esc(cur.toUpperCase())}" maxlength="7" spellcheck="false" autocomplete="off" aria-label="${esc(roleName(k))} hex"></span></label>`; }).join('')}</div>
+          ${colourProfiles(s)}
+          ${Object.keys(SL.colors).length && SL.sample ? '<p class="hxs-note">The motion sample is in the style’s own colours; your film uses yours.</p>' : ''}</div>
+        <div class="hxs-gp-blend"><span class="hxs-bl-t">Blend with${SL.blend ? ` <b>${esc((styleById(SL.blend) || {}).name || '')}</b>` : ''}</span>
+          <div class="hxs-bl" role="radiogroup" aria-label="Blend with">
+            <button type="button" role="radio" aria-checked="${!SL.blend}" class="hxs-bl-i${SL.blend ? '' : ' is-on'}" data-blend-pick=""><span class="hxs-bl-m hxs-bl-none">${icon('Cancel01Icon', 18)}</span><span>Keep it pure</span></button>
+            ${others.map((o) => `<button type="button" role="radio" aria-checked="${SL.blend === o.id}" class="hxs-bl-i${SL.blend === o.id ? ' is-on' : ''}" data-blend-pick="${esc(o.id)}" title="${esc(o.name)}: ${esc(o.tagline || '')}"><span class="hxs-bl-m" style="background:${esc(o.bg || '#888')}">${o.thumb ? `<img src="${smedia(o.id, 'thumb')}" alt="" loading="lazy" decoding="async">` : ''}</span><span>${esc(o.name)}</span></button>`).join('')}
+          </div>
+          ${SL.blend ? `<div class="hxs-gp-take" role="group" aria-label="Borrow from the blend">${['palette', 'type', 'texture'].map((k) => `<label><input type="checkbox" data-take value="${k}"${SL.take.includes(k) ? ' checked' : ''}><span>${cap(k)}</span></label>`).join('')}</div>
+          <p class="hxs-note">${esc(s.name)} keeps its motion; the blend lends what you tick.</p>` : ''}</div>
+        <div class="hxs-row"><button type="button" class="hxs-ghost" data-gp="back">Back</button><button type="button" class="hxs-primary" data-gp="use" data-id="${esc(s.id)}">${icon('CheckmarkCircle02Icon', 16)}<span>Use ${esc(s.name)}</span></button></div>
+      </div></div>`;
+  }
+  // how the style moves, cuts and sequences: the part of a style a still can't show
+  function editSystem(s) {
+    const g = s.grammar || {}, seq = s.sequence || [], ex = (s.example && s.example.scenes) || [], tot = seq.reduce((a, b) => a + (b.share || 0), 0) || 1;
+    const row = (k, v) => (v ? `<dt>${k}</dt><dd>${esc(v)}</dd>` : '');
+    const sec = (title, body, open) => (body ? `<details class="hxs-es"${open ? ' open' : ''}><summary>${title}</summary>${body}</details>` : '');
+    const moves = (g.rhythm || g.pacing) ? `<dl class="hxs-gp-l">${row('Rhythm', g.rhythm)}${row('Pacing', g.pacing)}${row('Easing', g.easing)}${row('Density', g.density)}</dl>${(g.movement || []).length ? `<ul class="hxs-es-chips">${g.movement.map((x) => `<li>${esc(x)}</li>`).join('')}</ul>` : ''}` : '';
+    const seqHtml = seq.length ? `<ol class="hxs-seq">${seq.map((b) => `<li class="hxs-seq-b"><i style="width:${Math.round(((b.share || 0) / tot) * 100)}%"></i><b>${esc(cap(b.id))}</b><span>${esc(b.archetypes.join(' · '))}${b.purpose ? `<small>${esc(b.purpose)}</small>` : ''}</span>${b.out ? `<em>${icon('ArrowRight01Icon', 11)}${esc(b.out)}</em>` : ''}</li>`).join('')}</ol>${s.cutRhythm ? `<p class="hxs-note">${esc(s.cutRhythm)}</p>` : ''}` : '';
+    const cuts = (s.presets || []).length ? `<ul class="hxs-es-list">${s.presets.map((p) => `<li><b>${esc(p.name)}</b> <i>${esc(String(p.kind || '').replace(/-/g, ' '))}</i><span>${esc(p.build)}</span></li>`).join('')}</ul>` : (s.signature || []).length ? `<ul class="hxs-es-list">${s.signature.map((x) => `<li><span>${esc(cap(x))}</span></li>`).join('')}</ul>` : '';
+    const arch = (s.archetypes || []).length ? `<ol class="hxs-es-list hxs-es-arch">${s.archetypes.map((a, i) => `<li><b><i>${'ABCDE'[i] || i + 1}</i>${esc(a.name)}</b><span>${esc(a.purpose)}${a.motion ? ` — ${esc(a.motion)}` : ''}</span></li>`).join('')}</ol>` : '';
+    const exHtml = ex.length ? `${s.example.title ? `<p class="hxs-note">${esc(s.example.title)}</p>` : ''}<ol class="hxs-es-list hxs-es-ex">${ex.map((sc) => `<li><b>${esc(sc.archetype)}</b> <i>${esc(sc.beat)}</i><span>${esc(sc.action)}</span>${sc.out ? `<em>${icon('ArrowRight01Icon', 11)}${esc(sc.out)}</em>` : ''}</li>`).join('')}</ol>` : '';
+    const el = s.elements || {}, elHtml = Object.keys(el).length ? `<dl class="hxs-gp-l">${Object.entries(el).map(([k, v]) => row(cap(k), v)).join('')}</dl>` : '';
+    const au = s.audio || {}, snd = (au.drive && au.drive.length) || au.sync || s.sound ? `<dl class="hxs-gp-l">${row('Driven by', (au.drive || []).join(', '))}${row('Sync', au.sync)}${row('Sounds', s.sound)}</dl>` : '';
+    return `<dl class="hxs-gp-l"><dt>Type</dt><dd><b style="font-weight:600">${esc(s.display)}</b>${s.text && s.text !== s.display ? ` with ${esc(s.text)}` : ''}</dd>${row('Camera', s.camera)}</dl>
+      ${sec('How a sequence unfolds', seqHtml, true)}${sec('How it moves', moves, true)}${sec('How it cuts and transitions', cuts, true)}
+      ${sec('Scene archetypes', arch)}${sec('Example edit', exHtml)}${sec('How elements behave', elHtml)}${sec('Sound', snd)}`;
+  }
+  function galleryCustom() {
+    return `<div class="hxs-gp hxs-gp-custom" role="dialog" aria-label="Custom style">
+      <div class="hxs-gp-b">
+        <div class="hxs-gp-h"><span class="hxs-sc-n">${icon('AiMagicIcon', 14)}</span><h3>Custom style</h3></div>
+        <p class="hxs-gp-d">Describe the look and add references (videos or images). ${NAME} studies them frame by frame (art direction, colour, type, motion, transitions, texture) and writes a motion language for this film, built on the nearest style in the library.</p>
+        <label class="hxs-gp-f"><span>Describe it</span><textarea data-custom rows="4" maxlength="1200" placeholder="e.g. grainy 16 mm, warm sunset colours, handwritten captions, slow drifting camera, cuts on the kick">${esc(SL.custom)}</textarea></label>
+        <label class="hxs-gp-f"><span>References <em>optional</em></span><input type="file" data-refs multiple accept="video/*,image/*"></label>
+        ${SL.refs.length ? `<ul class="hxs-gp-refs">${SL.refs.map((f, i) => `<li>${icon(/^video\//.test(f.type) ? 'Video01Icon' : 'Image01Icon', 14)}<span>${esc(f.name)}</span><button type="button" class="hxs-ib" data-ref-del="${i}" aria-label="Remove ${esc(f.name)}">${icon('Cancel01Icon', 14)}</button></li>`).join('')}</ul>` : ''}
+        <div class="hxs-row"><button type="button" class="hxs-ghost" data-gp="back">Back</button><button type="button" class="hxs-primary" data-gp="use" data-id="custom">${icon('CheckmarkCircle02Icon', 16)}<span>Use custom style</span></button></div>
+      </div></div>`;
+  }
+  function paintGallery() {
+    const g = ensureGallery();
+    clocks.forEach((t) => clearInterval(t)); clocks.clear();  // the strips they drive are about to be replaced
+    if (!SL.open) { g.innerHTML = ''; g.classList.remove('is-open'); document.documentElement.classList.remove('hx-gal-open'); return; }
+    g.classList.add('is-open');
+    document.documentElement.classList.add('hx-gal-open');
+    const list = SL.list || [];
+    const pv = SL.preview === 'custom' ? galleryCustom() : SL.preview ? (styleById(SL.preview) ? galleryPreview(styleById(SL.preview)) : '') : '';
+    g.innerHTML = `<div class="hxs-gal-scrim" data-gp="close"></div><section class="hxs-gal" role="dialog" aria-modal="true" aria-label="Choose a style">
+      <header class="hxs-gal-h"><div><h2>Choose a style</h2><p>Each style is its own motion language: look, type, colour, timing, transitions, camera and sound. Hover to preview.</p></div>
+        <button type="button" class="hxs-ib" data-gp="close" aria-label="Close">${icon('Cancel01Icon', 20)}</button></header>
+      ${pv || `<div class="hxs-gal-g">
+        <button type="button" class="hxs-sc hxs-sc-auto${SL.pick === 'auto' ? ' is-on' : ''}" data-style="auto" aria-pressed="${SL.pick === 'auto'}">
+          <span class="hxs-sc-m"><span class="hxs-sc-buddy"><span class="hxs-buddy" data-buddy="zoetie" aria-hidden="true"></span></span>${SL.pick === 'auto' ? `<span class="hxs-sc-ok">${icon('Tick02Icon', 14)}</span>` : ''}</span>
+          <span class="hxs-sc-b"><b>Let ${NAME} recommend</b><span>Reads your brief and brand, weighs a few styles and picks the best fit. You can switch after.</span></span></button>
+        ${SL.list === null ? (SL.failed && !SL.loading ? `<p class="hxs-note hxs-gal-load">Couldn’t load the styles. <button type="button" class="hxs-ghost hxs-sm" data-gp="retry">Try again</button></p>` : `<p class="hxs-note hxs-gal-load">Loading styles…</p>`) : list.length ? list.map(galleryCard).join('') : `<p class="hxs-note hxs-gal-load">No styles found in the studio's styles/ folder.</p>`}
+        <button type="button" class="hxs-sc hxs-sc-custom${SL.pick === 'custom' ? ' is-on' : ''}" data-style="custom" aria-pressed="${SL.pick === 'custom'}">
+          <span class="hxs-sc-m"><span class="hxs-sc-plus">${icon('Add01Icon', 26)}</span>${SL.pick === 'custom' ? `<span class="hxs-sc-ok">${icon('Tick02Icon', 14)}</span>` : ''}</span>
+          <span class="hxs-sc-b"><b>Custom style</b><span>Your references and a description; ${NAME} builds a language from them.</span></span></button>
+      </div>`}</section>`;
+    if (SL.preview) { const ps = g.querySelector('.hxs-gp-mw'); if (ps) beatClock(ps, true); }
+    if (SL.preview) { const v = g.querySelector('.hxs-gp video'); if (v && reducedMotion()) { v.removeAttribute('autoplay'); v.pause(); } }
+    if (root && g.parentNode !== root) root.appendChild(g);
+    hydrateLive(g);
+    const bl = g.querySelector('.hxs-bl'), on = bl && bl.querySelector('.hxs-bl-i.is-on');
+    if (on) bl.scrollLeft = Math.max(0, on.offsetLeft - bl.offsetLeft - (bl.clientWidth - on.offsetWidth) / 2);  // the picked blend stays in view
+  }
+  function onGalleryClick(e) {
+    const t = e.target;
+    if (t.closest('[data-col-reset]')) { SL.colors = {}; return paintGallery(); }
+    const bp = t.closest('[data-blend-pick]');
+    if (bp) { SL.blend = bp.dataset.blendPick; return paintGallery(); }
+    const cp = t.closest('[data-cp]');
+    if (cp) {
+      const from = cp.dataset.cpFrom, src = from === 'global' ? (GC.list || []) : from === CP.pid ? CP.list : (((PJ.list || []).find((x) => x.id === from) || {}).colours || []);
+      const c = src.find((x) => x.id === cp.dataset.cp), s = styleById(SL.preview);
+      if (c && s) { SL.colors = {}; for (const [k, v] of Object.entries(c.colors)) if (s.palette && s.palette[k] && s.palette[k].toUpperCase() !== v) SL.colors[k] = v; SL.colorsFor = s.id; }
+      return paintGallery();
+    }
+    const cpd = t.closest('[data-cp-del]');
+    if (cpd) { SV.err = ''; deleteProfile(cpd.dataset.cpFrom, cpd.dataset.cpDel).catch((e2) => { SV.err = e2.message; }).finally(() => paintGallery()); return; }
+    if (onSaveClick(t, gal, () => { const s = styleById(SL.preview), c = { ...((s && s.palette) || {}), ...SL.colors }; return c; }, paintGallery)) return;
+    const smp = t.closest('[data-sample]');
+    if (smp) { SL.sample = smp.dataset.sample === '1'; return paintGallery(); }
+    const rd = t.closest('[data-ref-del]');
+    if (rd) { SL.refs.splice(+rd.dataset.refDel, 1); return paintGallery(); }
+    const gp = t.closest('[data-gp]');
+    if (gp && gp.dataset.gp === 'close') return closeGallery();
+    if (gp && gp.dataset.gp === 'retry') { loadStyles(); return paintGallery(); }
+    if (gp && gp.dataset.gp === 'back') { SL.preview = null; paintGallery(); const c = gal.querySelector(`.hxs-sc[data-style="${CSS.escape(SL.pick || 'auto')}"]`); if (c) c.focus({ preventScroll: true }); return; }
+    if (gp && gp.dataset.gp === 'use') return useStyle(gp.dataset.id);
+    const c = t.closest('[data-style]');
+    if (!c) return;
+    const id = c.dataset.style;
+    if (id === 'auto') return useStyle('auto');
+    if (id !== SL.colorsFor) { SL.colors = {}; SL.colorsFor = id; }
+    SL.pick = id; SL.preview = id; SL.sample = false;
+    if (id !== SL.blendFor) { SL.blendFor = id; if (SL.blend === id) SL.blend = ''; }
+    paintGallery();
+    const b = gal.querySelector('.hxs-gal'); if (b) b.scrollTop = 0;
+  }
+  // the choice: on the home form it waits for "Start"; inside a film it's saved to project.json right away
+  async function useStyle(id) {
+    const sel = { id };
+    if (id !== 'auto' && id !== 'custom' && SL.blend && SL.blend !== id && SL.take.length) sel.blend = { id: SL.blend, take: SL.take.slice() };
+    if (id !== 'auto' && id !== 'custom' && Object.keys(SL.colors).length) sel.overrides = { palette: { ...SL.colors } };
+    if (id === 'custom') {
+      if (!SL.custom.trim() && !SL.refs.length) { const ta = gal.querySelector('[data-custom]'); if (ta) { ta.focus(); ta.classList.add('is-bad'); } return; }
+      sel.custom = { description: SL.custom.trim(), references: [] };
+    }
+    const files = id === 'custom' ? SL.refs.slice() : [];
+    closeGallery();
+    if (!P || SL.forHome) { SL.draft = { ...sel, files }; return render(); }
+    await guard(async () => { await applyStyle(sel, files); render(); });
+  }
+  async function applyStyle(sel, files) {
+    if (files && files.length) {
+      sel.custom = sel.custom || { description: '', references: [] };
+      for (const f of files) { const u = await upload(P.sessionId, f); sel.custom.references.push(u.path); }
+    }
+    const prev = P.style && P.style.id;
+    P.style = { ...sel, chosenAt: new Date().toISOString() };
+    if (prev && prev !== sel.id) P.style.previous = prev;
+    await saveProject();
+  }
+  // a storyboard drawn in another style is redrawn in the new one, keeping its content
+  const restyle = () => { const was = F.storyboard && F.storyboard.frames && F.storyboard.frames.length && F.storyboard.style; const now = effStyle();
+    return was && now !== 'auto' && was !== now ? ` The style changed from "${was}" to "${now}": redraw every frame in the new style's language (look, type, transitions, camera, timing), keeping the moments, story, copy and anchors; bump "version".` : ''; };
+  // what the jobs are told about the style (storyboard + render)
+  function styleBrief() {
+    const s = filmStyle(), id = effStyle();
+    const oc = overColors(s), ocs = Object.entries(oc).map(([k, v]) => `${k} ${v}`).join(', ');
+    const col = ocs ? ` The user chose the colours: ${ocs} — use exactly these for those palette roles (styleTokens("${id}", { palette: { ${Object.entries(oc).map(([k, v]) => `${k}: "${v}"`).join(', ')} } })); keep the style's colour logic (which role goes where), never its default values for these roles. Also save them in the film's tokens.` : '';
+    const bl = s.blend && s.blend.id ? ` Blend: borrow ${s.blend.take.join(', ')} from "${s.blend.id}" (styles/${s.blend.id}/style.json); ${id}'s motion (curves, timing, transitions) stays in charge.` : '';
+    if (id === 'custom') return `Style: CUSTOM — the user's description: "${String((s.custom && s.custom.description) || '').replace(/"/g, '\'')}"${s.custom && s.custom.references && s.custom.references.length ? `; their references: ${s.custom.references.join(', ')} (analyse them VISUALLY: extract frames with \`npm run style:extract\` if the studio has it, else ffmpeg contact sheets + frames around cuts + consecutive-frame bursts, and LOOK at them: art direction, colour, type, layout, motion, transitions, camera, texture, pacing; note what can't be determined)` : ''}. Write the film's motion language to ${pdir()}/STYLE.md (same sections as a styles/<id>/STYLE.md), build it on the nearest library style's tokens, and set storyboard.json "style":"custom","styleBase":"<nearest id>".`;
+    if (id === 'auto') return `Style: not chosen yet — recommend one. Read the brief, the product's brand (colours, type, tone) and any references; compare at least three distinct styles from styles/index.json (read each one's style.json and STYLE.md); pick the best fit and write storyboard.json "style":"<id>","styleReason":"<one line, why it fits this brief>","styleAlternatives":["<id>","<id>"]. Never fall back to one style silently. Then make the storyboard in the chosen style.`;
+    return `Style: "${(styleById(id) || {}).name || id}" (${id}) — read styles/${id}/STYLE.md and styles/${id}/style.json FIRST: the whole film is in this style's language (look, type, palette, curves, timing, frame step, transition vocabulary, camera, texture, sound); the film's tokens start from styles/${id}/style.json (styleTokens("${id}", brand overrides) where the studio has src/styles); the brand's colours and fonts map onto the style's colour roles. Build the edit from the style's edit system, not from a single look: lay the film out on its sequence model (style.json "sequence": beats and their shares; sequencePlan("${id}", frames, phraseCuts) where the studio has src/styles), fill each beat with its scene archetypes ("archetypes"), and connect scenes with its transition presets ("transitionPresets"); "exampleSequence" shows one way they chain. Write storyboard.json "style":"${id}" and give every frame "beat", "archetype" and "transitionPreset" (preset ids from the style).${col}${bl}`;
+  }
+
+  // What the music should do for this film's style: sent with every soundtrack generation so the track fits the
+  // edit (tempo for the cut rhythm, what drives it, where the hits go). The job also reads the style's files.
+  function musicStyleBrief() {
+    const s = filmStyle(), id = effStyle(), q = (x) => String(x || '').replace(/"/g, '\'');
+    if (id === 'custom') return ` The film's style is the user's own: "${q(s.custom && s.custom.description)}". Make the music fit that look and pace.`;
+    if (id === 'auto') return ' No motion style is chosen yet: read the brief and styles/index.json, decide which library style the film will most likely be in, and fit the music to that style\'s "sound", "audio" and "grammar" in its style.json (say which one you assumed).';
+    const st = styleById(id) || {}, a = st.audio || {}, g = st.grammar || {};
+    const bits = [
+      st.mood && st.mood.length && `mood ${st.mood.join(', ')}`,
+      st.sound && `sound: ${st.sound}`,
+      a.drive && a.drive.length && `the edit is ${a.drive.join(', ')}`,
+      a.sync && `sync: ${a.sync}`,
+      a.sfx && `its SFX palette (leave room for these): ${a.sfx}`,
+      g.pacing && `pacing: ${g.pacing}`,
+      st.cutRhythm && `cut rhythm: ${st.cutRhythm}`,
+    ].filter(Boolean).map(q);
+    return ` The film is in the "${q(st.name || id)}" motion style (${id}); the music must fit its edit. Read styles/${id}/style.json ("sound", "audio", "grammar", "sequence") and STYLE.md's sound section${bits.length ? `. In short: ${bits.join('; ')}` : ''}. Pick a tempo that lands on its cut rhythm, give the track the shape of its sequence beats (opening, build, peak, resolution), and put the big hits where its reveal and resolution fall. The user's prompt wins where they differ.`;
+  }
+
   const vOpening = () => `<section class="hxs-hero hxs-opening"><div class="hxs-buddy hxs-buddy-xl" data-buddy="zoetie" aria-hidden="true"></div><p>Opening the film…</p></section>`;
   function vHome() {
     if (needsInstall()) return vInstall();
+    loadStyles();
     const list = loadIdx();
     return `<section class="hxs-hero">
         <div class="hxs-buddy hxs-buddy-xl" data-buddy="zoetie" aria-hidden="true"></div>
@@ -1324,6 +1882,9 @@
         <form class="hxs-new" data-form="new">
           <input name="title" required maxlength="60" placeholder="Name the film, e.g. Acme launch" autocomplete="off">
           <textarea name="brief" rows="2" maxlength="600" placeholder="One line on what it should do (optional)"></textarea>
+          ${styleChip(SL.draft || { id: 'auto' }, 'style-home')}
+          <div class="hxs-fmt-row"><span>Format</span>${formatPicker({ id: FM.pick, width: FM.w, height: FM.h }, false, 'fmt-home')}</div>
+          ${projectPicker()}
           <button type="submit" class="hxs-primary">${icon('Add01Icon', 16)}<span>Start</span></button>
         </form>
         ${studioNote() ? `<p class="hxs-note hxs-studio-note">${esc(studioNote())}</p>` : ''}
@@ -1332,7 +1893,7 @@
           <p>Delete “${esc(x.title)}”? This removes the film’s project files (studio/${esc(x.project)}/ in the studio folder) and its chat. Renders in output/ and the music and its analysis stay on disk.</p>
           <div class="hxs-row"><button type="button" class="hxs-ghost hxs-sm" data-act="del-no">Cancel</button><button type="button" class="hxs-danger-b hxs-sm" data-act="del-yes" data-p="${esc(x.project)}"${delBusy ? ' disabled' : ''}>${delBusy ? 'Deleting…' : 'Delete'}</button></div></div>`
         : `<div class="hxs-film-row" data-row="${esc(x.project)}"><button type="button" class="hxs-film" data-open="${esc(x.project)}">
-          <span class="hxs-film-ic">${icon('Video01Icon', 18)}</span><span class="hxs-film-t">${esc(x.title)}</span>
+          <span class="hxs-film-ic">${icon('Video01Icon', 18)}</span><span class="hxs-film-t">${esc(x.title)}</span>${x.ctxName ? `<span class="hxs-film-pj">${esc(x.ctxName)}</span>` : ''}
           <span class="hxs-film-s">${esc((STEPS.find((s) => s[0] === x.step) || STEPS[0])[1])}</span></button>
           <button type="button" class="hxs-film-del" data-del="${esc(x.project)}" aria-label="Delete ${esc(x.title)}" title="Delete film">${icon('Delete02Icon', 17)}</button></div>`)).join('')}</section>` : ''}`;
   }
@@ -1357,7 +1918,7 @@
           : `<div class="hxs-choice hxs-choice-off">${icon('SparklesIcon', 22)}<b>Generate audio</b><span>Only this option needs ElevenLabs: uploading your own track works without it.</span>${elConnect()}</div>`}
       </div>
       ${mode === 'upload' && !tr ? `<label class="hxs-drop">${icon('Upload04Icon', 22)}<span>${a && a.name ? esc(a.name) : 'Choose a file or drop it here'}</span><input type="file" accept="${AUDIO_ACCEPT}" data-file="audio" class="hxs-file"></label>` : ''}`}
-      ${mode === 'generate' && !locked ? `<form class="hxs-gen" data-form="gen">
+      ${mode === 'generate' && !locked && !tr ? `<form class="hxs-gen" data-form="gen">
           <textarea name="prompt" rows="3" maxlength="800" placeholder="e.g. 20 seconds, punchy minimal techno, big drop at 8s, ends on a clean hit">${esc((a && a.prompt) || '')}</textarea>
           <div class="hxs-row"><label class="hxs-mini">Length <input name="dur" type="number" min="5" max="120" value="${esc((a && a.durationS) || 20)}"> s</label>
           <button type="submit" class="hxs-primary" data-needs="elevenlabs"${blocked() ? ' disabled' : ''}>${icon('SparklesIcon', 16)}<span>Generate</span></button></div>
@@ -1394,9 +1955,10 @@
     const locked = sketchesLocked();
     return `${host('Any sketches? A rough frame or a reference helps me match what’s in your head. Skipping is fine.')}
       ${locked ? lockNote(`Locked once the storyboard was asked for. Start a new film to change the sketches.${sk.length ? '' : ' (None were added.)'}`) : `<label class="hxs-drop">${icon('Image01Icon', 22)}<span>Add sketches or references, or drop them here</span><input type="file" accept="${IMAGE_ACCEPT}" multiple data-file="sketch" class="hxs-file"></label>`}
+      ${brandCard()}
       ${sk.length ? `<div class="hxs-sketches">${sk.map((s, i) => `<figure class="hxs-sk">${local.sketches[s.name] ? `<img src="${local.sketches[s.name]}" alt="">` : (s.path ? `<img src="${rawUrl(P.sessionId, s.path)}" alt="">` : `<span>${icon('Image01Icon', 22)}</span>`)}<figcaption>${esc(s.name)}</figcaption>${locked ? '' : `<button type="button" class="hxs-x" data-sk-del="${i}" aria-label="Remove">${icon('Cancel01Icon', 14)}</button>`}</figure>`).join('')}</div>` : ''}
       <div class="hxs-foot"><button type="button" class="hxs-ghost" data-go="mapping">Back</button>
-        ${locked ? `<button type="button" class="hxs-primary" data-go="storyboard">Next ${icon('ArrowRight01Icon', 16)}</button>` : `<span class="hxs-foot-r"><button type="button" class="hxs-ghost" data-act="sk-skip">Skip</button><button type="button" class="hxs-primary" data-act="sk-next"${sk.length ? '' : ' disabled'}>Next ${icon('ArrowRight01Icon', 16)}</button></span>`}</div>`;
+        ${locked ? `<button type="button" class="hxs-primary" data-go="storyboard">Next ${icon('ArrowRight01Icon', 16)}</button>` : `<span class="hxs-foot-r"><button type="button" class="hxs-ghost" data-act="sk-skip">Skip</button><button type="button" class="hxs-primary" data-act="sk-next"${sk.length || ((P.brand && P.brand.files) || []).length ? '' : ' disabled'}>Next ${icon('ArrowRight01Icon', 16)}</button></span>`}</div>`;
   }
 
   // Model for the storyboard and the film: the Motion chat's worker choice (the same setting as the
@@ -1450,10 +2012,14 @@
     const line = busy ? 'Drawing it up. Each card is a moment on the track.'
       : frames.length ? (st === 'approved' ? 'Approved. The film is being built in the editor.' : 'Here’s the plan. Approve it and I’ll build the film, or tell me what to change.')
         : (F.analysis ? 'I have the track and the moments. Ready when you are.' : 'I’m still listening to the track; you can ask for the storyboard now and I’ll use the analysis when it lands.');
+    loadStyles();
     return `${host(line)}
+      ${styleCard(st === 'approved' || busy)}
+      <div class="hxs-card hxs-fmt-card"><div class="hxs-fmt-h"><b>Format</b><span>${esc(`${fmtOf().width}×${fmtOf().height}`)}</span></div>${formatPicker(fmtOf(), st === 'approved' || busy, 'fmt-film')}
+        ${P.format && P.format.previous && frames.length && st !== 'approved' ? `<p class="hxs-note">${icon('RefreshIcon', 14)} The storyboard was drawn for ${esc(P.format.previous)}. Ask for an update and ${NAME} recomposes it for the new frame.</p>` : ''}</div>
       ${frames.length ? `${sb.summary ? `<p class="hxs-sum">${esc(sb.summary)}</p>` : ''}<div class="hxs-board">${frames.map((f, i) => `<article class="hxs-frame">
           <header><i>${i + 1}</i><b>${fmt(f.timeMs)}</b><span>${esc(f.anchor || '')}</span></header>
-          <h4>${esc(f.action || '')}</h4><p>${esc(f.description || '')}</p>${f.transition ? `<p class="hxs-tr">${icon('ArrowRight02Icon', 13)}<span>${esc(f.transition)}</span></p>` : ''}</article>`).join('')}</div>` : ''}
+          ${f.beat || f.archetype ? `<p class="hxs-fb">${esc([f.beat, archName(f.archetype)].filter(Boolean).join(' · '))}</p>` : ''}<h4>${esc(f.action || '')}</h4><p>${esc(f.description || '')}</p>${f.transition ? `<p class="hxs-tr">${icon('ArrowRight02Icon', 13)}<span>${esc(f.transition)}</span></p>` : ''}</article>`).join('')}</div>` : ''}
       ${modelCard(st === 'approved', busy)}
       ${!frames.length || st === 'revise' ? `<label class="hxs-card hxs-dir"><b>Creative direction <em>optional</em></b>
           <textarea data-brief rows="3" maxlength="2000" placeholder="What are you going for? Mood, story, who it’s for, must-haves, things to avoid…"${busy ? ' disabled' : ''}>${esc(P.brief || '')}</textarea></label>` : ''}
@@ -1464,6 +2030,21 @@
           <p class="hxs-note">Nothing renders until you approve.</p></form>` : ''}`;
   }
 
+  // the finished film's colours: its style's palette with the user's overrides on top
+  function filmColours() {
+    const st = styleById(effStyle()), out = {};
+    for (const [k, v] of Object.entries((st && st.palette) || {})) if (isHex(v)) out[k] = v.toUpperCase();
+    return { ...out, ...overColors(filmStyle()) };
+  }
+  function keepColoursCard() {
+    loadStyles(); loadGlobal();
+    const c = filmColours(), sw = Object.entries(c);
+    if (!sw.length) return '';
+    return `<section class="hxs-card hxs-keep"><div class="hxs-cps-h"><b>Keep these colours</b>${SV.open !== 'ed' ? '<button type="button" class="hxs-link" data-cp-save="ed">Save colours</button>' : ''}</div>
+      <div class="hxs-keep-sw">${sw.map(([k, v]) => `<span title="${esc(roleName(k))} ${esc(v)}"><em style="background:${esc(v)}"></em><b>${esc(roleName(k))}</b></span>`).join('')}</div>
+      ${SV.open === 'ed' ? saveForm('ed') : `<p class="hxs-note">Save them for this project, another one, or all films, and pick them in the style gallery next time.</p>`}
+      ${SV.ok ? `<p class="hxs-note">${esc(SV.ok)}</p>` : ''}${SV.err ? `<p class="hxs-note is-bad">${esc(SV.err)}</p>` : ''}</section>`;
+  }
   function vEditor() {
     const ri = F.renderInfo, out = ri && ri.output;
     const vid = out ? `${rawUrl(P.sessionId, out)}&v=${encodeURIComponent(ri.updatedAt || '')}` : '';
@@ -1473,7 +2054,7 @@
     const revs = (F.revisions && F.revisions.revisions) || [];
     const status = running() ? (running().kind === 'revision' ? 'Re-rendering' : 'Rendering') : (ri && ri.status) || 'waiting';
     return `<div class="hxs-ed">
-        <div class="hxs-player">${vid ? `<video class="hxs-video" src="${esc(vid)}" playsinline controls preload="metadata"></video>` : `<div class="hxs-player-empty">${host(running() ? 'Building the film. The preview shows up here as soon as there is a render; you can already select parts below.' : 'No render yet.')}</div>`}
+        <div class="hxs-player" style="aspect-ratio:${fmtOf().width} / ${fmtOf().height};width:min(100%, calc(52vh * ${fmtOf().width} / ${fmtOf().height}))">${vid ? `<video class="hxs-video" src="${esc(vid)}" playsinline controls preload="metadata"></video>` : `<div class="hxs-player-empty">${host(running() ? 'Building the film. The preview shows up here as soon as there is a render; you can already select parts below.' : 'No render yet.')}</div>`}
           <audio class="hxs-audio" preload="metadata" src="${esc(vid ? '' : audioSrc())}"></audio></div>
         <div class="hxs-transport"><button type="button" class="hxs-ib" data-act="play" aria-label="Play">${icon('PlayIcon', 18)}</button><span class="hxs-time">0:00.00</span><span class="hxs-badge hxs-st-${esc(status)}">${esc(status)}</span>${!running() && status === 'failed' ? `<button type="button" class="hxs-ghost hxs-sm hxs-retry" data-act="retry-job" data-kind="render"${active() || chatBusy() ? ' disabled' : ''}>${icon('RefreshIcon', 14)}<span>Try again</span></button>` : ''}${vid && !running() && ri.status === 'done' ? `<a class="hxs-dl" href="${esc(`${rawUrl(P.sessionId, out)}&download=1`)}" download>${icon('Download04Icon', 16)}<span>Download</span></a>` : ''}</div>
         <div class="hxs-card hxs-ed-tl">${timelineHTML(['ruler', 'wave', 'actions', 'scenes', 'revisions'], { selectable: true })}
@@ -1485,6 +2066,7 @@
           <div class="hxs-row"><select name="treatment"${n ? '' : ' disabled'}><option value="">Any treatment</option>${TREATMENTS.map((t) => `<option value="${t}">${TLABEL[t][0]} · ${TLABEL[t][1]}</option>`).join('')}</select>
             <label class="hxs-mini hxs-attach">${icon('Attachment01Icon', 16)}<span data-attach-name>Sketch</span><input type="file" accept="${IMAGE_ACCEPT}" data-file="redo" class="hxs-file"${n ? '' : ' disabled'}></label>
             <button type="submit" class="hxs-primary"${n && !blocked() ? '' : ' disabled'}>${icon('RefreshIcon', 16)}<span>Regenerate</span></button></div></form>
+        ${ri && ri.status === 'done' && !running() ? keepColoursCard() : ''}
         ${revs.length ? `<section class="hxs-revs"><h3>Revisions</h3>${revs.slice().reverse().map((r) => `<div class="hxs-rev"><span class="hxs-badge hxs-st-${esc(r.status)}">${esc(r.status)}</span><b>${esc(r.instruction)}</b><span>${(r.ranges || []).map((g) => `${fmt(g.startMs)}–${fmt(g.endMs)}`).concat((r.eventIds || []).map(esc)).join(', ')}${r.treatment ? ` · ${esc(tlab(r.treatment))}` : ''}</span></div>`).join('')}</section>` : ''}
       </div>`;
   }
@@ -1499,6 +2081,8 @@
     root.innerHTML = shell(body);
     gate();
     mountScrub();
+    hydrateLive(root);
+    if (SL.open) paintGallery();
     if (P) { root.appendChild(d); draftFill(root); paintFeed(); if (keep && document.activeElement !== keep.el) { keep.el.focus({ preventScroll: true }); try { keep.el.setSelectionRange(keep.a, keep.b); } catch (_) {} } }
     else d.remove();
     TW.paint();
@@ -1543,7 +2127,7 @@
     err = '';
     try { await fn(); } catch (e) { err = (e && e.message) || String(e); render(); }
   }
-  async function createProject(title, brief) {
+  async function createProject(title, brief, ctxId) {
     let slug = slugify(title);
     const taken = new Set(loadIdx().map((x) => x.project));
     for (let i = 2; taken.has(slug); i++) slug = `${slugify(title)}-${i}`;
@@ -1552,7 +2136,13 @@
     const sid = (r.session || r).session_id;
     try { await post('api/session/rename', { session_id: sid, title: `Motion · ${title}` }); } catch (_) {}
     P = { schema: 'tabbie.motion-studio/1', project: slug, title, brief, sessionId: sid, createdAt: new Date().toISOString(),
-      step: 'audio', audio: null, mapping: null, sketches: [], sketchesDone: false, storyboard: { status: 'none' }, render: { status: 'none' }, jobs: [] };
+      step: 'audio', audio: null, mapping: null, sketches: [], sketchesDone: false, storyboard: { status: 'none' }, render: { status: 'none' }, jobs: [],
+      style: { id: 'auto' } };
+    if (ctxId) { const c = await projectContext(ctxId); if (c) P.context = c; }
+    P.format = fmtMake(FM.pick, FM.w, FM.h);
+    PJ.pick = '';
+    const draft = SL.draft; SL.draft = null;
+    if (draft) { const { files, ...sel } = draft; try { await applyStyle(sel, files || []); } catch (_) { P.style = { id: sel.id === 'custom' ? 'custom' : sel.id, ...(sel.blend ? { blend: sel.blend } : {}), ...(sel.custom ? { custom: sel.custom } : {}) }; } }
     await saveProject();
     await loadFiles();
     view = 'audio';
@@ -1646,8 +2236,14 @@
   const isAudio = (f) => /^(audio|video)\//.test(f.type) || AUDIO_EXT.includes(ext(f));
   const isImage = (f) => /^image\//.test(f.type) || IMAGE_EXT.includes(ext(f));
   // drag & drop: audio on the Audio step, images on Sketches, one image onto the editor's redo form
-  function onDrop(files) {
+  function onDrop(files, target) {
     if (!P || !files.length) return;
+    // onto the brand card, or anything that isn't an image (fonts, SVG logos, PDFs, zips): the brand kit
+    if (view === 'sketches' && ((target && target.closest && target.closest('.hxs-brand')) || files.some((f) => !isImage(f) || /\.svg$/i.test(f.name)))) {
+      if (brandLocked()) { err = 'The brand kit is locked once the storyboard is approved.'; return render(); }
+      if (local.brandBusy) return;
+      return guard(() => onBrand(files));
+    }
     if (view === 'audio') {
       const f = files.find(isAudio);
       if (!f) { err = 'That is not an audio or video file.'; return render(); }
@@ -1693,10 +2289,11 @@
     } finally { local.uploading = false; render(); }
   }
   async function onGenerate(prompt, dur) {
+    await loadStyles();  // the style's sound goes with the request
     P.audio = { mode: 'generate', prompt, durationS: dur, status: 'generating' };
     local.retrim = false; TR.init = false; local.audioFile = null; local.audioUrl = '';
     await saveProject();
-    await dispatch('generate-audio', `Generate the soundtrack with the studio's ElevenLabs music generation (\`npm run music\` when package.json has it, else the same path as scripts/*-music-gen.mjs; no other provider). Prompt: "${prompt.replace(/"/g, '\'')}". Length about ${dur}s. Save it under public/audio/music/${P.project}/source/ and don't change it after. Don't analyse it yet: the user trims it first. In ${pdir()}/project.json set "audio.sourcePath" to that file's path relative to the studio folder and "audio.status" to "trim". Don't storyboard or render yet.`);
+    await dispatch('generate-audio', `Generate the soundtrack with the studio's ElevenLabs music generation (\`npm run music\` when package.json has it, else the same path as scripts/*-music-gen.mjs; no other provider). ${prompt ? `Prompt: "${prompt.replace(/"/g, '\'')}".` : `No prompt: write one from the film's brief${P.brief ? ` ("${String(P.brief).replace(/"/g, '\'')}")` : ''}.`}${musicStyleBrief()} Length about ${dur}s. Save it under public/audio/music/${P.project}/source/ and don't change it after. Don't analyse it yet: the user trims it first. In ${pdir()}/project.json set "audio.sourcePath" to that file's path relative to the studio root (\`public/audio/music/${P.project}/source/<file>\`, not \`../../…\`) and "audio.status" to "trim". Don't storyboard or render yet.`);
   }
   function addKeypoint(ms) {
     const pxPerMs = (scrub && scrub.pxPerMs()) || 1;
@@ -1714,6 +2311,37 @@
     F.keypoints.analysisSha = F.analysis && F.analysis.source ? F.analysis.source.sha256 : null;
     F.keypoints.updatedAt = new Date().toISOString();
     saveSoon('kp', () => writeJSON(P.sessionId, `${pdir()}/keypoints.json`, F.keypoints));
+  }
+  function brandCard() {
+    const b = (P.brand && P.brand.files) || [], locked = brandLocked();
+    return `<section class="hxs-card hxs-brand"><div class="hxs-brand-h"><b>Brand kit</b><span>Logos, fonts, colours, guidelines, or one zip. Optional.</span></div>
+      ${b.length ? `<div class="hxs-brand-l">${b.map((f, i) => `<span class="hxs-brand-f">${icon(BRAND_ICON[f.kind] || 'File01Icon', 16)}<span><b>${esc(f.name)}</b><em>${esc(BRAND_LABEL[f.kind] || 'File')}</em></span>${locked ? '' : `<button type="button" class="hxs-cp-x" data-brand-del="${i}" aria-label="Remove ${esc(f.name)}" title="Remove">×</button>`}</span>`).join('')}</div>` : ''}
+      ${locked ? (b.length ? '' : '<p class="hxs-note">No brand kit was added.</p>') : `<label class="hxs-drop hxs-drop-sm">${icon('Upload04Icon', 18)}<span>${local.brandBusy ? 'Uploading…' : b.length ? 'Add more' : 'Add brand files, or drop them here'}</span><input type="file" multiple accept="${BRAND_ACCEPT}" data-file="brand" class="hxs-file"></label>`}
+      ${b.length ? `<p class="hxs-note">${NAME} uses these as they are: the real logo files (never redrawn), your fonts, and your colours mapped onto the style’s colour roles.</p>` : ''}</section>`;
+  }
+  async function onBrand(files) {
+    local.brandBusy = true; render();
+    try {
+      for (const f of files.slice(0, 20)) {
+        if (f.size > 200e6) throw new Error(`${f.name} is over 200 MB.`);
+        const up = await upload(P.sessionId, f);
+        const l = ((P.brand && P.brand.files) || []).filter((x) => x.name !== f.name);
+        P.brand = { files: [...l, { name: f.name, kind: brandKind(f.name), uploadPath: up.path, size: f.size, at: new Date().toISOString() }], updatedAt: new Date().toISOString() };
+        render();
+      }
+      await saveProject();
+    } finally { local.brandBusy = false; render(); }
+  }
+  // what every creative job is told about the brand kit
+  function brandBrief() {
+    const b = (P.brand && P.brand.files) || [];
+    if (!b.length) return '';
+    const q = (x) => String(x || '').replace(/"/g, '\'');
+    return ` Brand kit from the user (${b.map((f) => `${BRAND_LABEL[f.kind] || 'file'}: ${q(f.uploadPath)}`).join('; ')}). `
+      + `Follow the studio CLAUDE.md "Brand kits" rules exactly. First time: copy them into public/${P.project}/brand/ (unzip a zip there, keep names), list EVERY file, READ every PDF, guideline, README and text file in full (all pages) and LOOK at every image and template BEFORE you propose or build anything; search the whole kit for logos (names and by eye) and pick the official variant for each background. `
+      + `Write ${pdir()}/BRAND.md: the inventory, what you read, the logo files per background, fonts and weights, exact hex colours, the guideline rules (clear space, minimum size, don'ts, tone), and the files you will NOT use and why. `
+      + `NEVER use signatures (any file or folder named signature/sig/autograph, or anything that looks handwritten-signed), personal photos of team members, internal or confidential documents, or deck/template pages as footage in the film, ever. `
+      + `Use the brand as it is: real logo files only (SVG preferred; never redrawn, recoloured, stretched, cropped, rotated or given effects), its fonts loaded from those files (@remotion/fonts loadFont), its exact colours mapped onto the style's colour roles unless the user set colours in the gallery (those win). Where the guidelines and the style disagree on the look, the guidelines win; say so in the summary. Later steps read BRAND.md instead of the originals. `;
   }
   async function onSketches(files) {
     for (const f of files) {
@@ -1852,14 +2480,15 @@
     const prev = F.storyboard && F.storyboard.frames && F.storyboard.frames.length ? ` Revise the current ${pdir()}/storyboard.json per the user's note: "${(note || '').replace(/"/g, '\'')}"; bump "version".` : '';
     P.storyboard = { status: 'requested', requestedAt: new Date().toISOString(), note: note || '' };
     await saveProject();
-    await dispatch('storyboard', `Make the storyboard only — do NOT render and do NOT write an edit map; the user approves first.${prev} Inputs: the user's creative direction / brief "${(P.brief || '').replace(/"/g, '\'')}" (follow it alongside MOTION_RULES.md; if it conflicts with the house style, say so in the summary) (${pdir()}/project.json); audio analysis audio/analysis/${P.project}/analysis.json (if it is missing, run the analysis on audio.path first); mapping: ${kp}; sketches: ${sk}. Follow MOTION_RULES.md. Write ${pdir()}/storyboard.json as {"schema":"tabbie.motion-storyboard/1","project":"${P.project}","fps":${FPS},"version":1,"summary":"<one paragraph>","frames":[{"id":"f1","timeMs":0,"frame":0,"endMs":1200,"anchor":"<anchorsFor id or manual>","keypoint":"<keypoint id or null>","action":"<short shot title>","description":"<what happens>","transition":"<how this shot becomes the next: technique · bridge element · what carries over>"}]} with frames in time order covering the whole track. The film is one continuous sequence (MOTION_RULES.md §8, docs/motion-knowledge/03 §11–12): plan the transitions FIRST, then the shots around them. Every frame's "transition" names how it flows into the next (camera push/pull, track-matte reveal, match cut, object continuity, motion continuity, perspective shift or seamless zoom) and the element that carries the eye across; a hard cut only with its reason (rhythm, story, impact). The last frame's transition leads into the end card.${span}`);
+    await dispatch('storyboard', `Make the storyboard only — do NOT render and do NOT write an edit map; the user approves first.${prev} ${styleBrief()}${restyle()} Inputs: the user's creative direction / brief "${(P.brief || '').replace(/"/g, '\'')}" (follow it alongside the style and MOTION_RULES.md; if it conflicts with the style, say so in the summary) (${pdir()}/project.json); audio analysis audio/analysis/${P.project}/analysis.json (if it is missing, run the analysis on audio.path first); mapping: ${kp}; sketches: ${sk}. Follow MOTION_RULES.md. Write ${pdir()}/storyboard.json as {"schema":"tabbie.motion-storyboard/1","project":"${P.project}","fps":${FPS},"version":1,"style":"<style id>","styleReason":"<when recommended>","styleAlternatives":["<id>"],"summary":"<one paragraph>","frames":[{"id":"f1","timeMs":0,"frame":0,"endMs":1200,"anchor":"<anchorsFor id or manual>","keypoint":"<keypoint id or null>","action":"<short shot title>","description":"<what happens>","beat":"<the style's sequence beat>","archetype":"<the style's scene archetype id>","transitionPreset":"<the style's preset id, or hard-cut>","transition":"<how this shot becomes the next: technique · bridge element · what carries over>"}]} with frames in time order covering the whole track. The film is one continuous sequence (MOTION_RULES.md §8, docs/motion-knowledge/03 §11–12): plan the transitions FIRST, then the shots around them. Every frame's "transition" names how it flows into the next (camera push/pull, track-matte reveal, match cut, object continuity, motion continuity, perspective shift or seamless zoom) and the element that carries the eye across; a hard cut only with its reason (rhythm, story, impact). The last frame's transition leads into the end card.${span}`);
   }
   async function approve() {
+    if (filmStyle().id === 'auto' && F.storyboard && F.storyboard.style && styleById(F.storyboard.style)) P.style = { id: F.storyboard.style, auto: true, reason: F.storyboard.styleReason || '' };
     P.storyboard = { ...(P.storyboard || {}), status: 'approved', approvedAt: new Date().toISOString(), version: (F.storyboard && F.storyboard.version) || 1 };
     P.render = { status: 'requested', requestedAt: new Date().toISOString() };
     await saveProject();
     view = 'editor'; P.step = 'editor';
-    await dispatch('render', `The user APPROVED the storyboard in ${pdir()}/storyboard.json (version ${P.storyboard.version}). Build and render the film now with the /motion workflow; each frame's "transition" is the plan for that seam (build the seams first, so the film plays as one continuous sequence): write the edit map from the storyboard's anchors (src/components/${P.project}/editMap.ts), export it with \`npm run editmap -- ${P.project}\` so audio/analysis/${P.project}/EDIT_MAP.json exists early, then render into output/. Keep ${pdir()}/render.json current: {"schema":"tabbie.motion-render/1","status":"rendering"|"done"|"failed","output":"output/<file>.mp4","updatedAt":"<ISO time>"} (output relative to the studio folder).`);
+    await dispatch('render', `The user APPROVED the storyboard in ${pdir()}/storyboard.json (version ${P.storyboard.version}). Build and render the film now with the /motion workflow. ${styleBrief()} The finished film must look and move in this style (its palette, type, curves, frame step, transitions, camera, texture and sound), not a generic default: build each storyboard frame's "archetype" as that scene archetype and each seam with its "transitionPreset" (style.json "transitionPresets": bridge, build, frames, ease, overlap, sound), keeping the style's grammar (rhythm, holds, density) and element behaviour ("elements"); each frame's "transition" is the plan for that seam (build the seams first, so the film plays as one continuous sequence): write the edit map from the storyboard's anchors (src/components/${P.project}/editMap.ts), export it with \`npm run editmap -- ${P.project}\` so audio/analysis/${P.project}/EDIT_MAP.json exists early, then render into output/. Keep ${pdir()}/render.json current: {"schema":"tabbie.motion-render/1","status":"rendering"|"done"|"failed","output":"output/<file>.mp4","updatedAt":"<ISO time>"} (output relative to the studio folder).`);
   }
   // Try again on a failed step: a render re-runs the approved build; any other step is sent again with
   // what went wrong, reusing whatever it had already made.
@@ -1893,6 +2522,17 @@
     root.addEventListener('click', (e) => {
       const t = e.target;
       if (t.closest('.hsc')) return; // the scrubber handles its own clicks
+      if (P && view === 'editor' && t.closest('.hxs-keep') && onSaveClick(t, root, filmColours, render)) return;
+      const bd = t.closest('[data-brand-del]');
+      if (bd && P && !brandLocked()) { const l = ((P.brand && P.brand.files) || []).slice(); l.splice(+bd.dataset.brandDel, 1); P.brand = { files: l, updatedAt: new Date().toISOString() }; return guard(async () => { await saveProject(); render(); }); }
+      const fh = t.closest('[data-fmt-home]');
+      if (fh) { FM.pick = fh.dataset.fmtHome; if (FM.pick !== 'custom') { const k = FORMATS.find((x) => x[0] === FM.pick); FM.w = k[1]; FM.h = k[2]; } return render(); }
+      const ff = t.closest('[data-fmt-film]');
+      if (ff && P) { const id = ff.dataset.fmtFilm, cur = fmtOf(); if (id === cur.id) return;
+        const nf = fmtMake(id, cur.width, cur.height), was = cur.id === 'custom' ? `${cur.width}×${cur.height}` : cur.id;
+        P.format = { ...nf, ...(F.storyboard && F.storyboard.frames && F.storyboard.frames.length ? { previous: (P.format && P.format.previous) || was } : {}) };
+        if (P.format.previous === (nf.id === 'custom' ? `${nf.width}×${nf.height}` : nf.id)) delete P.format.previous;
+        return guard(async () => { await saveProject(); render(); }); }
       const fd = t.closest('[data-act="feed"]');
       if (fd) { chat.open = !chat.open; saveOpen(chat.open); chat.unread = false; if (chat.open) chat.first = true; paintFeed(true); if (chat.open) chatPoll(true); return; }
       const qo = t.closest('.hxs-qc-o');
@@ -1931,6 +2571,8 @@
         (async () => { try { err = ''; await deleteFilm(slug); } catch (e) { err = (e && e.message) || String(e); } delBusy = false; delAsk = null; render(); })();
         return;
       }
+      const su = t.closest('[data-style-use]');
+      if (su && P && !blocked()) return guard(async () => { await applyStyle({ id: su.dataset.styleUse }, []); render(); });
       const op = t.closest('[data-open]');
       if (op) { navPush = true; return guard(() => openProject(op.dataset.open)); }
       const tl = t.closest('[data-trim-len]');
@@ -1978,6 +2620,9 @@
       if (act === 'kp-del') { F.keypoints.points = F.keypoints.points.filter((x) => x.id !== kpSel); kpSel = null; saveKeypoints(); return render(); }
       if ((act === 'sk-skip' || act === 'sk-next') && sketchesLocked()) return go('storyboard');
       if (act === 'sk-skip' || act === 'sk-next') { P.sketchesDone = true; if (act === 'sk-skip') P.sketches = []; saveProject(); return go('storyboard'); }
+      if (act === 'style-home') return openGallery(true);
+      if (act === 'style-open') return openGallery(false);
+      if (act === 'sb-restyle') { if (blocked()) return; return startJob('storyboard', () => { P.storyboard.status = 'revise'; return genStoryboard('Redraw it in the new style.'); }); }
       if (act === 'sb-gen') return startJob('storyboard', () => genStoryboard(''));
       if (act === 'sb-approve') return startJob('render', () => approve());
       if (act === 'stop-ask') { stopAsk = (running() || {}).id || null; return paintJob(); }
@@ -2003,14 +2648,17 @@
         return say(text);
       }
       if (f.dataset.form === 'new') navPush = true;
-      if (f.dataset.form === 'new') return guard(() => createProject(String(fd.get('title')).trim(), String(fd.get('brief') || '').trim()));
+      if (f.dataset.form === 'new') return guard(() => createProject(String(fd.get('title')).trim(), String(fd.get('brief') || '').trim(), String(fd.get('ctx') || '')));
       if (f.dataset.form === 'gen') { if (audioLocked()) return; const pr = String(fd.get('prompt')).trim(), du = Math.max(5, Math.min(120, +fd.get('dur') || 20)); return startJob('generate-audio', () => { draftClear('gen'); return onGenerate(pr, du); }); }
       if (f.dataset.form === 'sb-rev') { const note = String(fd.get('note') || '').trim(); if (note) startJob('storyboard', () => { draftClear('sb-rev'); P.storyboard.status = 'revise'; return genStoryboard(note); }); return; }
       if (f.dataset.form === 'redo' && !canRedo()) return;
       if (f.dataset.form === 'redo') { const ins = String(fd.get('instruction') || '').trim(), tr = String(fd.get('treatment') || ''); if (ins) startJob('revision', () => { draftClear('redo'); return submitRedo(ins, tr); }); }
     });
+    root.addEventListener('keydown', (e) => { if (e.key === 'Enter' && e.target.matches && e.target.matches('.hxs-keep [data-cp-name]')) { e.preventDefault(); const b = root.querySelector('.hxs-keep [data-cp-ok]'); if (b) b.click(); } });
     root.addEventListener('input', (e) => {
       if (e.target.id === 'hxsElKey') { EL.key = e.target.value; return; }  // never into drafts
+      if (e.target.matches('[data-fmt-home-w], [data-fmt-home-h]')) { FM[e.target.matches('[data-fmt-home-w]') ? 'w' : 'h'] = evenPx(e.target.value); return; }
+      if (P && e.target.matches('[data-fmt-film-w], [data-fmt-film-h]')) { const k = e.target.matches('[data-fmt-film-w]') ? 'width' : 'height'; P.format = { ...fmtOf(), id: 'custom', [k]: evenPx(e.target.value) }; saveSoon('project', () => saveProject()); return; }
       if (e.target.form) draftSave(e.target);
       if (e.target.matches && e.target.matches('textarea[data-brief]')) { if (P) { P.brief = e.target.value; saveSoon('project', () => saveProject()); } return; }
       const qo = e.target.closest('.hxs-qc-other');
@@ -2049,8 +2697,9 @@
     root.addEventListener('dragenter', (e) => { if ([...(e.dataTransfer?.types || [])].includes('Files')) { e.preventDefault(); dragDepth++; dragOn(true); } });
     root.addEventListener('dragover', (e) => { if ([...(e.dataTransfer?.types || [])].includes('Files')) { e.preventDefault(); e.dataTransfer.dropEffect = 'copy'; } });
     root.addEventListener('dragleave', () => { if (--dragDepth <= 0) { dragDepth = 0; dragOn(false); } });
-    root.addEventListener('drop', (e) => { e.preventDefault(); dragDepth = 0; dragOn(false); onDrop([...(e.dataTransfer?.files || [])]); });
+    root.addEventListener('drop', (e) => { e.preventDefault(); dragDepth = 0; dragOn(false); onDrop([...(e.dataTransfer?.files || [])], e.target); });
     root.addEventListener('change', (e) => {
+      if (e.target.matches('select[data-pj]')) { PJ.pick = e.target.value; return; }
       if (e.target.matches('select[data-model], select[data-effort]')) { if (!blocked()) guard(() => saveModel()); return; }
       if (e.target.matches('input[name="trimlen"]') && trimming()) {
         const v = parseFloat(e.target.value);
@@ -2064,6 +2713,7 @@
       inp.value = '';
       if (inp.dataset.file === 'audio') { if (audioLocked() || blocked() || local.uploading) return; guard(() => onAudioFile(files[0])); }
       if (inp.dataset.file === 'sketch') { if (sketchesLocked()) return; guard(() => onSketches(files)); }
+      if (inp.dataset.file === 'brand') { if (brandLocked() || local.brandBusy) return; guard(() => onBrand(files)); }
       if (inp.dataset.file === 'redo') { redoAttach = files[0]; const n = root.querySelector('[data-attach-name]'); if (n) n.textContent = files[0].name; }
     });
     // timeline: tap to add a keypoint (Mapping), seek / drag a range (Editor)
@@ -2169,6 +2819,7 @@
     const was = isOpen();
     document.documentElement.classList.add('hx-studio-open');
     place();
+    if (opts.forProject !== undefined) PJ.pick = opts.forProject || '';
     let home = !!opts.home, target = opts.sid || null;
     if (!home && !target) {
       const m = location.pathname.match(MO_RE);
@@ -2227,7 +2878,9 @@
     if (m) { if (m[1]) open({ sid: m[1] }); else open({ home: true }); }
     else if (isOpen()) close({ keepChat: !!(typeof _sessionIdFromLocation === 'function' && _sessionIdFromLocation()), pop: true });
   });
-  window.hxStudio = { open, close, isOpen, leaving };
+  // films made for a Tabbie project (this browser's index, refreshed from the studio folder)
+  async function filmsFor(pid) { await discover(); return loadIdx().filter((x) => x.ctx === pid); }
+  window.hxStudio = { open, close, isOpen, leaving, filmsFor };
   addEventListener('resize', place);
   // a file dropped beside the drop zones must not navigate the tab away from the studio
   addEventListener('dragover', (e) => { if (isOpen()) e.preventDefault(); });

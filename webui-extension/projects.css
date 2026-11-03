@@ -224,3 +224,18 @@ html.hx-proj-open .nav-tab.active:not(.hxp-nav) svg[data-hi] { stroke-width: 1.5
   .hxp-sheet-h::before { content: ''; position: absolute; top: 6px; left: 50%; width: 36px; height: 5px; margin-left: -18px;
     border-radius: 3px; background: var(--hx-fill-2, rgba(127,127,127,.28)); }
 }
+
+/* Motion tab */
+.hxp-mo { display: grid; gap: 14px; }
+.hxp-mo-h { display: flex; align-items: flex-start; justify-content: space-between; gap: 14px; }
+.hxp-mo-h p { margin: 0; max-width: 60ch; }
+.hxp-mo-h .hxp-primary { flex: none; }
+.hxp-mo-cols { display: grid; gap: 8px; font-size: 13px; }
+.hxp-mo-cols b { font-weight: 500; }
+.hxp-mo-cl { display: flex; flex-wrap: wrap; gap: 8px; }
+.hxp-mo-c { display: inline-flex; align-items: center; gap: 8px; padding: 6px 10px 6px 8px; border-radius: 99px; border: 1px solid var(--hx-line, rgba(127,127,127,.22)); font-size: 13px; max-width: 100%; }
+.hxp-mo-c > span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.hxp-mo-c i { display: inline-flex; flex: none; }
+.hxp-mo-c em { width: 16px; height: 16px; border-radius: 50%; margin-left: -5px; box-shadow: 0 0 0 1.5px var(--hx-bg, #1c1c1e); }
+.hxp-mo-c em:first-child { margin-left: 0; }
+@media (max-width: 640px) { .hxp-mo-h { flex-direction: column; } .hxp-mo-h .hxp-primary { align-self: stretch; justify-content: center; } }

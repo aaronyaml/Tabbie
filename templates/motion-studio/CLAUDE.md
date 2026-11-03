@@ -1,10 +1,10 @@
 # Motion studio
 
 A Remotion project (React → video) where Tabbie's Motion panel and `/motion` jobs make films.
-Tabbie created this folder from its template; it's yours to change. Style: `MOTION_RULES.md`, every time.
+Tabbie created this folder from its template; it's yours to change. Craft: `MOTION_RULES.md`. Look and motion: the film's style from `styles/` (`styles/<id>/STYLE.md` + `style.json`).
 
 ## Rules
-- 1920×1080 at 30 fps unless the brief says otherwise. Animation is a pure function of the frame
+- The film's own frame (project.json `format`: 16:9, 9:16, 1:1, 4:5, 4:3, 21:9 or custom; default 1920×1080) at 30 fps, composed natively and filling the whole frame (no bars, no scaled 16:9 layouts). Animation is a pure function of the frame
   (`useCurrentFrame()`, `interpolate`, `spring`): no timers, no `Math.random()` without a seed, no CSS transitions.
 - **Every film is new.** Build it in its own folders; never open, copy or adapt another film's files.
 - The product's repo (named in the job as PRODUCT SOURCE) is read-only: take its name, colours, logo, fonts,
@@ -73,6 +73,30 @@ export const editMap = {
 - Anchor sources (also what the panel's keypoints use): `beat:<i>`, `downbeat:<n>` (1-based), `<event id>`
   (e.g. `bass_hit#3`, `drop#1`), `section:<type>#<n>`, `word[<i>]:<text>`, or `manual` (only when nothing fits; say why in `note`).
 - Pick the moments that matter; don't cut on every beat. Most intensities ≤ 0.5 so the few big ones read.
+
+## Brand kits
+A brand kit (logos, fonts, guidelines, templates; often a zip) comes with a film in `studio/<p>/project.json` `brand.files`.
+- **Read everything before proposing anything.** Unzip into `public/<p>/brand/`, list every file, read every PDF,
+  guideline, README and text file in full (all pages, not the first few), and look at every image and template.
+  No storyboard, concept or frame before that. If a PDF can't be read (scanned, protected), say so.
+- **Find the logos.** Search the whole kit by name (logo, mark, wordmark, icon, lockup, symbol) and by eye. Note
+  every variant (light/dark, mono, mark vs wordmark, app icon) and the official one for each background. Never
+  invent, redraw, recolour, stretch, crop, rotate, outline or add effects to a logo. No logo found: say so.
+- **Never use signatures in a film or ad. Ever.** Files or folders named signature/sig/autograph, or anything that
+  looks like a handwritten signature, are excluded outright, whatever a brief says. The same for photos of team
+  members, ID documents, contracts, invoices, internal or confidential files.
+- **Templates and decks are references,** not footage: learn the hierarchy, spacing and layouts from them; never
+  drop a slide or template page into the film.
+- **Exact values:** colours as the guidelines give them (hex), fonts from the kit's own files (`@remotion/fonts`
+  `loadFont`), clear space and minimum sizes as specified, tone of voice for any copy.
+- **Guidelines beat the style** on look where they conflict (the style still decides how things move); colours the
+  user set in the gallery beat both. State conflicts in the storyboard summary.
+- **Write `studio/<p>/BRAND.md`**: inventory, what was read, logo per background, fonts and weights, colours, rules,
+  and the excluded files with the reason. Later steps read it instead of re-reading the kit.
+
+## Git
+Other work may already be staged here. If you commit, commit only the files you made or changed:
+`git commit -m "…" -- <paths>`, never a bare `git commit` (it takes the whole index).
 
 ## Licence
 Remotion is free for individuals and companies of up to three people; larger companies need a Remotion

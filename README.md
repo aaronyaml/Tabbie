@@ -786,6 +786,30 @@ the moments, approve a storyboard, and Claude Code (or Codex) builds and renders
   that re-renders) always runs on Claude Code: Remotion renders in a headless Chrome, which Codex's
   macOS sandbox won't start. The reply says so in a Note line. With only Codex enabled, renders fail.
 
+- **Styles**: every film is made in one style from the studio's library (`styles/`): Premium Minimal,
+  Digital Brutalism, Retro Editorial, Nature Organic, Industrial Brand, Kinetic Type, Digital Scrapbook,
+  Swiss International and Glyph Mosaic. Each one is a full motion language (look, type, colour, timing,
+  transitions, camera, texture, sound). Pick one in the **Style** gallery on the new-film form or the
+  Storyboard step: hover a card to play its preview, open it for the details, optionally blend in a
+  second style's palette, type or texture. **Let Zoetie recommend** (the default) weighs several styles
+  against your brief and says why it picked one, with one-tap alternatives. **Custom style** takes a
+  description and reference videos or images, which are studied frame by frame. The choice is saved in
+  the film's `project.json`; changing it keeps everything else and offers to redraw the storyboard.
+  Studios made from an older template get the library added once.
+
+- **Colours**: every colour in a style can be changed, and the live previews repaint as you go. Save a
+  set of colours (in the gallery, or **Keep these colours** when a film is finished) for one Project or
+  for all films, and apply it to the next film in one tap. Project colours are stored on the Project;
+  colours for all films in the studio's `studio/colours.json`.
+
+- **Format**: 16:9, 9:16, 1:1, 4:5, 4:3, 21:9 or a custom size, on the new-film form or the Storyboard
+  step. Films are composed natively for that frame and fill it edge to edge (no bars, no 16:9 layout
+  scaled down); the player takes the film's shape.
+
+- **Films for a Project**: pick a Project in **For** on the new-film form, or press **New film** in a
+  Project's **Motion** tab. Zoetie then reads that Project's folders (read only) for the product, its
+  copy and its brand before it plans anything, and the tab lists the Project's films and saved colours.
+
 - **One continuous film**: transitions are planned before the shots, and each storyboard card ends with
   how that shot flows into the next (a camera push, a matte reveal, a match cut, a zoom into a detail…).
   Hard cuts only where the rhythm or story calls for one. The studio's `MOTION_RULES.md` has the rules;
