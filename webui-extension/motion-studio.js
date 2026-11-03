@@ -1150,6 +1150,8 @@
     if (/^(Grep|Glob)$/i.test(tool)) return 'Looking through the files';
     if (/^Web/i.test(tool)) return 'Looking something up';
     if (/^TodoWrite$/i.test(tool)) return 'Planning the next steps';
+    // a wait loop ("until [ … ]; do sleep 10; done"): say what it waits for
+    if (/^(until|while)\b/.test(t) && /\bsleep\b/.test(t)) return /qa|still|frame/i.test(t) ? 'Waiting for the preview frames' : /render|out\.mp4|\.mp4/i.test(t) ? 'Waiting for the render' : 'Waiting for a step to finish';
     // a shell command: the first meaningful part of a chain decides
     const parts = t.split(/\s*(?:&&|\|\||;|\|)\s*/).map((x) => x.replace(/^(cd \S+|export \S+|set -\S+|nice( -n \d+)?|time)\s*/g, '').trim()).filter(Boolean);
     for (const c of parts) {
@@ -1176,6 +1178,13 @@
     }
     return /\//.test(t) || /^[a-z]+\s/.test(t) ? 'Working on the film' : cap(t).slice(0, 90);
   }
+  // A helper's name: sometimes a description ("gs45 stills progress"), sometimes the raw command it runs.
+  function agentLabel(name) {
+    const n = String(name || '').trim();
+    if (/[\[\]$|;&<>`]|^\s*(until|while|for|if|sleep|ls|cat|cd|npx|npm|node|python3?|bash|sh)\b/i.test(n)) return humanStep('Bash: ' + n);
+    if (/\bstills?\b|\bframes?\b/i.test(n)) return /finish|progress|done|wait|watch/i.test(n) ? 'Waiting for the preview frames' : 'Rendering preview frames';
+    return cap(n.replace(/^[a-z]{1,4}\d+\s+/i, '')).slice(0, 90);
+  }
   function liveStatus(j) {
     if (j && j.starting) return j.kind === 'analyze' && local.uploading ? 'Uploading your track' : 'Starting';
     if (j && j.stage) return cap(j.stage);
@@ -1184,7 +1193,7 @@
     if (/awaiting/.test(r.status || '')) return 'Waiting for your answer';
     const ag = r.agents_list || [];
     const sub = ag.filter((a) => a.parent && a.status === 'running').pop();
-    if (sub && sub.name && sub.name !== 'subagent') return cap(sub.name);
+    if (sub && sub.name && sub.name !== 'subagent') return agentLabel(sub.name);
     const main = ag.find((a) => !a.parent);
     const st = main && main.status === 'running' && main.step ? String(main.step) : '';
     return st && !/^(done|starting|thinking|working)\b/i.test(st) ? humanStep(st) : '';
@@ -1264,7 +1273,7 @@
   function stagesFor(it, j, r, live) {
     // stages we can observe: the worker's subagents (with their real status), else the live lines seen so far
     const subs = r ? (r.agents_list || []).filter((a) => a.parent && a.name && a.name !== 'subagent') : [];
-    if (subs.length) return subs.slice(-5).map((a) => ({ name: cap(a.name), done: a.status === 'done', on: a.status === 'running', failed: a.status === 'failed' }));
+    if (subs.length) return subs.slice(-5).map((a) => ({ name: agentLabel(a.name), done: a.status === 'done', on: a.status === 'running', failed: a.status === 'failed' }));
     const seen = chat.stages[it.id] || (chat.stages[it.id] = []);
     if (live && !/^Starting$/.test(live) && seen[seen.length - 1] !== live) seen.push(live);
     return seen.slice(-5).map((n, i, l) => ({ name: n, done: i < l.length - 1, on: i === l.length - 1 }));
@@ -1282,7 +1291,7 @@
     const stages = run && top ? stagesFor(it, j, r, live) : [];
     const more = [...(it.reply ? it.reply.body.split('\n').slice(1).filter(Boolean) : []), ...(it.reply ? it.reply.more : [])];
     const agents = !run && r ? (r.agents_list || []).filter((a) => a.parent && a.name && a.name !== 'subagent') : [];
-    const det = !top && !run && (agents.length || more.length) ? `<details class="hxs-jc-d"><summary>Details</summary>${agents.length ? `<ul>${agents.map((a) => `<li>${esc(cap(a.name))}</li>`).join('')}</ul>` : ''}${more.length ? `<p>${more.map(md).join('<br>')}</p>` : ''}</details>` : '';
+    const det = !top && !run && (agents.length || more.length) ? `<details class="hxs-jc-d"><summary>Details</summary>${agents.length ? `<ul>${[...new Set(agents.map((a) => agentLabel(a.name)))].map((x) => `<li>${esc(x)}</li>`).join('')}</ul>` : ''}${more.length ? `<p>${more.map(md).join('<br>')}</p>` : ''}</details>` : '';
     const stopping = top && stopAsk && stopAsk === (j && j.id);
     const foot = top && run && j && !j.starting ? (stopping
       ? `<div class="hxs-jc-ask"><span>Stop waiting for this step? ${NAME} stops tracking it here and unlocks the buttons. This does not cancel Claude, which may still finish it in the background.</span><span class="hxs-jc-askb"><button type="button" class="hxs-ghost hxs-sm" data-act="stop-no">Keep going</button><button type="button" class="hxs-ghost hxs-sm hxs-danger" data-act="job-drop">Stop waiting</button></span></div>`
