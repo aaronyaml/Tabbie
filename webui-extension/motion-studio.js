@@ -1273,7 +1273,17 @@
   function stagesFor(it, j, r, live) {
     // stages we can observe: the worker's subagents (with their real status), else the live lines seen so far
     const subs = r ? (r.agents_list || []).filter((a) => a.parent && a.name && a.name !== 'subagent') : [];
-    if (subs.length) return subs.slice(-5).map((a) => ({ name: agentLabel(a.name), done: a.status === 'done', on: a.status === 'running', failed: a.status === 'failed' }));
+    if (subs.length) {
+      // same label twice (several helpers waiting on one thing) → one line, running if any of them is
+      const out = [];
+      for (const a of subs) {
+        const it = { name: agentLabel(a.name), done: a.status === 'done', on: a.status === 'running', failed: a.status === 'failed' };
+        const prev = out.find((x) => x.name === it.name);
+        if (!prev) { out.push(it); continue; }
+        prev.on = prev.on || it.on; prev.failed = prev.failed || it.failed; prev.done = !prev.on && !prev.failed && it.done;
+      }
+      return out.slice(-5);
+    }
     const seen = chat.stages[it.id] || (chat.stages[it.id] = []);
     if (live && !/^Starting$/.test(live) && seen[seen.length - 1] !== live) seen.push(live);
     return seen.slice(-5).map((n, i, l) => ({ name: n, done: i < l.length - 1, on: i === l.length - 1 }));
