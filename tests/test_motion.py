@@ -169,6 +169,8 @@ def test_older_template_studio_gets_the_additions_once(tmp_path):
     (sfx / "manifest.json").write_text(json.dumps(man), encoding="utf-8")
     doc = p / "CLAUDE.md"
     doc.write_text(doc.read_text(encoding="utf-8").split("## Sound effects")[0], encoding="utf-8")
+    rules = p / "MOTION_RULES.md"
+    rules.write_text(rules.read_text(encoding="utf-8").split("## Transitions")[0] + "## My own rule\nKeep it.\n", encoding="utf-8")
     (p / motion.MARKER).write_text("template 1\n", encoding="utf-8")
     added = motion.sync_template(p)
     assert "public/audio/sfx/pop_soft_1.mp3" in added
@@ -176,6 +178,8 @@ def test_older_template_studio_gets_the_additions_once(tmp_path):
     sounds = json.loads((sfx / "manifest.json").read_text(encoding="utf-8"))["sounds"]
     assert "my_sound" in sounds and "pop_soft" in sounds
     assert doc.read_text(encoding="utf-8").count("## Sound effects") == 1
+    r = rules.read_text(encoding="utf-8")
+    assert r.count("## Transitions") == 1 and "## My own rule\nKeep it." in r and "MOTION_RULES.md (Transitions)" in added
     assert motion.sync_template(p) == []  # once
 
 

@@ -786,6 +786,11 @@ the moments, approve a storyboard, and Claude Code (or Codex) builds and renders
   that re-renders) always runs on Claude Code: Remotion renders in a headless Chrome, which Codex's
   macOS sandbox won't start. The reply says so in a Note line. With only Codex enabled, renders fail.
 
+- **One continuous film**: transitions are planned before the shots, and each storyboard card ends with
+  how that shot flows into the next (a camera push, a matte reveal, a match cut, a zoom into a detail…).
+  Hard cuts only where the rhythm or story calls for one. The studio's `MOTION_RULES.md` has the rules;
+  studios made from an older template get that section added once.
+
 - **Not installed yet?** Opening Motion shows a **Download Motion studio** button instead of the new-film
   form. It installs whatever's missing in the background (Node.js, the studio folder, its packages; about
   300 MB) and shows each step as it goes. Typing `/motion …` in a chat before then starts the same install

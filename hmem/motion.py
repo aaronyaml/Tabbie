@@ -124,15 +124,17 @@ def sync_template(p: Path | None = None) -> list[str]:
                 dst.parent.mkdir(parents=True, exist_ok=True)
                 shutil.copy2(f, dst)
                 added.append(f.relative_to(TEMPLATE).as_posix())
-    doc, tdoc = p / "CLAUDE.md", TEMPLATE / "CLAUDE.md"
-    try:
-        text, ttext = doc.read_text(encoding="utf-8"), tdoc.read_text(encoding="utf-8")
-        m = re.search(r"^## Sound effects.*?(?=^## )", ttext, re.M | re.S)
-        if m and "## Sound effects" not in text:
-            doc.write_text(text.rstrip("\n") + "\n\n" + m.group(0).rstrip("\n") + "\n", encoding="utf-8")
-            added.append("CLAUDE.md (Sound effects)")
-    except OSError:
-        pass
+    # sections a newer template added to its docs: appended once, the rest of the user's file untouched
+    for name, head in (("CLAUDE.md", "## Sound effects"), ("MOTION_RULES.md", "## Transitions")):
+        doc, tdoc = p / name, TEMPLATE / name
+        try:
+            text, ttext = doc.read_text(encoding="utf-8"), tdoc.read_text(encoding="utf-8")
+            m = re.search(rf"^{re.escape(head)}.*?(?=^## |\Z)", ttext, re.M | re.S)
+            if m and head not in text:
+                doc.write_text(text.rstrip("\n") + "\n\n" + m.group(0).rstrip("\n") + "\n", encoding="utf-8")
+                added.append(f"{name} ({m.group(0).splitlines()[0][3:].split(':')[0]})")
+        except OSError:
+            pass
     marker.write_text(f"template {want}\n", encoding="utf-8")
     return added
 
