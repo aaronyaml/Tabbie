@@ -486,11 +486,36 @@
     if (P && F.analysis && F.analysis.source && F.analysis.source.path) return rawUrl(P.sessionId, F.analysis.source.path);
     return local.audioUrl || '';
   }
+  // Waveforms, kept in this browser (IndexedDB) so opening a film doesn't re-download and decode the
+  // whole track (often 5-10 MB of WAV) every time. Keyed by the file's URL and the analysis length;
+  // a re-cut track gets a new file name, so a stale waveform can't come back.
+  const peakDb = () => new Promise((res, rej) => {
+    const q = indexedDB.open('hx-motion-peaks', 1);
+    q.onupgradeneeded = () => q.result.createObjectStore('peaks');
+    q.onsuccess = () => res(q.result); q.onerror = () => rej(q.error);
+  });
+  async function peakStore(mode, key, val) {
+    try {
+      const db = await peakDb();
+      return await new Promise((res) => {
+        const t = db.transaction('peaks', mode), st = t.objectStore('peaks');
+        const q = mode === 'readonly' ? st.get(key) : st.put(val, key);
+        q.onsuccess = () => res(q.result); q.onerror = () => res(null);
+        t.oncomplete = () => db.close();
+      });
+    } catch (_) { return null; }
+  }
   async function ensurePeaks() {
     const src = audioSrc();
     if (!src || local.peaksFor === src) return;
     local.peaksFor = src;
     local.peaks = null; // never draw the last track's waveform under this one
+    const key = src.startsWith('api/') ? `${src}|${(F.analysis && F.analysis.durationMs) || ''}` : '';
+    if (key) {
+      const hit = await peakStore('readonly', key);
+      if (local.peaksFor !== src) return;
+      if (hit && hit.coarse && hit.fine) { local.peaks = { ...hit, data: hit.coarse }; render(); return; }
+    }
     try {
       // a just-picked file is read directly: the site CSP blocks fetch() of blob: URLs. Huge files (long
       // videos) are skipped — decoding them in the page can stall Safari; the analysis markers still come.
@@ -514,6 +539,7 @@
       let top = 0; for (let i = 0; i < N; i++) if (coarse[i] > top) top = coarse[i];
       if (top > 0 && top < 0.98) { const g = 0.98 / top; for (let i = 0; i < N; i++) coarse[i] *= g; for (let i = 0; i < nf; i++) fine[i] *= g; }
       local.peaks = { data: coarse, coarse, fine, finePerSec: audio.sampleRate / FB, durationMs: audio.duration * 1000 };
+      if (key) peakStore('readwrite', key, { coarse, fine, finePerSec: local.peaks.finePerSec, durationMs: local.peaks.durationMs });
       try { ctx.close(); } catch (_) {}
       render();
     } catch (_) { local.peaksFor = ''; }
