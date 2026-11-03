@@ -25,7 +25,8 @@
  *                                              word[i]:text, <event id>, section:type#n, manual), timeMs, frame,
  *                                              tag, label, description, action {mode: auto|describe, text}
  *   storyboard.json tabbie.motion-storyboard/1 written by the job: frames {id, timeMs, frame, endMs, anchor,
- *                                              keypoint, action, description}
+ *                                              keypoint, action, description, transition (how this shot
+ *                                              becomes the next: technique · bridge · what carries over)}
  *   revisions.json  tabbie.motion-revisions/1  revisions {id, createdAt, ranges [{startMs,endMs,startFrame,endFrame}],
  *                                              eventIds, instruction, treatment, attachments, status}
  *   render.json     tabbie.motion-render/1     written by the job: status, output (relative to the studio)
@@ -1452,7 +1453,7 @@
     return `${host(line)}
       ${frames.length ? `${sb.summary ? `<p class="hxs-sum">${esc(sb.summary)}</p>` : ''}<div class="hxs-board">${frames.map((f, i) => `<article class="hxs-frame">
           <header><i>${i + 1}</i><b>${fmt(f.timeMs)}</b><span>${esc(f.anchor || '')}</span></header>
-          <h4>${esc(f.action || '')}</h4><p>${esc(f.description || '')}</p></article>`).join('')}</div>` : ''}
+          <h4>${esc(f.action || '')}</h4><p>${esc(f.description || '')}</p>${f.transition ? `<p class="hxs-tr">${icon('ArrowRight02Icon', 13)}<span>${esc(f.transition)}</span></p>` : ''}</article>`).join('')}</div>` : ''}
       ${modelCard(st === 'approved', busy)}
       ${!frames.length || st === 'revise' ? `<label class="hxs-card hxs-dir"><b>Creative direction <em>optional</em></b>
           <textarea data-brief rows="3" maxlength="2000" placeholder="What are you going for? Mood, story, who it’s for, must-haves, things to avoid…"${busy ? ' disabled' : ''}>${esc(P.brief || '')}</textarea></label>` : ''}
@@ -1851,14 +1852,14 @@
     const prev = F.storyboard && F.storyboard.frames && F.storyboard.frames.length ? ` Revise the current ${pdir()}/storyboard.json per the user's note: "${(note || '').replace(/"/g, '\'')}"; bump "version".` : '';
     P.storyboard = { status: 'requested', requestedAt: new Date().toISOString(), note: note || '' };
     await saveProject();
-    await dispatch('storyboard', `Make the storyboard only — do NOT render and do NOT write an edit map; the user approves first.${prev} Inputs: the user's creative direction / brief "${(P.brief || '').replace(/"/g, '\'')}" (follow it alongside MOTION_RULES.md; if it conflicts with the house style, say so in the summary) (${pdir()}/project.json); audio analysis audio/analysis/${P.project}/analysis.json (if it is missing, run the analysis on audio.path first); mapping: ${kp}; sketches: ${sk}. Follow MOTION_RULES.md. Write ${pdir()}/storyboard.json as {"schema":"tabbie.motion-storyboard/1","project":"${P.project}","fps":${FPS},"version":1,"summary":"<one paragraph>","frames":[{"id":"f1","timeMs":0,"frame":0,"endMs":1200,"anchor":"<anchorsFor id or manual>","keypoint":"<keypoint id or null>","action":"<short shot title>","description":"<what happens>"}]} with frames in time order covering the whole track.${span}`);
+    await dispatch('storyboard', `Make the storyboard only — do NOT render and do NOT write an edit map; the user approves first.${prev} Inputs: the user's creative direction / brief "${(P.brief || '').replace(/"/g, '\'')}" (follow it alongside MOTION_RULES.md; if it conflicts with the house style, say so in the summary) (${pdir()}/project.json); audio analysis audio/analysis/${P.project}/analysis.json (if it is missing, run the analysis on audio.path first); mapping: ${kp}; sketches: ${sk}. Follow MOTION_RULES.md. Write ${pdir()}/storyboard.json as {"schema":"tabbie.motion-storyboard/1","project":"${P.project}","fps":${FPS},"version":1,"summary":"<one paragraph>","frames":[{"id":"f1","timeMs":0,"frame":0,"endMs":1200,"anchor":"<anchorsFor id or manual>","keypoint":"<keypoint id or null>","action":"<short shot title>","description":"<what happens>","transition":"<how this shot becomes the next: technique · bridge element · what carries over>"}]} with frames in time order covering the whole track. The film is one continuous sequence (MOTION_RULES.md §8, docs/motion-knowledge/03 §11–12): plan the transitions FIRST, then the shots around them. Every frame's "transition" names how it flows into the next (camera push/pull, track-matte reveal, match cut, object continuity, motion continuity, perspective shift or seamless zoom) and the element that carries the eye across; a hard cut only with its reason (rhythm, story, impact). The last frame's transition leads into the end card.${span}`);
   }
   async function approve() {
     P.storyboard = { ...(P.storyboard || {}), status: 'approved', approvedAt: new Date().toISOString(), version: (F.storyboard && F.storyboard.version) || 1 };
     P.render = { status: 'requested', requestedAt: new Date().toISOString() };
     await saveProject();
     view = 'editor'; P.step = 'editor';
-    await dispatch('render', `The user APPROVED the storyboard in ${pdir()}/storyboard.json (version ${P.storyboard.version}). Build and render the film now with the /motion workflow: write the edit map from the storyboard's anchors (src/components/${P.project}/editMap.ts), export it with \`npm run editmap -- ${P.project}\` so audio/analysis/${P.project}/EDIT_MAP.json exists early, then render into output/. Keep ${pdir()}/render.json current: {"schema":"tabbie.motion-render/1","status":"rendering"|"done"|"failed","output":"output/<file>.mp4","updatedAt":"<ISO time>"} (output relative to the studio folder).`);
+    await dispatch('render', `The user APPROVED the storyboard in ${pdir()}/storyboard.json (version ${P.storyboard.version}). Build and render the film now with the /motion workflow; each frame's "transition" is the plan for that seam (build the seams first, so the film plays as one continuous sequence): write the edit map from the storyboard's anchors (src/components/${P.project}/editMap.ts), export it with \`npm run editmap -- ${P.project}\` so audio/analysis/${P.project}/EDIT_MAP.json exists early, then render into output/. Keep ${pdir()}/render.json current: {"schema":"tabbie.motion-render/1","status":"rendering"|"done"|"failed","output":"output/<file>.mp4","updatedAt":"<ISO time>"} (output relative to the studio folder).`);
   }
   // Try again on a failed step: a render re-runs the approved build; any other step is sent again with
   // what went wrong, reusing whatever it had already made.

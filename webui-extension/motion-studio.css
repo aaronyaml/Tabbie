@@ -186,6 +186,8 @@ html.hx-studio-open #hxStudio { display: block; position: fixed; top: 0; right: 
 .hxs-frame header span { flex: 1; text-align: right; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .hxs-frame h4 { margin: 10px 0 4px; font-size: 15px; font-weight: 600; letter-spacing: -0.01em; }
 .hxs-frame p { margin: 0; font-size: 13.5px; line-height: 1.4; color: var(--hx-text-2, #8a8a8e); }
+.hxs-frame .hxs-tr { display: flex; gap: 6px; align-items: flex-start; margin-top: 8px; padding-top: 8px; border-top: 1px solid var(--hx-sep, rgba(128,128,128,.16)); font-size: 12.5px; color: var(--hx-accent, #3054FD); }
+.hxs-frame .hxs-tr svg { flex: none; margin-top: 2px; }
 .hxs-revise { display: grid; gap: 10px; margin-top: 18px; }
 
 /* timeline */
