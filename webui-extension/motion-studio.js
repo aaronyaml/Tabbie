@@ -2708,6 +2708,10 @@ ${editSystem(s)}
       if (f.dataset.form === 'redo' && !canRedo()) return;
       if (f.dataset.form === 'redo') { const ins = String(fd.get('instruction') || '').trim(), tr = String(fd.get('treatment') || ''); if (ins) startJob('revision', () => { draftClear('redo'); return submitRedo(ins, tr); }); }
     });
+    // film rows: exactly one row shows its delete button, the one under a mouse pointer
+    const hoverRow = (row) => { root.querySelectorAll('.hxs-film-row.is-hover').forEach((r) => { if (r !== row) r.classList.remove('is-hover'); }); if (row) row.classList.add('is-hover'); };
+    root.addEventListener('pointerover', (e) => { if (e.pointerType === 'mouse') hoverRow(e.target.closest && e.target.closest('.hxs-film-row')); });
+    root.addEventListener('pointerleave', () => hoverRow(null));
     root.addEventListener('keydown', (e) => { if (e.key === 'Enter' && e.target.matches && e.target.matches('.hxs-keep [data-cp-name]')) { e.preventDefault(); const b = root.querySelector('.hxs-keep [data-cp-ok]'); if (b) b.click(); } });
     root.addEventListener('input', (e) => {
       if (e.target.id === 'hxsElKey') { EL.key = e.target.value; return; }  // never into drafts

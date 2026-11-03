@@ -778,13 +778,14 @@ Haiku) fall back to plain text when Claude Code is off. No file means both (olde
 ### Motion studio
 
 **Motion** (in the rail, under Chat) makes product films cut to music: pick or generate a track, mark
-the moments, approve a storyboard, and Claude Code (or Codex) builds and renders the film with
+the moments, approve a storyboard, and Claude Code builds and renders the film with
 [Remotion](https://www.remotion.dev). `/motion <brief>` in any chat does the same from a prompt.
 
-- **Model**: the Storyboard step has a model picker (e.g. Opus 5.5, Sonnet 5.5, GPT-6.1 Sol, plus
-  effort). That model draws the storyboard and writes the film. The render itself (and any revision
-  that re-renders) always runs on Claude Code: Remotion renders in a headless Chrome, which Codex's
-  macOS sandbox won't start. The reply says so in a Note line. With only Codex enabled, renders fail.
+- **Claude Code only**: Motion runs on Claude Code and nothing else. Codex and the other providers
+  aren't offered: Remotion renders in a headless Chrome, which Codex's macOS sandbox won't start, and the
+  studio's skill and rules are written for Claude Code. Without Claude Code enabled, Motion can't make
+  films. The Storyboard step has a model picker (e.g. Opus 5.5, Sonnet 5.5, plus effort); that model
+  draws the storyboard, writes the film and renders it.
 
 - **Styles**: every film is made in one style from the studio's library (`styles/`): Premium Minimal,
   Digital Brutalism, Retro Editorial, Nature Organic, Industrial Brand, Kinetic Type, Digital Scrapbook,
@@ -796,6 +797,24 @@ the moments, approve a storyboard, and Claude Code (or Codex) builds and renders
   description and reference videos or images, which are studied frame by frame. The choice is saved in
   the film's `project.json`; changing it keeps everything else and offers to redraw the storyboard.
   Studios made from an older template get the library added once.
+
+- **Scenes**: a film is a sequence of scenes, and each style brings its own 3–5 scene types plus the order
+  they play in (opening → development → escalation → reveal → resolution, or the style's own beats). The
+  storyboard names each card's scene type and the transition into the next. For example:
+
+  | Style | Scene types |
+  |---|---|
+  | Premium Minimal | Kinetic caption, Floating hero UI, Depth stack, Interaction beat, End lockup |
+  | Digital Brutalism | Typed line, Counter slam, Curved image plane, Glyph word, Terminal sign-off |
+  | Retro Editorial | Hero on the wall, Colour-block field, Stamp deck, Wordmark on the wall, Flat lay |
+  | Nature Organic | Moodboard cluster, Full-bleed photograph, Radiance poster, Collateral still, Radiant lockup |
+  | Industrial Brand | Application still, Colour-block field, Cropped letterform, Construction hold, System lockup |
+  | Kinetic Type | Hyperspace arrival, Debris assembly, Living hold, Word swap on the beat, Lightning sign-off |
+  | Digital Scrapbook | Cropped manifesto word, Typed thought, Keepsake ring, Heat portrait, Doodled end card |
+  | Swiss International | Poster, Number plate, Module layout, Data grid, Colophon |
+  | Glyph Mosaic | Glyph mark, Glyph portrait, Vortex field, Glyph hero, Glyph caption |
+
+  Open a style card in the gallery to see its scenes, sequence and an example edit.
 
 - **Colours**: every colour in a style can be changed, and the live previews repaint as you go. Save a
   set of colours (in the gallery, or **Keep these colours** when a film is finished) for one Project or
