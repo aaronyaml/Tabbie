@@ -230,7 +230,7 @@
       "name": "Vortex bloom",
       "kind": "seamless-zoom",
       "bridge": "concentric rings around the form",
-      "build": "glyphs are laid on polar rings around the silhouette; the rings scale out from 0.2 to fill the frame while rotating 30–60°, outer rings larger and sparser; to close, reverse it and the rings fold back into the form",
+      "build": "the form re-resolves into the vortex: every glyph of the silhouette flies to its own slot on the inner polar rings (inner rings first, nearest angle, 0.5–1 f stagger by distance), while the outer rings bloom out from 0.2 to fill the frame and the whole field turns 30–60°; outer rings larger and sparser; to close, reverse it and the rings fold back into the form",
       "frames": [
         24,
         45
@@ -453,7 +453,7 @@
           165,
           285
         ],
-        "action": "rings bloom out around the bust's white silhouette to full bleed; ripples run outward, glyphs flip in waves, the field turns 40°",
+        "action": "the bust's glyphs spiral out and become the inner rings; outer rings bloom to full bleed, ripples run outward, glyphs flip in waves, the field turns 40°",
         "transitionOut": "glyph-zoom"
       },
       {

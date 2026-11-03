@@ -35,7 +35,8 @@ form. It feels generative and alive but hand-printed, never neon.
 - **Object morph — re-resolve** (signature): sample the next shape on the same grid; shared glyphs ease to their
   new cells, others shrink out or grow in. Coarse → fine reads as "resolving".
 - **Seamless zoom — glyph zoom:** push into one glyph until it fills the frame; its parts become the next scene.
-- **Seamless zoom — vortex bloom:** concentric rings expand and rotate out of the form to full bleed, and fold back.
+- **Seamless zoom — vortex bloom:** the form re-resolves into the vortex: its glyphs fly out to become the inner rings
+  while the outer rings bloom to full bleed and the field turns; reversed, the rings fold back into the form.
 - **Motion continuity — split and scatter:** a hero glyph splits into parts that travel on the grid and become groups.
 - **Rhythmic change — glyph wave:** tiles flip glyph or colour in a wave without anything moving.
 - **Match cut:** the same silhouette as glyph portrait and as negative space inside the vortex field.
@@ -75,8 +76,8 @@ Opening (18 %, A) → re-resolve → development (22 %, B) → vortex bloom → 
 reveal (15 %, D) → split and scatter → resolution (20 %, E then A). One continuous shot, no cuts; 10–30 s.
 
 **Example mini-edit (15 s AI-product launch):** 1 · the monogram builds centre-out, "made of everything" types
-below (0–75) → re-resolve → 2 · it regrids into a coarse bust that resolves fine (75–165) → vortex bloom → 3 · rings
-bloom to full bleed around the bust's white silhouette, ripples, the field turns 40° (165–285) → glyph zoom → 4 · a
+below (0–75) → re-resolve → 2 · it regrids into a coarse bust that resolves fine (75–165) → vortex bloom → 3 · the
+bust's glyphs spiral out into the inner rings, the field blooms to full bleed and turns 40° (165–285) → glyph zoom → 4 · a
 pixel-cross glyph fills the frame, its ring cycles colour (285–360) → split → 5 · four groups gather into the
 product name beside the monogram (360–450).
 

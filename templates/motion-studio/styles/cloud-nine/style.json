@@ -1,0 +1,559 @@
+{
+  "schema": "motion.style/2",
+  "id": "cloud-nine",
+  "number": "12",
+  "name": "Cloud Nine",
+  "tagline": "A sunny painted sky over a green hill: letters ride a curve, app cards float in 3D, words blur in like breath.",
+  "description": "A light, optimistic product language set in one painted landscape: a bright blue sky with soft clouds over a rolling green hill, tiny petals drifting through. White rounded type arrives letter by letter along a wave, squashes into a block that becomes a floating stack of rounded app cards tilting in perspective, their screens swapping while they hover. A depth-of-field whip blurs them away, the camera drifts up into open sky and the next line blurs in word by word. One continuous shot, no cuts.",
+  "family": "extended",
+  "mood": [
+    "optimistic",
+    "airy",
+    "friendly",
+    "calm",
+    "dreamy"
+  ],
+  "bestFor": [
+    "consumer and lifestyle apps",
+    "productivity and wellbeing tools",
+    "creator tools and social apps",
+    "app store and launch teasers",
+    "short vertical and square social posts"
+  ],
+  "avoidFor": [
+    "serious enterprise and security",
+    "dark, edgy or technical brands",
+    "dense data and dashboards"
+  ],
+  "references": [
+    "references/ref11.mp4"
+  ],
+  "palette": {
+    "bg": "#36B4F5",
+    "sky": "#5AC5F7",
+    "haze": "#D0EAF9",
+    "surface": "#FFFFFF",
+    "ink": "#FFFFFF",
+    "card": "#FFFFFF",
+    "night": "#16181C",
+    "muted": "#8FA6B8",
+    "grass": "#A9D663",
+    "grass2": "#6FBF3A",
+    "accent": "#2FC25B",
+    "accent2": "#2E6BE6",
+    "hair": "rgba(255,255,255,0.4)",
+    "swatches": [
+      "#36B4F5",
+      "#D0EAF9",
+      "#A9D663",
+      "#FFFFFF",
+      "#2FC25B"
+    ],
+    "warm": "#F4A340",
+    "ember": "#C2531E",
+    "petal": "#F1E6D8",
+    "bloom": "#FFF6B0"
+  },
+  "type": {
+    "display": {
+      "family": "Manrope",
+      "google": "Manrope",
+      "weights": [
+        "600",
+        "800"
+      ],
+      "case": "sentence",
+      "tracking": -0.03,
+      "fallback": "\"Helvetica Neue\", Arial, sans-serif"
+    },
+    "text": {
+      "family": "DM Sans",
+      "google": "DMSans",
+      "weights": [
+        "500"
+      ],
+      "case": "sentence",
+      "tracking": -0.01,
+      "fallback": "\"Helvetica Neue\", Arial, sans-serif"
+    }
+  },
+  "motion": {
+    "step": 1,
+    "durations": {
+      "instant": 3,
+      "fast": 8,
+      "standard": 16,
+      "slow": 30,
+      "cinematic": 60
+    },
+    "ease": {
+      "enter": [
+        0.22,
+        1,
+        0.36,
+        1
+      ],
+      "exit": [
+        0.55,
+        0,
+        0.85,
+        0.4
+      ],
+      "move": [
+        0.45,
+        0,
+        0.2,
+        1
+      ],
+      "camera": [
+        0.4,
+        0,
+        0.2,
+        1
+      ],
+      "float": [
+        0.37,
+        0,
+        0.63,
+        1
+      ],
+      "morph": [
+        0.37,
+        0,
+        0.63,
+        1
+      ]
+    },
+    "springs": {
+      "letter": {
+        "damping": 13,
+        "stiffness": 140,
+        "mass": 0.7
+      },
+      "card": {
+        "damping": 18,
+        "stiffness": 110,
+        "mass": 1
+      }
+    },
+    "blur": "depth"
+  },
+  "transitions": {
+    "signature": [
+      "wave-in: letters fly in along a curved path one by one and settle onto the baseline",
+      "squash into cards: the settled word compresses into a block that unfolds as a floating 3D stack of app cards",
+      "focus whip: the subject sweeps sideways out of the plane of focus, going soft and big, revealing open sky"
+    ],
+    "use": [
+      "morph",
+      "motion-continuity",
+      "spatial",
+      "typographic"
+    ],
+    "avoid": [
+      "hard cuts",
+      "dark backgrounds",
+      "harsh flat colour blocks",
+      "glitch and pixel effects",
+      "busy layouts"
+    ],
+    "overlapFrames": [
+      8,
+      20
+    ]
+  },
+  "camera": "One continuous painted world. The camera floats: a slow drift and gentle tilt up from hill to open sky between beats, a slight dolly toward the hero cards. Depth of field is the main tool: the subject is sharp, the hill and far clouds are soft, and objects leave the frame by going out of focus.",
+  "texture": {
+    "grain": 0.01,
+    "paper": false,
+    "notes": "Soft painted sky: a vertical gradient from deeper blue at the top to haze near the horizon, puffy white clouds with soft edges, a rolling green hill with lighter highlights and tiny flecks of flowers. Small petals or leaves drift slowly through the sky."
+  },
+  "lighting": "Bright midday sun from the upper left: a soft lens glow in the top corner, cards lit evenly with soft, diffuse drop shadows below them.",
+  "sound": "Light and airy: a soft pluck or bell per letter, a gentle whoosh for the card fly-in and the focus whip, a warm pad underneath, a little birdsong or breeze.",
+  "preview": {
+    "frames": 150,
+    "thumbFrame": 64,
+    "beats": [
+      {
+        "from": 0,
+        "to": 34,
+        "beat": "opening",
+        "label": "Letters wave in over the hill"
+      },
+      {
+        "from": 34,
+        "to": 90,
+        "beat": "transformation",
+        "label": "Word squashes into a floating card stack"
+      },
+      {
+        "from": 90,
+        "to": 112,
+        "beat": "transition",
+        "label": "Focus whip, camera drifts up"
+      },
+      {
+        "from": 112,
+        "to": 150,
+        "beat": "resolution",
+        "label": "A line blurs in word by word"
+      }
+    ]
+  },
+  "motionSummary": "Moves like a daydream: letters ride a breeze onto the line, a word folds into a stack of floating app cards, and everything leaves by drifting out of focus into open sky.",
+  "visual": {
+    "composition": [
+      "one subject (a word, a line or a card stack) slightly above centre, the hill along the bottom third, sky everywhere else",
+      "the world stays put; the camera drifts and the subject floats",
+      "lots of air: never more than one line or one stack at a time"
+    ],
+    "shapeLanguage": "soft and rounded: generous corner radius on cards (≈ 12 % of their width), thin white card borders, puffy clouds, rolling hill curves; no hard edges",
+    "contrast": "bright high-key: white type and cards against mid blue sky, green hill as the base; the only dark element is a photo or dark screen inside one card"
+  },
+  "grammar": {
+    "pacing": "calm and continuous: one idea every 1.5–2.5 s, carried by floating moves rather than cuts",
+    "rhythm": "letter-by-letter and word-by-word: each letter or word lands 2–4 f after the last, like a melody",
+    "easing": "soft out ([0.22,1,0.36,1]) for arrivals, smooth float ([0.37,0,0.63,1]) for hovering, a gentle spring for letters landing; never linear, never snappy",
+    "acceleration": "fast in, long soft landing; floating objects never fully stop (2–6 px bob, 1–3° sway)",
+    "movement": [
+      "letters flying in along a curve with rotation",
+      "word squashing into a block",
+      "3D card stack tilting and hovering",
+      "card contents swapping in place",
+      "focus whip out of frame",
+      "camera tilt up into sky",
+      "words blurring in one by one",
+      "petals drifting"
+    ],
+    "density": "low: one subject, a few petals",
+    "holds": "soft holds of 15–30 f where the subject keeps floating"
+  },
+  "transitionPresets": [
+    {
+      "id": "wave-in",
+      "name": "Wave in",
+      "kind": "typographic",
+      "bridge": "the baseline",
+      "build": "each letter starts below and to the left on a curved path (rotated 30–60°, scaled 0.4, blurred 6 px), then follows the curve up onto the baseline with a gentle spring; 2–3 f stagger per letter",
+      "frames": [
+        18,
+        36
+      ],
+      "ease": "enter",
+      "overlap": 10,
+      "sound": "a soft pluck per letter"
+    },
+    {
+      "id": "squash-to-cards",
+      "name": "Squash into cards",
+      "kind": "object-morph",
+      "bridge": "the word's bounding box",
+      "build": "the settled word squashes horizontally (scaleX 1 → 0.2) and blurs into a rounded white block; the block becomes the front card and two cards slide out behind it in 3D, fanned and tilted",
+      "frames": [
+        16,
+        30
+      ],
+      "ease": "move",
+      "overlap": 8,
+      "sound": "a soft whoosh into a tap"
+    },
+    {
+      "id": "focus-whip",
+      "name": "Focus whip",
+      "kind": "spatial",
+      "bridge": "the depth of field",
+      "build": "the subject accelerates sideways and toward the camera (scale 1 → 1.4, x −40 %) while blur rises 0 → 24 px; the background stays sharp, so it reads as leaving the focal plane",
+      "frames": [
+        10,
+        18
+      ],
+      "ease": "exit",
+      "overlap": 6,
+      "sound": "an airy whoosh"
+    },
+    {
+      "id": "sky-drift",
+      "name": "Sky drift",
+      "kind": "seamless-zoom",
+      "bridge": "the sky",
+      "build": "the camera tilts up (the hill sinks 20–30 % and the clouds move slower than the hill), leaving open sky for the next line",
+      "frames": [
+        24,
+        48
+      ],
+      "ease": "camera",
+      "overlap": 12,
+      "sound": "a breeze swell"
+    },
+    {
+      "id": "blur-in-words",
+      "name": "Blur in words",
+      "kind": "typographic",
+      "bridge": "the centre line",
+      "build": "each word fades in from blur 12 px and opacity 0, rising 10 px, 4–6 f apart; a new line replaces the old one by blurring out as the next blurs in at the same place",
+      "frames": [
+        14,
+        30
+      ],
+      "ease": "enter",
+      "overlap": 8,
+      "sound": "a soft bell per word"
+    },
+    {
+      "id": "card-swap",
+      "name": "Card swap",
+      "kind": "motion-continuity",
+      "bridge": "the card frame",
+      "build": "the card stays, its screen content slides or crossfades to the next UI while the stack keeps hovering",
+      "frames": [
+        8,
+        16
+      ],
+      "ease": "float",
+      "overlap": 4,
+      "sound": "a tiny click"
+    }
+  ],
+  "archetypes": [
+    {
+      "id": "wave-word",
+      "name": "Wave word",
+      "purpose": "the hook: a short phrase that arrives playfully",
+      "composition": "one white word or short phrase above the hill, slightly above centre",
+      "elements": "white display type with a soft shadow, a few drifting petals",
+      "motion": "letters wave in along a curve and settle with a spring",
+      "camera": "slow drift right",
+      "frames": [
+        24,
+        54
+      ],
+      "enter": "wave-in",
+      "exit": "squash-to-cards"
+    },
+    {
+      "id": "card-stack",
+      "name": "Floating card stack",
+      "purpose": "the product: its screens as tangible objects",
+      "composition": "three rounded cards fanned in 3D (light UI, dark photo, bright UI), centred in the sky above the hill",
+      "elements": "app screens on rounded cards with thin white borders and soft drop shadows",
+      "motion": "the stack hovers and sways, tilts toward camera, screens swap",
+      "camera": "slight dolly in",
+      "frames": [
+        36,
+        90
+      ],
+      "enter": "squash-to-cards",
+      "exit": "focus-whip"
+    },
+    {
+      "id": "open-sky",
+      "name": "Open sky",
+      "purpose": "a breath between ideas",
+      "composition": "sky and clouds only, the hill sinking out of frame",
+      "elements": "clouds, petals, sun glow",
+      "motion": "camera tilts up, clouds drift",
+      "camera": "tilt up",
+      "frames": [
+        16,
+        36
+      ],
+      "enter": "focus-whip",
+      "exit": "blur-in-words"
+    },
+    {
+      "id": "breath-line",
+      "name": "Breath line",
+      "purpose": "the message, one line at a time",
+      "composition": "a single centred line of white text in open sky",
+      "elements": "text-face line, sentence case",
+      "motion": "words blur in one by one, line holds and floats up slightly, then blurs out as the next arrives",
+      "camera": "slow drift up",
+      "frames": [
+        30,
+        60
+      ],
+      "enter": "blur-in-words",
+      "exit": "blur-in-words"
+    },
+    {
+      "id": "hill-lockup",
+      "name": "Hill lockup",
+      "purpose": "the name and the call to action",
+      "composition": "the logo or app icon on a rounded tile above the hill, the name under it",
+      "elements": "app icon card, name, short line",
+      "motion": "the icon card floats down into place, the name blurs in",
+      "camera": "tilt back down to the hill",
+      "frames": [
+        30,
+        60
+      ],
+      "enter": "sky-drift",
+      "exit": "blur-in-words"
+    }
+  ],
+  "sequence": {
+    "beats": [
+      {
+        "id": "opening",
+        "share": 0.2,
+        "purpose": "the hook",
+        "archetypes": [
+          "wave-word"
+        ],
+        "motion": "letters wave in",
+        "transitionOut": "squash-to-cards"
+      },
+      {
+        "id": "development",
+        "share": 0.3,
+        "purpose": "the product as floating screens",
+        "archetypes": [
+          "card-stack"
+        ],
+        "motion": "stack hovers, screens swap",
+        "transitionOut": "focus-whip"
+      },
+      {
+        "id": "escalation",
+        "share": 0.15,
+        "purpose": "a breath and a lift",
+        "archetypes": [
+          "open-sky"
+        ],
+        "motion": "camera rises into sky",
+        "transitionOut": "blur-in-words"
+      },
+      {
+        "id": "reveal",
+        "share": 0.2,
+        "purpose": "the line that lands",
+        "archetypes": [
+          "breath-line"
+        ],
+        "motion": "words blur in, one line replaces another",
+        "transitionOut": "sky-drift"
+      },
+      {
+        "id": "resolution",
+        "share": 0.15,
+        "purpose": "the name",
+        "archetypes": [
+          "hill-lockup"
+        ],
+        "motion": "icon floats down above the hill",
+        "transitionOut": "blur-in-words"
+      }
+    ],
+    "cutRhythm": "no cuts: one continuous shot; letters and words land on beats, larger moves ride phrases",
+    "lengthRange": [
+      5,
+      20
+    ]
+  },
+  "exampleSequence": {
+    "title": "8 s app teaser",
+    "durationFrames": 240,
+    "scenes": [
+      {
+        "n": 1,
+        "archetype": "wave-word",
+        "beat": "opening",
+        "frames": [
+          0,
+          48
+        ],
+        "action": "'Plan less' waves in letter by letter over the hill",
+        "transitionOut": "squash-to-cards"
+      },
+      {
+        "n": 2,
+        "archetype": "card-stack",
+        "beat": "development",
+        "frames": [
+          48,
+          120
+        ],
+        "action": "the word squashes into a white card; a calendar card and a photo card fan out behind; the front screen swaps to a focus timer",
+        "transitionOut": "focus-whip"
+      },
+      {
+        "n": 3,
+        "archetype": "open-sky",
+        "beat": "escalation",
+        "frames": [
+          120,
+          144
+        ],
+        "action": "the stack whips left out of focus; the camera tilts up into clouds",
+        "transitionOut": "blur-in-words"
+      },
+      {
+        "n": 4,
+        "archetype": "breath-line",
+        "beat": "reveal",
+        "frames": [
+          144,
+          204
+        ],
+        "action": "'Your week, sorted' blurs in word by word, then 'without the stress'",
+        "transitionOut": "sky-drift"
+      },
+      {
+        "n": 5,
+        "archetype": "hill-lockup",
+        "beat": "resolution",
+        "frames": [
+          204,
+          240
+        ],
+        "action": "the camera settles back on the hill; the app icon floats down, the name blurs in under it",
+        "transitionOut": "blur-in-words"
+      }
+    ]
+  },
+  "elements": {
+    "text": "white, sentence case, short; display face for hooks (letters waving in), text face for lines (words blurring in); a soft shadow for legibility on light sky",
+    "logo": "on a rounded white tile, floating above the hill at the end",
+    "icons": "rounded app-icon tiles that float and bob",
+    "images": "inside rounded cards only (a photo screen in the stack), never full-bleed",
+    "ui": "real screens on rounded cards, fanned in a 3D stack, swapping content",
+    "shapes": "rounded cards, clouds, the hill; nothing angular",
+    "background": "the painted sky and hill, always present, moved only by the camera",
+    "particles": "a few petals or leaves drifting and turning slowly"
+  },
+  "audio": {
+    "drive": [
+      "melodic",
+      "ambient",
+      "light percussion"
+    ],
+    "sync": "letters and words land on notes of a melody or soft hats; the card stack arrives on a phrase start; the focus whip on a swell",
+    "sfx": "soft plucks for letters, bells for words, gentle whooshes for cards and focus whips, a breeze and light birdsong under everything"
+  },
+  "live": {
+    "seconds": 6,
+    "rest": 0.42,
+    "beats": [
+      {
+        "at": 0,
+        "label": "Letters wave in"
+      },
+      {
+        "at": 0.24,
+        "label": "Word squashes into cards"
+      },
+      {
+        "at": 0.36,
+        "label": "Card stack floats, screens swap"
+      },
+      {
+        "at": 0.6,
+        "label": "Focus whip, sky"
+      },
+      {
+        "at": 0.74,
+        "label": "A line blurs in"
+      }
+    ]
+  }
+}

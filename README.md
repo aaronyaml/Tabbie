@@ -789,7 +789,7 @@ the moments, approve a storyboard, and Claude Code builds and renders the film w
 
 - **Styles**: every film is made in one style from the studio's library (`styles/`): Premium Minimal,
   Digital Brutalism, Retro Editorial, Nature Organic, Industrial Brand, Kinetic Type, Digital Scrapbook,
-  Swiss International and Glyph Mosaic. Each one is a full motion language (look, type, colour, timing,
+  Swiss International, Glyph Mosaic, Shape Lab, Midnight Gradient and Cloud Nine. Each one is a full motion language (look, type, colour, timing,
   transitions, camera, texture, sound). Pick one in the **Style** gallery on the new-film form or the
   Storyboard step: hover a card to play its preview, open it for the details, optionally blend in a
   second style's palette, type or texture. **Let Zoetie recommend** (the default) weighs several styles
@@ -813,6 +813,9 @@ the moments, approve a storyboard, and Claude Code builds and renders the film w
   | Digital Scrapbook | Cropped manifesto word, Typed thought, Keepsake ring, Heat portrait, Doodled end card |
   | Swiss International | Poster, Number plate, Module layout, Data grid, Colophon |
   | Glyph Mosaic | Glyph mark, Glyph portrait, Vortex field, Glyph hero, Glyph caption |
+  | Shape Lab | Primitive pair, Ring orbit, Burst field, Depth beat, Number plate |
+  | Midnight Gradient | Word beat, Glow pill, Feature row, Gradient hero, App reveal |
+  | Cloud Nine | Wave word, Floating card stack, Open sky, Breath line, Hill lockup |
 
   Open a style card in the gallery to see its scenes, sequence and an example edit.
 
