@@ -84,7 +84,7 @@ cuts on clicks and snares; each scene animated on twos inside.
 **Example mini-edit (15 s):** 1 "what do" pops in letter by letter → *typed-carry* → 2 "what do you keep when
 everything changes?" types, the vignette tightens → *flare-sweep* → 3 eight keepsakes pop into the ring, "the
 small things." → *flash-frame* (3 red frames, white zig-zag) → 4 a profile heats up, "you keep them." →
-*typed-carry* → 5 k-e-p-t drift loose, the pen circles the k, @lost.and.kept; hold on the blinking cursor.
+*typed-carry* → 5 k-e-p-t drift loose, the pen circles the k; hold on the blinking cursor.
 
 ## Element behaviour
 Display words pop in by letter; captions type by word and may run across a cut; nothing fades in. The handle pops

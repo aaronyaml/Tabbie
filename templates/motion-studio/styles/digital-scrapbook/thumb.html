@@ -64,9 +64,6 @@
 /* page furniture: vignette that breathes and tightens while typing, the handle */
 .vig{position:absolute;inset:0;pointer-events:none;background:radial-gradient(ellipse 75% 70% at 50% 50%,transparent 45%,var(--night) 100%);animation-name:vg;animation-timing-function:steps(1)}
 @keyframes vg{0%{opacity:.42}12.222%{opacity:.55}16.667%{opacity:.68}21.111%{opacity:.78}26.667%{opacity:.6}30%{opacity:.4}33.889%{opacity:.42}45%{opacity:.5}50%{opacity:.42}57.778%{opacity:0}60%{opacity:.2}80%{opacity:.42}100%{opacity:.42}}
-.hd{position:absolute;right:4.6vw;top:3.6vw;display:flex;align-items:center;gap:.7vw;font:400 1.25vw var(--mono);opacity:.85;animation-name:hc;animation-timing-function:steps(1)}
-.hd i{width:1.35vw;height:1.35vw;border:.2vw solid currentColor;border-radius:.3vw}
-@keyframes hc{0%{color:var(--ink)}57.778%{color:var(--surface)}80%,100%{color:var(--ink)}}
 @keyframes w20{0%{max-width:0}11.111%,100%{max-width:40vw}}
 @keyframes w24{0%{max-width:0}13.333%,100%{max-width:40vw}}
 @keyframes w28{0%{max-width:0}15.556%,100%{max-width:40vw}}
@@ -117,5 +114,4 @@
  <svg class="pen" viewBox="0 0 1920 1080"><path class="p1" pathLength="1" d="M640 290 C 520 250 440 330 470 430 C 500 520 650 530 700 450 C 740 380 690 300 610 300 C 560 300 520 330 505 360"/><path class="p2" pathLength="1" d="M1310 640 l 40 -28 l 14 26 l 40 -30 l 12 24"/></svg></div>
 <div class="sc v-big"><svg class="guides" viewBox="0 0 1920 1080" preserveAspectRatio="none"><line x1="0" x2="1920" y1="452" y2="452"/><line x1="0" x2="1920" y1="742" y2="742"/></svg><div class="word"><span class="L" style="animation-name:lb0">w</span><span class="L" style="animation-name:lb0">h</span><span class="L" style="animation-name:lb1">a</span><span class="L" style="animation-name:lb1">t</span><span class="L" style="animation-name:lb2">&nbsp;</span><span class="L" style="animation-name:lb2;color:color-mix(in srgb,var(--ink) 78%,var(--bg))">d</span><span class="L" style="animation-name:lb3;color:color-mix(in srgb,var(--ink) 78%,var(--bg))">o</span></div></div>
 <div class="vig"></div>
-<div class="hd"><i></i>@lost.and.kept</div>
 </div>

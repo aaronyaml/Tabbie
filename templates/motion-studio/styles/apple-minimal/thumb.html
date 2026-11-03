@@ -34,11 +34,11 @@
 .chart{position:absolute;left:3vw;right:3vw;bottom:2.6vw;height:6vw}
 .chart path{stroke:var(--accent);stroke-width:.5vw;fill:none;stroke-linecap:round;stroke-dasharray:100;animation:dw var(--T) cubic-bezier(.22,1,.36,1) infinite both;animation-delay:calc(-1 * var(--rest, 0s))}
 @keyframes dw{0%,32%{stroke-dashoffset:100}52%,100%{stroke-dashoffset:0}}
-.sat{position:absolute;width:17vw;height:9vw;border-radius:1.8vw;background:color-mix(in srgb,var(--surface) 85%,transparent);box-shadow:0 2vw 4vw color-mix(in srgb,var(--ink) 10%,transparent),0 0 0 .12vw color-mix(in srgb,var(--ink) 7%,transparent);padding:1.6vw}
-.sat small{font:400 1.2vw var(--text);color:var(--muted)}.sat b{display:block;font-weight:600;font-size:3.6vw;letter-spacing:-.03em}
-.s1{left:8vw;top:8vw;animation-name:s1;animation-timing-function:cubic-bezier(.22,1,.36,1)}.s2{right:7vw;top:32vw;animation-name:s2;animation-timing-function:cubic-bezier(.22,1,.36,1)}
-@keyframes s1{0%,44%{opacity:0;transform:translate3d(-4vw,0,0)}52%,72%{opacity:1;transform:translate3d(0,0,6vw)}78%,100%{opacity:0;transform:translate3d(-3vw,0,0)}}
-@keyframes s2{0%,47%{opacity:0;transform:translate3d(4vw,0,0)}55%,72%{opacity:1;transform:translate3d(0,0,10vw)}78%,100%{opacity:0;transform:translate3d(3vw,0,0)}}
+.sat{position:absolute;width:16vw;display:flex;flex-direction:column;gap:.9vw;border-radius:1.8vw;background:color-mix(in srgb,var(--surface) 85%,transparent);box-shadow:0 2vw 4vw color-mix(in srgb,var(--ink) 10%,transparent),0 0 0 .12vw color-mix(in srgb,var(--ink) 7%,transparent);padding:1.6vw}
+.sat small{font:400 1.2vw/1 var(--text);color:var(--muted)}.sat b{display:block;font-weight:600;font-size:3.6vw;line-height:1;letter-spacing:-.03em}
+.s1{left:8.5vw;top:12.5vw;animation-name:s1;animation-timing-function:cubic-bezier(.22,1,.36,1)}.s2{right:6.5vw;top:30.5vw;animation-name:s2;animation-timing-function:cubic-bezier(.22,1,.36,1)}
+@keyframes s1{0%,44%{opacity:0;transform:translate3d(-4vw,0,0)}52%,72%{opacity:1;transform:translate3d(0,0,10vw)}78%,100%{opacity:0;transform:translate3d(-3vw,0,0)}}
+@keyframes s2{0%,47%{opacity:0;transform:translate3d(4vw,0,0)}55%,72%{opacity:1;transform:translate3d(0,0,5vw)}78%,100%{opacity:0;transform:translate3d(3vw,0,0)}}
 .cur{position:absolute;width:3vw;height:3vw;animation-name:cu;animation-timing-function:cubic-bezier(.65,0,.35,1)}
 .cur path{fill:var(--ink);stroke:var(--surface);stroke-width:1.4}
 @keyframes cu{0%,50%{opacity:0;left:62vw;top:44vw}53%{opacity:1;left:62vw;top:44vw}61%{left:66.5vw;top:17.5vw;transform:scale(1)}63%{transform:scale(.88)}66%,70%{opacity:1;left:66.5vw;top:17.5vw;transform:scale(1)}74%,100%{opacity:0;left:66vw;top:22vw}}
