@@ -626,8 +626,8 @@ After downloading:
   [Start the services](#start-the-services)). If the update changed other setup steps, it tells you
   to run `bin/setup` again.
 
-Your settings and the files you've edited are never overwritten. If an update would change a file
-you've edited, it stops and tells you which file, and nothing changes. To check another repo or
+If an update changes a file you've edited, your copy is saved to `backups/update-<time>/` and
+then replaced, so the update always lands. Edits to files the update doesn't touch stay. To check another repo or
 branch (e.g. your fork), or to turn checking off, edit `updates:` in `config/router.yaml`.
 
 ### Page addresses

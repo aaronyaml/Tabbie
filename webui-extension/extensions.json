@@ -280,7 +280,7 @@
       "id": "updates",
       "name": "Tabbie updates (asks before downloading)",
       "scripts": [
-        "updates.js?v=7"
+        "updates.js?v=8"
       ],
       "stylesheets": [
         "updates.css?v=4"

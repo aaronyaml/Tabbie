@@ -208,3 +208,33 @@ def test_orphans_left_alone_while_any_worker_runs(tmp_path, monkeypatch):
     monkeypatch.setattr(up, "_workers_alive", lambda: True)
     _req(tmp_path, "20261102-100000-aaaaaa", "executing", 600)
     assert up.reap_orphans() == []
+
+
+def test_update_backs_up_and_overwrites_edited_files(tmp_path, monkeypatch):
+    import subprocess
+    def git(*a, cwd):
+        subprocess.run(["git", "-C", str(cwd), *a], check=True, capture_output=True)
+    remote, local = tmp_path / "remote", tmp_path / "local"
+    remote.mkdir()
+    git("init", "-q", "-b", "main", cwd=remote)
+    git("config", "user.email", "t@t", cwd=remote); git("config", "user.name", "t", cwd=remote)
+    (remote / "a.txt").write_text("1\n"); (remote / "keep.txt").write_text("1\n")
+    git("add", ".", cwd=remote); git("commit", "-qm", "one", cwd=remote)
+    subprocess.run(["git", "clone", "-q", str(remote), str(local)], check=True)
+    (remote / "a.txt").write_text("2\n"); (remote / "new.txt").write_text("from update\n")
+    git("add", ".", cwd=remote); git("commit", "-qm", "two", cwd=remote)
+    (local / "a.txt").write_text("my edit\n"); (local / "keep.txt").write_text("mine\n")
+    (local / "new.txt").write_text("my own file\n")
+    monkeypatch.setattr(up, "ROOT", local)
+    monkeypatch.setattr(up, "STATE", local / "state" / "updates.json")
+    monkeypatch.setattr(up, "_url", lambda s: str(remote))
+    monkeypatch.setattr(up, "settings", lambda: {"branch": "main", "repo": "x/y"})
+    monkeypatch.setattr(up, "check", lambda force=False: {"available": True})
+    monkeypatch.setattr(up, "ensure_services", lambda: [])
+    res = up.apply()
+    assert res["ok"], res
+    assert (local / "a.txt").read_text() == "2\n" and (local / "new.txt").read_text() == "from update\n"
+    assert (local / "keep.txt").read_text() == "mine\n"  # not in the update: left alone
+    saved = local / res["backed_up"]["dir"]
+    assert (saved / "a.txt").read_text() == "my edit\n" and (saved / "new.txt").read_text() == "my own file\n"
+    assert res["backed_up"]["files"] == ["a.txt", "new.txt"]

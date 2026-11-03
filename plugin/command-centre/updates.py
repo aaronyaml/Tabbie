@@ -159,8 +159,33 @@ def _needs(files: list[str]) -> list[str]:
     return sorted(need)
 
 
+def _overwrite_clashes(head: str) -> dict:
+    """Edited or new local files that the update also changes: copy them to backups/ and undo them, so
+    the update can land. Edits to files the update doesn't touch stay as they are."""
+    theirs = set(filter(None, _git("diff", "--name-only", head, "FETCH_HEAD").splitlines()))
+    edited = set(filter(None, _git("diff", "--name-only", "HEAD").splitlines()))
+    new = set(filter(None, _git("ls-files", "--others", "--exclude-standard").splitlines()))
+    clash = sorted((edited | new) & theirs)
+    if not clash:
+        return {}
+    dest = ROOT / "backups" / f"update-{time.strftime('%Y%m%d-%H%M%S')}"
+    for f in clash:
+        src = ROOT / f
+        if src.is_file():
+            (dest / f).parent.mkdir(parents=True, exist_ok=True)
+            shutil.copy2(src, dest / f)
+    tracked = [f for f in clash if f in edited]
+    if tracked:
+        _git("checkout", "HEAD", "--", *tracked)
+    for f in clash:
+        if f in new:
+            (ROOT / f).unlink(missing_ok=True)
+    return {"dir": str(dest.relative_to(ROOT)), "files": clash}
+
+
 def apply() -> dict:
-    """Download the update the user accepted. Fast-forward only; local edits are never touched."""
+    """Download the update the user accepted. Fast-forward only. Local edits to files the update changes
+    are copied to backups/ first and then overwritten; other edits are left alone."""
     s = settings()
     info = check(force=True)
     if not info["available"]:
@@ -170,14 +195,11 @@ def apply() -> dict:
             return {"ok": False, "error": f"Switch to the {s['branch']} branch to update."}
         before = _git("rev-parse", "HEAD")
         _git("fetch", "--quiet", _url(s), s["branch"], timeout=120)
+        saved = _overwrite_clashes(before)
         _git("merge", "--ff-only", "--quiet", "FETCH_HEAD", timeout=60)
         after = _git("rev-parse", "HEAD")
         files = [f for f in _git("diff", "--name-only", before, after).splitlines() if f]
     except Exception as exc:
-        if "overwritten" in str(exc) or "local changes" in str(exc):
-            edited = [f for f in _git("diff", "--name-only", "HEAD").splitlines() if f][:5]
-            return {"ok": False, "error": "The update changes files you've edited on this computer"
-                    + (f" ({', '.join(edited)})" if edited else "") + ". Save a copy, undo the edits, then update."}
         last = (str(exc).strip().splitlines() or [""])[-1]
         return {"ok": False, "error": f"Update failed, nothing changed ({last[:160]})"}
     needs = _needs(files)
@@ -189,7 +211,7 @@ def apply() -> dict:
     _save_state({"from": before, "to": after, "at": int(time.time()), "needs": needs, "services": changed})
     _cache.update(at=0.0, result=None)
     return {"ok": True, "from": before[:7], "to": after[:7], "files": len(files), "needs": needs,
-            "installed": installed}
+            "installed": installed, "backed_up": saved}
 
 
 def pending_restart() -> list[str]:

@@ -67,7 +67,7 @@
       + (more ? `<li class="hx-up-more">+${more} more</li>` : '');
     show(`<div class="hx-up-head"><b>Tabbie update available</b><span>${n ? `${n} change${n === 1 ? '' : 's'}` : 'New version'}</span></div>`
       + (list ? `<ul class="hx-up-list">${list}</ul>` : '')
-      + `<p class="hx-up-note">Your settings and any files you've edited stay as they are.</p>`
+      + `<p class="hx-up-note">Files you've edited that the update also changes are saved to <code>backups/</code>, then replaced.</p>`
       + `<div class="hx-up-btns"><button type="button" data-later>Later</button><button type="button" class="hx-up-go" data-update>Update</button></div>`);
   }
   let lastNeeds = [];
@@ -75,7 +75,8 @@
     const needs = res.needs || [];
     lastNeeds = needs;
     const restart = needs.some((x) => x === 'gateway' || x === 'webui' || x === 'sidecar' || x === 'caddy');
-    const setup = needs.includes('setup') ? '<p class="hx-up-note">This update changed setup steps: run <code>bin/setup</code> on the computer when convenient.</p>' : '';
+    const saved = res.backed_up && res.backed_up.files ? `<p class="hx-up-note">Your edits to ${res.backed_up.files.length} file${res.backed_up.files.length === 1 ? '' : 's'} were saved to <code>${esc(res.backed_up.dir)}</code>.</p>` : '';
+    const setup = saved + (needs.includes('setup') ? '<p class="hx-up-note">This update changed setup steps: run <code>bin/setup</code> on the computer when convenient.</p>' : '');
     if (restart) {
       show(`<div class="hx-up-head"><b>Update downloaded</b>${res.from ? `<span>${esc(res.from)} → ${esc(res.to)}</span>` : ''}</div>`
         + `<p class="hx-up-note">Restart Tabbie's services to finish. If anything is running (a request, a worker or a Motion render) it waits until that's done, so nothing is cut off.</p>${setup}`

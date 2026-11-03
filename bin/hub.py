@@ -147,7 +147,7 @@ def update() -> int:
         print(f"Tabbie update available{f': {n} change' + ('s' if n != 1 else '') if n else ''}")
         for c in r["commits"][:10]:
             print(f"  • {c['title']}")
-        if not ask("Download it now? Your settings and edited files stay as they are."):
+        if not ask("Download it now? Edited files it changes are saved to backups/ first."):
             print("Skipped.")
             return 0
         res = u.apply()
@@ -155,6 +155,8 @@ def update() -> int:
             print(res["error"])
             return 1
         print(f"Updated {res['from']} → {res['to']} ({res['files']} files).")
+        if res.get("backed_up"):
+            print(f"Your edits to {', '.join(res['backed_up']['files'])} were saved to {res['backed_up']['dir']}.")
         if "setup" in res["needs"]:
             print("This update changed setup steps: run bin\\setup.ps1 when convenient.")
         if "reload" in res["needs"]:
