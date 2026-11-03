@@ -643,3 +643,18 @@ select { background-repeat: no-repeat !important; background-position: right 10p
 @media (hover: none), (max-width: 640px) {
   .session-item .session-title-row { padding-right: 28px; }
 }
+
+/* Phones: nothing scrolls sideways (a sideways scroller steals the swipe that opens the menu).
+   The page itself is clipped, and the upstream pages that had wide content reflow instead. */
+@media (max-width: 640px) {
+  html, body { overflow-x: clip; }
+  .logs-output, .logs-output.wrap { white-space: pre-wrap; overflow-wrap: anywhere; overflow-x: hidden; }
+  .insights-usage-grid .insights-card { overflow-x: visible; }
+  .insights-model-table .insights-table-head, .insights-model-table .insights-table-row { grid-template-columns: minmax(0, 1fr) repeat(5, auto); gap: 6px; }
+  .skill-usage-table .insights-table-head, .skill-usage-table .insights-table-row { grid-template-columns: minmax(0, 1fr) repeat(4, auto); gap: 6px; }
+  .insights-model-health-table .insights-table-head, .insights-model-health-table .insights-table-row { grid-template-columns: minmax(0, 1fr) auto auto; min-width: 0; row-gap: 2px; }
+  .insights-model-health-table .insights-table-head > :nth-child(4), .insights-model-health-table .insights-table-row > :nth-child(4) { grid-column: 1 / -1; }
+  .insights-table-head > *, .insights-table-row > * { min-width: 0; overflow-wrap: anywhere; }
+  /* hover tooltips can't show on touch, but their hidden boxes still widen the header */
+  .has-tooltip::before, .has-tooltip::after { display: none !important; }
+}

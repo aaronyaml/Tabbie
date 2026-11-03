@@ -177,13 +177,13 @@ html.hx-studio-open #hxStudio { display: block; position: fixed; top: 0; right: 
 .hxs-x { position: absolute; top: 6px; right: 6px; display: grid; place-items: center; width: 24px; height: 24px; border: 0; border-radius: 50%; background: rgba(0,0,0,.5); color: #fff !important; cursor: pointer; }
 
 /* storyboard */
-.hxs-board { display: grid; grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); gap: 12px; }
-.hxs-frame { padding: 14px; border-radius: 18px; border: 1px solid var(--hx-hair, rgba(127,127,127,.2)); background: var(--hx-raised, #fff); }
+.hxs-board { display: grid; grid-template-columns: repeat(auto-fill, minmax(min(220px, 100%), 1fr)); gap: 12px; }
+.hxs-frame { min-width: 0; overflow-wrap: anywhere; padding: 14px; border-radius: 18px; border: 1px solid var(--hx-hair, rgba(127,127,127,.2)); background: var(--hx-raised, #fff); }
 :root.dark .hxs-frame { background: var(--hx-fill, #1c1d22); border-color: transparent; }
 .hxs-frame header { display: flex; align-items: center; gap: 8px; font-size: 12.5px; color: var(--hx-text-2, #8a8a8e); font-variant-numeric: tabular-nums; }
 .hxs-frame header i { display: grid; place-items: center; width: 22px; height: 22px; border-radius: 50%; font-style: normal; font-weight: 600; background: var(--hx-fill-2, rgba(127,127,127,.15)); color: var(--hx-text, inherit); }
 .hxs-frame header b { color: var(--hx-text, inherit); font-weight: 600; }
-.hxs-frame header span { flex: 1; text-align: right; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.hxs-frame header span { flex: 1; min-width: 0; text-align: right; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .hxs-frame h4 { margin: 10px 0 4px; font-size: 15px; font-weight: 600; letter-spacing: -0.01em; }
 .hxs-frame p { margin: 0; font-size: 13.5px; line-height: 1.4; color: var(--hx-text-2, #8a8a8e); }
 .hxs-frame .hxs-tr { display: flex; gap: 6px; align-items: flex-start; margin-top: 8px; padding-top: 8px; border-top: 1px solid var(--hx-sep, rgba(128,128,128,.16)); font-size: 12.5px; color: var(--hx-accent, #3054FD); }
@@ -267,7 +267,7 @@ html.hx-studio-open #hxStudio { display: block; position: fixed; top: 0; right: 
   .hxs-tr-l { display: none; }
   .hxs-host-md .hxs-buddy { width: 48px; height: 48px; }
   .hxs-player { border-radius: 14px; }
-  .hxs-board { grid-template-columns: 1fr; }
+  .hxs-board { grid-template-columns: minmax(0, 1fr); }
 }
 @keyframes hxs-in { from { opacity: 0; } to { opacity: 1; } }
 @keyframes hxs-spin { to { transform: rotate(360deg); } }
@@ -862,3 +862,11 @@ html.hx-gal-open #hxStudio { overflow: hidden; }
 .hxs-brand-f b { font-weight: 500; font-size: 13px; color: var(--hx-text, inherit); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; max-width: 220px; }
 .hxs-brand-f em { font-style: normal; font-size: 11.5px; }
 .hxs-drop-sm { min-height: 0; padding: 14px; flex-direction: row; gap: 10px; font-size: 13.5px; }
+/* Phones: the step bar fits the width (no sideways scroll stealing the swipe-for-menu); only the
+   current step keeps its label, the others are their numbered/ticked circle (name in aria-label). */
+@media (max-width: 640px) {
+  .hxs-steps { overflow: visible; justify-content: space-between; gap: 2px; }
+  .hxs-step { padding: 0 6px; flex: none; }
+  .hxs-step:not(.is-on) span { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); white-space: nowrap; }
+  .hxs-step.is-on { padding-right: 12px; }
+}

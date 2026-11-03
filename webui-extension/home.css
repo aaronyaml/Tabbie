@@ -77,12 +77,10 @@ html.hx-typing #hxHome { opacity: 0; transform: translateY(6px); pointer-events:
   .hx-home-head { margin: 0 16px 8px; }
   .hx-need { padding: 0 16px; margin-bottom: 12px; }
   .hx-need-head { margin-top: 0; }
-  .hx-projs { flex-wrap: nowrap; overflow-x: auto; padding: 0 16px 2px; margin-bottom: 12px; scrollbar-width: none; }
-  .hx-proj { flex: none; }
-  .hx-tries { display: flex; overflow-x: auto; scroll-snap-type: x mandatory; gap: 10px; padding: 0 16px 4px; scrollbar-width: none;
-    -webkit-mask-image: linear-gradient(90deg, transparent 0, #000 12px, #000 calc(100% - 24px), transparent 100%);
-    mask-image: linear-gradient(90deg, transparent 0, #000 12px, #000 calc(100% - 24px), transparent 100%); }
-  .hx-tries::-webkit-scrollbar { display: none; }
-  .hx-try { flex: 0 0 68%; min-height: 104px; scroll-snap-align: start; padding: 12px 12px 14px; }
+  /* no sideways carousels on phones: they steal the swipe that opens the menu */
+  .hx-projs { flex-wrap: wrap; padding: 0 16px 2px; margin-bottom: 12px; }
+  .hx-tries { grid-template-columns: minmax(0, 1fr); gap: 8px; padding: 0 16px 4px; }
+  .hx-try { min-height: 0; padding: 12px 12px 14px; }
+  .hx-try-top { margin-bottom: 4px; }
 }
 @media (prefers-reduced-motion: reduce) { #hxHome { transition: none; } }
