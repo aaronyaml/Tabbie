@@ -115,6 +115,52 @@
     }
   } catch (_) {}
 
+  // Loading screen: the app shell takes a couple of seconds to boot (upstream's big scripts, then
+  // ~40 extensions, then the session), and without this you'd watch an empty frame, upstream's
+  // "Hermes" title and the rail icons shuffling. It covers the page from the first paint and fades
+  // out once the sidebar or the chat has content (and the Motion studio has painted, on /motion),
+  // or after 10 s whatever happens. The mascot only fades in after 0.3 s, so a quick load never flashes it.
+  (function () {
+    var html = D.documentElement, t0 = Date.now(), loadAt = 0;
+    var css = D.createElement('style');
+    css.id = 'hx-splash-css';
+    css.textContent = '#hx-splash{position:fixed;inset:0;z-index:2147483646;display:flex;flex-direction:column;align-items:center;'
+      + 'justify-content:center;gap:22px;background:#FFFFFF;transition:opacity .25s ease}'
+      + 'html.dark #hx-splash{background:#0E0F13}'
+      + '#hx-splash img,#hx-splash i{opacity:0;animation:hx-sp-in .35s ease .3s forwards}'
+      + '#hx-splash img{width:84px;height:84px;object-fit:contain}'
+      + '#hx-splash i{display:block;width:96px;height:3px;border-radius:3px;background:rgba(128,128,128,.18);overflow:hidden}'
+      + '#hx-splash i:after{content:"";display:block;width:40%;height:100%;border-radius:3px;background:#3054FD;'
+      + 'animation:hx-sp-bar 1.1s cubic-bezier(.45,0,.55,1) infinite}'
+      + 'html.dark #hx-splash i:after{background:#6B86FF}'
+      + '#hx-splash.hx-out{opacity:0;pointer-events:none}'
+      + '@keyframes hx-sp-in{to{opacity:1}}@keyframes hx-sp-bar{from{transform:translateX(-100%)}to{transform:translateX(250%)}}'
+      + '@media (prefers-reduced-motion:reduce){#hx-splash i:after{animation:none;width:100%;opacity:.5}}';
+    var el = D.createElement('div');
+    el.id = 'hx-splash';
+    el.setAttribute('aria-label', 'Loading Tabbie');
+    el.setAttribute('role', 'progressbar');
+    el.innerHTML = '<img src="/hx-brand/mascot-256.png" alt=""><i></i>';
+    html.appendChild(css);
+    html.appendChild(el);
+    window.addEventListener('load', function () { loadAt = Date.now(); });
+    function has(id) { var n = D.getElementById(id); return !!(n && n.children.length); }
+    function ready() {
+      if (Date.now() - t0 > 10000) return true;
+      if (!loadAt || html.classList.contains('hx-mo-boot')) return false;
+      return has('sessionList') || has('msgInner') || Date.now() - loadAt > 2500;
+    }
+    var iv = setInterval(function () {
+      if (!ready()) return;
+      clearInterval(iv);
+      // two frames so whatever just rendered is painted before the cover lifts
+      requestAnimationFrame(function () { requestAnimationFrame(function () {
+        el.classList.add('hx-out');
+        setTimeout(function () { el.remove(); css.remove(); }, 300);
+      }); });
+    }, 80);
+  })();
+
   // then the untouched upstream script, from the root
   var v = '';
   try { v = new URL(D.currentScript.src).searchParams.get('v') || ''; } catch (_) {}
