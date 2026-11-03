@@ -645,9 +645,8 @@ select { background-repeat: no-repeat !important; background-position: right 10p
 }
 
 /* Phones: nothing scrolls sideways (a sideways scroller steals the swipe that opens the menu).
-   The page itself is clipped, and the upstream pages that had wide content reflow instead. */
+   Wide content reflows instead. Never clip html/body here: iOS then hit-tests taps below the element. */
 @media (max-width: 640px) {
-  html, body { overflow-x: clip; }
   .logs-output, .logs-output.wrap { white-space: pre-wrap; overflow-wrap: anywhere; overflow-x: hidden; }
   .insights-usage-grid .insights-card { overflow-x: visible; }
   .insights-model-table .insights-table-head, .insights-model-table .insights-table-row { grid-template-columns: minmax(0, 1fr) repeat(5, auto); gap: 6px; }
