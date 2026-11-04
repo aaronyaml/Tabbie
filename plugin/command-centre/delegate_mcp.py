@@ -261,7 +261,7 @@ class Delegator:
                 if changed and rdir:
                     run.save()
 
-        timeout = int(ecfg.get("timeout_seconds", 3600))
+        timeout = providers.run_limit(ecfg)
         out_file = ddir / "last.txt"
         if target == "codex":
             cmd = providers.build_codex_exec_cmd(model=model, effort=effort, out_file=out_file, cwd=cwd,

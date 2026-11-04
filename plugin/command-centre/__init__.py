@@ -321,6 +321,22 @@ def _on_agent_loop_stopped(session_key: str = "", **kwargs):
         pass
 
 
+# Tools that wait for a worker: the hub's generic tool deadline (timeouts.tools.sequential_call) must never
+# cut them off. A long build or render runs until it finishes or the user stops it.
+_WAITS_FOR_WORKER = frozenset({"cc_claude_execute", "cc_execute_approved", "cc_astra_plan"})
+_NO_DEADLINE_S = 365 * 86400.0  # Hermes caps timeouts at a year; that is its "unbounded"
+
+
+def _lift_hub_deadline(name: str) -> None:
+    try:
+        from tools.registry import registry
+        entry = registry.get_entry(name)
+        if entry is not None:
+            entry.execution_timeout = _NO_DEADLINE_S
+    except Exception as exc:
+        log_decision(event="hub_deadline_unlifted", tool=name, error=repr(exc)[:200])
+
+
 def _on_api_request(**kw):
     """P0 observer: the hub's own calls (size, tools, latency, usage) into decisions.jsonl."""
     try:
@@ -1827,6 +1843,8 @@ def register(ctx):
             schema={"name": name, "description": desc,
                     "parameters": {"type": "object", "properties": props, "required": required}},
         )
+        if name in _WAITS_FOR_WORKER:
+            _lift_hub_deadline(name)
 
     rid = {"request_id": {"type": "string", "description": "Request id from the [command-centre] directive"}}
     tool("cc_claude_execute",

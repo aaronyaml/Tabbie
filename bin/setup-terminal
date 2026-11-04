@@ -254,15 +254,15 @@ for p in command-centre fragment-memory limits workboard; do
     || warn "Couldn't enable the $p plugin. Run: hermes plugins enable $p"
 done
 ok "Plugins enabled (router, memory, limits, kanban/todos)"
-# Workers can run for an hour: the hub must wait for them (backup first, like every config change).
+# Other hub tools keep a 65-min deadline; the tools that wait for a worker lift it themselves (no time limit).
 T="$(hermes config get timeouts.tools.sequential_call 2>/dev/null | tr -dc '0-9')"
 if [ "${T:-0}" -lt 3900 ]; then
   backup_hermes_config
   hermes config set timeouts.tools.sequential_call 3900 >/dev/null 2>&1 \
-    && ok "Hub waits up to 65 min for workers" \
+    && ok "Hub tool deadline set (workers have no time limit)" \
     || warn "Couldn't set the hub timeout. Add timeouts.tools.sequential_call: 3900 to ~/.hermes/config.yaml"
 else
-  ok "Hub waits up to $((T / 60)) min for workers"
+  ok "Hub tool deadline already set (workers have no time limit)"
 fi
 fi
 

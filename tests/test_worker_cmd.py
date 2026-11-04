@@ -96,7 +96,7 @@ def test_codex_mcp_overrides_and_delegate_cmd(tmp_path):
     over = prov.codex_mcp_overrides(env)
     joined = " ".join(over)
     assert "mcp_servers.tabbie.command=" in joined and "delegate_mcp.py" in joined
-    assert "mcp_servers.tabbie.tool_timeout_sec=10800" in joined and 'TABBIE_DELEGATE_FROM = "codex"' in joined
+    assert f"mcp_servers.tabbie.tool_timeout_sec={prov.DELEGATE_TIMEOUT_S}" in joined and 'TABBIE_DELEGATE_FROM = "codex"' in joined
     cmd = prov.build_codex_exec_cmd(model="gpt-6-astra", effort=None, out_file=tmp_path / "o", cwd="/p", add_dirs=[],
                                     extra=over)
     assert cmd[-1] == "-" and over[1] in cmd and "-s" in cmd and cmd[cmd.index("-s") + 1] == "workspace-write"

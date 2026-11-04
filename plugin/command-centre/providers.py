@@ -123,7 +123,7 @@ def _clean_env(drop: tuple[str, ...]) -> dict:
     return env
 
 
-def _run(cmd: list[str], *, cwd: str, env: dict, timeout: int, stdin: str | None = None) -> tuple[int, str, str]:
+def _run(cmd: list[str], *, cwd: str, env: dict, timeout: int | None, stdin: str | None = None) -> tuple[int, str, str]:
     proc = subprocess.Popen(procutil.argv(cmd), cwd=cwd, env=env, stdin=subprocess.PIPE if stdin is not None else subprocess.DEVNULL,
                             stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True, encoding="utf-8", errors="replace", **procutil.GROUP)
     try:
@@ -139,7 +139,13 @@ def _run(cmd: list[str], *, cwd: str, env: dict, timeout: int, stdin: str | None
     return proc.returncode, out or "", err or ""
 
 
-def _run_stream(cmd: list[str], *, cwd: str, env: dict, timeout: int, stdin: str,
+def run_limit(ecfg: dict) -> int | None:
+    """A worker's wall-clock limit: executor.timeout_seconds, 0 or unset = none (it runs until done or stopped)."""
+    t = int((ecfg or {}).get("timeout_seconds") or 0)
+    return t if t > 0 else None
+
+
+def _run_stream(cmd: list[str], *, cwd: str, env: dict, timeout: int | None, stdin: str,
                 on_line, on_start=None, live=None) -> tuple[int, str, str]:
     """Like _run, but hands each stdout line to on_line as it arrives (stream-json workers).
     With live (a LiveInput), stdin stays open so the user's messages reach the worker mid-run."""
@@ -158,9 +164,10 @@ def _run_stream(cmd: list[str], *, cwd: str, env: dict, timeout: int, stdin: str
             if not procutil.stop(proc.pid, force=force):  # whole tree: no orphaned workers or dev servers
                 return
             time.sleep(10)
-    timer = threading.Timer(timeout, _kill)
-    timer.daemon = True
-    timer.start()
+    timer = threading.Timer(timeout, _kill) if timeout else None  # None/0: no time limit
+    if timer:
+        timer.daemon = True
+        timer.start()
     try:
         if live:
             live.start(proc, stdin)
@@ -178,7 +185,8 @@ def _run_stream(cmd: list[str], *, cwd: str, env: dict, timeout: int, stdin: str
                 pass  # a UI sink failing must never fail the run
         proc.wait()
     finally:
-        timer.cancel()
+        if timer:
+            timer.cancel()
         if live:
             live.stop()
     err = "".join(err_buf) + (f"\nTIMEOUT after {timeout}s" if timed_out.is_set() else "")
@@ -658,7 +666,7 @@ def worker_rules(provider: str = "claude", *, dynamic: bool = False, max_subagen
 
 
 DELEGATE_SERVER = Path(__file__).resolve().parent / "delegate_mcp.py"
-DELEGATE_TIMEOUT_S = 10800
+DELEGATE_TIMEOUT_S = 7 * 86400  # hand-offs have no practical limit (Node timers overflow past ~24.8 days in ms)
 
 
 def delegate_server_spec(env: dict) -> dict:
@@ -878,7 +886,7 @@ def run_claude(prompt: str, *, cwd: str, add_dirs: list[str], cfg: dict, resume_
     try:
         with WorkerSlot(ecfg.get("max_parallel", 1), int(ecfg.get("queue_wait_seconds", 1800)), session_key):
             timings["slot"] = time.time()
-            run_env, run_timeout = _clean_env(_ANTHROPIC_BILLING_VARS), int(ecfg.get("timeout_seconds", 3600))
+            run_env, run_timeout = _clean_env(_ANTHROPIC_BILLING_VARS), run_limit(ecfg)
             run_env["TABBIE_WORKER_MODEL"] = model or str(ecfg.get("model") or "")
             run_env.update(endpoint_env)
             if delegate:
@@ -1096,7 +1104,7 @@ def run_astra_executor(prompt: str, *, cwd: str, add_dirs: list[str], cfg: dict,
         pid_file.write_text(str(proc.pid), encoding="utf-8")
     try:
         code, _out, err = _run_stream(cmd, cwd=cwd, env={**_clean_env(_OPENAI_BILLING_VARS), **launch_env},
-                                      timeout=int((cfg.get("executor", {}) or {}).get("timeout_seconds", 3600)),
+                                      timeout=run_limit(cfg.get("executor", {}) or {}),
                                       stdin=prompt, on_line=_json_lines(on_ev), on_start=on_start)
     finally:
         pid_file.unlink(missing_ok=True)
