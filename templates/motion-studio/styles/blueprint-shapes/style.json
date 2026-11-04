@@ -1,0 +1,568 @@
+{
+  "schema": "motion.style/2",
+  "id": "blueprint-shapes",
+  "number": "12",
+  "name": "Blueprint Shapes",
+  "tagline": "Flat white geometry on an electric-blue grid, cut hard to the beat.",
+  "description": "A beat-cut montage of flat geometric compositions on an electric-blue blueprint grid: white rects slam together into a bar, an iris opens, an outline frame grows while sparkles fly out, a disc squeezes out a dot, stars pop in sequence on a white field and the frame flips to black and gold. Every hit is a hard cut, often on a one-frame RGB-split glitch; inside each shot shapes snap with expo curves. Dither particle discs, broken concentric rings, string-art cards and big thin numerals complete the kit.",
+  "family": "extended",
+  "mood": [
+    "energetic",
+    "graphic",
+    "precise",
+    "playful",
+    "techy"
+  ],
+  "bestFor": [
+    "design studios, agencies and portfolio reels",
+    "launch teasers and countdowns",
+    "developer tools, AI and data products",
+    "music, events and festival promos",
+    "brand idents built on simple geometry"
+  ],
+  "avoidFor": [
+    "calm luxury, wellness and spa",
+    "photo-led lifestyle and food",
+    "long explanations that need reading time",
+    "serious finance, legal or medical"
+  ],
+  "references": [
+    "references/replica-blue-reel.mp4"
+  ],
+  "palette": {
+    "bg": "#0A4BFE",
+    "ink": "#FFFFFF",
+    "surface": "#FFFFFF",
+    "night": "#0E1838",
+    "void": "#030306",
+    "accent": "#F5B000",
+    "accent2": "#E8143C",
+    "muted": "#D2D2D7",
+    "grid": "#DADCF0",
+    "deep": "#1C2B8C",
+    "hair": "rgba(255,255,255,0.18)",
+    "swatches": [
+      "#0A4BFE",
+      "#FFFFFF",
+      "#0E1838",
+      "#F5B000",
+      "#030306"
+    ]
+  },
+  "type": {
+    "display": {
+      "family": "Big Shoulders",
+      "google": "BigShoulders",
+      "weights": [
+        "100",
+        "200",
+        "300"
+      ],
+      "case": "upper",
+      "tracking": -0.01,
+      "fallback": "\"Helvetica Neue\", Arial, sans-serif"
+    },
+    "text": {
+      "family": "DM Mono",
+      "google": "DMMono",
+      "weights": [
+        "400"
+      ],
+      "case": "lower",
+      "tracking": 0.04,
+      "fallback": "ui-monospace, Menlo, monospace"
+    }
+  },
+  "motion": {
+    "step": 1,
+    "durations": {
+      "instant": 1,
+      "fast": 4,
+      "standard": 10,
+      "slow": 15,
+      "cinematic": 30
+    },
+    "ease": {
+      "enter": [
+        0.16,
+        1,
+        0.3,
+        1
+      ],
+      "exit": [
+        0.7,
+        0,
+        0.84,
+        0
+      ],
+      "move": [
+        0.65,
+        0,
+        0.35,
+        1
+      ],
+      "camera": [
+        0.25,
+        1,
+        0.5,
+        1
+      ],
+      "morph": [
+        0.37,
+        0,
+        0.63,
+        1
+      ]
+    },
+    "springs": {
+      "pop": {
+        "damping": 11,
+        "stiffness": 320,
+        "mass": 0.5
+      },
+      "settle": {
+        "damping": 18,
+        "stiffness": 220,
+        "mass": 0.7
+      }
+    },
+    "blur": "none"
+  },
+  "transitions": {
+    "signature": [
+      "beat cut: every hit is a hard cut to a new shape composition, often through a one-frame RGB-split glitch",
+      "shape match: the last shape of a shot becomes the first of the next (bar → iris tick, dot → ring centre, band → bar)",
+      "colour flip: the same layout re-inked in an inverted palette (white/blue → black/gold) on the hit"
+    ],
+    "use": [
+      "cut",
+      "match",
+      "flash",
+      "zoom"
+    ],
+    "avoid": [
+      "crossfades and dissolves",
+      "soft gradients as backgrounds",
+      "drop shadows and 3D bevels on flat shapes",
+      "long holds",
+      "handwritten or serif type"
+    ],
+    "overlapFrames": [
+      0,
+      2
+    ]
+  },
+  "camera": "Locked off and flat. Movement comes from the shapes; the only camera moves are a fast ease-in zoom through rings past the lens, a small pull-back (≈8 %) on a colour flip, and an iris that opens to fill the frame.",
+  "texture": {
+    "grain": 0,
+    "notes": "Clean vector flats with three digital textures used as accents: hard 4×4 Bayer-dithered particle clouds, string-art / moiré line fans, and one-frame glitches (RGB split 4–14 px, scan streaks, edges re-quantised into 6–16 px blocks) on the hits."
+  },
+  "lighting": "None. Flat colour fields; a soft white halo only around the dither disc's core and the sparkle cores.",
+  "sound": "A driving electronic track around 120–135 BPM; every cut lands on a transient (kick, impact, tink), glitch frames on snares or risers; shape pops get tiny clicks, colour flips a hit.",
+  "preview": {
+    "frames": 150,
+    "thumbFrame": 93,
+    "beats": [
+      {
+        "from": 0,
+        "to": 30,
+        "beat": "opening",
+        "label": "Rects slam into a bar, iris opens"
+      },
+      {
+        "from": 30,
+        "to": 75,
+        "beat": "transformation",
+        "label": "Frame and sparkles, numeral card, disc to rings"
+      },
+      {
+        "from": 75,
+        "to": 105,
+        "beat": "transition",
+        "label": "Stars pop, flip to black and gold"
+      },
+      {
+        "from": 105,
+        "to": 150,
+        "beat": "resolution",
+        "label": "Dither disc, rings zoom, band splits to rects"
+      }
+    ]
+  },
+  "motionSummary": "Moves like a graphic beat machine: flat white shapes slam, pop and fly out with expo curves on an electric-blue grid, and every hit is a hard cut, a glitch frame or a colour flip into the next composition.",
+  "visual": {
+    "composition": [
+      "one or two flat shapes centred on a full-bleed electric-blue field with a hairline grid (22 or 44 px at 720p)",
+      "a white outline frame or card on a grid of ghosted panel tiles, with elements flying out of its edges",
+      "inverted shots: blue shapes and a dashed-outline blob on a white field with a lavender grid",
+      "palette-flip shots: the same layout in black and gold"
+    ],
+    "shapeLanguage": "pure flat geometry: rects, bars, discs, dots, rings and broken concentric arcs, diamonds, 4-to-16-point stars and bursts, 8-ray sparkles with a glowing core, hairline boxes and dotted guides; textures as dither clouds and string-art fans",
+    "contrast": "maximum: pure white on saturated blue, blue on white, gold on black; one red accent kept for numerals"
+  },
+  "grammar": {
+    "pacing": "fast montage: a new composition every 0.4–1 s (12–30 f), cut to the music's hits; whole sections can strobe at 1–3 f per image",
+    "rhythm": "beat-cut: hard cuts on transients; inside a shot one or two snappy moves and a short hold",
+    "easing": "expo out [0.16,1,0.3,1] for pops, flights and iris openings; expo in [0.7,0,0.84,0] for slams and zooms past camera; an overshooting spring for star pops; never linear on shapes",
+    "acceleration": "violent starts and soft landings: shapes arrive in 2–4 f and settle; slams accelerate into the cut",
+    "movement": [
+      "slam: two shapes accelerate together and merge on the hit",
+      "pop: a shape scales 0.3 → 1 with a spring overshoot and a small counter-rotation",
+      "fly-out: sparkles leave a frame's edges, growing and turning",
+      "squeeze-out: a disc extrudes a dot that shoots away and decelerates",
+      "iris: a disc breathes and opens to fill the frame",
+      "condense: dither particles gather into a disc and spiral",
+      "stroke thinning: rings and frames go from heavy to hairline as they settle"
+    ],
+    "density": "low per shot (one idea, lots of field), high across the edit",
+    "holds": "short (4–10 f) after each move; longer only on the numeral card and the end card"
+  },
+  "transitionPresets": [
+    {
+      "id": "beat-cut",
+      "name": "Beat cut",
+      "kind": "rhythmic-cut",
+      "bridge": "the music's transient",
+      "build": "hard cut to a new shape composition on the hit; change field colour or grid pitch so the cut reads; no overlap",
+      "frames": [
+        0,
+        0
+      ],
+      "ease": "enter",
+      "overlap": 0,
+      "sound": "the track's own kick or impact"
+    },
+    {
+      "id": "glitch-hit",
+      "name": "Glitch hit",
+      "kind": "flash",
+      "bridge": "one corrupted frame",
+      "build": "the last (or first) frame of a shot gets an RGB split of 4–14 px (magenta/green or red/cyan), 10–30 thin scan streaks and optionally a 6–16 px block re-quantise; exactly one frame, then cut",
+      "frames": [
+        1,
+        1
+      ],
+      "ease": "enter",
+      "overlap": 0,
+      "sound": "a digital crackle or snare"
+    },
+    {
+      "id": "shape-match",
+      "name": "Shape match",
+      "kind": "match-cut",
+      "bridge": "a shape that exists on both sides of the cut",
+      "build": "end a shot on a simple shape (bar, dot, disc, band) at a known size and position; start the next shot on the same shape there and give it a new role (bar → iris tick, dot → ring centre, band → bar); the move continues across the cut",
+      "frames": [
+        2,
+        6
+      ],
+      "ease": "enter",
+      "overlap": 0,
+      "sound": "a tink or click on the cut"
+    },
+    {
+      "id": "colour-flip",
+      "name": "Colour flip",
+      "kind": "flash",
+      "bridge": "the layout",
+      "build": "keep every shape where it is and re-ink the frame in the inverted palette (white field/blue shapes → void field/gold shapes, hollow shapes swap fill), add one new element (a burst rising expo-out from an edge) and pull the camera back ≈8 % over 8–12 f",
+      "frames": [
+        8,
+        15
+      ],
+      "ease": "enter",
+      "overlap": 0,
+      "sound": "a hit with a short reverse swell before it"
+    },
+    {
+      "id": "iris-open",
+      "name": "Iris open",
+      "kind": "seamless-zoom",
+      "bridge": "a disc bigger than the frame",
+      "build": "a flat disc on the night field breathes in (expo out, 6 f), holds, then opens (expo in, 3 f) until it fills the frame and becomes the next shot's ground",
+      "frames": [
+        12,
+        16
+      ],
+      "ease": "exit",
+      "overlap": 0,
+      "sound": "a rising sweep that peaks on the open"
+    },
+    {
+      "id": "ring-zoom",
+      "name": "Ring zoom",
+      "kind": "seamless-zoom",
+      "bridge": "broken concentric rings",
+      "build": "the ring set scales ×5 with expo in, inner and outer arcs counter-rotating, until the arcs leave the frame; cut on the last frame",
+      "frames": [
+        6,
+        10
+      ],
+      "ease": "exit",
+      "overlap": 0,
+      "sound": "a riser that ends on the cut"
+    }
+  ],
+  "archetypes": [
+    {
+      "id": "shape-slam",
+      "name": "Shape slam",
+      "purpose": "the opening hook and the logo moment: two shapes become one",
+      "composition": "two white rects (or discs) on the blue grid, symmetric about the centre, each ≈25 % of the frame width",
+      "elements": "two flat shapes, the hairline grid",
+      "motion": "they accelerate together (expo in, 10–12 f), narrowing as they go, and merge into a bar on the hit; reversed (expo out) they split apart",
+      "camera": "locked",
+      "frames": [
+        12,
+        20
+      ],
+      "enter": "beat-cut",
+      "exit": "shape-match"
+    },
+    {
+      "id": "frame-sparkles",
+      "name": "Frame and sparkles",
+      "purpose": "a title or feature card: the thing in the frame",
+      "composition": "a white outline frame (≈50 % of the frame) on a grid of ghosted panel tiles; two 8-ray sparkles at its mid-left and mid-right; optionally a white card with a big thin numeral or word inside",
+      "elements": "outline frame, panel tiles, sparkles, card, display numeral in the red accent, dotted string-art fan",
+      "motion": "the frame grows (expo out) while its stroke thins from heavy to hairline; sparkles fly out diagonally, growing and turning; the card cuts in on the next hit",
+      "camera": "locked; the grid scales with the frame",
+      "frames": [
+        24,
+        45
+      ],
+      "enter": "iris-open",
+      "exit": "beat-cut"
+    },
+    {
+      "id": "primitive-play",
+      "name": "Primitive play",
+      "purpose": "a single idea as a tiny shape event: a dot, a ring, a square popping off a bar",
+      "composition": "one disc, ring or square near the centre on the blue grid; lots of empty field",
+      "elements": "disc, dot, concentric ring with faint halo rings, square and bar, hairline guide boxes",
+      "motion": "a disc squeezes out a dot that shoots away (expo out); a ring settles while its stroke thins; a square pops off a bar and tilts",
+      "camera": "locked",
+      "frames": [
+        10,
+        30
+      ],
+      "enter": "beat-cut",
+      "exit": "shape-match"
+    },
+    {
+      "id": "star-bloom",
+      "name": "Star bloom",
+      "purpose": "the energy peak: many things at once, then the flip",
+      "composition": "inverted: white field with a lavender grid; a blue blob with a dashed outline pushes in from one side, a dither cloud on the other; stars and bursts bloom inside the blob",
+      "elements": "blob, dashed edge, dither cloud, 4–16 point stars and bursts (filled and hollow-outlined), a triangle",
+      "motion": "the blob pushes in (expo out); stars pop one per frame with a spring overshoot; on the hit the whole layout flips to black and gold and a burst rises from the bottom edge",
+      "camera": "locked, then an 8 % pull-back on the flip",
+      "frames": [
+        24,
+        45
+      ],
+      "enter": "beat-cut",
+      "exit": "colour-flip"
+    },
+    {
+      "id": "texture-field",
+      "name": "Texture field",
+      "purpose": "atmosphere between beats: dither discs, broken rings, string-art",
+      "composition": "a full-frame pattern: dither particles condensing into a disc on a pale grey field, broken concentric arcs, or a moiré line fan",
+      "elements": "Bayer-dithered particles, white core disc, spokes, broken arcs, dotted fans",
+      "motion": "particles condense and spiral into arms; rings strobe solid/ghost every 1–2 f while growing, then zoom past camera",
+      "camera": "locked, or an expo-in zoom",
+      "frames": [
+        12,
+        30
+      ],
+      "enter": "beat-cut",
+      "exit": "ring-zoom"
+    }
+  ],
+  "sequence": {
+    "beats": [
+      {
+        "id": "opening",
+        "share": 0.2,
+        "purpose": "the hook: two shapes become one",
+        "archetypes": [
+          "shape-slam"
+        ],
+        "motion": "rects slam into a bar; the bar becomes the iris tick and the iris opens",
+        "transitionOut": "iris-open"
+      },
+      {
+        "id": "development",
+        "share": 0.25,
+        "purpose": "what it is: the name, the number, the feature",
+        "archetypes": [
+          "frame-sparkles",
+          "primitive-play"
+        ],
+        "motion": "frame grows, sparkles fly out, the card with the numeral cuts in; small shape events on each hit",
+        "transitionOut": "beat-cut"
+      },
+      {
+        "id": "escalation",
+        "share": 0.2,
+        "purpose": "energy and scale",
+        "archetypes": [
+          "star-bloom"
+        ],
+        "motion": "stars pop one per frame, then the colour flip",
+        "transitionOut": "colour-flip"
+      },
+      {
+        "id": "reveal",
+        "share": 0.15,
+        "purpose": "a texture breath before the end",
+        "archetypes": [
+          "texture-field"
+        ],
+        "motion": "dither condenses, rings strobe and zoom",
+        "transitionOut": "ring-zoom"
+      },
+      {
+        "id": "resolution",
+        "share": 0.2,
+        "purpose": "the end card",
+        "archetypes": [
+          "frame-sparkles",
+          "shape-slam"
+        ],
+        "motion": "the card or numeral holds, then a white band narrows into the bar (the mark)",
+        "transitionOut": null
+      }
+    ],
+    "cutRhythm": "hard cuts on the music's transients, 12–30 f per shot; one-frame glitches on about half the cuts; a 1–3 f strobe section is allowed once per film",
+    "lengthRange": [
+      6,
+      30
+    ]
+  },
+  "exampleSequence": {
+    "title": "10 s product-launch teaser",
+    "durationFrames": 300,
+    "scenes": [
+      {
+        "n": 1,
+        "archetype": "shape-slam",
+        "beat": "opening",
+        "frames": [
+          0,
+          45
+        ],
+        "action": "two white rects slam into a bar on the blue grid; glitch; the bar is the tick inside a navy iris that breathes and opens",
+        "transitionOut": "iris-open"
+      },
+      {
+        "n": 2,
+        "archetype": "frame-sparkles",
+        "beat": "development",
+        "frames": [
+          45,
+          105
+        ],
+        "action": "an outline frame grows on the panel grid while two sparkles fly out; on the hit a white card cuts in with the launch date as a big thin numeral",
+        "transitionOut": "beat-cut"
+      },
+      {
+        "n": 3,
+        "archetype": "primitive-play",
+        "beat": "development",
+        "frames": [
+          105,
+          150
+        ],
+        "action": "a disc squeezes out a dot that shoots right; match cut on the dot to concentric rings thinning to hairlines",
+        "transitionOut": "beat-cut"
+      },
+      {
+        "n": 4,
+        "archetype": "star-bloom",
+        "beat": "escalation",
+        "frames": [
+          150,
+          210
+        ],
+        "action": "white field: a blue blob pushes in, stars pop one per frame; glitch; the layout flips to black and gold and a burst rises",
+        "transitionOut": "colour-flip"
+      },
+      {
+        "n": 5,
+        "archetype": "texture-field",
+        "beat": "reveal",
+        "frames": [
+          210,
+          250
+        ],
+        "action": "dither particles condense into a disc and spiral; broken rings strobe and zoom past camera",
+        "transitionOut": "ring-zoom"
+      },
+      {
+        "n": 6,
+        "archetype": "shape-slam",
+        "beat": "resolution",
+        "frames": [
+          250,
+          300
+        ],
+        "action": "end card: a white band narrows on blue into the bar, the product's mark; no tag or handle",
+        "transitionOut": null
+      }
+    ]
+  },
+  "elements": {
+    "text": "almost none: one big thin numeral or one short word in the display face (weight 100–200, red accent or white) on a card; tiny mono marks at most",
+    "logo": "built from the shape kit: the slam bar, a ring with a dot, a star; appears as a match on a hit",
+    "icons": "redrawn as flat primitives (disc, ring, star, arrow) in white or blue",
+    "images": "not used; a product appears as a flat silhouette or a dithered shape",
+    "ui": "as hairline boxes, dotted guides and outline frames, never as screenshots",
+    "shapes": "the whole language: rects, bars, discs, dots, rings, broken arcs, diamonds, stars, bursts, sparkles",
+    "background": "electric-blue field with a hairline grid; white field with a lavender grid; navy, void black or pale grey for single shots",
+    "particles": "hard Bayer-dithered dots (clouds, discs, spirals); never soft bokeh"
+  },
+  "audio": {
+    "drive": [
+      "beat-driven",
+      "impact-driven"
+    ],
+    "sync": "every cut sits on a transient within ±2 f; glitch frames on snares or risers; star pops one per 16th; colour flips on downbeats; the iris and ring zoom ride risers that peak on the cut",
+    "sfx": "tiny clicks for pops, digital crackles for glitch frames, a sub hit for colour flips, a riser into ring zooms; the track carries the rest"
+  },
+  "live": {
+    "seconds": 6,
+    "rest": 0.62,
+    "beats": [
+      {
+        "at": 0,
+        "label": "Rects slam into a bar"
+      },
+      {
+        "at": 0.1,
+        "label": "Iris opens"
+      },
+      {
+        "at": 0.2,
+        "label": "Frame, sparkles, numeral"
+      },
+      {
+        "at": 0.4,
+        "label": "Disc to rings"
+      },
+      {
+        "at": 0.5,
+        "label": "Stars pop, colour flip"
+      },
+      {
+        "at": 0.7,
+        "label": "Dither disc, rings zoom"
+      },
+      {
+        "at": 0.9,
+        "label": "Band splits to rects"
+      }
+    ]
+  }
+}

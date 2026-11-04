@@ -1,0 +1,556 @@
+{
+  "schema": "motion.style/2",
+  "id": "sky-meadow",
+  "number": "11",
+  "name": "Sky Meadow",
+  "tagline": "A painted summer sky over a lime meadow: bold white type springs up letter by letter and glossy app cards burst into the air.",
+  "description": "A bright, anime-painted summer sky and rolling green meadow, shot like a real lens: it racks into focus, tilts and pushes in. Extruded white display type snakes on letter by letter, each letter springing up past its slot and settling, then collapses into the centre while glossy app cards burst out of it, fan open, change their content and drift with the camera. A blur-and-cyan exposure whip hides the cut to a deeper sky, where lighter lines fade up word by word, blur-condense and morph into the closing title.",
+  "family": "extended",
+  "mood": [
+    "fresh",
+    "optimistic",
+    "light",
+    "friendly",
+    "airy"
+  ],
+  "bestFor": [
+    "consumer mobile apps and app-store launches",
+    "wellbeing, travel, photo and lifestyle products",
+    "feature reels that show two or three app screens",
+    "social ads and short product teasers",
+    "summer campaigns and friendly onboarding films"
+  ],
+  "avoidFor": [
+    "serious finance, legal or medical",
+    "dark, premium or luxury brands",
+    "dense data or B2B dashboards",
+    "night, winter or moody stories"
+  ],
+  "references": [
+    "references/replica-sky-cards.mp4"
+  ],
+  "palette": {
+    "bg": "#3DB8F6",
+    "sky": "#A6E6FF",
+    "cloud": "#FFFFFF",
+    "meadow": "#93D83C",
+    "meadow2": "#4E9F25",
+    "ink": "#FFFFFF",
+    "extrude": "#B4C4D8",
+    "surface": "#FFFFFF",
+    "muted": "#6B7280",
+    "night": "#0E1420",
+    "accent": "#2BC84A",
+    "accent2": "#2F86FF",
+    "flash": "#6EE8FF",
+    "hair": "rgba(20,60,110,0.18)",
+    "swatches": [
+      "#3DB8F6",
+      "#A6E6FF",
+      "#93D83C",
+      "#FFFFFF",
+      "#2BC84A",
+      "#2F86FF"
+    ]
+  },
+  "type": {
+    "display": {
+      "family": "Inter Tight",
+      "google": "InterTight",
+      "weights": [
+        "700"
+      ],
+      "case": "sentence",
+      "tracking": -0.055,
+      "fallback": "\"Helvetica Neue\", Arial, sans-serif"
+    },
+    "text": {
+      "family": "Inter",
+      "google": "Inter",
+      "weights": [
+        "500",
+        "600",
+        "700",
+        "800"
+      ],
+      "case": "sentence",
+      "tracking": -0.025,
+      "fallback": "\"Helvetica Neue\", Arial, sans-serif"
+    }
+  },
+  "motion": {
+    "step": 1,
+    "durations": {
+      "instant": 2,
+      "fast": 6,
+      "standard": 12,
+      "slow": 24,
+      "cinematic": 40
+    },
+    "ease": {
+      "enter": [
+        0.22,
+        1,
+        0.36,
+        1
+      ],
+      "exit": [
+        0.55,
+        0,
+        0.85,
+        0.4
+      ],
+      "move": [
+        0.65,
+        0,
+        0.35,
+        1
+      ],
+      "camera": [
+        0.7,
+        0,
+        0.3,
+        1
+      ],
+      "morph": [
+        0.45,
+        0,
+        0.55,
+        1
+      ]
+    },
+    "springs": {
+      "letter": {
+        "stiffness": 210,
+        "damping": 14,
+        "mass": 1
+      },
+      "card": {
+        "stiffness": 170,
+        "damping": 18,
+        "mass": 1
+      }
+    },
+    "blur": "velocity"
+  },
+  "transitions": {
+    "signature": [
+      "letter snake: each letter is born small below-right of its slot on a descending trail and springs up past it (overshoot, lift), the tail still oversized while the head has settled",
+      "collapse to burst: the settled line rises, its letters converge on the centre and blur away while app cards burst out of that point and fan open",
+      "exposure whip: everything accelerates down-left with motion blur, the plate pushes in and blooms cyan-white, a hidden cut lands on a new framing that settles out of the blur",
+      "blur-morph: a line condenses (spacing collapses) under blur and the next line resolves from blur with wide word gaps that close"
+    ],
+    "use": [
+      "spring",
+      "burst",
+      "rack focus",
+      "exposure whip",
+      "blur morph",
+      "fade up from below"
+    ],
+    "avoid": [
+      "hard visible cuts",
+      "flat linear moves",
+      "dark grounds",
+      "heavy grain",
+      "more than three cards at once",
+      "watermarks, handles or corner logos"
+    ],
+    "overlapFrames": [
+      4,
+      12
+    ]
+  },
+  "camera": "A real lens on a painted plate: opens soft and racks into focus over 12 f, tilts slowly up while the type plays, makes one big ease-in-out tilt and push-in (with the meadow going soft) as the cards rise, then accelerates into the exposure whip. After the hidden cut a new framing settles out of blur and drifts gently; a small dip and push as the closing title grows.",
+  "texture": {
+    "grain": 0,
+    "notes": "Clean, bright and painterly: anime-style cumulus and grass, a soft sun bloom in the top corner, a cyan haze that comes and goes with focus. Depth of field is the texture: background blur rises whenever the foreground (cards, title) owns the frame."
+  },
+  "lighting": "High summer daylight from the top-left: a soft white sun bloom, airy cyan haze near the horizon, cards lit flat with soft blue-grey drop shadows; the type has a grey-blue extruded underside and a soft blue cast shadow.",
+  "sound": "Bright, light beat bed (~125 BPM) under a friendly voice-over; letters land just ahead of the words, the card burst rides a bass hit, content swaps sit on beats, a whoosh peaks on the whip cut.",
+  "preview": {
+    "frames": 150,
+    "thumbFrame": 50,
+    "beats": [
+      {
+        "from": 0,
+        "to": 28,
+        "beat": "opening",
+        "label": "Rack focus, letters spring up"
+      },
+      {
+        "from": 24,
+        "to": 74,
+        "beat": "transformation",
+        "label": "Word collapses, cards burst and fan"
+      },
+      {
+        "from": 74,
+        "to": 90,
+        "beat": "transition",
+        "label": "Blur and cyan whip to a new sky"
+      },
+      {
+        "from": 86,
+        "to": 150,
+        "beat": "resolution",
+        "label": "Lines fade up, blur-morph, title lifts off"
+      }
+    ]
+  },
+  "motionSummary": "Moves like a sunny app teaser shot through a real lens: letters spring up one by one, cards burst out of the word and fan open, a blur-and-cyan whip carries you to a new sky.",
+  "visual": {
+    "composition": [
+      "a painted sky over a low, sloping meadow horizon (lower 15–35 % of the frame); everything else floats in the sky",
+      "one line of big extruded white type across the upper-middle third, or a cluster of two or three tilted app cards in the centre",
+      "after a cut, quieter centred lines of lighter white type over a deeper blue sky"
+    ],
+    "shapeLanguage": "soft and rounded: rounded-square app cards (≈14 % corner radius) with thick white frames, pill chips, round icons and arc gauges, cumulus clouds, small butterflies and petals",
+    "contrast": "bright, high-key and saturated: sky blue and lime green carry the frame, pure white type and card frames sit on top with soft blue shadows; one dark card or widget gives a single punch of contrast"
+  },
+  "grammar": {
+    "pacing": "brisk and bouncy: a new action every 0.5–1.5 s, holds of 10–20 f only once a line or a fan of cards has settled",
+    "rhythm": "springy and staggered: letters on a ≈1.25 f stagger, cards 3–4 f apart, words 3 f apart; everything lands in a ripple, never all at once",
+    "easing": "entrances are springs or strong ease-out (most travel in the first 4–6 frames, a long settle); exits ease in and accelerate with blur; camera tilts are ease-in-out; never linear",
+    "acceleration": "burst then glide: fast emergence, long soft settle, a slow drift, then an accelerating exit into the next transition",
+    "movement": [
+      "letter snake: born small below-right, springs up past its slot (scale ≈1.3, lifted), settles",
+      "collapse: the line rises, letters converge on the centre, blur and fade",
+      "card burst: cards scale up from a point with motion blur and fan out to tilted rest angles (−12° … +12°)",
+      "live content swap: a card's screen wipes, slides or morphs to its next state",
+      "drift: cards and plate drift together with the camera tilt",
+      "words fade up from below with blur while the line re-centres",
+      "blur-condense and blur-morph between lines",
+      "rack focus and push-in on the plate"
+    ],
+    "density": "low to medium: one line or up to three cards, plus a few drifting butterflies; the sky always has room",
+    "holds": "short (10–20 f) once a line or the card fan has settled; the plate and butterflies keep drifting so a hold is never dead"
+  },
+  "transitionPresets": [
+    {
+      "id": "letter-snake",
+      "name": "Letter snake",
+      "kind": "typographic",
+      "bridge": "the line's own letters",
+      "build": "each letter starts at 18 % scale, 34 px right and 92 px below its slot (1080p), rotated 22°, and springs into place (letter spring, stiffness 210, damping 14) with an extra sine bump (scale +0.12…+0.28, lift up to 18 px) over its first 10 f; stagger 1.25 f per letter so the tail is still oversized while the head settles; extruded white type with a 4-step grey-blue underside",
+      "frames": [
+        20,
+        26
+      ],
+      "ease": "enter",
+      "overlap": 0,
+      "sound": "light ticks on the first letters, the word lands just ahead of the VO"
+    },
+    {
+      "id": "collapse-burst",
+      "name": "Collapse to burst",
+      "kind": "object-morph",
+      "bridge": "the centre point of the line",
+      "build": "over 7 f the settled line rises ≈75 px (ease-in-out), its letters converge 70 % toward the line's centre and blur to 10 px (ease-in) while fading tail-last; from frame 1 of the collapse, cards are born at that centre at 2–3 % size and burst out 3–4 f apart, reaching 80 % of their size in 6–8 f with motion blur proportional to speed",
+      "frames": [
+        8,
+        14
+      ],
+      "ease": "exit",
+      "overlap": 6,
+      "sound": "a bass hit on the burst"
+    },
+    {
+      "id": "exposure-whip",
+      "name": "Exposure whip",
+      "kind": "flash",
+      "bridge": "blur and a cyan-white exposure",
+      "build": "over 5–8 f everything on screen accelerates down-left and grows (ease-in), blur 0 → 10 px, the plate pushes in and a radial cyan-white bloom rises to 60 %; hard cut under it to a new framing that starts blurred (15 px) and over-exposed cyan, decaying ease-out to clean in ≈10 f",
+      "frames": [
+        12,
+        18
+      ],
+      "ease": "exit",
+      "overlap": 0,
+      "sound": "a whoosh whose peak sits on the hidden cut"
+    },
+    {
+      "id": "fade-up-words",
+      "name": "Words fade up",
+      "kind": "typographic",
+      "bridge": "the line's baseline",
+      "build": "each word starts 45 px below its slot, 90 % scale, blurred 9 px and transparent, and eases up into place over 6 f (ease.enter), 3 f apart; while the words arrive the whole line slides left from its right-heavy start to centre (ease-out over ≈30 f)",
+      "frames": [
+        14,
+        32
+      ],
+      "ease": "enter",
+      "overlap": 0,
+      "sound": "none; the VO carries it"
+    },
+    {
+      "id": "blur-morph",
+      "name": "Blur morph",
+      "kind": "object-morph",
+      "bridge": "a blurred line of white type",
+      "build": "the outgoing line's spacing collapses (letter-spacing −0.085 em, word gaps halve) while it blurs to 15 px and fades; the incoming line appears blurred 16 px with word gaps of 1.1 em that close to 0.24 em while it sharpens (ease.enter over 10–13 f)",
+      "frames": [
+        10,
+        16
+      ],
+      "ease": "morph",
+      "overlap": 6,
+      "sound": "a soft air swell"
+    },
+    {
+      "id": "rack-focus",
+      "name": "Rack focus",
+      "kind": "spatial",
+      "bridge": "the plate's depth of field",
+      "build": "the plate opens (or ends) at 13 px blur with a 40 % cyan haze and racks to sharp over 12 f (ease.enter); reversed as an ending, blur and haze rise while the camera eases back to the opening framing, so a film can loop",
+      "frames": [
+        10,
+        14
+      ],
+      "ease": "enter",
+      "overlap": 0,
+      "sound": "a soft airy swell"
+    }
+  ],
+  "archetypes": [
+    {
+      "id": "letter-line",
+      "name": "Letter line",
+      "purpose": "the hook: the opening statement or the product name",
+      "composition": "one line of big extruded white display type (cap height ≈ 9–12 % of frame height) across the upper-middle sky, slightly left of centre; meadow horizon low and sloping",
+      "elements": "the line, the plate, two to six butterflies or petals",
+      "motion": "rack focus in, letter snake on, a short hold while the camera tilts up, then the collapse",
+      "camera": "rack focus in, slow tilt up",
+      "frames": [
+        24,
+        40
+      ],
+      "enter": "rack-focus",
+      "exit": "collapse-burst"
+    },
+    {
+      "id": "card-burst",
+      "name": "Card burst",
+      "purpose": "show the product: two or three screens or features at once",
+      "composition": "three rounded app cards (each ≈ 34 % of frame height) fanned in the centre, back-left to front-right, tilted −10°, +3°, +12°, overlapping by a third",
+      "elements": "cards with thick white frames and soft blue shadows; one light lock screen, one dark album, one white widget (or the product's own screens)",
+      "motion": "burst from the collapsed line, fan open, settle, live content swaps on beats, drift with the camera",
+      "camera": "big ease-in-out tilt and push-in, meadow going soft",
+      "frames": [
+        45,
+        65
+      ],
+      "enter": "collapse-burst",
+      "exit": "exposure-whip"
+    },
+    {
+      "id": "live-card",
+      "name": "Live card",
+      "purpose": "one feature in action",
+      "composition": "a single card larger in the centre (≈ 45 % of frame height) or the front card of the fan, tilted a few degrees",
+      "elements": "a card whose content changes: a screen that wipes to a new view, a photo stack that slides away for the next photo, an icon that pulses and morphs into a widget with a glowing gauge",
+      "motion": "content changes inside the frame (wipe, slide, morph) while the card keeps drifting",
+      "camera": "slow drift",
+      "frames": [
+        20,
+        40
+      ],
+      "enter": "collapse-burst",
+      "exit": "exposure-whip"
+    },
+    {
+      "id": "sky-line",
+      "name": "Sky line",
+      "purpose": "the message: a benefit or the tension in one line",
+      "composition": "one centred line of lighter white text type (≈ 7 % of frame height) with a soft glow, over a deeper blue sky with the clouds low",
+      "elements": "the line and the plate only",
+      "motion": "words fade up from below with blur while the line re-centres; hold; blur-condense out",
+      "camera": "new framing settling out of the whip, gentle drift",
+      "frames": [
+        30,
+        45
+      ],
+      "enter": "exposure-whip",
+      "exit": "blur-morph"
+    },
+    {
+      "id": "lift-title",
+      "name": "Lift title",
+      "purpose": "the resolution: the promise or the call to action",
+      "composition": "a short centred title, slightly larger than the sky line",
+      "elements": "the title, the plate",
+      "motion": "blur-morphs in with closing word gaps, then rises and grows, accelerating toward the top of frame",
+      "camera": "a small dip and push while the title rises",
+      "frames": [
+        24,
+        36
+      ],
+      "enter": "blur-morph",
+      "exit": "rack-focus"
+    }
+  ],
+  "sequence": {
+    "beats": [
+      {
+        "id": "opening",
+        "share": 0.2,
+        "purpose": "the hook in one line",
+        "archetypes": [
+          "letter-line"
+        ],
+        "motion": "rack focus in, letters snake on and settle",
+        "transitionOut": "collapse-burst"
+      },
+      {
+        "id": "development",
+        "share": 0.35,
+        "purpose": "the product: two or three screens",
+        "archetypes": [
+          "card-burst",
+          "live-card"
+        ],
+        "motion": "cards burst out of the word, fan, change content on beats and drift",
+        "transitionOut": "exposure-whip"
+      },
+      {
+        "id": "reveal",
+        "share": 0.25,
+        "purpose": "the message",
+        "archetypes": [
+          "sky-line"
+        ],
+        "motion": "a new sky settles out of the whip, the line fades up word by word",
+        "transitionOut": "blur-morph"
+      },
+      {
+        "id": "resolution",
+        "share": 0.2,
+        "purpose": "the promise or call to action",
+        "archetypes": [
+          "lift-title"
+        ],
+        "motion": "the title blur-morphs in and lifts off",
+        "transitionOut": "rack-focus"
+      }
+    ],
+    "cutRhythm": "nearly one continuous shot: a single hidden cut under the exposure whip per 5–8 s; everything else is internal motion, a new action every 0.5–1.5 s on the beat",
+    "lengthRange": [
+      5,
+      20
+    ]
+  },
+  "exampleSequence": {
+    "title": "6 s photo-app teaser",
+    "durationFrames": 180,
+    "scenes": [
+      {
+        "n": 1,
+        "archetype": "letter-line",
+        "beat": "opening",
+        "frames": [
+          0,
+          32
+        ],
+        "action": "the sky racks into focus; 'Light as air' snakes on letter by letter, the tail still bouncing as the head settles",
+        "transitionOut": "collapse-burst"
+      },
+      {
+        "n": 2,
+        "archetype": "card-burst",
+        "beat": "development",
+        "frames": [
+          26,
+          70
+        ],
+        "action": "the line collapses into its centre and three cards burst out: a lock screen, a dark photo album, a white widget; they fan open while the camera tilts up and the meadow softens",
+        "transitionOut": null
+      },
+      {
+        "n": 3,
+        "archetype": "live-card",
+        "beat": "development",
+        "frames": [
+          52,
+          96
+        ],
+        "action": "on the beat the lock screen wipes to a stats view, the album's photos slide away for a new one, the widget icon pulses and morphs into a glowing gauge; the fan drifts left",
+        "transitionOut": "exposure-whip"
+      },
+      {
+        "n": 4,
+        "archetype": "sky-line",
+        "beat": "reveal",
+        "frames": [
+          96,
+          146
+        ],
+        "action": "the cards whip down-left into a cyan flash; a deeper sky settles out of the blur and 'Every photo, sorted for you' fades up word by word",
+        "transitionOut": "blur-morph"
+      },
+      {
+        "n": 5,
+        "archetype": "lift-title",
+        "beat": "resolution",
+        "frames": [
+          140,
+          180
+        ],
+        "action": "the line condenses under blur into 'Try it free', which sharpens as its word gaps close, then rises and grows toward the top",
+        "transitionOut": null
+      }
+    ]
+  },
+  "elements": {
+    "text": "two voices: big extruded white display type (Inter Tight 700, tight tracking) that snakes on letter by letter, and lighter white text type (Inter 500) with a soft glow that fades up word by word; short lines, sentence case",
+    "logo": "on a card (a lock screen or icon) or as the closing title's word; never a corner bug or watermark",
+    "icons": "round app-style icons inside cards that pulse and morph into widgets",
+    "images": "the painted plate is the world; product photos live inside cards as tilted stacks that slide and swap",
+    "ui": "glossy rounded app cards with thick white frames and soft blue shadows; content changes live (wipe, slide, morph); at most three at once",
+    "shapes": "rounded squares, pills, rings, arc gauges",
+    "background": "a painted summer sky over a lime meadow with a low sloping horizon; rack focus, tilts and push-ins; deeper blue after the cut",
+    "particles": "a few small butterflies and petals, defocused, flapping and drifting in the opening scenes only"
+  },
+  "audio": {
+    "drive": [
+      "beat-driven",
+      "VO-locked",
+      "light"
+    ],
+    "sync": "letters land 1–3 f ahead of their spoken word; the collapse-burst sits on a bass hit; card content swaps on beats; the whip whoosh peaks on the hidden cut; the closing title rises on the last phrase",
+    "sfx": "soft ticks for letters, a bassy pop for the card burst, small UI clicks for content swaps, an airy whoosh for the whip, a soft swell under the closing rise"
+  },
+  "live": {
+    "seconds": 6,
+    "rest": 0.36,
+    "beats": [
+      {
+        "at": 0,
+        "label": "Sky racks into focus"
+      },
+      {
+        "at": 0.04,
+        "label": "Letters spring up"
+      },
+      {
+        "at": 0.2,
+        "label": "Word collapses, cards burst"
+      },
+      {
+        "at": 0.38,
+        "label": "Cards change content"
+      },
+      {
+        "at": 0.52,
+        "label": "Blur and cyan whip"
+      },
+      {
+        "at": 0.6,
+        "label": "Words fade up"
+      },
+      {
+        "at": 0.8,
+        "label": "Blur-morph, title lifts"
+      }
+    ]
+  }
+}

@@ -1,0 +1,611 @@
+{
+  "schema": "motion.style/2",
+  "id": "gradient-launch",
+  "number": "10",
+  "name": "Gradient Launch",
+  "tagline": "Scattered letters hop into place on a near-black stage; light, gradient and product UI ignite on the beat.",
+  "description": "A dark product-launch language: white lower-case geometric sans words assemble from letters scattered across the frame that hop into their slots on a shared tick grid (held frames, no tween), small pink squares hopping with them. Between the words, one warm gradient light (orange → pink → violet) does everything: a letter stretches into a light streak and flares inside a glass tile, the tile becomes a glowing input pill whose border carries a running light, the send button fires gradient rings, a dashed outline word fills and finally ignites in gradient while a dark giant echo slides past behind it. Cut to the bar, fast, clean, premium.",
+  "family": "extended",
+  "mood": [
+    "energetic",
+    "premium",
+    "confident",
+    "nocturnal",
+    "launch-day"
+  ],
+  "bestFor": [
+    "AI and creative-tool product launches",
+    "app feature reels and changelog films",
+    "music, audio and media products",
+    "social promos cut to a beat",
+    "dark-mode SaaS with a gradient brand"
+  ],
+  "avoidFor": [
+    "calm editorial or heritage brands",
+    "print-feel, hand-made or organic products",
+    "long VO-led explainers with dense copy"
+  ],
+  "references": [
+    "references/replica-dark-promo.mov"
+  ],
+  "palette": {
+    "bg": "#030106",
+    "surface": "#1D1B21",
+    "ink": "#FFFFFF",
+    "muted": "#8D8A93",
+    "hair": "rgba(255,255,255,0.12)",
+    "accent": "#FF6B3A",
+    "accent2": "#EC3A86",
+    "accent3": "#7A3CF0",
+    "accent4": "#3F48EE",
+    "night": "#0C0B10",
+    "swatches": [
+      "#030106",
+      "#FF6B3A",
+      "#EC3A86",
+      "#7A3CF0",
+      "#FFFFFF"
+    ]
+  },
+  "type": {
+    "display": {
+      "family": "Inter Tight",
+      "google": "InterTight",
+      "weights": [
+        "300",
+        "400",
+        "600"
+      ],
+      "case": "lower",
+      "tracking": -0.02,
+      "fallback": "\"SF Pro Display\", \"Helvetica Neue\", Arial, sans-serif"
+    },
+    "text": {
+      "family": "Inter Tight",
+      "google": "InterTight",
+      "weights": [
+        "400",
+        "500"
+      ],
+      "case": "sentence",
+      "tracking": -0.01,
+      "fallback": "\"SF Pro Text\", \"Helvetica Neue\", Arial, sans-serif"
+    }
+  },
+  "motion": {
+    "step": 1,
+    "durations": {
+      "instant": 2,
+      "fast": 6,
+      "standard": 12,
+      "slow": 22,
+      "cinematic": 40
+    },
+    "ease": {
+      "enter": [
+        0.16,
+        1,
+        0.3,
+        1
+      ],
+      "exit": [
+        0.55,
+        0,
+        1,
+        0.45
+      ],
+      "move": [
+        0.65,
+        0,
+        0.35,
+        1
+      ],
+      "camera": [
+        0.45,
+        0,
+        0.25,
+        1
+      ],
+      "morph": [
+        0.22,
+        1,
+        0.36,
+        1
+      ]
+    },
+    "springs": {
+      "button": {
+        "damping": 18,
+        "stiffness": 320,
+        "mass": 0.6
+      },
+      "icon": {
+        "damping": 16,
+        "stiffness": 220,
+        "mass": 0.7
+      }
+    },
+    "blur": "velocity",
+    "hop": {
+      "note": "letters and squares move on a shared tick grid: hold 1–5 frames, jump with no interpolation, land on the slot",
+      "ticksPerSecond": [
+        6,
+        10
+      ],
+      "holdFrames": [
+        1,
+        5
+      ],
+      "spread": [
+        0.4,
+        0.42
+      ],
+      "shrinkPerHop": 0.55
+    }
+  },
+  "transitions": {
+    "signature": [
+      "hop assemble: scattered letters hop on a shared tick grid into the word, pink squares hop with them and stand in for missing letters",
+      "letter to light: one letter of a gradient word stretches into a streak that flares white-hot inside a glass tile",
+      "send pulse: the gradient send button is pressed and two gradient rings expand from it across the frame",
+      "ignition: a white word jumps in scale and fills with a flowing gradient while a giant dark echo of it slides past behind"
+    ],
+    "use": [
+      "typographic",
+      "object",
+      "match",
+      "zoom",
+      "rhythmic-cut"
+    ],
+    "avoid": [
+      "crossfades",
+      "slow drifting holds",
+      "light backgrounds for more than a flash",
+      "serif or condensed type",
+      "flat cheap CSS gradients as backgrounds"
+    ],
+    "overlapFrames": [
+      2,
+      12
+    ]
+  },
+  "camera": "Mostly locked and centred. Pushes are fast and purposeful: a zoom into the input pill, a camera that tracks the typing caret, an expo-out contraction of a giant word to its resting size. No floating, no handheld.",
+  "texture": {
+    "grain": 0.02,
+    "notes": "Clean digital black with a faint violet cast. Light is the only texture: soft gradient glows, a blurred halo around the flare, faint grain inside the round feature icons. No paper, no scanlines."
+  },
+  "lighting": "One warm gradient light source (orange → pink → violet) that lives in the content: the flare in the glass tile, the light running along the pill border, the rings, the ignited word. Everything else stays near-black.",
+  "sound": "A bright, punchy electronic track around 120–125 BPM; every word lands on a beat, ticks for the letter hops, a filtered whoosh into the flare, a soft click and a shimmering swell on the send pulse, a sub hit on the ignition.",
+  "preview": {
+    "frames": 150,
+    "thumbFrame": 132,
+    "beats": [
+      {
+        "from": 0,
+        "to": 28,
+        "beat": "opening",
+        "label": "Scattered letters hop into 'start with'"
+      },
+      {
+        "from": 28,
+        "to": 78,
+        "beat": "transformation",
+        "label": "Gradient 'light', its l streaks and flares in a glass tile"
+      },
+      {
+        "from": 78,
+        "to": 110,
+        "beat": "transition",
+        "label": "Tile becomes the glowing input pill, send fires rings"
+      },
+      {
+        "from": 110,
+        "to": 150,
+        "beat": "resolution",
+        "label": "Dashed word fills and ignites, echo slides, letters hop off"
+      }
+    ]
+  },
+  "motionSummary": "Moves like a launch film cut to the bar: letters hop into words on a stepped tick grid, then one gradient light carries everything — a streak, a flare in glass, a glowing input pill, rings from the send button and a word that ignites while its dark echo slides past.",
+  "visual": {
+    "composition": [
+      "one short lower-case word dead centre on near-black, 10–16 % of the frame height, nothing else but a few hopping squares",
+      "one giant word in gradient filling half the frame, cropped by the edge",
+      "one product object centred: a phone screen, an input pill, a row of round feature icons, a stack of list cards"
+    ],
+    "shapeLanguage": "rounded and soft: pills, capsules, circles, glass tiles with a 22 % radius, small rounded squares; thin dashed outlines and dot rings for construction moments",
+    "contrast": "maximum: white type and one saturated gradient on almost-black; colour appears only where the light is"
+  },
+  "grammar": {
+    "pacing": "fast and bar-locked: a new word or object every 0.8–1.5 s, short 6–15 f holds where a word reads",
+    "rhythm": "stepped and beat-cut: letters and squares hop on a tick grid (no tween), words land on beats, scenes hard-cut on the bar; UI and light moves in between are smooth",
+    "easing": "two clocks: hops are held frames with instant jumps; everything else is expo-out on entry ([0.16,1,0.3,1]), ease-in on exit, in-out for camera tracking; never linear",
+    "acceleration": "big early deltas that decay (flare contraction, giant-word contraction, dot rings closing), rings that expand nearly constantly and slow a little, exits that accelerate into the cut",
+    "movement": [
+      "hop assemble / hop out of letters",
+      "per-letter gradient word with tracking collapse",
+      "letter stretches into a tilting light streak",
+      "flare halo contracting inside a glass tile",
+      "input pill with a running gradient light and blooming typed characters",
+      "send button press and two gradient rings",
+      "round gradient icons sliding out from behind each other with confetti",
+      "dashed outline word contracting and filling",
+      "dot rings closing in and counter-rotating",
+      "ignition with a dark echo sliding behind"
+    ],
+    "density": "sparse: one word or one object at a time, a handful of squares or confetti dots as punctuation",
+    "holds": "short, 6–15 f on each readable word; the hero word may hold 20–30 f while its gradient keeps flowing"
+  },
+  "transitionPresets": [
+    {
+      "id": "hop-assemble",
+      "name": "Hop assemble",
+      "kind": "typographic",
+      "bridge": "the letters themselves",
+      "build": "each glyph appears far from its slot (spread 40 % × 42 % of the frame) and jumps — no interpolation — on a shared tick grid (ticks 1–5 f apart), each hop shrinking its offset by ~55 % until it lands; letters land in 3–4 groups over 10–15 f; 3–7 small pink squares hop on the same ticks; reversed, the word hops apart",
+      "frames": [
+        18,
+        34
+      ],
+      "ease": "enter",
+      "overlap": 0,
+      "sound": "a tick per hop group, the landing on a beat"
+    },
+    {
+      "id": "letter-to-light",
+      "name": "Letter to light",
+      "kind": "object-morph",
+      "bridge": "one letter (an l, i or stroke)",
+      "build": "the other letters hop out and vanish, the chosen stroke slides to centre, stretches (×5) and tilts 40° into a thin gradient streak; on the beat it flashes into a white-hot elongated core with a warm halo that contracts expo-out, then a frosted glass tile fades in around it with a light shaft and floor reflection",
+      "frames": [
+        14,
+        30
+      ],
+      "ease": "enter",
+      "overlap": 2,
+      "sound": "a rising filtered whoosh into a bright flare hit"
+    },
+    {
+      "id": "tile-to-pill",
+      "name": "Tile to pill",
+      "kind": "object-morph",
+      "bridge": "the glass container and its light",
+      "build": "the glass tile widens into an input pill (height ×0.35, radius to full) while its glass border turns into a gradient border with a light running along it; the flare core shrinks into the round gradient send button at the pill's right end; typing starts, each new character blooms violet → pink → white",
+      "frames": [
+        10,
+        16
+      ],
+      "ease": "morph",
+      "overlap": 4,
+      "sound": "a soft glassy swell, key ticks for the typing"
+    },
+    {
+      "id": "send-pulse",
+      "name": "Send pulse",
+      "kind": "seamless-zoom",
+      "bridge": "the send button",
+      "build": "the button presses (0.93 → 1.03 → 1), the pill collapses into it and the button glides to centre; two gradient rings (orange → pink → violet → blue) launch 5 f apart and expand from 0.1 to 1.2 frame heights, decelerating, then fade; the button becomes the next object (a result card, a word, an icon)",
+      "frames": [
+        12,
+        40
+      ],
+      "ease": "camera",
+      "overlap": 10,
+      "sound": "a click, then a shimmering swell that follows the rings"
+    },
+    {
+      "id": "outline-fill",
+      "name": "Outline fill",
+      "kind": "track-matte",
+      "bridge": "the word's outline",
+      "build": "the next word arrives as a dashed outline (marching dashes, muted) at ×2.4, blurred, contracting expo-out to ×1 in 12–16 f; a grey fill band sweeps left → right through it, then it snaps solid white in 2–3 f",
+      "frames": [
+        14,
+        22
+      ],
+      "ease": "enter",
+      "overlap": 4,
+      "sound": "a reversed swell that lands on a snap"
+    },
+    {
+      "id": "dot-rings",
+      "name": "Dot rings",
+      "kind": "spatial",
+      "bridge": "the space around a centred word",
+      "build": "4–5 concentric rings of small gradient dots (warm and cool) close in from ×2.1 to ×1 expo-out around the word, alternate rings counter-rotating; on exit they open out again with an ease-in and fade",
+      "frames": [
+        16,
+        30
+      ],
+      "ease": "enter",
+      "overlap": 8,
+      "sound": "a sparkle run that converges"
+    },
+    {
+      "id": "ignition",
+      "name": "Ignition",
+      "kind": "flash",
+      "bridge": "the hero word",
+      "build": "a giant dark echo of the word (0.9 frame heights, night colour, faint outline) slides past behind in two or three short passes; on the beat the white word jumps ×1.5–2.7 in 2 f and fills with a vertical violet → pink → orange gradient that keeps flowing, with confetti dots bursting outward",
+      "frames": [
+        10,
+        24
+      ],
+      "ease": "enter",
+      "overlap": 0,
+      "sound": "a sub hit with a bright sparkle tail"
+    },
+    {
+      "id": "bar-cut",
+      "name": "Bar cut",
+      "kind": "rhythmic-cut",
+      "bridge": "centre position and the beat",
+      "build": "hard cut on the bar from one centred word to the next, the new word entering with a 3 f tracking collapse (0.38 em → −0.02 em) and 50 % → 100 % opacity; squares keep hopping across the cut",
+      "frames": [
+        3,
+        6
+      ],
+      "ease": "enter",
+      "overlap": 0,
+      "sound": "the beat itself"
+    }
+  ],
+  "archetypes": [
+    {
+      "id": "hop-word",
+      "name": "Hop word",
+      "purpose": "the line of copy, one short phrase at a time",
+      "composition": "a white lower-case word or two centred on near-black, ~11 % of frame height; small pink squares scattered around",
+      "elements": "letters scattered over the whole frame, 3–7 hopping squares, an optional pink period that lands last",
+      "motion": "letters hop on a tick grid into their slots; squares hop and stand in for missing letters; holds 6–15 f",
+      "camera": "locked",
+      "frames": [
+        20,
+        45
+      ],
+      "enter": "hop-assemble",
+      "exit": "bar-cut"
+    },
+    {
+      "id": "light-tile",
+      "name": "Light tile",
+      "purpose": "the spark: an idea, a feature being born, the brand light",
+      "composition": "a white-hot elongated flare tilted ~45° in a warm halo, framed by a frosted glass tile with a light shaft above and a thin reflection below",
+      "elements": "flare core + halo, glass tile (radius 22 %), shaft, floor glint, a few dust motes",
+      "motion": "halo contracts expo-out from the flash, tile fades in around it, the core slowly narrows",
+      "camera": "locked",
+      "frames": [
+        24,
+        45
+      ],
+      "enter": "letter-to-light",
+      "exit": "tile-to-pill"
+    },
+    {
+      "id": "product-ui",
+      "name": "Product UI",
+      "purpose": "the product doing the thing: prompt, result, list",
+      "composition": "a dark phone screen centred, or one element of it (the input pill, a result card, a list) filling the frame",
+      "elements": "the app's real UI; input pill with gradient border and send button, typed prompt, result card, list cards",
+      "motion": "phone rises from blur; the camera pushes into the pill and tracks the caret; new characters bloom; press → rings → result card",
+      "camera": "push-in on the active element, tracking with the caret, pull back on send",
+      "frames": [
+        45,
+        150
+      ],
+      "enter": "tile-to-pill",
+      "exit": "send-pulse"
+    },
+    {
+      "id": "feature-icons",
+      "name": "Feature icons",
+      "purpose": "what it can do: three to five capabilities",
+      "composition": "round gradient icons (grainy spheres) in a row at mid-height with labels below; confetti dots around",
+      "elements": "one sphere per feature in palette gradients, a white glyph on each, a typed label, confetti",
+      "motion": "the first sphere pops in centre, the others slide out from behind it; labels type on; confetti pops and drifts outward; exits by shrinking ×0.72 and brightening",
+      "camera": "locked",
+      "frames": [
+        40,
+        70
+      ],
+      "enter": "send-pulse",
+      "exit": "bar-cut"
+    },
+    {
+      "id": "hero-ignition",
+      "name": "Hero ignition",
+      "purpose": "the claim and the name",
+      "composition": "one word centred: first as a dashed outline or inside dot rings, then large in a flowing gradient; a giant dark echo of it passing behind",
+      "elements": "outline word, dot rings or a dashed construction circle, the gradient word, confetti, the dark echo",
+      "motion": "outline contracts and fills, dot rings close in, then the ignition jump and the echo passes; gradient keeps flowing in the hold",
+      "camera": "locked; the scale jump is the impact",
+      "frames": [
+        30,
+        80
+      ],
+      "enter": "outline-fill",
+      "exit": "hop-assemble"
+    }
+  ],
+  "sequence": {
+    "beats": [
+      {
+        "id": "opening",
+        "share": 0.18,
+        "purpose": "the hook in a few words",
+        "archetypes": [
+          "hop-word"
+        ],
+        "motion": "letters hop into the first line, squares hop with them",
+        "transitionOut": "letter-to-light"
+      },
+      {
+        "id": "development",
+        "share": 0.17,
+        "purpose": "the spark",
+        "archetypes": [
+          "light-tile"
+        ],
+        "motion": "a gradient word's letter becomes light and flares in glass",
+        "transitionOut": "tile-to-pill"
+      },
+      {
+        "id": "escalation",
+        "share": 0.3,
+        "purpose": "the product in use",
+        "archetypes": [
+          "product-ui",
+          "feature-icons"
+        ],
+        "motion": "prompt typed in the glowing pill, send pulse, result, features",
+        "transitionOut": "send-pulse"
+      },
+      {
+        "id": "reveal",
+        "share": 0.2,
+        "purpose": "the claim",
+        "archetypes": [
+          "hop-word",
+          "hero-ignition"
+        ],
+        "motion": "outline word fills inside dot rings, then ignites",
+        "transitionOut": "ignition"
+      },
+      {
+        "id": "resolution",
+        "share": 0.15,
+        "purpose": "the name and the mark",
+        "archetypes": [
+          "hero-ignition"
+        ],
+        "motion": "the product name in a thin gradient, the mark drawn in light",
+        "transitionOut": null
+      }
+    ],
+    "cutRhythm": "hard cuts on the bar between words, continuous object morphs inside each light/UI passage; a beat every 0.5 s carries hops and landings; 1–3 hard cuts per 4 s",
+    "lengthRange": [
+      10,
+      45
+    ]
+  },
+  "exampleSequence": {
+    "title": "15 s AI music-app launch",
+    "durationFrames": 450,
+    "scenes": [
+      {
+        "n": 1,
+        "archetype": "hop-word",
+        "beat": "opening",
+        "frames": [
+          0,
+          60
+        ],
+        "action": "'every song starts' hops together from letters scattered across the frame; four squares hop with them; it lands on the first downbeat",
+        "transitionOut": "bar-cut"
+      },
+      {
+        "n": 2,
+        "archetype": "light-tile",
+        "beat": "development",
+        "frames": [
+          60,
+          120
+        ],
+        "action": "'small' in a violet → orange gradient; s, m, a hop out, the first l stretches into a streak that flares inside a glass tile",
+        "transitionOut": "tile-to-pill"
+      },
+      {
+        "n": 3,
+        "archetype": "product-ui",
+        "beat": "escalation",
+        "frames": [
+          120,
+          240
+        ],
+        "action": "the tile widens into the app's prompt pill; 'warm piano for late nights' types in with blooming letters as the camera tracks the caret; send → two rings → the button stretches into the result card",
+        "transitionOut": "send-pulse"
+      },
+      {
+        "n": 4,
+        "archetype": "feature-icons",
+        "beat": "escalation",
+        "frames": [
+          240,
+          315
+        ],
+        "action": "the card's icon pops in as a sphere; two more slide out from behind it: 'Melody', 'Voice', 'Mix'; confetti drifts outward",
+        "transitionOut": "bar-cut"
+      },
+      {
+        "n": 5,
+        "archetype": "hero-ignition",
+        "beat": "reveal",
+        "frames": [
+          315,
+          400
+        ],
+        "action": "'yours' arrives as a dashed outline inside closing dot rings, fills white, then ignites in gradient as its dark echo slides past",
+        "transitionOut": "ignition"
+      },
+      {
+        "n": 6,
+        "archetype": "hero-ignition",
+        "beat": "resolution",
+        "frames": [
+          400,
+          450
+        ],
+        "action": "the product name in a thin gradient dims as its mark draws itself in a glowing stroke and turns white",
+        "transitionOut": null
+      }
+    ]
+  },
+  "elements": {
+    "text": "lower-case geometric sans, semibold, tight tracking, centred, two to four words at a time; assembles by hopping letters, or by a tracking collapse on a cut; giant gradient fragments may fill half the frame for one beat",
+    "logo": "drawn last as a glowing gradient stroke that turns solid white; the name before it in a thin weight with a gradient",
+    "icons": "round grainy gradient spheres with a white line glyph, sliding out from behind each other",
+    "images": "rare and quick: flicker in 4 f each, or duotoned in the brand gradient before switching to colour",
+    "ui": "the real app in dark mode: phone screen, input pill with gradient border and running light, send button with rings, result card, list cards; typed characters bloom",
+    "shapes": "small pink rounded squares and dots that hop; dashed outlines and dashed construction circles; rings of gradient dots",
+    "background": "near-black with a violet cast; a white page only as a short flash or a wipe",
+    "particles": "confetti dots in palette colours that pop and drift outward; dust motes in the flare light"
+  },
+  "audio": {
+    "drive": [
+      "beat-driven",
+      "impact-driven"
+    ],
+    "sync": "every word lands on a beat, hop ticks follow the hi-hats, the flare and the ignition sit on bass hits, the send rings on a downbeat; cuts on the bar",
+    "sfx": "tiny ticks for hops, a filtered whoosh into the flare, glassy key ticks for typing, a soft click and shimmer for the send pulse, a sub hit with sparkle for the ignition"
+  },
+  "live": {
+    "seconds": 7,
+    "rest": 0.8,
+    "beats": [
+      {
+        "at": 0,
+        "label": "Letters hop into the line"
+      },
+      {
+        "at": 0.19,
+        "label": "Gradient word, its l becomes light"
+      },
+      {
+        "at": 0.36,
+        "label": "Flare in a glass tile"
+      },
+      {
+        "at": 0.52,
+        "label": "Tile becomes the input pill, send pulses"
+      },
+      {
+        "at": 0.74,
+        "label": "Outline word fills, ignites"
+      },
+      {
+        "at": 0.94,
+        "label": "Letters hop off"
+      }
+    ]
+  }
+}
