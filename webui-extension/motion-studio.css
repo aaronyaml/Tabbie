@@ -674,11 +674,11 @@ html.hx-gal-open #hxStudio { overflow: hidden; }
 .hxs-sc-n { position: absolute; left: 10px; top: 10px; z-index: 1; padding: 2px 7px; border-radius: 999px; font-size: 11.5px; font-weight: 600; font-variant-numeric: tabular-nums;
   color: #fff; background: rgba(0,0,0,.46); -webkit-backdrop-filter: blur(8px); backdrop-filter: blur(8px); }
 .hxs-sc-ok { position: absolute; right: 10px; top: 10px; z-index: 1; display: grid; place-items: center; width: 24px; height: 24px; border-radius: 50%; color: #fff; background: var(--hx-ink, #3054FD); box-shadow: 0 2px 8px rgba(0,0,0,.25); }
-.hxs-sc-b { display: grid; gap: 3px; padding: 10px 4px 2px; }
+.hxs-sc-b { display: grid; grid-template-columns: minmax(0, 1fr); min-width: 0; gap: 3px; padding: 10px 4px 2px; }
 .hxs-sc-b b { font-weight: 600; font-size: 15px; letter-spacing: -0.01em; }
 .hxs-sc-b > span { font-size: 13px; line-height: 1.35; color: var(--hx-text-2, #8a8a8e); }
 .hxs-sc-f { display: flex !important; align-items: center; gap: 8px; margin-top: 4px; }
-.hxs-sc-f em { font-style: normal; font-size: 12px; color: var(--hx-text-2, #8a8a8e); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.hxs-sc-f em { min-width: 0; font-style: normal; font-size: 12px; color: var(--hx-text-2, #8a8a8e); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .hxs-sc-auto .hxs-sc-m { background: linear-gradient(135deg, var(--hx-tint, rgba(48,84,253,.12)), rgba(176,92,255,.14) 60%, rgba(255,138,91,.14)); }
 .hxs-sc-buddy { position: absolute; inset: 0; display: grid; place-items: center; }
 .hxs-sc-buddy .hxs-buddy { width: 64px; height: 64px; }
