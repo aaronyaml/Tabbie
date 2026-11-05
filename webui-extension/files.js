@@ -6,8 +6,7 @@
  *     so the allowed roots stay the server's call) -> cards under the reply.
  *  3. Card: Hugeicon or thumbnail, middle-truncated name, "TYPE · size", download button.
  *     Viewable types open a modal viewer (sheet on phones); archives/binaries only download.
- * Serving: /api/media (byte ranges, allow-listed roots); /api/file/raw for PDF frames, since
- * it is the only route that answers with a frameable (CSP-sandboxed) response.
+ * Serving: /api/media (byte ranges, allow-listed roots); PDFs render with PDF.js, page per screen.
  */
 (() => {
   'use strict';
@@ -51,13 +50,12 @@
   }
   const typeLabel = (name) => (extOf(name) || 'file').toUpperCase();
 
-  // ── sources: one file -> view / download / frame URLs ─────────────────────
+  // ── sources: one file -> view / download URLs ───────────────────────────
   function sidOf(el) {
     const row = el && el.closest && el.closest('[data-session-id]');
     if (row) return row.getAttribute('data-session-id');
     try { return (S.session && S.session.session_id) || ''; } catch (_) { return ''; }
   }
-  function wsRoot() { try { return String((S.session && S.session.workspace) || '').replace(/\/+$/, ''); } catch (_) { return ''; } }
   const enc = encodeURIComponent;
   // path: absolute file path; else name only (an in-flight upload: file/raw resolves it).
   function source(path, sid, opts) {
@@ -66,14 +64,9 @@
     if (path.startsWith('/')) {
       s.url = 'api/media?path=' + enc(path) + (sid ? '&session_id=' + enc(sid) : '');
       s.dl = s.url;
-      const ws = wsRoot();
-      const attachDir = /\/webui\/attachments\/[^/]+\/[^/]+$/.test(path);
-      if (sid && attachDir) s.frame = 'api/file/raw?session_id=' + enc(sid) + '&path=' + enc(name) + '&inline=1';
-      else if (sid && ws && path.startsWith(ws + '/')) s.frame = 'api/file/raw?session_id=' + enc(sid) + '&path=' + enc(path.slice(ws.length + 1)) + '&inline=1';
     } else {
       s.url = 'api/file/raw?session_id=' + enc(sid) + '&path=' + enc(path);
       s.dl = s.url + '&download=1';
-      s.frame = s.url + '&inline=1';
     }
     s.play = s.url + (s.url.includes('?') ? '&' : '?') + 'inline=1';
     return s;
@@ -355,7 +348,7 @@
     let y0 = null, dy = 0;
     sheet.addEventListener('touchstart', (e) => {
       const b = sheet.querySelector('.hx-v-body');
-      const scroller = e.target.closest('.hx-v-scroll');
+      const scroller = e.target.closest('.hx-v-scroll, .hx-v-pages');
       if (e.touches.length !== 1 || e.target.closest('video, audio, iframe, input, .hx-v-img.zoomed') || (scroller && scroller.scrollTop > 0) || (b && b.scrollTop > 0)) { y0 = null; return; }
       y0 = e.touches[0].clientY; dy = 0;
       sheet.style.transition = 'none';
@@ -413,8 +406,7 @@
     if (s.size != null) return s.size > TEXT_CAP ? (body.innerHTML = tooBig(s, `Too large to preview (${fmtSize(s.size)}).`)) : go();
     probe(s.url).then((r) => { if (current !== s) return; s.size = r.size; if (r.size > TEXT_CAP) body.innerHTML = tooBig(s, `Too large to preview (${fmtSize(r.size)}).`); else go(); });
   }
-  // PDF outside the workspace/uploads: /api/media is never frameable, so render pages with
-  // the PDF.js build upstream already uses (loaded on demand from the same CDN).
+  // The PDF.js build upstream already uses (loaded on demand from the same CDN).
   function pdfjs() {
     if (window._pdfjsLib) return Promise.resolve(window._pdfjsLib);
     return new Promise((res, rej) => {
@@ -432,24 +424,66 @@
       setTimeout(() => rej(new Error('pdfjs timeout')), 15000);
     });
   }
+  // Every PDF renders with PDF.js (an iframe shows one page or nothing on iPhones): one page per screen,
+  // fitted to it, snapping page to page as you scroll or swipe, with a "3 / 18" counter. Only pages
+  // near the view keep a canvas, so a long PDF doesn't run a phone out of memory.
   function pdfView(s, body) {
-    if (s.frame) { body.innerHTML = `<iframe class="hx-v-pdf" title="${esc(s.name)}" src="${esc(s.frame)}"></iframe>`; return; }
-    body.innerHTML = '<div class="hx-v-scroll hx-v-pages"><div class="hx-v-note">Loading…</div></div>';
-    const wrap = body.querySelector('.hx-v-pages');
+    body.innerHTML = '<div class="hx-v-pages" tabindex="0"><div class="hx-v-note">Loading…</div></div><div class="hx-v-pgn" hidden></div>';
+    const wrap = body.querySelector('.hx-v-pages'), pgn = body.querySelector('.hx-v-pgn');
     Promise.all([pdfjs(), fetch(s.url, { credentials: 'same-origin' }).then((r) => { if (!r.ok) throw new Error(r.status); return r.arrayBuffer(); })])
       .then(([lib, buf]) => lib.getDocument({ data: buf, isEvalSupported: false }).promise)
-      .then(async (pdf) => {
+      .then((pdf) => {
         if (current !== s) return;
+        const n = pdf.numPages;
         wrap.innerHTML = '';
-        for (let i = 1; i <= Math.min(pdf.numPages, 60) && current === s; i++) {
-          const page = await pdf.getPage(i);
-          const vp = page.getViewport({ scale: 2 });
-          const c = document.createElement('canvas');
-          c.width = vp.width; c.height = vp.height;
-          c.className = 'hx-v-page';
-          await page.render({ canvasContext: c.getContext('2d'), viewport: vp }).promise;
-          wrap.appendChild(c);
+        const slots = [];
+        for (let i = 1; i <= n; i++) {
+          const d = document.createElement('div');
+          d.className = 'hx-v-pg';
+          d.dataset.n = i;
+          d.setAttribute('aria-label', `Page ${i} of ${n}`);
+          wrap.appendChild(d);
+          slots.push(d);
         }
+        const want = new Set(); // pages in or near the view
+        const drawn = new Map(); // page -> the size it was drawn for
+        async function draw(d) {
+          const i = +d.dataset.n, W = d.clientWidth - 24, H = d.clientHeight - 24;
+          if (W <= 0 || H <= 0 || drawn.get(i) === W + 'x' + H) return;
+          drawn.set(i, W + 'x' + H);
+          const page = await pdf.getPage(i);
+          const base = page.getViewport({ scale: 1 });
+          const fit = Math.min(W / base.width, H / base.height);
+          const dpr = Math.min(window.devicePixelRatio || 1, 2);
+          const vp = page.getViewport({ scale: fit * dpr });
+          const c = document.createElement('canvas');
+          c.className = 'hx-v-page';
+          c.width = Math.floor(vp.width); c.height = Math.floor(vp.height);
+          c.style.width = Math.floor(vp.width / dpr) + 'px'; c.style.height = Math.floor(vp.height / dpr) + 'px';
+          await page.render({ canvasContext: c.getContext('2d'), viewport: vp }).promise;
+          if (current !== s || !want.has(i) || drawn.get(i) !== W + 'x' + H) { c.width = c.height = 0; return; }
+          d.querySelectorAll('canvas').forEach((x) => { x.width = x.height = 0; x.remove(); });
+          d.appendChild(c);
+        }
+        function drop(d) {
+          const i = +d.dataset.n;
+          drawn.delete(i);
+          d.querySelectorAll('canvas').forEach((x) => { x.width = x.height = 0; x.remove(); }); // frees the bitmap now
+        }
+        const io = new IntersectionObserver((es) => es.forEach((e) => {
+          const i = +e.target.dataset.n;
+          if (e.isIntersecting) { want.add(i); draw(e.target).catch(() => {}); } else { want.delete(i); drop(e.target); }
+        }), { root: wrap, rootMargin: '100% 0px' });
+        slots.forEach((d) => io.observe(d));
+        const ro = new ResizeObserver(() => slots.forEach((d) => { if (want.has(+d.dataset.n)) draw(d).catch(() => {}); }));
+        ro.observe(wrap);
+        const done = new MutationObserver(() => { if (!wrap.isConnected) { io.disconnect(); ro.disconnect(); done.disconnect(); pdf.destroy(); } });
+        done.observe(body, { childList: true });
+        const count = () => { pgn.textContent = `${Math.min(n, Math.round(wrap.scrollTop / Math.max(1, wrap.clientHeight)) + 1)} / ${n}`; };
+        pgn.hidden = false;
+        count();
+        wrap.addEventListener('scroll', count, { passive: true });
+        wrap.focus({ preventScroll: true });
       }).catch(() => { if (current === s) body.innerHTML = tooBig(s, 'This PDF could not be previewed.'); });
   }
   function open(s) {

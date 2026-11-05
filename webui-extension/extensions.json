@@ -67,10 +67,10 @@
       "id": "files",
       "name": "File cards & viewer",
       "scripts": [
-        "files.js?v=2"
+        "files.js?v=3"
       ],
       "stylesheets": [
-        "files.css?v=4"
+        "files.css?v=5"
       ]
     },
     {

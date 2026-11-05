@@ -119,8 +119,18 @@ html.hx-viewer-open, html.hx-viewer-open body { overflow: hidden; }
 .hx-v-audio audio { width: 100%; }
 .hx-v-art { width: 88px; height: 88px; border-radius: 22px; display: grid; place-items: center; background: var(--hx-tint, rgba(48,84,253,.1)); color: var(--hx-ink, #3054FD); }
 .hx-v-pdf { flex: 1; width: 100%; border: 0; background: #fff; }
-.hx-v-pages { display: flex; flex-direction: column; align-items: center; gap: 12px; padding: 16px; }
-.hx-v-page { width: min(100%, 860px); height: auto; background: #fff; border-radius: 4px; box-shadow: 0 1px 3px rgba(0,0,0,.12); }
+/* PDF: one page per screen, fitted to it; scroll or swipe snaps page to page. */
+.hx-v-pages {
+  flex: 1; min-height: 0; overflow-y: auto; overflow-x: hidden; -webkit-overflow-scrolling: touch;
+  overscroll-behavior: contain; scroll-snap-type: y mandatory; outline: none; display: flex; flex-direction: column;
+}
+.hx-v-pg { flex: none; height: 100%; box-sizing: border-box; padding: 12px; display: grid; place-items: center; scroll-snap-align: start; scroll-snap-stop: always; }
+.hx-v-page { display: block; max-width: 100%; max-height: 100%; background: #fff; border-radius: 4px; box-shadow: 0 1px 3px rgba(0,0,0,.18); }
+.hx-v-pgn {
+  position: absolute; left: 50%; bottom: 14px; transform: translateX(-50%); pointer-events: none;
+  padding: 4px 10px; border-radius: 999px; background: rgba(20,20,19,.72); color: #fff;
+  font-size: 12px; font-weight: 500; font-variant-numeric: tabular-nums;
+}
 
 .hx-v-code {
   margin: 0; padding: 16px 18px; min-height: 100%; box-sizing: border-box;
