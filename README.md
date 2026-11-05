@@ -739,6 +739,8 @@ Design notes: `docs/memory/ARCHITECTURE.md`, `docs/projects/ARCHITECTURE.md`.
   between the chat's images, pinch or double-tap to zoom, swipe up or down to close. Only images inside
   the project or the request's own folder are shown; anything else says why it couldn't be.
   `bin/attach-images <request-id> --allow <dir>` adds images to a finished reply by hand.
+- **PDFs in the chat**: a worker can attach a PDF (a report, an export) the same way, with an
+  `ATTACH: <path>.pdf` line in its final message. The reply shows it as a file card you can open and download.
 - **Plans**: a plan card has **Approve**, **Change** and **Cancel** buttons (typing `yes` still works).
 - **Questions**: when a worker needs a decision it asks a structured question card (number keys pick
   an option; a half-typed answer is kept), and your reply resumes the same session.

@@ -20,7 +20,7 @@ import time
 from pathlib import Path
 
 from . import executor_choice, limits_gate, projects, providers, questions, review, worker_profile
-from .agents import AgentRun, strip_attach
+from .agents import AgentRun, attach_docs, strip_attach
 from .attachments import Manifest, find_candidates, kind_of
 from .common import REQUESTS_DIR, STATE_DIR, load_config, log_decision, read_json, write_json
 from .providers import (WORKER_RULES, claude_transcript_tail, codex_models, git_state, run_astra_executor, run_claude,
@@ -169,14 +169,32 @@ def _relay(r: Request, out: dict, body: str, *, keep: tuple[str, ...] = ()) -> d
     return slim
 
 
+def _chat_attachments(sid: str) -> Path | None:
+    """The WebUI chat's own attachments folder (it serves files there to that chat)."""
+    if not sid or not re.fullmatch(r"[A-Za-z0-9_-]{4,64}", sid):
+        return None
+    home = Path(os.environ.get("HERMES_WEBUI_STATE_DIR") or Path.home() / ".hermes" / "webui").expanduser()
+    return home / "attachments" / sid
+
+
+def _with_docs(r: Request, text: str) -> str:
+    """PDFs the worker attached (ATTACH lines) -> file cards in the reply."""
+    try:
+        roots = [_cwd(r), *(r.data.get("extra_dirs") or []), str(r.dir)]
+        return attach_docs(text, roots, _chat_attachments(r["session_id"] or ""))
+    except Exception as exc:  # never lose the reply over an attachment
+        log_decision(event="attach_docs_failed", request=r.id, error=repr(exc)[:200])
+        return text
+
+
 def _reply_body(r: Request, res: dict, *, clean: str | None = None, started: float = 0.0) -> str:
     """What the user reads under the route line: the worker's own text, or a short failure."""
     if res.get("stopped_by_user"):
         body = "Stopped by you. The work done so far stays in the project."
     elif res.get("ok"):
-        body = strip_attach((clean if clean is not None else (res.get("result") or "")).strip()) or "Done."
+        body = strip_attach(_with_docs(r, (clean if clean is not None else (res.get("result") or "")).strip())) or "Done."
     else:
-        text = strip_attach((res.get("result") or "").strip())
+        text = strip_attach(_with_docs(r, (res.get("result") or "").strip()))
         body = text or f"Problem: {str(res.get('error') or 'the worker failed')[:600]}"
     lines = _note_lines(r, started)
     denials = res.get("permission_denials") or []
@@ -976,7 +994,8 @@ def _claude_prompt(r: Request, manifest: Manifest, history: bool = False) -> str
     parts += ["", manifest.render(), "", _memory_context(r)]
     parts += ["", f"IMAGES FOR THE USER: save screenshots/renders to show under {(r.dir / 'attach').resolve()} "
                   "(or inside the project folders above), then write `ATTACH: <absolute path>` on its own line. "
-                  "Images anywhere else are not shown."]
+                  "Images anywhere else are not shown. A PDF for the user: the same `ATTACH:` line in your final "
+                  "message; it shows as a file card."]
     return "\n".join(parts)
 
 
@@ -1372,7 +1391,8 @@ def _takeover_prompt(r: Request) -> str:
              "Continue the work from where it stopped. Do not redo finished work; check the repo state first.",
              "Be exhaustive in execution, minimal in words. Final message: Done / Verified / Note bullets.",
              "To show the user an image while you work (screenshot, render), write a line "
-             "`ATTACH: /absolute/path.png` (png/jpg/webp/gif inside the project); it appears in the chat at once.",
+             "`ATTACH: /absolute/path.png` (png/jpg/webp/gif inside the project); it appears in the chat at once. "
+             "A PDF for the user: `ATTACH: /absolute/path.pdf` in your final message (a file card).",
              questions.QUESTION_RULES,
              "", _claude_prompt(r, Manifest(r.dir)),
              "", "RECENT SESSION CONVERSATION (compacted):", convo or "(none)",

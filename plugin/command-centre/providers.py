@@ -592,6 +592,8 @@ WORKER_RULES = """You are the execution worker of the user's command centre (dis
   the IMAGES FOR THE USER folder given below, and write a line `ATTACH: /absolute/path.png` (png,
   jpg, webp or gif), during the work or in your final message. It appears in the chat straight
   away. Images saved anywhere else are NOT shown. Only images the user should see.
+  A PDF for the user (a report, an export) works the same way: `ATTACH: /absolute/path.pdf` in your
+  final message; it shows as a file card they can open and download.
 - Verify your work (tests/build/typecheck/visual check as appropriate) before reporting.
 - Final message, short bullets only:
     Done: <what changed>

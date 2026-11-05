@@ -237,3 +237,28 @@ def test_codex_commands_show_without_the_shell_wrapper():
     assert ag._codex_cmd('bash -lc "npm test"') == "npm test"
     assert ag._codex_cmd("/bin/zsh -lc 'echo '\\''hi'\\'''") == "echo 'hi'"
     assert ag._codex_cmd("ls -la") == "ls -la"
+
+
+def test_pdf_attach_becomes_file_card(tmp_path):
+    proj, chat = tmp_path / "proj", tmp_path / "webui" / "attachments" / "abc123"
+    (proj / "out").mkdir(parents=True)
+    pdf = proj / "out" / "Q3 report.pdf"
+    pdf.write_bytes(b"%PDF-1.7\n" + b"x" * 64)
+    (proj / "fake.pdf").write_bytes(b"not a pdf at all, just text")
+    text = f"Done: report\nATTACH: {pdf}\nATTACH: {proj / 'fake.pdf'}\nATTACH: /a/b.png"
+    out = agents.attach_docs(text, [str(proj)], chat)
+    assert f"MEDIA: {chat / 'Q3-report.pdf'}" in out and (chat / "Q3-report.pdf").read_bytes() == pdf.read_bytes()
+    assert "(Couldn't attach fake.pdf: not a valid pdf.)" in out
+    assert "ATTACH: /a/b.png" in out  # images stay for the Agents block
+    assert agents.strip_attach(out).count("ATTACH") == 0
+    outside = tmp_path / "elsewhere.pdf"; outside.write_bytes(b"%PDF-1.4\n" + b"y" * 64)
+    assert "outside the project folders" in agents.attach_docs(f"ATTACH: {outside}", [str(proj)], chat)
+    # a live ATTACH of a PDF is not an image and not a "couldn't show" either
+    run = agents.AgentRun(RID, "s"); run.attach_roots = [str(proj)]
+    run.start_main("Claude Code", "claude")
+    assert run.attach(str(pdf), run.main(), 1.0) is False
+    assert not run.data.get("images") and not run.data.get("attach_rejected")
+
+
+def test_worker_rules_mention_pdf():
+    assert "ATTACH: /absolute/path.pdf" in providers.worker_rules("claude")

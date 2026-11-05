@@ -45,6 +45,8 @@ NARRATION_CHARS = 280         # one line, after cleaning
 SHOTS_MAX = 24                # images per request
 SHOT_MAX_BYTES = 25 * 1024 * 1024
 IMAGE_EXT = {".png": "png", ".jpg": "jpg", ".jpeg": "jpg", ".webp": "webp", ".gif": "gif"}
+DOC_EXT = {".pdf": "pdf"}     # files (not pictures): a card in the reply, copied into the chat's attachments
+DOC_MAX_BYTES = 100 * 1024 * 1024
 _ATTACH_RX = re.compile(r"^[ \t>*-]*ATTACH(?:\*\*)?:(?:\*\*)?[ \t]*(.+?)[ \t]*$", re.M)
 _FENCE_RX = re.compile(r"```.*?(?:```|$)", re.S)
 _SHOT_ID = re.compile(r"^[0-9a-f]{16}$")
@@ -82,6 +84,37 @@ def strip_attach(text: str) -> str:
     return re.sub(r"\n{3,}", "\n\n", _ATTACH_RX.sub("", text)).strip()
 
 
+def attach_docs(text: str, roots: list[str], dest: Path | None) -> str:
+    """A reply's ATTACH lines naming a PDF -> `MEDIA: <copy>` (the chat shows a file card it can open and
+    download); the copy goes into the chat's own attachments folder (dest), which the WebUI serves.
+    Other ATTACH lines are left for strip_attach (images show in the Agents block)."""
+    if not text or "ATTACH" not in text:
+        return text
+
+    def sub(m):
+        raw = m.group(1).strip().strip("`'\"<>").strip()
+        if not is_doc(raw):
+            return m.group(0)
+        p, why = check_doc(raw, roots)
+        if p is None or dest is None:
+            return f"(Couldn't attach {_short(Path(raw).name or raw, 120)}: {why if p is None else 'no chat to attach it to'}.)"
+        try:
+            dest.mkdir(parents=True, exist_ok=True)
+            blob = p.read_bytes()
+            name = re.sub(r"[^\w.-]+", "-", p.name).strip("-.") or "file.pdf"  # a MEDIA path can't hold spaces
+            out = dest / name
+            if out.exists() and out.read_bytes() != blob:  # another file of that name: keep both
+                out = dest / f"{Path(name).stem}-{hashlib.sha1(blob).hexdigest()[:6]}{p.suffix.lower()}"
+            if not out.exists():
+                tmp = out.with_name(f".tmp-{out.name}-{os.getpid()}")
+                tmp.write_bytes(blob)
+                os.replace(tmp, out)
+        except OSError:
+            return f"(Couldn't attach {_short(p.name, 120)}: couldn't copy it.)"
+        return f"MEDIA: {out}"
+    return _ATTACH_RX.sub(sub, text)
+
+
 def clean_narration(text: str) -> str | None:
     """A worker text block -> one short, safe narration line (None = nothing to show)."""
     t = _FENCE_RX.sub(" ", strip_attach(text or ""))
@@ -112,12 +145,25 @@ def past_tense(label: str) -> str:
 def _magic_ok(head: bytes, ext: str) -> bool:
     return {"png": head.startswith(b"\x89PNG\r\n\x1a\n"), "jpg": head.startswith(b"\xff\xd8\xff"),
             "gif": head[:6] in (b"GIF87a", b"GIF89a"),
-            "webp": head[:4] == b"RIFF" and head[8:12] == b"WEBP"}.get(ext, False)
+            "webp": head[:4] == b"RIFF" and head[8:12] == b"WEBP", "pdf": head.startswith(b"%PDF-")}.get(ext, False)
 
 
 def check_image(raw: str, roots: list[str]) -> tuple[Path | None, str]:
     """(resolved path, ext) when raw names an existing png/jpg/webp/gif inside one of roots, else
     (None, why not). Relative paths are taken from the first root. Symlinks are resolved first."""
+    return _check(raw, roots, IMAGE_EXT, SHOT_MAX_BYTES, "not a png, jpg, webp or gif", "not a valid image")
+
+
+def check_doc(raw: str, roots: list[str]) -> tuple[Path | None, str]:
+    """check_image for files the reply shows as cards (PDF)."""
+    return _check(raw, roots, DOC_EXT, DOC_MAX_BYTES, "not a pdf", "not a valid pdf")
+
+
+def is_doc(raw: str) -> bool:
+    return Path(str(raw or "").strip()).suffix.lower() in DOC_EXT
+
+
+def _check(raw: str, roots: list[str], exts: dict, max_bytes: int, bad_ext: str, bad_magic: str):
     if not raw or "\x00" in raw:
         return None, "no path"
     if not roots:
@@ -132,11 +178,11 @@ def check_image(raw: str, roots: list[str]) -> tuple[Path | None, str]:
             return None, "file not found"
         if not p.is_file():
             return None, "file not found"
-        ext = IMAGE_EXT.get(p.suffix.lower())
+        ext = exts.get(p.suffix.lower())
         if not ext:
-            return None, "not a png, jpg, webp or gif"
+            return None, bad_ext
         size = p.stat().st_size
-        if size > SHOT_MAX_BYTES:
+        if size > max_bytes:
             return None, "too large"
         inside = False
         for r in roots:
@@ -151,7 +197,7 @@ def check_image(raw: str, roots: list[str]) -> tuple[Path | None, str]:
             return None, "outside the project folders"
         with open(p, "rb") as fh:
             if size < 16 or not _magic_ok(fh.read(16), ext):
-                return None, "not a valid image"
+                return None, bad_magic
         return p, ext
     except (OSError, ValueError, RuntimeError):
         return None, "unreadable"
@@ -528,6 +574,8 @@ class AgentRun:
     def attach(self, raw: str, a: dict, now: float) -> bool:
         imgs = self.data.setdefault("images", [])
         if len(imgs) >= SHOTS_MAX:
+            return False
+        if is_doc(raw):  # a file, not a picture: the finished reply shows it as a card (attach_docs)
             return False
         p, ext = check_image(raw, self.attach_roots)
         if p is None:  # shown in the reply as "couldn't show": a silent drop looks like a broken chat
