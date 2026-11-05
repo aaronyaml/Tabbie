@@ -36,6 +36,11 @@
   const isMac = /Mac|iPhone|iPad/.test(navigator.platform || navigator.userAgent || '');
   const CHORD = isMac ? '⌘↵' : 'Ctrl+↵';
   const pushing = new Set(); // _queued_at stamps currently being pushed
+  // Stamps already delivered (to Claude, into the reply, or sent as a turn). A saved copy of the queue
+  // read before the delivery (upstream re-queues a rejected send, then reloads the chat) must never
+  // bring one back, so the restore and the forwarder skip these and the card drops them.
+  const delivered = new Set();
+  const markDelivered = (ts) => { if (ts != null) delivered.add(ts); };
 
   // ── 1. queue instead of silent steer ───────────────────────────────────────
   let userMode = window._defaultMessageMode;
@@ -182,6 +187,7 @@
       const ok = await toWorker(sid, text0, mode === 'queue' ? 'queue' : 'now');
       pushing.delete(ts);
       if (ok) {
+        markDelivered(ts);
         if (curSid() === sid) noteSent(sid, text0);
         toast(mode === 'queue' ? 'Passed to Claude: it reads it at its next step' : 'Sent to Claude: it paused and is reading it now', 2600);
         return;
@@ -191,7 +197,7 @@
 
     if (!runningFor(sid)) {
       // Nothing running to push into: just send it now as a normal message.
-      if (curSid() === sid && !(st() && st().busy) && sendAsTurn(entry)) return;
+      if (curSid() === sid && !(st() && st().busy) && sendAsTurn(entry)) { markDelivered(ts); return; }
       putBack(sid, entry, index);
       toast('Nothing running to push into, so it stays queued', 3200);
       return;
@@ -206,6 +212,7 @@
       if (!text) throw Object.assign(new Error('empty'), { status: 400 });
       res = await api('/api/chat/steer', { method: 'POST', retries: 0, body: JSON.stringify({ session_id: sid, text }) });
       if (res && res.accepted) {
+        markDelivered(ts);
         try { const acc = _steerAcceptedBySid.get(sid) || []; acc.push(text); _steerAcceptedBySid.set(sid, acc); } catch (_) {}
         if (curSid() === sid && has('_showSteerIndicator')) _showSteerIndicator(text0 || text);
         const why = { codex: 'Codex can’t take messages mid-run, so Tabbie reads it when Codex finishes',
@@ -228,6 +235,7 @@
       return;
     }
     if (!runningFor(sid) && curSid() === sid && !(st() && st().busy) && sendAsTurn(entry)) {
+      markDelivered(ts);
       toast('The reply had finished, so it was sent as a new message', 3200);
       return;
     }
@@ -323,7 +331,8 @@
     persisted.delete(sid);
     const q = liveQueue(sid);
     const have = new Set(q.map((e) => e && e._queued_at));
-    const back = pending.filter((e) => e && entryText(e) && !have.has(e._queued_at) && !alreadySent(e, s.messages));
+    const back = pending.filter((e) => e && entryText(e) && !have.has(e._queued_at) && !delivered.has(e._queued_at)
+      && !alreadySent(e, s.messages));
     if (!back.length) return;
     // Upstream may have put the first one in the composer as a draft: it's queued again, so clear it.
     const box = document.getElementById('msg');
@@ -357,6 +366,12 @@
     return true;
   }
 
+  function dropDelivered(sid) {
+    const q = sid ? liveQueue(sid) : [];
+    if (!delivered.size || !q.some((e) => e && delivered.has(e._queued_at))) return;
+    saveQueue(sid, q.filter((e) => !(e && delivered.has(e._queued_at)))); // re-renders the card
+  }
+
   // Queued messages don't wait for the whole reply: while a Claude Code worker runs, each one is
   // handed to it (like typing ahead in Claude Code), oldest first. Ones with files keep waiting.
   let forwarding = false;
@@ -364,6 +379,7 @@
     const sid = curSid();
     hookLoadSession(); // no-op once hooked
     tryRestore(sid); // start-up load that ran before this file was hooked in
+    dropDelivered(sid);
     if (forwarding || !sid || !runningFor(sid)) return;
     const next = liveQueue(sid).find((e) => e && entryText(e) && !realFiles(e).length && !pushing.has(e._queued_at));
     if (!next || !(await workerOpen(sid))) return;

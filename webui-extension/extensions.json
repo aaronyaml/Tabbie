@@ -308,7 +308,7 @@
       "id": "message-queue",
       "name": "Message queue & send now",
       "scripts": [
-        "message-queue.js?v=5"
+        "message-queue.js?v=6"
       ],
       "stylesheets": [
         "message-queue.css?v=4"
