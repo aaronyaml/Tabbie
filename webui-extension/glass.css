@@ -1,0 +1,317 @@
+/* Tabbie — liquid glass (glass.js). On by default; Settings › Appearance › Liquid glass turns it off
+ * (localStorage "hx-glass" = "off"; motion-boot.js sets html.hx-glass before first paint).
+ *
+ * Glass only where something floats over the conversation, and nowhere else:
+ *   full glass (tint + rim + refraction)  the composer, the round floating controls (Back, sidebar
+ *                                          toggle, Agents pill)
+ *   menu tier (heavy blur + surface wash) popovers and menus: model picker, workspace, Recents ⋯
+ *   modal tier (frost over the tint)       sheets and dialogs: Agents panel, the "one thing" card
+ *   chip tier (tint + rim + light blur)   file cards; on pages, the cards that group things
+ * The sidebar, messages, logs, editors and inputs stay solid: text you read for minutes doesn't sit on glass.
+ * Glass is colourless; the colour comes from a faint ambient glow painted into the chat behind it.
+ * Tokens and recipe from the liquid-glass skill (stormaref-skills/liquid-glass).
+ */
+
+html.hx-glass {
+  --glass-radius-full: 9999px;
+  --glass-ease: cubic-bezier(0.16, 1, 0.3, 1);
+  --glass-tint-top: rgba(255, 255, 255, 0.06);
+  --glass-tint-bottom: rgba(179, 179, 179, 0.06);
+  --glass-tint-top-hover: rgba(255, 255, 255, 0.11);
+  --glass-tint-bottom-hover: rgba(179, 179, 179, 0.11);
+  --glass-rim-top: rgba(255, 255, 255, 0.55);
+  --glass-rim-hairline: rgba(255, 255, 255, 0.12);
+  --glass-rim-bottom: rgba(255, 255, 255, 0.06);
+  --glass-border: rgba(30, 33, 45, 0.12);
+  --glass-shadow: 0 10px 30px rgba(30, 33, 45, 0.1);
+  --glass-menu-surface: #f6f7f9;
+  --glass-menu-shadow: 0 12px 32px rgba(20, 22, 30, 0.14), 0 4px 10px rgba(20, 22, 30, 0.07);
+  --glass-modal-tint: rgba(255, 255, 255, 0.5);
+  --glass-frost: rgba(255, 255, 255, 0.42);   /* behind typed text: the composer */
+  --glass-mesh-violet: rgba(139, 92, 246, 0.10);
+  --glass-mesh-pink: rgba(236, 72, 153, 0.07);
+  --glass-mesh-cyan: rgba(6, 182, 212, 0.07);
+}
+html.hx-glass.dark {
+  --glass-rim-top: rgba(255, 255, 255, 0.22);
+  --glass-rim-hairline: rgba(255, 255, 255, 0.07);
+  --glass-rim-bottom: rgba(255, 255, 255, 0.04);
+  --glass-border: rgba(255, 255, 255, 0.08);
+  --glass-shadow: 0 18px 40px rgba(0, 0, 0, 0.35);
+  --glass-menu-surface: #16161b;
+  --glass-menu-shadow: 0 16px 40px rgba(0, 0, 0, 0.55), 0 4px 12px rgba(0, 0, 0, 0.35);
+  --glass-modal-tint: rgba(10, 10, 14, 0.5);
+  --glass-frost: rgba(20, 21, 27, 0.5);
+  --glass-mesh-violet: rgba(139, 92, 246, 0.13);
+  --glass-mesh-pink: rgba(236, 72, 153, 0.08);
+  --glass-mesh-cyan: rgba(6, 182, 212, 0.08);
+}
+
+/* ── the backdrop: one soft glow layer behind the whole chat, the composer included ──
+ * Painted on #mainChat::before (behind every child; #messages is made see-through so nothing cuts it off)
+ * and blurred, so the colour fades out smoothly instead of in rings. A fine grain on ::after dithers the
+ * last 8-bit steps away. It drifts very slowly (transform only: no repaint), like macOS wallpaper glows. */
+html.hx-glass #mainChat { position: relative; isolation: isolate; overflow: clip; }
+html.hx-glass #mainChat #messages, html.hx-glass #mainChat .messages-shell { background: transparent !important; }
+html.hx-glass #mainChat::before {
+  content: ''; position: absolute; inset: -18%; z-index: -1; pointer-events: none;
+  background:
+    radial-gradient(closest-side, var(--glass-mesh-violet), transparent),
+    radial-gradient(closest-side, var(--glass-mesh-pink), transparent),
+    radial-gradient(closest-side, var(--glass-mesh-cyan), transparent);
+  background-size: 60% 55%, 52% 50%, 58% 45%;
+  background-position: 22% 96%, 74% 100%, 50% 88%;
+  background-repeat: no-repeat;
+  filter: blur(48px) saturate(115%);
+  transform-origin: 50% 85%;
+  will-change: transform;
+  animation: hx-glow-drift 26s cubic-bezier(.45,0,.55,1) infinite alternate;
+}
+html.hx-glass #mainChat:has(#emptyState:not([style*="none"]))::before {
+  background-size: 58% 62%, 50% 56%, 56% 52%;
+  background-position: 34% 46%, 66% 56%, 50% 70%;
+  transform-origin: 50% 50%;
+}
+html.hx-glass #mainChat::after {
+  content: ''; position: absolute; inset: 0; z-index: -1; pointer-events: none; opacity: .045; mix-blend-mode: overlay;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='160' height='160'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.9' numOctaves='2' stitchTiles='stitch'/%3E%3CfeColorMatrix values='0 0 0 0 .5 0 0 0 0 .5 0 0 0 0 .5 0 0 0 1 0'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
+}
+/* upstream fades the composer's strip to the solid page colour, which would cut the glow off behind the
+ * composer: with glass the messages fade out at their own bottom edge instead */
+html.hx-glass #composerWrap::before { background: none !important; }
+html.hx-glass #mainChat #messages { -webkit-mask-image: linear-gradient(to bottom, #000 calc(100% - 28px), transparent);
+  mask-image: linear-gradient(to bottom, #000 calc(100% - 28px), transparent); }
+@keyframes hx-glow-drift {
+  0%   { transform: translate3d(0, 0, 0) scale(1) rotate(0deg); }
+  33%  { transform: translate3d(3%, -2%, 0) scale(1.06) rotate(2deg); }
+  66%  { transform: translate3d(-3%, 1.5%, 0) scale(.97) rotate(-1.5deg); }
+  100% { transform: translate3d(1.5%, -1%, 0) scale(1.04) rotate(1deg); }
+}
+@media (prefers-reduced-motion: reduce) { html.hx-glass #mainChat::before { animation: none; } }
+
+/* ── full glass ── */
+html.hx-glass #composerBox,
+html.hx-glass .hx-back,
+html.hx-glass #hxSidebarToggle,
+html.hx-glass .hx-agents-pill {
+  border: 1px solid var(--glass-border) !important;
+  background: linear-gradient(180deg, var(--glass-tint-top), var(--glass-tint-bottom)) !important;
+  box-shadow: var(--glass-shadow), inset 0 1px 0 var(--glass-rim-top), inset 0 0 0 1px var(--glass-rim-hairline),
+    inset 0 -1px 0 var(--glass-rim-bottom) !important;
+  -webkit-backdrop-filter: blur(3px) saturate(125%);
+  backdrop-filter: blur(3px) saturate(125%);
+}
+/* the composer holds what you type: frost under the tint so scrolling text never shows through it */
+html.hx-glass #composerBox {
+  background: linear-gradient(180deg, var(--glass-tint-top), var(--glass-tint-bottom)),
+    linear-gradient(var(--glass-frost), var(--glass-frost)) !important;
+  -webkit-backdrop-filter: blur(18px) saturate(150%);
+  backdrop-filter: blur(18px) saturate(150%);
+}
+html.hx-glass #composerBox:focus-within { border-color: color-mix(in srgb, var(--hx-accent, #3054FD) 45%, var(--glass-border)) !important; }
+/* the sidebar toggle becomes a round control like Back */
+html.hx-glass #hxSidebarToggle { width: 36px; height: 36px; border-radius: 50% !important; display: inline-grid; place-items: center; }
+html.hx-glass .hx-back, html.hx-glass #hxSidebarToggle, html.hx-glass .hx-agents-pill {
+  transition: background-color .18s var(--glass-ease), transform .18s var(--glass-ease);
+}
+html.hx-glass .hx-back:hover, html.hx-glass #hxSidebarToggle:hover, html.hx-glass .hx-agents-pill:hover {
+  background: linear-gradient(180deg, var(--glass-tint-top-hover), var(--glass-tint-bottom-hover)) !important;
+}
+/* children of glass paint no surface of their own */
+html.hx-glass #composerBox textarea, html.hx-glass #composerBox #hxModelChip { background: transparent !important; }
+
+/* ── chip tier: file cards in the chat (CSS only, no refraction: they repeat) ── */
+html.hx-glass .hx-file {
+  border: 1px solid var(--glass-border) !important;
+  background: linear-gradient(180deg, var(--glass-tint-top), var(--glass-tint-bottom)) !important;
+  box-shadow: 0 6px 18px rgba(0,0,0,.18), inset 0 1px 0 var(--glass-rim-top), inset 0 0 0 1px var(--glass-rim-hairline),
+    inset 0 -1px 0 var(--glass-rim-bottom) !important;
+  -webkit-backdrop-filter: blur(10px) saturate(140%);
+  backdrop-filter: blur(10px) saturate(140%);
+  transition: background .18s var(--glass-ease), transform .18s var(--glass-ease);
+}
+html.hx-glass .hx-file:hover { background: linear-gradient(180deg, var(--glass-tint-top-hover), var(--glass-tint-bottom-hover)) !important; }
+html.hx-glass .hx-file:active { transform: scale(.985); }
+/* the icon well inside is a softer pane of the same glass, not a solid tile */
+html.hx-glass .hx-file .hx-file-ic { background: linear-gradient(180deg, rgba(255,255,255,.07), rgba(255,255,255,.02)) !important;
+  box-shadow: inset 0 1px 0 var(--glass-rim-hairline); border: 0 !important; }
+html.hx-glass:not(.dark) .hx-file { box-shadow: 0 6px 18px rgba(30,33,45,.08), inset 0 1px 0 var(--glass-rim-top), inset 0 0 0 1px var(--glass-rim-hairline) !important; }
+html.hx-glass:not(.dark) .hx-file .hx-file-ic { background: linear-gradient(180deg, rgba(255,255,255,.7), rgba(255,255,255,.35)) !important; }
+
+/* ── file viewer: the frame is glass (modal tier), the document itself stays solid paper ── */
+html.hx-glass .hx-v-scrim { -webkit-backdrop-filter: blur(6px) saturate(120%); backdrop-filter: blur(6px) saturate(120%); }
+html.hx-glass .hx-v-sheet {
+  background: linear-gradient(180deg, var(--glass-modal-tint), var(--glass-modal-tint)),
+    linear-gradient(180deg, var(--glass-tint-top), var(--glass-tint-bottom)),
+    color-mix(in srgb, var(--glass-menu-surface) 50%, transparent) !important;
+  box-shadow: var(--glass-menu-shadow), inset 0 1px 0 var(--glass-rim-top), inset 0 0 0 1px var(--glass-rim-hairline) !important;
+  -webkit-backdrop-filter: blur(28px) saturate(150%); backdrop-filter: blur(28px) saturate(150%);
+}
+/* parts of the frame paint no surface of their own; a hairline separates the header */
+html.hx-glass .hx-v-head { background: transparent !important; border-bottom-color: var(--glass-rim-hairline) !important; }
+html.hx-glass .hx-v-body { background: transparent !important; }
+html.hx-glass .hx-v-btn:not(.hx-back):hover { background: linear-gradient(180deg, var(--glass-tint-top-hover), var(--glass-tint-bottom-hover)) !important; }
+/* the page counter floats over the document: a small glass pill */
+html.hx-glass .hx-v-pgn {
+  background: color-mix(in srgb, var(--glass-menu-surface) 55%, transparent) !important; color: var(--hx-text, #fff);
+  border: 1px solid var(--glass-border); box-shadow: 0 6px 18px rgba(0,0,0,.25), inset 0 1px 0 var(--glass-rim-top);
+  -webkit-backdrop-filter: blur(14px) saturate(150%); backdrop-filter: blur(14px) saturate(150%);
+}
+html.hx-glass .hx-v-page { box-shadow: 0 10px 30px rgba(0,0,0,.28), 0 1px 3px rgba(0,0,0,.2); }
+
+/* ── pages (Insights, Settings, Kanban, Tasks, Skills, Memory, Spaces, Profiles, Logs, Todos, Projects) ──
+ * The same soft glow sits behind every page, placed high (there is no composer to light from below).
+ * Cards that group things become chip-tier glass (tint + rim + light blur, no refraction: they repeat);
+ * what's inside a card paints a faint fill at most, never a second glass surface. Long-read and edit
+ * surfaces (log output, editors, inputs, code) stay solid. */
+html.hx-glass main.main[class*="showing-"], html.hx-glass.hx-side-page main.main { position: relative; isolation: isolate; overflow: clip; }
+html.hx-glass main.main[class*="showing-"] > .main-view, html.hx-glass.hx-side-page main.main > .main-view,
+html.hx-glass main.main .main-view-header, html.hx-glass main.main .kanban-board-wrap { background: transparent !important; }
+html.hx-glass main.main .main-view-header { border-bottom-color: var(--glass-rim-hairline) !important; }
+html.hx-glass main.main[class*="showing-"]::before, html.hx-glass.hx-side-page main.main::before,
+html.hx-glass.hx-proj-open #hxProjects::before, html.hx-glass.hx-studio-open #hxStudio::before {
+  content: ''; position: absolute; inset: -18%; z-index: -1; pointer-events: none;
+  background:
+    radial-gradient(closest-side, var(--glass-mesh-violet), transparent),
+    radial-gradient(closest-side, var(--glass-mesh-cyan), transparent),
+    radial-gradient(closest-side, var(--glass-mesh-pink), transparent);
+  background-size: 62% 52%, 56% 48%, 50% 46%;
+  background-position: 70% 18%, 26% 34%, 60% 78%;
+  background-repeat: no-repeat;
+  filter: blur(48px) saturate(115%);
+  opacity: .85;
+  will-change: transform;
+  animation: hx-glow-drift 30s cubic-bezier(.45,0,.55,1) infinite alternate;
+}
+/* Projects and Motion are fixed, scrolling overlays (already their own stacking context, z-index 45/46): the glow is
+ * a plain absolute layer at their top that scrolls away with the page. No position: fixed, will-change or extra
+ * isolation inside a scroller: some GPU compositors then paint the glow over the page's text and boxes. */
+html.hx-glass.hx-proj-open #hxProjects::before, html.hx-glass.hx-studio-open #hxStudio::before {
+  inset: 0 0 auto 0; height: 100vh; will-change: auto; animation: none; filter: blur(40px) saturate(115%); }
+@media (prefers-reduced-motion: reduce) {
+  html.hx-glass main.main::before, html.hx-glass #hxProjects::before, html.hx-glass #hxStudio::before { animation: none; }
+}
+/* chip-tier cards */
+html.hx-glass :is(.hx-ins-card, #insightsContent > .insights-card, .hxp-card, .hxs-card, .hx-st-card, .hx-lim-card, #hxUpdSettings, #mainSettings .plugin-card, #mainSettings .extension-gallery-card,
+  main.main .detail-card, main.main .profile-card, main.main .kanban-card, #mainSettings .settings-field) {
+  background: linear-gradient(180deg, var(--glass-tint-top), var(--glass-tint-bottom)) !important;
+  border: 1px solid var(--glass-border) !important;
+  box-shadow: 0 8px 24px rgba(0,0,0,.18), inset 0 1px 0 var(--glass-rim-top), inset 0 0 0 1px var(--glass-rim-hairline) !important;
+  -webkit-backdrop-filter: blur(6px) saturate(125%);
+  backdrop-filter: blur(6px) saturate(125%);
+}
+html.hx-glass:not(.dark) :is(.hx-ins-card, #insightsContent > .insights-card, .hxp-card, .hxs-card, .hx-st-card, .hx-lim-card, #hxUpdSettings, #mainSettings .plugin-card, #mainSettings .extension-gallery-card,
+  main.main .detail-card, main.main .profile-card, main.main .kanban-card, #mainSettings .settings-field) {
+  background: linear-gradient(180deg, rgba(255,255,255,.62), rgba(255,255,255,.4)) !important;
+  box-shadow: 0 6px 18px rgba(30,33,45,.07), inset 0 1px 0 var(--glass-rim-top), inset 0 0 0 1px var(--glass-rim-hairline) !important;
+}
+html.hx-glass :is(.hxp-pcard, main.main .kanban-card):hover {
+  background: linear-gradient(180deg, var(--glass-tint-top-hover), var(--glass-tint-bottom-hover)) !important; }
+/* inside a glass card: a faint fill, no border, no second blur */
+html.hx-glass :is(.hx-ins-stat, .system-health-metric, .hx-ins-seg-ctl, .hxp-stat:not(.is-hot)) {
+  background: rgba(255,255,255,.035) !important; border-color: transparent !important; box-shadow: none !important; }
+html.hx-glass:not(.dark) :is(.hx-ins-stat, .system-health-metric, .hx-ins-seg-ctl, .hxp-stat:not(.is-hot)) { background: rgba(255,255,255,.5) !important; }
+html.hx-glass :is(.hx-ins-tr.th, .system-health-metrics) { background: transparent !important; }
+/* Settings: the picker tiles inside a glass row are a faint fill, not a second solid surface */
+html.hx-glass #mainSettings :is(.theme-pick-btn, .font-size-pick-btn, .skin-pick-btn):not(.active) { background: rgba(255,255,255,.03) !important; }
+html.hx-glass:not(.dark) #mainSettings :is(.theme-pick-btn, .font-size-pick-btn, .skin-pick-btn):not(.active) { background: rgba(255,255,255,.45) !important; }
+html.hx-glass #mainSettings :is(.theme-pick-btn, .font-size-pick-btn, .skin-pick-btn).active { background: rgba(255,255,255,.07) !important; }
+/* Project home (/projects#<id>): designed from screenshots of every tab.
+ * - the header and the sticky tab bar are frosted (menu tier), so rows scrolling under them blur away
+ *   instead of colliding with the tab labels; the tab bar becomes one floating glass pill, like Insights'
+ *   period control, and its right edge fades when the tabs scroll sideways
+ * - the stat tiles are standalone, so each is a small glass tile
+ * - each list (folders, sessions, memory, Dreamer findings, repo notes) is one grouped glass card with
+ *   hairlines between rows, instead of loose rows floating on the glow */
+html.hx-glass #hxProjects .hxp-top { background: color-mix(in srgb, var(--hx-bg, #0e0f13) 78%, transparent) !important;
+  -webkit-backdrop-filter: blur(22px) saturate(140%); backdrop-filter: blur(22px) saturate(140%);
+  box-shadow: inset 0 -1px 0 var(--glass-rim-hairline); }
+html.hx-glass #hxProjects .hxp-tabs { top: 58px; margin: 18px 0 0; padding: 4px; gap: 2px; width: fit-content; max-width: 100%;
+  border: 1px solid var(--glass-border) !important; border-radius: 999px;
+  background: linear-gradient(180deg, var(--glass-tint-top), var(--glass-tint-bottom)),
+    color-mix(in srgb, var(--glass-menu-surface) 82%, transparent) !important;
+  box-shadow: var(--glass-shadow), inset 0 1px 0 var(--glass-rim-top), inset 0 0 0 1px var(--glass-rim-hairline) !important;
+  -webkit-backdrop-filter: blur(24px) saturate(150%); backdrop-filter: blur(24px) saturate(150%);
+  -webkit-mask-image: linear-gradient(90deg, #000 calc(100% - 28px), transparent); mask-image: linear-gradient(90deg, #000 calc(100% - 28px), transparent); }
+html.hx-glass #hxProjects .hxp-tabs.is-end, html.hx-glass #hxProjects .hxp-tabs:not(.is-over) { -webkit-mask-image: none; mask-image: none; }
+html.hx-glass #hxProjects .hxp-tab { height: 32px; padding: 0 11px; }
+@media (min-width: 641px) { html.hx-glass #hxProjects .hxp-tab { padding: 0 8px; gap: 5px; } }
+html.hx-glass #hxProjects .hxp-tab:hover { background: rgba(255,255,255,.06); }
+html.hx-glass #hxProjects .hxp-tab.is-on { background: rgba(255,255,255,.11);
+  box-shadow: inset 0 1px 0 rgba(255,255,255,.14), 0 1px 3px rgba(0,0,0,.25); }
+html.hx-glass:not(.dark) #hxProjects .hxp-tab.is-on { background: rgba(255,255,255,.85); box-shadow: 0 1px 3px rgba(30,33,45,.12); }
+html.hx-glass #hxProjects .hxp-body { padding-top: 14px; }
+html.hx-glass #hxProjects .hxp-stat:not(.is-hot) {
+  background: linear-gradient(180deg, var(--glass-tint-top), var(--glass-tint-bottom)) !important;
+  box-shadow: inset 0 1px 0 var(--glass-rim-top), inset 0 0 0 1px var(--glass-rim-hairline) !important;
+  -webkit-backdrop-filter: blur(6px) saturate(125%); backdrop-filter: blur(6px) saturate(125%); }
+html.hx-glass #hxProjects .hxp-stat:hover { background: linear-gradient(180deg, var(--glass-tint-top-hover), var(--glass-tint-bottom-hover)) !important; }
+html.hx-glass #hxProjects .hxp-body .hxp-list:not(:empty) { gap: 0; padding: 4px; border-radius: 18px;
+  border: 1px solid var(--glass-border);
+  background: linear-gradient(180deg, var(--glass-tint-top), var(--glass-tint-bottom));
+  box-shadow: 0 8px 24px rgba(0,0,0,.18), inset 0 1px 0 var(--glass-rim-top), inset 0 0 0 1px var(--glass-rim-hairline);
+  -webkit-backdrop-filter: blur(6px) saturate(125%); backdrop-filter: blur(6px) saturate(125%); }
+html.hx-glass:not(.dark) #hxProjects .hxp-body .hxp-list:not(:empty) { background: linear-gradient(180deg, rgba(255,255,255,.62), rgba(255,255,255,.4));
+  box-shadow: 0 6px 18px rgba(30,33,45,.07), inset 0 1px 0 var(--glass-rim-top), inset 0 0 0 1px var(--glass-rim-hairline); }
+html.hx-glass #hxProjects .hxp-body .hxp-list > * { position: relative; }
+html.hx-glass #hxProjects .hxp-body .hxp-list > * + *::before { content: ''; position: absolute; top: 0; left: 58px; right: 12px; height: 1px;
+  background: var(--glass-rim-hairline); pointer-events: none; }
+html.hx-glass #hxProjects .hxp-body .hxp-list > :hover::before, html.hx-glass #hxProjects .hxp-body .hxp-list > :hover + *::before { opacity: 0; }
+html.hx-glass #hxProjects .hxp-body .hxp-list .hxp-item-i { background: rgba(255,255,255,.06); }
+html.hx-glass:not(.dark) #hxProjects .hxp-body .hxp-list .hxp-item-i { background: rgba(255,255,255,.7); }
+
+/* Settings › This chat: the action tiles are light glass buttons, not solid slabs */
+html.hx-glass #mainSettings .settings-action-btn { background: linear-gradient(180deg, var(--glass-tint-top), var(--glass-tint-bottom)) !important;
+  box-shadow: inset 0 1px 0 var(--glass-rim-top), inset 0 0 0 1px var(--glass-rim-hairline) !important; }
+html.hx-glass #mainSettings .settings-action-btn:not(.disabled):hover { background: linear-gradient(180deg, var(--glass-tint-top-hover), var(--glass-tint-bottom-hover)) !important; }
+html.hx-glass:not(.dark) #mainSettings .settings-action-btn { background: rgba(255,255,255,.55) !important; }
+/* inside glass plugin / extension cards: no second box */
+html.hx-glass #mainSettings :is(.plugin-card-body) { border-color: transparent !important; }
+html.hx-glass #mainSettings :is(.extension-gallery-permission-list, .extension-gallery-next-step) { background: rgba(255,255,255,.03) !important; border-color: var(--glass-rim-hairline) !important; }
+/* project detail sheets (session, finding, memory, file, proposal, new project, folder picker): modal glass over a
+ * softly blurred scrim; the sticky sheet header carries its own frost so text scrolling under it stays unreadable */
+html.hx-glass #hxProjects .hxp-scrim { -webkit-backdrop-filter: blur(6px) saturate(120%); backdrop-filter: blur(6px) saturate(120%); }
+html.hx-glass #hxProjects .hxp-sheet-h { background: color-mix(in srgb, var(--glass-menu-surface) 80%, transparent) !important;
+  box-shadow: inset 0 -1px 0 var(--glass-rim-hairline); }
+html.hx-glass #hxProjects .hxp-sheet .hxp-card { box-shadow: inset 0 1px 0 var(--glass-rim-top), inset 0 0 0 1px var(--glass-rim-hairline) !important;
+  -webkit-backdrop-filter: none; backdrop-filter: none; }
+/* kanban columns: a lane, not a card */
+html.hx-glass main.main .kanban-column { background: rgba(255,255,255,.02) !important; border-color: var(--glass-rim-hairline) !important; }
+html.hx-glass:not(.dark) main.main .kanban-column { background: rgba(255,255,255,.3) !important; }
+
+/* ── menu tier ── */
+html.hx-glass .hx-more-menu,
+html.hx-glass .hx-mp-panel,
+html.hx-glass #composerWsDropdown,
+html.hx-glass .hx-pop:not(.is-sheet) {
+  background: color-mix(in srgb, var(--glass-menu-surface) 62%, transparent) !important;
+  border: 1px solid var(--glass-border) !important;
+  box-shadow: var(--glass-menu-shadow), inset 0 1px 0 var(--glass-rim-top) !important;
+  -webkit-backdrop-filter: blur(22px) saturate(140%) !important;
+  backdrop-filter: blur(22px) saturate(140%) !important;
+}
+
+/* ── modal tier ── */
+html.hx-glass .hx-as-panel,
+html.hx-glass .hx-needs-card,
+html.hx-glass #hxProjects .hxp-sheet {
+  background: linear-gradient(180deg, var(--glass-modal-tint), var(--glass-modal-tint)),
+    linear-gradient(180deg, var(--glass-tint-top), var(--glass-tint-bottom)),
+    color-mix(in srgb, var(--glass-menu-surface) 55%, transparent) !important;
+  border: 1px solid var(--glass-border);
+  box-shadow: var(--glass-menu-shadow), inset 0 1px 0 var(--glass-rim-top), inset 0 0 0 1px var(--glass-rim-hairline) !important;
+  -webkit-backdrop-filter: blur(26px) saturate(150%) !important;
+  backdrop-filter: blur(26px) saturate(150%) !important;
+}
+
+/* Phones: the composer sits on the keyboard edge; keep it frosted, refraction off (glass.js) to save battery */
+@media (prefers-reduced-transparency: reduce) {
+  html.hx-glass #composerBox, html.hx-glass .hx-more-menu, html.hx-glass .hx-mp-panel, html.hx-glass #composerWsDropdown, html.hx-glass .hx-pop,
+  html.hx-glass .hx-as-panel, html.hx-glass .hx-needs-card { background: var(--glass-menu-surface) !important; }
+}
+
+/* Settings › Appearance › Liquid glass */
+.hx-glass-set > label { display: flex !important; width: 100% !important; align-items: center; justify-content: space-between; gap: 16px; margin: 0; cursor: pointer; }
+.hx-glass-set > label > button[role="switch"] { margin-left: auto; flex: none; display: inline-flex; align-items: center; }
+.hx-glass-set button[role="switch"] { border: 0; padding: 0; background: transparent; cursor: pointer; }
+.hx-glass-set .hx-glass-desc { font-size: 11px; color: var(--muted); margin-top: 4px; }

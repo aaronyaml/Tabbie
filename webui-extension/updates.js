@@ -3,7 +3,8 @@
  *   GET  …/sidecar/update          -> {available, ahead_by, commits, remote, pending_restart}
  *   POST …/sidecar/update          -> download it (fast-forward; local edits are never overwritten)
  *   POST …/sidecar/update/restart  -> restart what it touched now, or once nothing is running ({waiting: true})
- * "Later" snoozes the card for a day (or until GitHub has something newer); "Later" on a downloaded update
+ * A background check never pops a card: it puts a dot on Settings, and Settings → System shows
+ * "See update" (the card). "Later" there snoozes it for a day; "Later" on a downloaded update
  * that still needs a restart snoozes it for 4 h. A scheduled restart is watched (30 s poll) until it has
  * happened, then a "Tabbie restarted · Reload" card appears. Settings → System has a
  * "Tabbie" row with the version and a Check for updates button, any time.
@@ -179,9 +180,26 @@
       }
       return;
     }
-    if (!force && snoozed(j.remote)) return;
-    offer(j);
+    if (force) { offer(j); return; }
+    // Passive check: no card over the composer. A dot on Settings, and Settings → System offers it.
+    badge(j);
   }
+
+  // Update available (found by the background check): a small dot on the Settings icons + the
+  // Settings → System row gets an Update button. Nothing covers the page.
+  function badge(j) {
+    info = j;
+    document.querySelectorAll('[data-panel="settings"]').forEach((b) => {
+      if (b.querySelector('.hx-up-dot')) return;
+      const d = document.createElement('span');
+      d.className = 'hx-up-dot';
+      d.setAttribute('aria-hidden', 'true');
+      b.appendChild(d);
+      if (!/update/i.test(b.getAttribute('aria-label') || '')) b.setAttribute('aria-label', (b.getAttribute('aria-label') || 'Settings') + ' (update available)');
+    });
+    paintSettings(j);
+  }
+  let paintSettings = () => {};
 
   // Settings → System: a Tabbie row (version, Check for updates). Upstream's block there covers the
   // WebUI and Hermes Agent, not Tabbie.
@@ -198,9 +216,12 @@
     const say = (j) => {
       const v = j.local ? j.local.slice(0, 7) : '';
       ver.textContent = j.available ? `Version ${v} · an update is available` : j.note ? `Version ${v} · ${j.note}` : `Version ${v} · up to date`;
+      if (j.available) { btn.textContent = 'See update'; btn.dataset.offer = '1'; info = j; }
     };
+    paintSettings = say;
     call('', 'GET').then(say).catch(() => { ver.textContent = 'Allow Tabbie\'s helper to check for updates.'; });
     btn.addEventListener('click', async () => {
+      if (btn.dataset.offer && info && info.available) { if (card) { card.remove(); card = null; } offer(info); return; }
       btn.disabled = true; btn.textContent = 'Checking…';
       try {
         const j = await call('?force=1', 'GET');
@@ -209,7 +230,7 @@
         if (j.pending_restart && j.pending_restart.length && !j.restart_waiting) { fresh(); finished({ needs: j.pending_restart }); }
         else if (j.available) { fresh(); offer(j); }
       } catch (e) { ver.textContent = `Couldn't check (${(e && e.message) || e}).`; }
-      btn.disabled = false; btn.textContent = 'Check for updates';
+      btn.disabled = false; btn.textContent = btn.dataset.offer ? 'See update' : 'Check for updates';
     });
   }
 

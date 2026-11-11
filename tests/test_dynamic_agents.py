@@ -72,7 +72,7 @@ def test_peer_model_same_tier():
     assert ec.peer_model("anthropic", "claude-opus-5-5")["model"] == "gpt-6.1-sol"
     assert ec.peer_model("openai", "gpt-6.1-sol")["model"] == "claude-opus-5-5"
     assert ec.peer_model("anthropic", "claude-fable-5-1")["model"] == "gpt-6-astra"
-    assert ec.peer_model("openai", "gpt-6-astra")["model"] == "claude-fable-5-1"
+    assert ec.peer_model("openai", "gpt-6-astra")["model"] == "claude-fable-5-2"
     for a, b in ec.PEER.items():
         assert ec.PEER[b] == a  # every pair goes both ways
     assert ec.peer_model("anthropic", "claude-haiku-5-5", available_openai=["gpt-6-astra"])["model"] == "gpt-6-astra"

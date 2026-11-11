@@ -1,4 +1,4 @@
-/* Hermes — new-chat home (home.js): greeting, Try cards + recent chats around the composer. */
+/* Tabbie — new-chat home (home.js): small greeting, the composer, one short list of chats. */
 #hxHome { display: none; }
 #mainChat:has(#emptyState:not([style*="none"])) #hxHome { display: block; }
 #emptyState .suggestion-grid, #emptyState p { display: none !important; }
@@ -8,79 +8,36 @@
 #hxHome { width: 100%; max-width: 720px; margin: 0 auto; padding: 0 2px; box-sizing: border-box;
   transition: opacity .2s ease, transform .25s cubic-bezier(.32,.72,0,1); }
 html.hx-typing #hxHome { opacity: 0; transform: translateY(6px); pointer-events: none; }
-.hx-home-head { display: flex; align-items: center; justify-content: space-between; margin: 26px 4px 10px;
-  font-size: 13px; font-weight: 500; color: var(--hx-text-2, #8a8a8e); }
-.hx-home-head span { display: inline-flex; align-items: center; gap: 6px; }
-.hx-home-head svg { width: 16px; height: 16px; }
 
-.hx-tries { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 10px; }
-.hx-try { display: flex; flex-direction: column; align-items: flex-start; gap: 4px; min-height: 120px; padding: 14px 14px 16px;
-  text-align: left; border-radius: 18px; border: 1px solid var(--hx-hair, rgba(127,127,127,.2)); background: var(--hx-raised, #fff);
+/* One list: title · tag · when. Plain rows, no cards. */
+.hx-list { display: flex; flex-direction: column; margin-top: 18px; }
+.hx-row { display: grid; grid-template-columns: minmax(0, 1fr) auto auto; align-items: center; column-gap: 10px;
+  min-height: 40px; padding: 0 12px; border: 0; border-radius: 10px; background: transparent; text-align: left;
   color: var(--hx-text, inherit); cursor: pointer; font: inherit; -webkit-tap-highlight-color: transparent;
-  transition: background-color .18s ease, border-color .18s ease, transform .18s ease; }
-:root.dark .hx-try { background: var(--hx-fill, #1c1d22); border-color: transparent; }
-.hx-try:hover { border-color: var(--hx-line, rgba(127,127,127,.35)); }
-:root.dark .hx-try:hover { background: var(--hx-fill-2, #24252b); }
-.hx-try:active { transform: scale(.98); }
-.hx-try-top { display: flex; align-items: center; justify-content: space-between; width: 100%; margin-bottom: 8px; }
-.hx-try-ic { display: grid; place-items: center; color: var(--hx-ink, #3054FD); }
-.hx-try-ic svg { width: 22px; height: 22px; }
-.hx-try-pill { font-size: 12.5px; font-weight: 500; padding: 4px 11px; border-radius: 999px;
-  border: 1px solid var(--hx-hair, rgba(127,127,127,.25)); color: var(--hx-text-2, #8a8a8e); }
-.hx-try:hover .hx-try-pill { color: var(--hx-text, inherit); }
-.hx-try-tt { font-size: 14.5px; font-weight: 600; letter-spacing: -0.01em; line-height: 1.3; }
-.hx-try-sub { font-size: 13px; line-height: 1.35; color: var(--hx-text-2, #8a8a8e);
-  display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
+  transition: background-color .15s ease; }
+.hx-row:hover, .hx-row:focus-visible { background: var(--hx-fill, rgba(127,127,127,.1)); outline: none; }
+.hx-row-tt { font-size: 14px; font-weight: 500; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.hx-row-meta { grid-column: 3; font-size: 12.5px; color: var(--hx-text-2, #8a8a8e); white-space: nowrap; overflow: hidden;
+  text-overflow: ellipsis; max-width: 28ch; text-align: right; }
+.hx-row-tag { grid-column: 2; font-size: 11.5px; font-weight: 600; padding: 2px 8px; border-radius: 999px; white-space: nowrap; }
+.hx-row-tag.is-need { background: var(--hx-accent, #3054FD); color: #fff; }
+.hx-row-tag.is-live { background: var(--hx-fill-2, rgba(127,127,127,.18)); color: var(--hx-text, inherit); }
 
-.hx-recent { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 10px; }
-.hx-rec { display: grid; grid-template-columns: auto 1fr; grid-template-rows: auto auto; column-gap: 8px; row-gap: 2px;
-  align-items: center; padding: 10px 12px; border-radius: 14px; border: 0; background: transparent; text-align: left;
-  color: var(--hx-text, inherit); cursor: pointer; font: inherit; transition: background-color .15s ease; }
-.hx-rec:hover { background: var(--hx-fill, rgba(127,127,127,.1)); }
-.hx-rec-ic { grid-row: 1 / span 2; display: grid; color: var(--hx-text-2, #8a8a8e); }
-.hx-rec-tt { font-size: 13.5px; font-weight: 500; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-.hx-rec-when { font-size: 12px; color: var(--hx-text-2, #8a8a8e); }
-
-/* Needs you: chats waiting on an answer or a plan approval */
-.hx-need-head { margin-top: 18px; }
-.hx-need { display: flex; flex-direction: column; gap: 4px; }
-.hx-need-row { display: grid; grid-template-columns: auto minmax(0, 1fr); column-gap: 10px; row-gap: 2px; align-items: center;
-  padding: 10px 12px; border-radius: 14px; border: 0; background: var(--hx-fill, rgba(127,127,127,.08)); text-align: left;
-  color: var(--hx-text, inherit); cursor: pointer; font: inherit; transition: background-color .15s ease; }
-.hx-need-row:hover { background: var(--hx-fill-2, rgba(127,127,127,.16)); }
-.hx-need-pill { grid-row: 1 / span 2; align-self: start; font-size: 11px; font-weight: 600; padding: 3px 8px; border-radius: 999px;
-  background: var(--accent, #d97757); color: #fff; }
-.hx-need-tt { font-size: 13.5px; font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-.hx-need-tx { font-size: 12.5px; color: var(--hx-text-2, #8a8a8e); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-
-/* Project launcher */
-.hx-projs { display: flex; flex-wrap: wrap; gap: 8px; }
-.hx-proj { display: inline-flex; align-items: center; gap: 7px; padding: 8px 14px; border-radius: 999px; font: inherit; font-size: 13.5px;
-  font-weight: 500; border: 1px solid var(--hx-border, rgba(127,127,127,.22)); background: transparent; color: var(--hx-text, inherit);
-  cursor: pointer; transition: background-color .15s ease; }
-.hx-proj:hover { background: var(--hx-fill, rgba(127,127,127,.1)); }
-.hx-proj-ic { display: grid; color: var(--hx-text-2, #8a8a8e); }
-
-/* desktop: buddy beside the greeting, like Claude */
+/* desktop: a small buddy beside a small greeting */
 @media (min-width: 641px) {
   /* upstream sometimes sets an inline display:block; keep the row layout regardless */
-  #emptyState:not([style*="none"]) { display: flex !important; flex-direction: row !important; align-items: center !important; justify-content: center !important; gap: 14px; text-align: left; }
-  #emptyState .empty-logo { width: 64px !important; height: 64px !important; margin: 0 !important; flex: none; }
-  #emptyState h2 { margin: 0 !important; font-size: 34px !important; }
+  #emptyState:not([style*="none"]) { display: flex !important; flex-direction: row !important; align-items: center !important; justify-content: center !important; gap: 10px; text-align: left; }
+  #emptyState .empty-logo { width: 36px !important; height: 36px !important; margin: 0 !important; flex: none; }
+  #emptyState h2 { margin: 0 !important; font-size: 24px !important; font-weight: 600 !important; letter-spacing: -0.02em; }
   #mainChat:has(#emptyState:not([style*="none"])) #messages { padding-top: 0 !important; padding-bottom: 0 !important; min-height: 0 !important; }
-  #mainChat:has(#emptyState:not([style*="none"])) #emptyState { padding: 0 0 28px !important; min-height: 0 !important; height: auto !important; }
+  #mainChat:has(#emptyState:not([style*="none"])) #emptyState { padding: 0 0 20px !important; min-height: 0 !important; height: auto !important; }
   #mainChat:has(#emptyState:not([style*="none"])) #msgInner { display: none; }
 }
-/* phones: one swipeable strip just above the composer */
+/* phones: the list sits just above the composer */
 @media (max-width: 640px) {
-  #hxHome { padding: 0; margin-bottom: 4px; }
-  .hx-home-head { margin: 0 16px 8px; }
-  .hx-need { padding: 0 16px; margin-bottom: 12px; }
-  .hx-need-head { margin-top: 0; }
-  /* no sideways carousels on phones: they steal the swipe that opens the menu */
-  .hx-projs { flex-wrap: wrap; padding: 0 16px 2px; margin-bottom: 12px; }
-  .hx-tries { grid-template-columns: minmax(0, 1fr); gap: 8px; padding: 0 16px 4px; }
-  .hx-try { min-height: 0; padding: 12px 12px 14px; }
-  .hx-try-top { margin-bottom: 4px; }
+  #hxHome { padding: 0 8px; margin-bottom: 6px; }
+  .hx-list { margin-top: 0; }
+  .hx-row { min-height: 44px; }
+  .hx-row-meta { max-width: 14ch; }
 }
 @media (prefers-reduced-motion: reduce) { #hxHome { transition: none; } }

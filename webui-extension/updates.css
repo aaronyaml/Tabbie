@@ -37,3 +37,8 @@
 #hxUpdSettings span { font-size: 12.5px; color: var(--hx-text-2, var(--muted)); overflow-wrap: anywhere; }
 #hxUpdSettings button { flex: none; }
 .hx-up-list .hx-up-more { list-style: none; margin-left: -18px; color: var(--hx-text-2, var(--muted)); opacity: .8; }
+
+/* Background check found an update: a dot on the Settings icons instead of a card over the page */
+[data-panel="settings"] { position: relative; }
+.hx-up-dot { position: absolute; top: 6px; right: 6px; width: 7px; height: 7px; border-radius: 50%;
+  background: var(--hx-accent, #3054FD); box-shadow: 0 0 0 2px var(--hx-rail-bg, var(--bg, #111)); pointer-events: none; }

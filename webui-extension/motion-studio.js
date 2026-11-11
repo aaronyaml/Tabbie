@@ -1205,7 +1205,9 @@
     t = t.replace(/```hermes-question\s*\n([\s\S]*?)```/g, (_, body) => { try { const o = JSON.parse(body); if (o && Array.isArray(o.questions) && o.questions.length) q = o; } catch (_) {} return ''; });
     const main = [], more = [];
     t.split('\n').forEach((l) => {
-      const m = /^\s*(?:[-*]\s*)?(Done|Verified|Note|Next|Status|Result)s?:\s*(.*)$/i.exec(l);
+      // "- Done: x", "- **Done:** x", "**Done**: x"; a label with nothing after it (its items follow) is dropped
+      const m = /^\s*(?:[-*]\s+)?(?:\*\*|__)?(Done|Verified|Note|Next|Status|Result)s?(?::(?:\*\*|__)|(?:\*\*|__):|:)\s*(.*)$/i.exec(l);
+      if (m && !m[2].trim()) return;
       if (m && /verified/i.test(m[1])) more.push(cap(m[2])); else main.push(m ? cap(m[2]) : l);
     });
     return { body: main.join('\n').replace(/\n{3,}/g, '\n\n').trim(), more, q };
@@ -1246,6 +1248,17 @@
       const body = it.type === 'z' ? it.r.body : it.type === 'job' && it.reply ? it.reply.body : '';
       if (body && /\?\s*$/.test(body)) { it.ask = true; break; }
       if (body) break;
+    }
+    // a question the worker asked that never reached the transcript (its hub turn ended first): the request
+    // still waits for an answer, so it's asked here from the request itself (sidecar session view)
+    if (!items.some((x) => x.type === 'q' && x.pending)) {
+      const open = (chat.reqs || []).filter((r) => r.question && Array.isArray(r.question.questions) && r.question.questions.length).pop();
+      const lastUserAt = Math.max(0, ...items.filter((x) => x.type === 'user').map((x) => x.at || 0));
+      const qAt = open ? Date.parse(open.updated || open.created || '') || 0 : 0;
+      if (open && (!lastUserAt || qAt >= lastUserAt - 60000)) {
+        const q = open.question;
+        items.push({ type: 'q', q, pending: true, at: qAt || Date.now(), key: `${q.request_id || ''}:${q.round || 1}:${q.questions.map((x) => x.question).join('|')}` });
+      }
     }
     // a chat turn the transcript shows but that has no reply yet
     const last = items[items.length - 1];
@@ -1543,8 +1556,8 @@
       return `<button type="button" class="hxs-step${on ? ' is-on' : ''}${done ? ' is-done' : ''}" data-go="${k}" aria-label="${l}"${on ? ' aria-current="step"' : ''}${i > reach() ? ' disabled' : ''}><i>${done && !on ? icon('Tick02Icon', 12) : i + 1}</i><span>${l}</span></button>`;
     }).join('')}</nav>` : '';
     return `<header class="hxs-top">
+        <button type="button" class="hx-back" data-act="${P ? 'home' : 'exit'}" aria-label="${P ? 'Back to all films' : 'Back to chats'}">${icon('ArrowLeft01Icon', 18)}<span>${P ? 'Films' : 'Back'}</span></button>
         <button type="button" class="hxs-ib hxs-menu" data-act="menu" aria-label="Menu">${icon('Menu01Icon', 20)}</button>
-        ${P ? `<button type="button" class="hxs-ib" data-act="home" aria-label="All films">${icon('ArrowLeft01Icon', 20)}</button>` : ''}
         <div class="hxs-title"><span>${P ? esc(P.title) : 'Motion'}</span>${P ? '' : `<em>with ${NAME}</em>`}</div>
         ${P ? `<button type="button" class="hxs-chip" data-act="feed">${icon('BubbleChatIcon', 16)}<span>${NAME}</span></button>` : ''}
       </header>${steps}<div class="hxs-jobslot">${P ? jobLine() : ''}</div>${err ? `<div class="hxs-err">${esc(err)}</div>` : ''}<main class="hxs-main">${inner}</main>`;
@@ -2709,6 +2722,7 @@ ${editSystem(s)}
       if (!a) return;
       const act = a.dataset.act;
       if (act === 'menu') { try { if (typeof toggleMobileSidebar === 'function') toggleMobileSidebar(); } catch (_) {} return; }
+      if (act === 'exit') return close();
       if (act === 'home') { P = null; view = 'home'; err = ''; resetChat(); navPush = true; return render(); }
       if (act === 'retrim') { if (audioLocked() || blocked()) return; local.retrim = true; TR.init = false; return render(); }
       if (act === 'range-trim') { if (blocked()) return; local.rangeAsk = true; return paintRangeBar(); }
@@ -2870,7 +2884,10 @@ ${editSystem(s)}
   // Motion sessions are studio-only (motion.js keeps them out of the chat list and sends anyone who
   // lands on one by URL here). Leaving the studio goes back to the chat you were in before.
   let prevSid = null, leavingUntil = 0;
-  const isMo = (sid) => !!(window.hxMotion && window.hxMotion.isMotion(sid));
+  // Motion chats whose film can't be found (e.g. its project folder was renamed or never made): they open as
+  // a plain chat instead, so whatever is waiting there (a question from the hub) is still reachable.
+  const noFilm = new Set();
+  const isMo = (sid) => !noFilm.has(sid) && !!(window.hxMotion && window.hxMotion.isMotion(sid));
   function place() {
     if (!root) return;
     const rail = document.querySelector('.rail');
@@ -2906,7 +2923,16 @@ ${editSystem(s)}
       let x = loadIdx().find((i) => i.sid === sid);
       if (!x) { discovered = false; await discover(); x = loadIdx().find((i) => i.sid === sid); }
       if (x) await openProject(x.project);
-    } finally { if (wantSid === sid) wantSid = null; render(); }
+      else if (wantSid === sid && typeof loadSession === 'function') {
+        noFilm.add(sid);
+        wantSid = null;
+        close({ keepChat: true });
+        const url = chatUrl(sid);
+        if (window.__hxMoHist) window.__hxMoHist.replace(history.state, url); else history.replaceState(history.state, '', url);
+        await loadSession(sid);
+        return;
+      }
+    } finally { if (wantSid === sid) wantSid = null; if (isOpen()) render(); }
   }
   // open({home}) shows the film list; open({sid}) that film; open() follows the URL, else the session.
   function open(opts = {}) {
@@ -2984,7 +3010,7 @@ ${editSystem(s)}
   });
   // films made for a Tabbie project (this browser's index, refreshed from the studio folder)
   async function filmsFor(pid) { await discover(); return loadIdx().filter((x) => x.ctx === pid); }
-  window.hxStudio = { open, close, isOpen, leaving, filmsFor };
+  window.hxStudio = { open, close, isOpen, leaving, filmsFor, noFilm: (sid) => noFilm.has(sid) };
   addEventListener('resize', place);
   // a file dropped beside the drop zones must not navigate the tab away from the studio
   addEventListener('dragover', (e) => { if (isOpen()) e.preventDefault(); });

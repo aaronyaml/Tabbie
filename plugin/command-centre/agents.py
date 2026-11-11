@@ -29,6 +29,7 @@ import hashlib
 import json
 import os
 import re
+import shutil
 import sys
 import threading
 import time
@@ -45,8 +46,11 @@ NARRATION_CHARS = 280         # one line, after cleaning
 SHOTS_MAX = 24                # images per request
 SHOT_MAX_BYTES = 25 * 1024 * 1024
 IMAGE_EXT = {".png": "png", ".jpg": "jpg", ".jpeg": "jpg", ".webp": "webp", ".gif": "gif"}
-DOC_EXT = {".pdf": "pdf"}     # files (not pictures): a card in the reply, copied into the chat's attachments
-DOC_MAX_BYTES = 100 * 1024 * 1024
+DOC_EXT = {".pdf": "pdf"}     # file types whose content is checked (magic bytes) before attaching
+DOC_MAX_BYTES = 500 * 1024 * 1024  # any other file (not a picture): a card in the reply, copied into the chat's
+                                   # attachments; readable types open in the in-site viewer, the rest download
+# Never attached, whatever the folder: secrets and keys.
+_SECRET_NAME = re.compile(r"(^\.env(\..*)?$|^id_(rsa|dsa|ecdsa|ed25519)$|\.(pem|key|p12|pfx|keystore|jks)$|^\.netrc$|^\.npmrc$|^\.pypirc$|credentials)", re.I)
 _ATTACH_RX = re.compile(r"^[ \t>*-]*ATTACH(?:\*\*)?:(?:\*\*)?[ \t]*(.+?)[ \t]*$", re.M)
 _FENCE_RX = re.compile(r"```.*?(?:```|$)", re.S)
 _SHOT_ID = re.compile(r"^[0-9a-f]{16}$")
@@ -84,8 +88,16 @@ def strip_attach(text: str) -> str:
     return re.sub(r"\n{3,}", "\n\n", _ATTACH_RX.sub("", text)).strip()
 
 
+def _sha1_file(p: Path) -> str:
+    h = hashlib.sha1()
+    with open(p, "rb") as fh:
+        for chunk in iter(lambda: fh.read(1 << 20), b""):
+            h.update(chunk)
+    return h.hexdigest()
+
+
 def attach_docs(text: str, roots: list[str], dest: Path | None) -> str:
-    """A reply's ATTACH lines naming a PDF -> `MEDIA: <copy>` (the chat shows a file card it can open and
+    """A reply's ATTACH lines naming any non-picture file -> `MEDIA: <copy>` (the chat shows a file card it can open and
     download); the copy goes into the chat's own attachments folder (dest), which the WebUI serves.
     Other ATTACH lines are left for strip_attach (images show in the Agents block)."""
     if not text or "ATTACH" not in text:
@@ -100,14 +112,14 @@ def attach_docs(text: str, roots: list[str], dest: Path | None) -> str:
             return f"(Couldn't attach {_short(Path(raw).name or raw, 120)}: {why if p is None else 'no chat to attach it to'}.)"
         try:
             dest.mkdir(parents=True, exist_ok=True)
-            blob = p.read_bytes()
-            name = re.sub(r"[^\w.-]+", "-", p.name).strip("-.") or "file.pdf"  # a MEDIA path can't hold spaces
+            digest = _sha1_file(p)
+            name = re.sub(r"[^\w.-]+", "-", p.name).strip("-.") or "file"  # a MEDIA path can't hold spaces
             out = dest / name
-            if out.exists() and out.read_bytes() != blob:  # another file of that name: keep both
-                out = dest / f"{Path(name).stem}-{hashlib.sha1(blob).hexdigest()[:6]}{p.suffix.lower()}"
+            if out.exists() and _sha1_file(out) != digest:  # another file of that name: keep both
+                out = dest / f"{Path(name).stem}-{digest[:6]}{p.suffix.lower()}"
             if not out.exists():
                 tmp = out.with_name(f".tmp-{out.name}-{os.getpid()}")
-                tmp.write_bytes(blob)
+                shutil.copyfile(p, tmp)
                 os.replace(tmp, out)
         except OSError:
             return f"(Couldn't attach {_short(p.name, 120)}: couldn't copy it.)"
@@ -155,12 +167,20 @@ def check_image(raw: str, roots: list[str]) -> tuple[Path | None, str]:
 
 
 def check_doc(raw: str, roots: list[str]) -> tuple[Path | None, str]:
-    """check_image for files the reply shows as cards (PDF)."""
-    return _check(raw, roots, DOC_EXT, DOC_MAX_BYTES, "not a pdf", "not a valid pdf")
+    """check_image for files the reply shows as cards: any type, inside the run's folders, not a secret.
+    A PDF must really be one (magic bytes); other types are passed through as they are."""
+    name = Path(str(raw or "").strip().strip("`'\"<>")).name
+    if _SECRET_NAME.search(name):
+        return None, "looks like a secret or key file"
+    if Path(name).suffix.lower() in DOC_EXT:
+        return _check(raw, roots, DOC_EXT, DOC_MAX_BYTES, "not a pdf", "not a valid pdf")
+    return _check(raw, roots, None, DOC_MAX_BYTES, "", "")
 
 
 def is_doc(raw: str) -> bool:
-    return Path(str(raw or "").strip()).suffix.lower() in DOC_EXT
+    """Any attached file that isn't a picture (pictures show in the Agents block)."""
+    p = Path(str(raw or "").strip().strip("`'\"<>"))
+    return bool(p.name) and p.suffix.lower() not in IMAGE_EXT
 
 
 def _check(raw: str, roots: list[str], exts: dict, max_bytes: int, bad_ext: str, bad_magic: str):
@@ -178,7 +198,7 @@ def _check(raw: str, roots: list[str], exts: dict, max_bytes: int, bad_ext: str,
             return None, "file not found"
         if not p.is_file():
             return None, "file not found"
-        ext = exts.get(p.suffix.lower())
+        ext = exts.get(p.suffix.lower()) if exts is not None else (p.suffix.lower().lstrip(".") or "file")
         if not ext:
             return None, bad_ext
         size = p.stat().st_size
@@ -195,9 +215,10 @@ def _check(raw: str, roots: list[str], exts: dict, max_bytes: int, bad_ext: str,
                 break
         if not inside:
             return None, "outside the project folders"
-        with open(p, "rb") as fh:
-            if size < 16 or not _magic_ok(fh.read(16), ext):
-                return None, bad_magic
+        if exts is not None:
+            with open(p, "rb") as fh:
+                if size < 16 or not _magic_ok(fh.read(16), ext):
+                    return None, bad_magic
         return p, ext
     except (OSError, ValueError, RuntimeError):
         return None, "unreadable"
@@ -360,6 +381,8 @@ class AgentRun:
         now = time.time() if now is None else now
         main = self.main() or self.start_main("Claude Code", "claude", now=now)
         t, st = ev.get("type"), ev.get("subtype")
+        if t in ("assistant", "user"):
+            step_log_claude(self, ev, now)  # planner / hand-off runs keep no transcript: their own step log
         if t == "system" and st == "init":
             self._reopen(main)
             main["model"] = ev.get("model") or main["model"]
@@ -617,6 +640,7 @@ class AgentRun:
         now = time.time() if now is None else now
         main = self.main() or self.start_main("Astra", "astra", now=now)
         t = ev.get("type", "")
+        step_log_codex(self, ev, now)  # planner / hand-off runs keep no transcript: their own step log
         if t == "thread.started":
             main["thread_id"] = ev.get("thread_id")
             main["step"] = "Started"
@@ -800,6 +824,28 @@ def merged_summary(rows: list[dict], base: dict | None = None) -> dict:
     return {**(base or {}), **run.summary()}
 
 
+def _pid_alive(pid) -> bool:
+    if not isinstance(pid, int) or pid <= 1:
+        return False
+    try:
+        os.kill(pid, 0)
+    except ProcessLookupError:
+        return False
+    except OSError:
+        return True  # exists, not ours to signal
+    return True
+
+
+def _worker_gone(rid: str, rows: list[dict]) -> bool:
+    """A request still marked executing whose recorded worker process no longer exists and has no agent
+    running: it was killed (restart, reboot, a Stop the hub never reported). Without a recorded pid we
+    can't tell, so it stays as recorded."""
+    pid = (read_json(REQUESTS_DIR / rid / "live.json", {}) or {}).get("pid")
+    if not isinstance(pid, int) or _pid_alive(pid):
+        return False
+    return not any(a.get("status") in ("running", "waiting") for a in rows)
+
+
 def session_view(session_id: str) -> dict:
     """Everything the agents panel shows for one session: requests (oldest first) with their agents."""
     idx = read_json(AGENTS_INDEX_DIR / f"{_safe(session_id)}.json", None) or {"requests": {}}
@@ -809,9 +855,14 @@ def session_view(session_id: str) -> dict:
         row = dict(idx["requests"][rid])
         row["status"] = req.get("status", row.get("status"))
         row["agents_list"] = merged_agents(rid)
+        if row["status"] in ("executing", "planning") and _worker_gone(rid, row["agents_list"]):
+            row["status"] = "stopped"  # display only: its worker exited without the request being closed
         if any(a.get("kind") in ("delegate", "background") or a.get("status") == "stopped" for a in row["agents_list"]):
             row.update(merged_summary(row["agents_list"]))
         row["waiting"] = any(a.get("status") == "waiting" for a in row["agents_list"])
+        if row["status"] in ("awaiting_answer", "awaiting_answers") and isinstance(req.get("question"), dict):
+            # the open question itself, so a view whose transcript never got the card can still ask it
+            row["question"] = {**req["question"], "request_id": rid}
         out.append(row)
     return {"session_id": session_id, "requests": out}
 
@@ -824,3 +875,849 @@ def load_events(path: Path) -> list[dict]:
         except json.JSONDecodeError:
             pass
     return out
+
+
+# =========================================================================================
+# Agent detail: the Agents sheet's click-through view (GET /agent/detail, /agent/part in the sidecar).
+# Everything one agent did, as one list of steps: the brief it got, its words, its reasoning when the
+# provider records it, every tool call (short label + input + output), errors, the sub-agents and
+# hand-offs it started (linked by id), files it changed, its final output. Read-only.
+# Sources, best first:
+#   Claude main worker  -> its Claude Code transcript (~/.claude/projects/<cwd>/<session>.jsonl), only the
+#                          lines inside the agent's own time window (a chat resumes one session)
+#   Claude sub-agent    -> <session>/subagents/agent-*.jsonl whose meta.json names the row's tool_use id
+#   Codex worker / sub  -> its rollout ~/.codex/sessions/YYYY/MM/DD/rollout-*-<thread id>.jsonl
+#   planner, hand-off   -> run ephemeral (no transcript): <request>/steps/<agent>.jsonl, written live by
+#                          AgentRun (step_log), plus what the request keeps (planning transcript, brief,
+#                          delegates/<id>/prompt.md + result.md)
+#   anything else       -> the request's narration (short lines only)
+# Every string is scrubbed (known secret values + secret patterns, hmem.trace.clean) and cut; outputs of
+# commands that dump the environment or read credential files are withheld entirely.
+# =========================================================================================
+
+CLAUDE_PROJECTS = Path(os.environ.get("HMEM_CLAUDE_PROJECTS", Path.home() / ".claude" / "projects")).expanduser()
+CODEX_SESSIONS = Path(os.environ.get("CODEX_HOME", Path.home() / ".codex")).expanduser() / "sessions"
+DETAIL_PAGE = 150          # steps per page
+DETAIL_PREVIEW = 320       # chars of a tool step's input / output in the list
+DETAIL_TEXT = 700          # chars of a text / thinking step in the list
+DETAIL_FULL = 60_000       # chars of one field on "Show more" (well under the proxy's 512 KB cap)
+STEP_LOG_MAX = 3000        # records per agent in <request>/steps/<agent>.jsonl
+STEP_LOG_CHARS = 20_000    # chars per field in a step-log record
+_DETAIL_MAX_LINE = 2_000_000  # transcript lines longer than this are images / blobs: skipped
+_EDIT_TOOLS = ("Edit", "Write", "MultiEdit", "NotebookEdit")
+_WITHHELD = "[withheld: this step may show credentials or environment variables]"
+_ENV_DUMP_RX = re.compile(
+    r"(?i)(^|[;&|(]\s*|\n\s*)(env|printenv|set|export -p|security\s+find-[a-z-]*password|gh auth token|op read|"
+    r"aws configure export-credentials|gcloud auth print-|vercel env pull|supabase status|heroku config|"
+    r"docker inspect|cat\s+[^|;&\n]*(\.env\b|credentials|auth\.json|id_rsa|\.pem|\.netrc|token))(\s|$|;|\|)")
+_CRED_PATH_RX = re.compile(r"(?i)(/\.env(\.[\w.-]+)?$|/\.ssh/|/Keychains/|/\.aws/|/\.config/gh/|/\.codex/auth|"
+                           r"/\.claude/\.credentials|\.(pem|key|p12|pfx)$|/\.netrc$|/\.npmrc$|/\.pypirc$|credentials)")
+_detail_cache: dict = {}
+_rollout_cache: dict = {}
+
+
+def _hm_clean():
+    try:
+        from hmem import trace
+    except ImportError:
+        root = str(Path(__file__).resolve().parents[2])
+        if root not in sys.path:
+            sys.path.insert(0, root)
+        try:
+            from hmem import trace
+        except ImportError:
+            return None
+    return trace.clean
+
+
+def redact(text, n: int | None = None) -> tuple[str, int]:
+    """(scrubbed text cut to n chars, length before cutting). Secrets are scrubbed before the cut, over a
+    window wider than what is kept, so a secret at the edge can't leak half of itself."""
+    s = text if isinstance(text, str) else json.dumps(text, ensure_ascii=False, default=str, indent=1)
+    full = len(s)
+    if n:
+        s = s[:max(n * 2, n + 4000)]
+    c = _hm_clean()
+    s = c(s) if c else _scrub(s)
+    if n and len(s) > n:
+        s = s[:n]
+    return s, full
+
+
+def _iso_ts(s) -> float | None:
+    if isinstance(s, (int, float)):
+        return float(s)
+    if not isinstance(s, str) or not s:
+        return None
+    try:
+        from datetime import datetime
+        return datetime.fromisoformat(s.replace("Z", "+00:00")).timestamp()
+    except ValueError:
+        return None
+
+
+def _blocks_text(c) -> str:
+    if isinstance(c, str):
+        return c
+    if isinstance(c, list):
+        out = []
+        for x in c:
+            if isinstance(x, str):
+                out.append(x)
+            elif isinstance(x, dict):
+                if x.get("type") in ("image", "input_image", "local_image"):
+                    out.append("[image]")
+                elif isinstance(x.get("text"), str):
+                    out.append(x["text"])
+        return "\n".join(out)
+    if c is None:
+        return ""
+    return json.dumps(c, ensure_ascii=False, default=str)
+
+
+def _sensitive(tool: str, inp) -> bool:
+    """A step whose output may hold secrets: a command that prints env / credentials, a read of a key file."""
+    if isinstance(inp, dict):
+        cmd = inp.get("command") or inp.get("cmd") or ""
+        if isinstance(cmd, list):
+            cmd = " ".join(map(str, cmd))
+        if cmd and _ENV_DUMP_RX.search(str(cmd)):
+            return True
+        for k in ("file_path", "path", "notebook_path"):
+            if isinstance(inp.get(k), str) and _CRED_PATH_RX.search(inp[k]):
+                return True
+        return False
+    return bool(_ENV_DUMP_RX.search(str(inp or "")))
+
+
+def _claude_tool_input(name: str, inp: dict) -> str:
+    if not isinstance(inp, dict):
+        return _blocks_text(inp)
+    if name == "Bash" and inp.get("command"):
+        return str(inp["command"])
+    if name in ("Agent", "Task") and inp.get("prompt"):
+        head = " · ".join(str(inp[k]) for k in ("subagent_type", "description") if inp.get(k))
+        return (head + "\n\n" if head else "") + str(inp["prompt"])
+    if name == "Write" and inp.get("file_path"):
+        return f"{inp['file_path']}\n\n{inp.get('content') or ''}"
+    if name == "Edit" and inp.get("file_path"):
+        return f"{inp['file_path']}\n\n- {inp.get('old_string') or ''}\n+ {inp.get('new_string') or ''}"
+    if name == "Read" and inp.get("file_path"):
+        return str(inp["file_path"]) + (f"  (lines {inp.get('offset')}+)" if inp.get("offset") else "")
+    return json.dumps(inp, ensure_ascii=False, default=str, indent=1)
+
+
+def _files_of(name: str, inp) -> list[str]:
+    if name in _EDIT_TOOLS and isinstance(inp, dict):
+        fp = inp.get("file_path") or inp.get("notebook_path")
+        return [fp] if isinstance(fp, str) else []
+    return []
+
+
+_SYS_PREFIX = ("<system-reminder", "<command-", "<local-command", "Caveat:")
+
+
+def claude_records(ev: dict, t: float | None = None) -> list[dict]:
+    """Step records from one Claude event (a transcript line or a stream-json event: same shape).
+    Records: {t, kind: user|text|thinking|tool|result, ...}; a result fills the tool step with its id."""
+    t = _iso_ts(ev.get("timestamp")) if t is None else t
+    typ, m = ev.get("type"), ev.get("message") or {}
+    out: list[dict] = []
+    if typ == "assistant":
+        for b in m.get("content") or []:
+            if not isinstance(b, dict):
+                continue
+            bt = b.get("type")
+            if bt == "text" and str(b.get("text") or "").strip():
+                out.append({"t": t, "kind": "text", "text": b["text"]})
+            elif bt in ("thinking", "redacted_thinking"):
+                txt = str(b.get("thinking") or "").strip()
+                out.append({"t": t, "kind": "thinking", "text": txt} if txt else {"t": t, "kind": "thinking_hidden"})
+            elif bt == "tool_use":
+                name, inp = str(b.get("name") or "tool"), b.get("input") or {}
+                if name == "SubagentHandback" and isinstance(inp, dict) and inp.get("message"):
+                    out.append({"t": t, "kind": "text", "text": str(inp["message"])})  # a sub-agent's final report
+                    continue
+                rec = {"t": t, "kind": "tool", "id": str(b.get("id") or ""), "tool": name,
+                       "label": _step_of(b) or name, "input": _claude_tool_input(name, inp),
+                       "files": _files_of(name, inp)}
+                if _sensitive(name, inp):
+                    rec["withhold"] = True
+                if name in _SUB_TOOLS:
+                    rec["agent"] = rec["id"]
+                out.append(rec)
+    elif typ == "user":
+        if ev.get("isMeta"):
+            return out
+        c = m.get("content")
+        blocks = c if isinstance(c, list) else [{"type": "text", "text": c}] if isinstance(c, str) else []
+        texts = []
+        for b in blocks:
+            if not isinstance(b, dict):
+                continue
+            if b.get("type") == "tool_result":
+                out.append({"t": t, "kind": "result", "id": str(b.get("tool_use_id") or ""),
+                            "output": _blocks_text(b.get("content")), "ok": not b.get("is_error")})
+            elif b.get("type") == "text" and str(b.get("text") or "").strip():
+                texts.append(b["text"])
+        txt = "\n".join(texts).strip()
+        if txt and not txt.startswith(_SYS_PREFIX):
+            if txt.startswith("<task-notification"):
+                out.append({"t": t, "kind": "event", "text": txt, "label": "Background task reported back"})
+            elif txt.startswith("[Request interrupted"):
+                out.append({"t": t, "kind": "event", "text": txt, "label": "Interrupted"})
+            else:
+                out.append({"t": t, "kind": "user", "text": txt})
+    return out
+
+
+def _cmd_str(cmd) -> str:
+    if isinstance(cmd, list):
+        cmd = cmd[-1] if len(cmd) >= 3 and str(cmd[1]).startswith("-") else " ".join(map(str, cmd))
+    return _codex_cmd(cmd)
+
+
+def codex_item_records(it: dict, t: float | None) -> list[dict]:
+    """Step records from one Codex item: `codex exec --json` items (snake_case types) and rollout
+    item_completed items (CamelCase types) map to the same records."""
+    k = str(it.get("type") or "")
+    kl = re.sub(r"(?<!^)(?=[A-Z])", "_", k).lower()
+    iid = str(it.get("id") or "")
+    if kl in ("agent_message", "assistant_message"):
+        txt = it.get("text") if isinstance(it.get("text"), str) else _blocks_text(it.get("content"))
+        return [{"t": t, "kind": "text", "text": txt}] if str(txt or "").strip() else []
+    if kl == "user_message":
+        txt = _blocks_text(it.get("content"))
+        return [{"t": t, "kind": "user", "text": txt}] if txt.strip() else []
+    if kl == "reasoning":
+        txt = it.get("text") if isinstance(it.get("text"), str) else _blocks_text(it.get("summary_text") or it.get("summary"))
+        return [{"t": t, "kind": "thinking", "text": txt}] if str(txt or "").strip() else [{"t": t, "kind": "thinking_hidden"}]
+    if kl == "command_execution":
+        cmd = _cmd_str(it.get("command"))
+        bad = str(it.get("status") or "").lower() in ("failed", "error", "declined") or it.get("exit_code") not in (None, 0)
+        rec = {"t": t, "kind": "tool", "id": iid, "tool": "Shell", "label": "Ran: " + _short(cmd, 140), "input": cmd,
+               "output": str(it.get("aggregated_output") or it.get("output") or ""), "ok": not bad, "done": True}
+        if it.get("exit_code") not in (None, 0):
+            rec["output"] = f"(exit {it.get('exit_code')})\n" + rec["output"]
+        if _sensitive("Shell", {"command": cmd}):
+            rec["withhold"] = True
+        return [rec]
+    if kl == "file_change":
+        ch = it.get("changes") or []
+        if isinstance(ch, dict):
+            paths = list(ch)
+            body = "\n\n".join(f"{p}\n{(v or {}).get('unified_diff') or ''}" for p, v in ch.items() if isinstance(v, dict))
+        else:
+            paths = [str(c.get("path") or "") for c in ch if isinstance(c, dict) and c.get("path")]
+            body = "\n".join(f"{c.get('kind') or 'update'} {c.get('path')}" for c in ch if isinstance(c, dict))
+        names = [Path(p).name for p in paths]
+        label = "Edited " + (names[0] if len(names) == 1 else f"{len(names)} files")
+        return [{"t": t, "kind": "tool", "id": iid, "tool": "Edit", "label": label, "input": body,
+                 "output": str(it.get("stdout") or ""), "files": paths, "done": True,
+                 "ok": str(it.get("status") or "completed").lower() not in ("failed", "error", "declined")}]
+    if kl == "mcp_tool_call":
+        err = it.get("error")
+        res = it.get("result")
+        out = _blocks_text((res or {}).get("content") if isinstance(res, dict) else res)
+        if err:
+            out = (err.get("message") if isinstance(err, dict) else str(err)) + ("\n" + out if out else "")
+        deleg = it.get("server") == "tabbie" and it.get("tool") == "delegate"
+        return [{"t": t, "kind": "tool", "id": iid, "tool": f"{it.get('server') or 'mcp'}.{it.get('tool') or 'tool'}",
+                 "label": "Handed off to Claude Code" if deleg else f"Used {it.get('tool') or 'a tool'}",
+                 "input": json.dumps(it.get("arguments") or {}, ensure_ascii=False, default=str, indent=1),
+                 "output": out, "done": True, "delegate": deleg or None,
+                 "ok": not err and str(it.get("status") or "completed").lower() not in ("failed", "error")}]
+    if kl in ("web_search", "extension") and (it.get("query") or it.get("kind") == "web.search"):
+        q = str(it.get("query") or "")
+        res = it.get("results") or []
+        out = "\n".join(f"{r.get('title') or ''} {r.get('url') or ''}".strip() for r in res if isinstance(r, dict))
+        return [{"t": t, "kind": "tool", "id": iid, "tool": "WebSearch", "label": "Searched the web for " + _short(q, 100),
+                 "input": q, "output": out, "ok": True, "done": True}]
+    if kl == "todo_list":
+        items = it.get("items") or []
+        txt = "\n".join(("[x] " if x.get("completed") else "[ ] ") + str(x.get("text") or "") for x in items if isinstance(x, dict))
+        return [{"t": t, "kind": "event", "label": "Updated the plan", "text": txt}] if txt else []
+    if kl == "collab_tool_call":
+        tool = str(it.get("tool") or "")
+        if tool.startswith("spawn"):
+            return [{"t": t, "kind": "tool", "id": iid, "tool": "spawn_agent", "label": "Started a sub-agent",
+                     "input": str(it.get("prompt") or ""), "output": "", "ok": True, "done": True,
+                     "agent": (it.get("receiver_thread_ids") or [None])[0]}]
+        return []
+    if kl == "sub_agent_activity":
+        return []
+    if kl == "error":
+        return [{"t": t, "kind": "error", "text": str(it.get("message") or "error")}]
+    return []
+
+
+_EXEC_CMD = re.compile(r"""\b(?:cmd|command)\s*:\s*("(?:[^"\\]|\\.)*")""")
+
+
+def _codex_response_records(p: dict, t: float | None) -> list[dict]:
+    """Older rollouts without item_completed events: the raw response items."""
+    k = p.get("type")
+    if k == "message":
+        role = p.get("role")
+        txt = _blocks_text(p.get("content"))
+        if role == "assistant" and txt.strip():
+            return [{"t": t, "kind": "text", "text": txt}]
+        if role == "user" and txt.strip():
+            return [{"t": t, "kind": "user", "text": txt}]
+        return []
+    if k == "reasoning":
+        txt = _blocks_text(p.get("summary"))
+        return [{"t": t, "kind": "thinking", "text": txt}] if txt.strip() else [{"t": t, "kind": "thinking_hidden"}]
+    if k in ("function_call", "custom_tool_call", "local_shell_call"):
+        raw = p.get("arguments") if k == "function_call" else (p.get("input") or p.get("action"))
+        raw_s = raw if isinstance(raw, str) else json.dumps(raw, ensure_ascii=False, default=str)
+        name = str(p.get("name") or k)
+        cmds = []
+        for m in _EXEC_CMD.finditer(raw_s or ""):
+            try:
+                cmds.append(json.loads(m.group(1)))
+            except ValueError:
+                pass
+        if not cmds:
+            try:
+                a = json.loads(raw_s) if raw_s and raw_s.lstrip().startswith("{") else {}
+                c = a.get("cmd") or a.get("command")
+                if c:
+                    cmds = [_cmd_str(c)]
+            except ValueError:
+                pass
+        label = ("Ran: " + _short(cmds[0], 140) + (f" (+{len(cmds) - 1})" if len(cmds) > 1 else "")) if cmds \
+            else ("Edited files" if name == "apply_patch" else f"Used {name}")
+        rec = {"t": t, "kind": "tool", "id": str(p.get("call_id") or p.get("id") or ""), "tool": name, "label": label,
+               "input": "\n".join(cmds) if cmds and name == "exec_command" else raw_s}
+        if name == "apply_patch":
+            rec["files"] = re.findall(r"^\*\*\* (?:Update|Add) File: (.+)$", raw_s or "", re.M)
+        if _sensitive(name, raw_s):
+            rec["withhold"] = True
+        return [rec]
+    if k in ("function_call_output", "custom_tool_call_output", "local_shell_call_output"):
+        o = p.get("output")
+        if isinstance(o, dict):
+            o = o.get("content") or o.get("output") or json.dumps(o)
+        return [{"t": t, "kind": "result", "id": str(p.get("call_id") or ""), "output": _blocks_text(o), "ok": True}]
+    if k == "web_search_call":
+        q = (p.get("action") or {}).get("query") or ""
+        return [{"t": t, "kind": "tool", "id": str(p.get("id") or ""), "tool": "WebSearch", "done": True, "ok": True,
+                 "label": "Searched the web" + (f" for {_short(q, 100)}" if q else ""), "input": q, "output": ""}]
+    return []
+
+
+def _codex_rollout(thread_id: str) -> Path | None:
+    if not re.match(r"^[0-9A-Za-z-]{8,80}$", str(thread_id or "")):
+        return None
+    hit = _rollout_cache.get(thread_id)
+    if hit and hit.exists():
+        return hit
+    found = sorted(CODEX_SESSIONS.glob(f"*/*/*/rollout-*-{thread_id}.jsonl"))
+    if found:
+        _rollout_cache[thread_id] = found[-1]
+        return found[-1]
+    return None
+
+
+def _skip_codex_user(txt: str) -> bool:
+    s = txt.lstrip()
+    return s.startswith(("<environment_context", "<user_instructions", "# AGENTS.md", "<skills_instructions",
+                         "<permissions", "<turn_aborted"))
+
+
+def _read_records(path: Path, kind: str, t0: float | None, t1: float | None) -> list[dict]:
+    """All step records of one transcript / rollout, cached on (size, mtime, window)."""
+    try:
+        st = path.stat()
+    except OSError:
+        return []
+    key = (str(path), st.st_size, st.st_mtime_ns, kind, t0, t1)
+    hit = _detail_cache.get(key)
+    if hit is not None:
+        return hit
+    recs: list[dict] = []
+    alt: list[dict] = []   # codex: raw response items, used when the rollout has no item_completed events
+    try:
+        fh = open(path, "rb")
+    except OSError:
+        return []
+    with fh:
+        for raw in fh:
+            if len(raw) > _DETAIL_MAX_LINE:
+                continue
+            try:
+                e = json.loads(raw)
+            except (ValueError, UnicodeDecodeError):
+                continue
+            if not isinstance(e, dict):
+                continue
+            t = _iso_ts(e.get("timestamp"))
+            if t is not None and ((t0 and t < t0 - 3) or (t1 and t > t1 + 3)):
+                continue
+            if kind == "claude":
+                if e.get("type") in ("user", "assistant"):
+                    recs += claude_records(e, t)
+            else:
+                p = e.get("payload") or {}
+                if e.get("type") == "event_msg" and p.get("type") == "item_completed":
+                    recs += codex_item_records(p.get("item") or {}, t)
+                elif e.get("type") == "response_item":
+                    alt += _codex_response_records(p, t)
+                elif e.get("type") == "event_msg" and p.get("type") in ("error", "stream_error") and p.get("message"):
+                    recs.append({"t": t, "kind": "error", "text": str(p["message"])})
+    if kind == "codex":
+        if not any(r["kind"] in ("tool", "text") for r in recs):
+            recs = [r for r in recs if r["kind"] == "error"] + alt
+        recs = [r for r in recs if not (r["kind"] == "user" and _skip_codex_user(r.get("text") or ""))]
+    if len(_detail_cache) > 24:
+        _detail_cache.clear()
+    _detail_cache[key] = recs
+    return recs
+
+
+def assemble_steps(recs: list[dict]) -> list[dict]:
+    """Records -> steps: a tool result fills its tool step; the first user message is the prompt."""
+    steps: list[dict] = []
+    by_id: dict[str, dict] = {}
+    for r in recs:
+        if r.get("kind") == "result":
+            s = by_id.get(r.get("id") or "")
+            if s is not None:
+                s["output"], s["ok"], s["done"] = r.get("output") or "", r.get("ok", True), True
+                if r.get("t"):
+                    s["ended"] = r["t"]
+            continue
+        s = dict(r)
+        if s.get("kind") == "user" and all(x["kind"] in ("thinking", "thinking_hidden") for x in steps):
+            s["kind"] = "prompt"
+        if s.get("kind") == "tool" and s.get("id"):
+            prev = by_id.get(s["id"])
+            if prev is not None:      # a step-log "started" record followed by its "completed" record
+                prev.update({k: v for k, v in s.items() if v not in (None, "", [])})
+                continue
+            by_id[s["id"]] = s
+        steps.append(s)
+    return steps
+
+
+# -- step log (agents with no saved transcript: planner, hand-offs) --------------------------
+def _step_log_path(base: Path | None, rid: str, agent_id: str) -> Path:
+    return (base or REQUESTS_DIR) / rid / "steps" / f"{_safe(agent_id)}.jsonl"
+
+
+def _cut_rec(r: dict) -> dict:
+    out = {}
+    for k, v in r.items():
+        if isinstance(v, str) and len(v) > STEP_LOG_CHARS:
+            v = v[:STEP_LOG_CHARS] + f"\n…[cut: {len(v) - STEP_LOG_CHARS} more chars]"
+        out[k] = v
+    if out.get("withhold") and "output" in out:
+        out["output"] = _WITHHELD
+    for k in ("input", "output", "text"):
+        if isinstance(out.get(k), str):
+            out[k] = _scrub(out[k])
+    return out
+
+
+def write_step_log(run: "AgentRun", agent_id: str, recs: list[dict]) -> None:
+    """Append records to <request>/steps/<agent>.jsonl (capped). Never raises: a log must not break a run."""
+    if not recs:
+        return
+    try:
+        n = run.__dict__.setdefault("_steplog_n", {})
+        if n.get(agent_id, 0) >= STEP_LOG_MAX:
+            return
+        p = _step_log_path(run.base, run.request_id, agent_id)
+        p.parent.mkdir(parents=True, exist_ok=True)
+        with open(p, "a", encoding="utf-8") as f:
+            for r in recs:
+                if r.get("kind") == "thinking_hidden":
+                    continue
+                f.write(json.dumps(_cut_rec(r), ensure_ascii=False, default=str) + "\n")
+                n[agent_id] = n.get(agent_id, 0) + 1
+    except Exception:  # noqa: BLE001
+        pass
+
+
+def _no_transcript(a: dict | None) -> bool:
+    """Runs that keep no transcript of their own: the planner (codex --ephemeral) and hand-offs."""
+    return bool(a) and (a.get("kind") == "delegate" or a.get("description") == "planner")
+
+
+def step_log_claude(run: "AgentRun", ev: dict, now: float) -> None:
+    main = run.main()
+    if not _no_transcript(main) or ev.get("type") not in ("assistant", "user"):
+        return
+    aid = ev.get("parent_tool_use_id") or main["id"]
+    write_step_log(run, aid, claude_records(ev, now))
+
+
+def step_log_codex(run: "AgentRun", ev: dict, now: float) -> None:
+    main = run.main()
+    if not _no_transcript(main):
+        return
+    if ev.get("type") == "item.completed":
+        write_step_log(run, main["id"], codex_item_records(ev.get("item") or {}, now))
+    elif ev.get("type") in ("turn.failed", "error"):
+        err = ev.get("error")
+        msg = err.get("message") if isinstance(err, dict) else ev.get("message")
+        write_step_log(run, main["id"], [{"t": now, "kind": "error", "text": str(msg or "failed")}])
+
+
+def _read_step_log(p: Path) -> list[dict]:
+    try:
+        return [r for r in load_events(p) if isinstance(r, dict)]
+    except OSError:
+        return []
+
+
+# -- finding an agent's transcript ---------------------------------------------------------
+def _munge(cwd: str) -> str:
+    return re.sub(r"[^A-Za-z0-9]", "-", cwd)
+
+
+def _claude_main_transcript(rid: str, req: dict, a: dict, base: Path | None) -> Path | None:
+    """The Claude Code transcript a main worker wrote: the request's recorded session, else (a run that
+    started a fresh session, e.g. before a question was answered) the newest transcript in the project's
+    folder that names this request and was written during the agent's run."""
+    d = (base or REQUESTS_DIR) / rid
+    ex = req.get("executor") or {}
+    cwd = req.get("project") or str((d / "work").resolve())
+    folder = CLAUDE_PROJECTS / _munge(cwd)
+    sess = str(ex.get("session_id") or "")
+    t0 = a.get("started") or 0
+    t1 = a.get("ended")
+    cands = []
+    if re.match(r"^[0-9A-Za-z-]{8,80}$", sess) and (folder / f"{sess}.jsonl").exists():
+        cands.append(folder / f"{sess}.jsonl")
+    try:
+        more = [p for p in folder.glob("*.jsonl") if p not in cands and p.stat().st_mtime >= t0 - 5]
+    except OSError:
+        more = []
+    more.sort(key=lambda p: p.stat().st_mtime)
+    marker = f"COMMAND CENTRE REQUEST {rid}".encode()
+    for p in cands + more[:12]:
+        if p in cands:
+            if any(True for r in _read_records(p, "claude", t0, t1) if r["kind"] != "result"):
+                return p
+            continue
+        try:
+            with open(p, "rb") as fh:
+                head = fh.read(400_000)
+        except OSError:
+            continue
+        if marker in head:
+            return p
+    return cands[0] if cands else None
+
+
+def _claude_sub_transcript(main_path: Path | None, tool_use_id: str) -> Path | None:
+    if not main_path:
+        return None
+    d = main_path.with_suffix("") / "subagents"
+    if not d.is_dir():
+        return None
+    for meta in d.glob("*.meta.json"):
+        m = read_json(meta, {}) or {}
+        if m.get("toolUseId") == tool_use_id:
+            p = meta.with_name(meta.name[: -len(".meta.json")] + ".jsonl")
+            return p if p.exists() else None
+    return None
+
+
+def _main_of(a: dict, rows: list[dict]) -> dict | None:
+    seen = set()
+    while a and a.get("parent") and a["id"] not in seen:
+        seen.add(a["id"])
+        if a.get("kind") == "delegate":
+            return a
+        a = next((x for x in rows if x["id"] == a["parent"]), None)
+    return a
+
+
+def _planner_records(req: dict, rid: str, base: Path | None) -> tuple[list[dict], str]:
+    """What the request keeps of a planner run: its questions / proposals and the user's replies."""
+    recs: list[dict] = []
+    final = ""
+    for t in req.get("planning_transcript") or []:
+        if t.get("role") == "planner":
+            try:
+                data = json.loads(t.get("content") or "{}")
+            except (ValueError, TypeError):
+                data = {"summary": str(t.get("content") or "")}
+            kind = data.get("kind")
+            if kind == "questions":
+                qs = data.get("questions") or []
+                body = "\n\n".join(str(q.get("question") or q.get("header") or q) if isinstance(q, dict) else str(q) for q in qs)
+                recs.append({"kind": "event", "label": f"Asked you {len(qs)} question{'s' if len(qs) != 1 else ''}",
+                             "text": (str(data.get("summary") or "") + "\n\n" + body).strip()})
+            else:
+                body = str(data.get("proposal_markdown") or data.get("brief") or data.get("summary") or "")
+                recs.append({"kind": "text", "text": (str(data.get("summary") or "") + "\n\n" + body).strip()})
+                final = body or final
+        elif t.get("role") == "user":
+            recs.append({"kind": "user", "text": str(t.get("content") or "")})
+    return recs, final
+
+
+def _fallback_records(rid: str, aid: str, base: Path | None) -> list[dict]:
+    data = read_json((base or REQUESTS_DIR) / rid / "agents.json", {}) or {}
+    recs = []
+    for n in data.get("narration") or []:
+        if n.get("agent") != aid:
+            continue
+        if n.get("kind") == "op":
+            recs.append({"t": n.get("at"), "kind": "tool", "id": n.get("id") or "", "tool": n.get("tool") or "tool",
+                         "label": n.get("done") or n.get("text"), "input": "", "output": "",
+                         "ok": n.get("status") != "failed", "done": n.get("status") != "running"})
+        else:
+            recs.append({"t": n.get("at"), "kind": "text", "text": n.get("text") or ""})
+    return recs
+
+
+def _read_text(p: Path, n: int = 400_000) -> str:
+    try:
+        with open(p, "r", encoding="utf-8", errors="replace") as fh:
+            return fh.read(n)
+    except OSError:
+        return ""
+
+
+def _agent_source(rid: str, a: dict, rows: list[dict], req: dict, base: Path | None) -> dict:
+    """{recs, source, prompt, output, note} for one agent row."""
+    d = (base or REQUESTS_DIR) / rid
+    aid = a["id"]
+    out = {"recs": [], "source": "none", "prompt": None, "output": None, "note": None}
+    log = _step_log_path(base, rid, aid)
+    if a.get("kind") == "delegate":
+        ddir = d / "delegates" / aid.removeprefix("delegate-")
+        out["prompt"] = _read_text(ddir / "prompt.md") or None
+        out["output"] = _read_text(ddir / "result.md") or _read_text(ddir / "last.txt") or None
+        out["recs"] = _read_step_log(log)
+        out["source"] = "step-log" if out["recs"] else "hand-off files"
+        if not out["recs"]:
+            out["note"] = "Hand-offs run without a saved transcript. Steps are recorded for hand-offs started from now on."
+        return out
+    if a.get("description") == "planner":
+        recs, final = _planner_records(req, rid, base)
+        log_recs = _read_step_log(log)
+        out["recs"] = log_recs + recs
+        out["prompt"] = str(req.get("effective_text") or req.get("original_prompt") or "") or None
+        out["output"] = str(req.get("brief") or "") or final or None
+        out["source"] = "step-log" if log_recs else "planning transcript"
+        if not log_recs:
+            out["note"] = "The planner runs without a saved transcript, so only its questions and plans are shown. Its tool calls are recorded for plans made from now on."
+        return out
+    if a.get("kind") == "background":
+        parent = next((x for x in rows if x["id"] == a.get("parent")), None)
+        src = _agent_source(rid, parent, rows, req, base) if parent else out
+        step = [s for s in assemble_steps(src["recs"]) if s.get("id") == aid]
+        out.update(recs=step, source=src["source"])
+        return out
+    is_codex = str(a.get("provider") or "").startswith(("astra", "codex"))
+    if is_codex:
+        tid = a.get("thread_id") or (aid if a.get("parent") else None)
+        p = _codex_rollout(tid) if tid else None
+        if p:
+            t0 = a.get("started") if a.get("parent") is None else None
+            t1 = a.get("ended") if a.get("parent") is None else None
+            out["recs"], out["source"] = _read_records(p, "codex", t0, t1), "codex rollout"
+            return out
+    else:
+        top = _main_of(a, rows)
+        if top is not None and top.get("kind") == "delegate":
+            out["recs"] = _read_step_log(log)
+            out["source"] = "step-log" if out["recs"] else "none"
+            if not out["recs"]:
+                out["note"] = "This hand-off's sub-agent ran without a saved transcript."
+            return out
+        if top is not None and top.get("parent") is None:
+            mp = _claude_main_transcript(rid, req, top, base)
+            if a is top and mp:
+                out["recs"], out["source"] = _read_records(mp, "claude", a.get("started"), a.get("ended")), "claude transcript"
+                return out
+            sp = _claude_sub_transcript(mp, aid)
+            if sp:
+                out["recs"], out["source"] = _read_records(sp, "claude", None, None), "claude sub-agent transcript"
+                call = [s for s in assemble_steps(_read_records(mp, "claude", None, None)) if s.get("id") == aid]
+                if call and call[0].get("done") and call[0].get("output") \
+                        and not str(call[0]["output"]).startswith("Async agent launched"):
+                    out["output"], out["soft_output"] = call[0]["output"], True  # what it handed back
+                return out
+            if mp:  # no transcript of its own: the call that started it (brief + what it returned)
+                call = [s for s in assemble_steps(_read_records(mp, "claude", None, None)) if s.get("id") == aid]
+                if call:
+                    out["prompt"], out["output"] = call[0].get("input"), call[0].get("output")
+                    out["source"], out["note"] = "parent transcript", "Only the brief and the result were saved for this sub-agent."
+                    return out
+    out["recs"] = _fallback_records(rid, aid, base)
+    out["source"] = "narration" if out["recs"] else "none"
+    out["note"] = "No transcript was found for this agent; showing the short progress lines it reported." if out["recs"] \
+        else "No transcript was found for this agent."
+    return out
+
+
+def _preview(text, n: int) -> dict | None:
+    if text is None or text == "":
+        return None
+    s, full = redact(text, n)
+    return {"text": s, "len": full, "more": full > len(s)}
+
+
+def _public_step(i: int, s: dict) -> dict:
+    k = s.get("kind")
+    out = {"i": i, "kind": k, "t": s.get("t")}
+    if k == "tool":
+        label = s.get("label") or s.get("tool") or ""
+        out.update(tool=s.get("tool"), label=redact(past_tense(label) if s.get("done") else label, 200)[0],
+                   ok=s.get("ok"), done=bool(s.get("done")), ended=s.get("ended"))
+        out["in"] = _preview(s.get("input"), DETAIL_PREVIEW)
+        out["out"] = {"text": _WITHHELD, "len": len(_WITHHELD), "more": False} if s.get("withhold") and s.get("output") \
+            else _preview(s.get("output"), DETAIL_PREVIEW)
+        for key in ("agent", "files", "delegate"):
+            if s.get(key):
+                out[key] = s[key]
+    else:
+        out["label"] = s.get("label")
+        out["text"] = _preview(s.get("text"), DETAIL_TEXT)
+    return out
+
+
+def _link_children(steps: list[dict], a: dict, rows: list[dict]) -> None:
+    """Point each tool step that started an agent at that agent's row (sub-agents by tool_use id;
+    hand-offs by order: the n-th delegate call made the n-th hand-off row of this agent)."""
+    ids = {r["id"] for r in rows}
+    for s in steps:
+        if s.get("agent") and s["agent"] not in ids:
+            s.pop("agent", None)
+        if s.get("kind") == "tool" and s.get("id") in ids and not s.get("agent"):
+            s["agent"] = s["id"]   # e.g. a background command that has a row of its own
+    hand = sorted((r for r in rows if r.get("kind") == "delegate" and r.get("parent") == a["id"]),
+                  key=lambda r: r.get("started") or 0)
+    calls = [s for s in steps if s.get("kind") == "tool"
+             and (s.get("delegate") or re.search(r"(^|__|\.)delegate$", str(s.get("tool") or "")))]
+    for s, r in zip(calls, hand):
+        s["agent"] = r["id"]
+
+
+def _row_public(a: dict) -> dict:
+    keep = ("id", "parent", "name", "description", "provider", "model", "status", "step", "started", "ended",
+            "duration_s", "tokens", "output_tokens", "tool_uses", "kind", "to", "turns", "async")
+    return {k: (redact(a[k], 300)[0] if k in ("step", "name") and isinstance(a.get(k), str) else a.get(k))
+            for k in keep if k in a}
+
+
+def agent_steps(rid: str, agent_id: str, base: Path | None = None):
+    """(row, steps, source info, rows) for one agent, or None when the request / agent doesn't exist."""
+    rows = merged_agents(rid, base)
+    a = next((x for x in rows if x.get("id") == agent_id), None)
+    if a is None:
+        return None
+    req = read_json((base or REQUESTS_DIR) / rid / "request.json", {}) or {}
+    src = _agent_source(rid, a, rows, req, base)
+    steps = [s for s in assemble_steps(src["recs"]) if s.get("kind") != "thinking_hidden"]
+    hidden = sum(1 for r in src["recs"] if r.get("kind") == "thinking_hidden")
+    if src["prompt"] is None and steps and steps[0].get("kind") == "prompt":
+        src["prompt"] = steps.pop(0).get("text")
+    else:
+        steps = [s for s in steps if s.get("kind") != "prompt"] if src["prompt"] is not None else steps
+    if (src["output"] is None or src.get("soft_output")) and a.get("status") != "running":
+        last = next((s for s in reversed(steps) if s.get("kind") in ("text", "tool")), None)
+        if last is not None and last.get("kind") == "text":
+            src["output"] = steps.pop(len(steps) - 1 - steps[::-1].index(last)).get("text")
+    _link_children(steps, a, rows)
+    src["hidden_thinking"] = hidden
+    return a, steps, src, rows
+
+
+def agent_detail(rid: str, agent_id: str, offset: int = 0, limit: int = DETAIL_PAGE, base: Path | None = None) -> dict | None:
+    got = agent_steps(rid, agent_id, base)
+    if got is None:
+        return None
+    a, steps, src, rows = got
+    offset = max(0, int(offset or 0))
+    limit = max(1, min(int(limit or DETAIL_PAGE), 400))
+    files: list[str] = []
+    for s in steps:
+        for f in s.get("files") or []:
+            if f not in files:
+                files.append(f)
+    counts = {"tools": sum(1 for s in steps if s.get("kind") == "tool"),
+              "failed": sum(1 for s in steps if s.get("kind") == "tool" and s.get("ok") is False),
+              "texts": sum(1 for s in steps if s.get("kind") == "text"),
+              "thinking": sum(1 for s in steps if s.get("kind") == "thinking"),
+              "thinking_hidden": src["hidden_thinking"]}
+    parent = next((x for x in rows if x["id"] == a.get("parent")), None)
+    children = [{"id": r["id"], "name": redact(r.get("name") or "", 160)[0], "kind": r.get("kind"),
+                 "status": r.get("status"), "description": r.get("description")}
+                for r in rows if r.get("parent") == a["id"]]
+    return {"rid": rid, "agent": _row_public(a), "source": src["source"], "note": src["note"],
+            "parent": {"id": parent["id"], "name": parent.get("name")} if parent else None,
+            "prompt": _preview(src["prompt"], 1200), "output": _preview(src["output"], 2400),
+            "files": [redact(f, 400)[0] for f in files[:100]], "files_total": len(files),
+            "children": children, "counts": counts, "total": len(steps), "offset": offset,
+            "steps": [_public_step(i, s) for i, s in enumerate(steps[offset:offset + limit], start=offset)],
+            "running": a.get("status") == "running"}
+
+
+def agent_part(rid: str, agent_id: str, part: str, i: int = -1, base: Path | None = None) -> dict | None:
+    """One field in full (up to DETAIL_FULL chars, scrubbed): part prompt | output | in | out | text."""
+    got = agent_steps(rid, agent_id, base)
+    if got is None:
+        return None
+    a, steps, src, _rows = got
+    if part in ("prompt", "output"):
+        raw = src.get(part)
+    else:
+        if not 0 <= i < len(steps):
+            return None
+        s = steps[i]
+        if part == "out" and s.get("withhold"):
+            raw = _WITHHELD
+        else:
+            raw = s.get({"in": "input", "out": "output", "text": "text"}.get(part, ""))
+    if raw is None:
+        return None
+    txt, full = redact(raw, DETAIL_FULL)
+    return {"rid": rid, "agent": agent_id, "part": part, "i": i, "text": txt, "len": full, "truncated": full > len(txt)}
+
+
+def request_detail(rid: str, base: Path | None = None) -> dict | None:
+    """The request itself (the sheet's request header): what was asked, how it was routed, who ran it,
+    the brief, the result, and its agents (ids for drilling in)."""
+    d = (base or REQUESTS_DIR) / rid
+    req = read_json(d / "request.json", None)
+    if not isinstance(req, dict):
+        return None
+    ex = req.get("executor") or {}
+    res = req.get("result") or {}
+    result = res.get("result") if isinstance(res, dict) else res
+    error = res.get("error") if isinstance(res, dict) and not res.get("ok") else None
+    rows = merged_agents(rid, base)
+    return {"rid": rid, "status": req.get("status"), "created": req.get("created"), "updated": req.get("updated"),
+            "route": req.get("route"), "route_reason": req.get("route_reason"),
+            "project": req.get("project"), "project_source": req.get("project_source"),
+            "planner": req.get("planner"),
+            "executor": {k: ex.get(k) for k in ("provider", "model", "effort", "profile", "resumed", "billing")} if ex else None,
+            "usage": ex.get("usage") if isinstance(ex.get("usage"), dict) else None,
+            "prompt": _preview(req.get("effective_text") or req.get("original_prompt"), 1500),
+            "brief": _preview(req.get("brief"), 1500),
+            "result": _preview(result if isinstance(result, str) else None, 2400),
+            "error": _preview(error if isinstance(error, str) else None, 600),
+            "modifications": [redact(m, 400)[0] for m in (req.get("modifications") or [])[-5:]],
+            "agents": [_row_public(a) for a in rows]}
+
+
+def request_part(rid: str, part: str, base: Path | None = None) -> dict | None:
+    req = read_json((base or REQUESTS_DIR) / rid / "request.json", None)
+    if not isinstance(req, dict):
+        return None
+    res = req.get("result") or {}
+    raw = {"prompt": req.get("effective_text") or req.get("original_prompt"), "brief": req.get("brief"),
+           "result": res.get("result") if isinstance(res, dict) else res,
+           "error": res.get("error") if isinstance(res, dict) and not res.get("ok") else None}.get(part)
+    if not isinstance(raw, str):
+        return None
+    txt, full = redact(raw, DETAIL_FULL)
+    return {"rid": rid, "part": part, "text": txt, "len": full, "truncated": full > len(txt)}

@@ -14,7 +14,7 @@ import re
 from pathlib import Path
 
 from . import doc as D
-from . import dreamer, projects, proposals, retrieve, security, store, trace as T
+from . import dreamer, projects, proposals, repo_suggest, retrieve, security, store, trace as T
 from .paths import is_link
 
 MAX_BODY = 64_000
@@ -180,24 +180,10 @@ def fs_check(raw: str | None) -> dict:
             "project": (projects.get(owner) or {}).get("name") if owner else None}
 
 
-def fs_repos() -> dict:
-    """Git repos under the usual places that no project has claimed yet (suggestions for the picker)."""
-    base = projects.allowed_root()
-    taken = {f["path"] for pj in projects.all_projects() for f in pj.get("folders", [])}
-    out = []
-    for root in (base, base / "Developer", base / "Projects", base / "code"):
-        if not root.is_dir():
-            continue
-        try:
-            for c in root.iterdir():
-                if c.name.startswith(".") or c.name in _NO_BROWSE or not (c / ".git").exists():
-                    continue
-                real = c.resolve()
-                if str(real) not in taken and projects._forbidden(real) is None:
-                    out.append({"name": c.name, "path": str(real), "display": projects.tilde(str(real))})
-        except PermissionError:
-            continue
-    return {"repos": sorted(out, key=lambda r: r["name"].lower())[:200]}
+def fs_repos(q: str | None = None) -> dict:
+    """Unclaimed git repos to suggest in the picker / New project sheet: most recently active first, or
+    ranked against q (the project name being typed). See hmem/repo_suggest.py."""
+    return repo_suggest.suggest(str(q or ""))
 
 
 def repo_file(p: dict, folder_id: str, rel: str) -> dict:
@@ -331,7 +317,7 @@ def _get(path: str, q: dict) -> dict:
     if path == "/fs/check":
         return fs_check(q.get("path"))
     if path == "/fs/repos":
-        return fs_repos()
+        return fs_repos(q.get("q"))
     raise LookupError(path)
 
 

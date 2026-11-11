@@ -10,7 +10,7 @@
 </p>
 
 <p align="center">
-  <img src="docs/images/project-home.png" alt="A project's home: linked folders, sessions, items to review, and New task / Run Dreamer buttons" width="900">
+  <img src="docs/images/home.png" alt="The new-chat home: greeting, the liquid-glass composer, chats waiting on you and recent ones, and the sidebar" width="900">
 </p>
 
 > **Having an AI agent install this?** Tell it: *"Install Tabbie by following the
@@ -102,8 +102,15 @@ Measured with `bin/bench-latency` (two passes of 3 runs each, Opus 5.5):
 sets the hub's effort for those runs only, to compare); results go to `state/bench/`. The hub stays at
 medium: low was faster on routed jobs but no better on plain answers in a small A/B.
 
-Insights has a **Workers** card: Claude Code and Codex tokens per model for the chosen period (in,
-cached share, out), read from each request's recorded usage. The hub's own tokens are in the cards below it.
+**Insights** counts every model token on this Mac: Claude Code and Codex (Tabbie workers and your own
+terminal sessions, from their transcripts) and the hub (from Hermes' state.db), for today, 7, 30 or 90
+days. Cost is API-equivalent: tokens in, out, cache read and cache write × each model's published list
+price (one table, `RATES` in `plugin/command-centre/usage_insights.py`), even though the work runs on
+subscriptions. Tokens per day, weekday and hour, cost by token type, and the period by model, project and chat.
+
+<p align="center">
+  <img src="docs/images/insights.png" alt="Insights: API-equivalent cost for 7 days split across Claude Code, Codex and the hub, token totals, and tokens per day" width="900">
+</p>
 
 ### Second opinion on sensitive changes
 
@@ -141,20 +148,29 @@ hand-off shows as a nested row in the reply's Agents block (e.g. "hand-off from 
 Hand-offs go one level deep; the helper can't hand off again.
 
 <p align="center">
-  <img src="docs/images/handoff.png" alt="A reply's Agents block: Claude Code as the main worker and a nested Codex GPT-6 Astra row, hand-off from Claude Code" width="560">
-  <img src="docs/images/model-picker.png" alt="The model picker's Agents row: Claude, OpenAI and Hand-offs pills, all on" width="280">
+  <img src="docs/images/handoff.png" alt="A reply's Agents block: Claude Code as the main worker, plus a hand-off to Codex GPT-6 Astra with tokens and time for each" width="440">
+  <img src="docs/images/agents-detail.png" alt="The Agents sheet opened on one agent: role, model and tokens, its prompt, sub-agents and hand-offs, timed steps and final output" width="300">
 </p>
 
-On by default. Turn it off with the **Hand-offs** pill in the model picker's Agents row, or
+<p align="center">
+  <img src="docs/images/model-picker.png" alt="The model picker (Anthropic, OpenAI, More models, Agents &amp; behaviour) and its Agents &amp; behaviour page: Claude Code, Codex, Hand-offs, Takeover, Small commits and Test before done" width="740">
+</p>
+
+On by default. Turn it off with the **Hand-offs** switch on the model picker's **Agents & behaviour** page, or
 `dynamic: false` in `config/agents.yaml`. With one agent off, there is nothing to hand off to.
 
 ### Usage limits gate
 
 Before any worker, planner or hand-off starts, Tabbie checks the subscription's usage (cached for
 60 s). At 95% or more the request runs on the other agent's equivalent model instead, and the reply's
-route line says so (Opus 5.5 ↔ GPT-6.1 Sol, Fable 5.1 ↔ GPT-6-Astra, Sonnet 5.5 ↔ GPT-6.1 Terra,
+route line says so (Opus 5.5 ↔ GPT-6.1 Sol, Fable 5.2 ↔ GPT-6-Astra, Sonnet 5.5 ↔ GPT-6.1 Terra,
 Haiku 5.5 ↔ GPT-6 Luna; the same pairs are used for hand-offs and when an agent is switched off). If the
 other agent is also at its limit or not signed in, nothing starts and Tabbie says when each limit resets.
+
+Models are named by family, never pinned to a version: every family (Opus, Fable, Sonnet, Haiku, GPT Astra, Sol,
+Terra, Luna) always runs and shows its newest release. Claude Code's family aliases and Codex's model list are
+checked at most every 12 hours (`plugin/command-centre/model_latest.py`, cached in `state/model-latest.json`); a
+chat or `router.yaml` entry naming an older version moves up automatically.
 
 The same happens mid-task, with no question asked: if Claude hits its limit while working, Codex carries
 on from where it stopped; if a Codex job hits its limit, its Claude equivalent picks up the same task (the
@@ -640,6 +656,10 @@ Every page has its own address, so a refresh (or a bookmark) lands you back on i
 | `/projects` | Projects |
 | `/motion`, `/motion/<id>` | Motion studio |
 | `/tasks`, `/kanban`, `/todos`, `/skills`, `/memory`, `/workspaces`, `/profiles`, `/insights`, `/logs`, `/settings` | That page |
+| `/settings#appearance`, `/settings#preferences`, `/settings#providers` … | That part of Settings |
+
+Reloading a chat shows a skeleton of the chat (its title and message shapes) until the messages arrive,
+never the empty New chat page.
 
 These go through Caddy (`https://hermes.local` or your Tailscale address).
 
@@ -667,10 +687,15 @@ These go through Caddy (`https://hermes.local` or your Tailscale address).
 
 ### Projects
 
+<p align="center">
+  <img src="docs/images/project-home.png" alt="An Acme project's home: stats, New task and Run Dreamer, the tab bar, and its linked repos" width="900">
+</p>
+
 A **Project** groups the folders or repos that make up one product. Nothing becomes a project
 automatically. In the WebUI, open the rail → **Projects** → **New project**:
 
-1. Name it and add folders. Pick from suggested repos, browse, or type a path, and select several at once.
+1. Name it and add folders. Pick from suggested repos (git repos no project has claimed yet, ranked by how
+   well they match the name you're typing), browse, or type a path, and select several at once.
 2. Choose the primary folder; workers start there and get the others as extra directories.
 3. **New task** opens a session that knows the project. Workers get a short context block, never memory dumps.
 
@@ -728,8 +753,9 @@ Design notes: `docs/memory/ARCHITECTURE.md`, `docs/projects/ARCHITECTURE.md`.
     configs) and Tabbie's own `~/.hermes/` state except WebUI uploads; at most 40 files and
     `max_total_mb` (1000) per message.
 - **Agents panel**: each reply shows a live block of the worker and its subagents (status, latest
-  step, tokens, time). The Agents pill opens the whole session; tap a request there to jump to its
-  reply. **Stop** ends a running worker and keeps the work so far. Finished jobs list the files they
+  step, tokens, time). The Agents pill opens the whole session; tap a request or an agent there to drill
+  into it: the prompt it was given, every step it took (paged, live while it runs) and its output, with
+  long fields shown in full on **Show more**. **Stop** ends a running worker and keeps the work so far. Finished jobs list the files they
   changed and a command to resume the session in a terminal.
 - **Live timeline**: while a worker runs, the short lines it writes between steps type into the reply,
   each followed by the step it led to (an icon per kind: command, file, image; green done, red failed),
@@ -756,6 +782,29 @@ Design notes: `docs/memory/ARCHITECTURE.md`, `docs/projects/ARCHITECTURE.md`.
   a phone; **?** opens the keyboard shortcuts; the update banner watches a restart through and can
   be snoozed. Settings › **Having an issue?** opens [Tabbie's issues](https://github.com/aaronyaml/Tabbie/issues).
 
+### Look and settings
+
+- **Liquid glass**: the composer, menus, sheets, file cards, the file viewer and the cards on every page
+  and sub-page (Insights, Settings, Projects and their detail sheets, Motion, Spaces, Profiles …) are
+  frosted glass over a slow-drifting colour glow. The backdrop bends through the edges of a few floating
+  controls in Chrome and Edge; elsewhere it's plain frost. Documents, logs, editors and inputs stay
+  solid. On by default; turn it off in **Settings › Appearance › Liquid glass** (stored per browser).
+- **Font size** (Settings › Appearance) scales the whole sidebar and chat.
+- **Dropdowns** across the app (workspace, project, Settings) share the model picker's look. The
+  composer's workspace menu lists **General** and your projects by name.
+- **Settings › Providers** shows what's actually connected: Claude Code and Codex (plan, signed in or
+  not), the hub's login, services set up on this Mac (from MCP configs and CLIs) and providers linked
+  in the model picker. Names and plan labels only, never a key.
+- **Settings › Preferences › Model** is the model new chats start on, kept in sync with the composer's
+  picker both ways. **Hub model** picks the hub's own model (newest Claude or ChatGPT; Claude uses
+  Claude Code's login, no API key).
+- **Faster loads**: identical requests made at the same time during start-up share one network call,
+  and Settings' version badges are cached instead of running git on every call (patch `0003`).
+
+<p align="center">
+  <img src="docs/images/settings.png" alt="Settings › Preferences with the Model and Hub model rows" width="900">
+</p>
+
 ### Choosing Claude Code, Codex or both
 
 | Setup | Who executes | Who plans big jobs | Usage limit hit |
@@ -764,8 +813,8 @@ Design notes: `docs/memory/ARCHITECTURE.md`, `docs/projects/ARCHITECTURE.md`.
 | **Claude Code only** | Claude Code | Claude Code (`claude-cli` planner) | Tabbie tells you; no takeover |
 | **Codex only** | Codex | Codex | no fallback agent |
 
-Change it any time from the composer's **model picker → Agents** (Claude Code / Codex toggles; at
-least one stays on; **Hand-offs** and **Takeover** sit beside them). It applies on the next request with no restart. It's stored in
+Change it any time from the composer's **model picker → Agents & behaviour** (Claude Code / Codex
+switches; at least one stays on; **Hand-offs**, **Takeover**, **Small commits** and **Test before done** sit below them). It applies on the next request with no restart. It's stored in
 `config/agents.yaml`:
 
 ```yaml
@@ -982,7 +1031,7 @@ Use Claude Code's own permission settings for hard limits.
 | `plugin/workboard/` | Kanban cards and todos shared with the WebUI |
 | `hmem/`, `bin/hmem` | Memory store, tracer, Dreamer, Projects registry, CLI, HTTP API |
 | `webui-extension/` | WebUI extension: Apple-style skin, Projects, agents, questions, limits, workboard, motion studio |
-| `webui-patches/`, `bin/webui-patches` | Small patches Tabbie carries on the upstream WebUI (e.g. lighter chat loads: screenshots left out of the transcript JSON, first page capped at 96 KB). `bin/webui-patches` applies any that are missing (safe to re-run; run it after a fresh install or if `status` shows one missing); upstream's updater keeps them across updates |
+| `webui-patches/`, `bin/webui-patches` | Small patches Tabbie carries on the upstream WebUI (e.g. lighter chat loads: screenshots left out of the transcript JSON, first page capped at 96 KB; Settings' version badges cached). `bin/webui-patches` applies any that are missing (safe to re-run; run it after a fresh install or if `status` shows one missing); upstream's updater keeps them across updates |
 | `brand/` | Icons, mascot animation frames, login skin |
 | `services/` | LaunchAgent templates and the Caddyfile |
 | `templates/motion-studio/` | The Motion studio's starting point (Remotion project, audio analysis, music and edit-map scripts) |

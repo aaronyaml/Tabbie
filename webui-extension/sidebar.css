@@ -1,0 +1,211 @@
+/* Tabbie — ChatGPT-style chat sidebar (sidebar.js). One left edge: every row's box sits 8px in from the
+ * sidebar and its text/icon 10px inside that, the panel title lines up with them, all rows 36px. */
+
+/* upstream controls moved into rows / the Recents ⋯ menu */
+html #sessionList > .project-bar,
+html #sessionList > .hx-in-menu { display: none !important; }
+html #panelChat > .panel-head { display: none !important; }
+/* no icon rail / drawer icon row: the sidebar's own rows and account button replace them */
+html nav.rail, html .sidebar > .sidebar-nav { display: none !important; }
+
+.hx-side-top, .hx-side { display: flex; flex-direction: column; padding: 0 8px; }
+.hx-side-top { padding-top: 2px; }
+.hx-side { padding-bottom: 2px; }
+.hx-side-row {
+  display: flex; align-items: center; gap: 10px; width: 100%; height: 36px; padding: 0 10px; border: 0; border-radius: 10px;
+  background: transparent; color: var(--hx-text, var(--text)); font: 400 14px/1 var(--font-ui, -apple-system, system-ui, sans-serif);
+  text-align: left; cursor: pointer; -webkit-tap-highlight-color: transparent; transition: background-color .15s var(--hx-ease, ease);
+}
+.hx-side-row:hover, .hx-side-row:focus-visible { background: var(--hover-bg, var(--hx-fill)); outline: none; }
+.hx-side-row.is-on { background: var(--hx-fill-2, rgba(127,127,127,.18)); font-weight: 500; }
+.hx-side-row svg { width: 18px; height: 18px; flex: none; color: var(--hx-text-2, var(--muted)); }
+.hx-side-row span { min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.hx-side-row.is-quiet { color: var(--hx-text-2, var(--muted)); }
+.hx-side-h {
+  display: flex; align-items: center; justify-content: space-between; height: 32px; margin-top: 14px; padding: 0 10px;
+  font: 500 12.5px/1 var(--font-ui, system-ui); color: var(--hx-text-2, var(--muted));
+}
+.hx-side-more { height: 26px; min-width: 26px; padding: 0 6px; border: 0; border-radius: 8px; background: transparent;
+  color: var(--hx-text-2, var(--muted)); font: 600 14px/1 var(--font-ui, system-ui); cursor: pointer; }
+.hx-side-more:hover, .hx-side-more.is-on { background: var(--hover-bg, var(--hx-fill)); color: var(--hx-text, var(--text)); }
+
+/* brand row + persistent top rows */
+.hx-side-frame-top { flex: none; padding-top: 8px; }
+.hx-side-brand { display: flex; align-items: center; justify-content: space-between; height: 40px; padding: 0 12px 0 18px; }
+.hx-side-name { font: 600 17px/1 var(--font-ui, -apple-system, system-ui); letter-spacing: -0.01em; color: var(--hx-text, var(--text)); }
+.hx-side-ic { display: inline-grid; place-items: center; width: 32px; height: 32px; border: 0; border-radius: 8px; background: transparent;
+  color: var(--hx-text-2, var(--muted)); cursor: pointer; }
+.hx-side-ic:hover { background: var(--hover-bg, var(--hx-fill)); color: var(--hx-text, var(--text)); }
+.hx-side-frame-top .hx-side-top { padding-top: 4px; padding-bottom: 6px; }
+
+/* account button, bottom left */
+.hx-side-foot { flex: none; margin-top: auto; padding: 8px; border-top: 0.5px solid var(--hx-hair, rgba(127,127,127,.2)); }
+.hx-side-acct { display: flex; align-items: center; gap: 10px; width: 100%; height: 48px; padding: 0 10px; border: 0; border-radius: 10px;
+  background: transparent; color: var(--hx-text, var(--text)); cursor: pointer; text-align: left; font: inherit; }
+.hx-side-acct:hover, .hx-side-acct.is-on { background: var(--hover-bg, var(--hx-fill)); }
+.hx-side-acct > svg { margin-left: auto; width: 18px; height: 18px; color: var(--hx-text-2, var(--muted)); }
+.hx-side-av { display: grid; place-items: center; width: 30px; height: 30px; border-radius: 50%; flex: none;
+  background: linear-gradient(135deg, var(--hx-accent, #3054FD), #B05CFF); color: #fff; font: 600 13px/1 var(--font-ui, system-ui); }
+.hx-side-who { display: grid; gap: 2px; min-width: 0; }
+.hx-side-who b { font: 500 14px/1.1 var(--font-ui, system-ui); }
+.hx-side-who small { font: 400 12px/1.1 var(--font-ui, system-ui); color: var(--hx-text-2, var(--muted)); }
+
+/* search field: hidden until opened from the header (or while it has text) */
+html #panelChat > .session-search:not(.hx-search-open) { display: none !important; }
+
+/* Search: upstream's own input, drawn as a row (same edge, height and icon size as New chat) */
+html #panelChat > .session-search { padding: 0 8px !important; margin: 0 !important; }
+html .session-search-field { height: 36px; padding: 0 10px !important; border-radius: 10px; background: transparent !important;
+  border: 0 !important; box-shadow: none !important; gap: 10px; display: flex; align-items: center; }
+html .session-search-field:hover, html .session-search-field:focus-within { background: var(--hover-bg, var(--hx-fill)) !important; }
+html .session-search-field .sidebar-search-icon { position: static !important; width: 18px !important; height: 18px !important; flex: none; transform: none !important; color: var(--hx-text-2, var(--muted)); }
+html .session-search-field input { padding: 0 !important; height: 36px; background: transparent !important; border: 0 !important;
+  box-shadow: none !important; font-size: 14px !important; color: var(--hx-text, var(--text)); }
+html .session-search-field input::placeholder { color: var(--hx-text, var(--text)); opacity: 1; }
+html .session-search-field input:focus::placeholder { color: var(--hx-text-2, var(--muted)); }
+
+/* Recents: title only. One "Recents" label replaces Today / Yesterday / This week. */
+html #sessionList { padding-top: 0 !important; }
+html #sessionList .session-date-header { display: none !important; }
+html #sessionList .session-item { height: 36px; min-height: 36px; padding: 0 10px !important; display: flex; align-items: center; }
+/* keep the title clear of the unread dot / spinner / actions button on the right */
+html #sessionList .session-item .session-text { min-width: 0; flex: 1; }
+html #sessionList .session-item.unread, html #sessionList .session-item.needs-attention,
+html #sessionList .session-item.streaming, html #sessionList .session-item:hover,
+html #sessionList .session-item.menu-open, html #sessionList .session-item:has(:focus-visible) { padding-right: 34px !important; }
+html #sessionList .session-item .session-title { font-size: 14px; }
+html #sessionList .session-time,
+html #sessionList .session-project-dot { display: none !important; }
+/* the dot that stays: unread / needs attention (upstream clears it when you open the chat) */
+html #sessionList .session-item:not(.unread):not(.needs-attention):not(.streaming) .session-attention-indicator { display: none !important; }
+
+.hx-need-tag { flex: none; margin-left: 6px; padding: 1px 7px; border-radius: 999px; font: 600 10.5px/1.5 var(--font-ui, system-ui);
+  background: var(--hx-accent, #3054FD); color: #fff; }
+
+@media (max-width: 640px) {
+  .hx-side-foot { padding-bottom: calc(8px + env(safe-area-inset-bottom)); }
+  .hx-side-row, html .session-search-field, html #sessionList .session-item { height: 44px; min-height: 44px; }
+  html .session-search-field input { height: 44px; font-size: 16px !important; }
+  .hx-side-row, html #sessionList .session-item .session-title { font-size: 16px; }
+}
+
+/* forks: indented under the chat they came from */
+html #sessionList .session-item.hx-fork { padding-left: calc(10px + 14px * var(--hx-fork-depth, 1)) !important; }
+
+/* Back to chats, above another panel's list */
+.hx-side-back { display: flex; align-items: center; gap: 8px; margin: 6px 8px 0; height: 32px; padding: 0 10px; border: 0; border-radius: 10px;
+  background: transparent; color: var(--hx-text-2, var(--muted)); font: 500 13px/1 var(--font-ui, system-ui); cursor: pointer; flex: none; }
+.hx-side-back:hover { background: var(--hover-bg, var(--hx-fill)); color: var(--hx-text, var(--text)); }
+
+/* New project: upstream's inline name field, in our row */
+.hx-side .project-create-input { height: 36px; margin: 0; padding: 0 10px; border-radius: 10px; border: 0.5px solid var(--hx-hair, rgba(127,127,127,.3));
+  background: var(--hx-fill, transparent); color: var(--hx-text, var(--text)); font: 400 14px/1 var(--font-ui, system-ui); outline: none; }
+.hx-side .project-create-input:focus { border-color: var(--hx-accent, #3054FD); }
+@media (max-width: 640px) { .hx-side .project-create-input { height: 44px; font-size: 16px; } }
+
+/* project filter on: tinted row with a tick, and a banner above the list with one tap back to all chats */
+.hx-proj-row svg:first-child { color: var(--hx-proj, var(--hx-text-2, var(--muted))); }
+.hx-proj-row.is-on { background: color-mix(in srgb, var(--hx-proj, var(--hx-accent, #3054FD)) 22%, transparent); }
+.hx-proj-tick { display: inline-flex; margin-left: auto; color: var(--hx-proj, var(--hx-accent, #3054FD)); font-style: normal; }
+.hx-proj-tick svg { width: 16px !important; height: 16px !important; color: inherit !important; }
+.hx-filter { display: flex; align-items: center; gap: 10px; margin: 2px 0 6px; padding: 8px 8px 8px 12px; border-radius: 12px;
+  background: color-mix(in srgb, var(--hx-proj) 14%, transparent); box-shadow: inset 3px 0 0 var(--hx-proj); }
+.hx-filter-dot { width: 8px; height: 8px; border-radius: 50%; flex: none; background: var(--hx-proj); }
+.hx-filter-txt { display: grid; gap: 2px; min-width: 0; flex: 1; }
+.hx-filter-txt b { font: 600 13.5px/1.15 var(--font-ui, system-ui); color: var(--hx-text, var(--text)); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.hx-filter-txt small { font: 400 12px/1.1 var(--font-ui, system-ui); color: var(--hx-text-2, var(--muted)); }
+.hx-filter-x { display: inline-flex; align-items: center; gap: 4px; flex: none; height: 28px; padding: 0 10px; border: 0; border-radius: 999px;
+  background: var(--hx-fill-2, rgba(127,127,127,.2)); color: var(--hx-text, var(--text)); font: 500 12.5px/1 var(--font-ui, system-ui); cursor: pointer; }
+.hx-filter-x:hover { background: var(--hover-bg, rgba(127,127,127,.3)); }
+.hx-filter-x svg { width: 14px; height: 14px; }
+@media (max-width: 640px) { .hx-filter-x { height: 34px; padding: 0 12px; font-size: 14px; } }
+
+/* Back on Settings, Scheduled… pages: top left of the page, just right of the sidebar toggle */
+main.main { position: relative; }
+main.main > .hx-main-back { position: absolute; top: 9px; left: 52px; z-index: 20; }
+html.hx-side-collapsed main.main > .hx-main-back { left: 56px; }
+
+/* Todos and any other sidebar-only page: a real page in the main area; the sidebar keeps the chats */
+#hxSidePage { display: none; }
+html.hx-side-page main.main > #mainChat { display: none !important; }
+html.hx-side-page main.main > #hxSidePage { display: flex; overflow-y: auto; }
+html.hx-side-page aside.sidebar > #panelChat { display: flex !important; }
+#hxSidePage > .panel-view { display: flex !important; flex: none; width: 100%; max-width: 760px; margin: 0 auto; padding: 56px 24px 32px; box-sizing: border-box; background: transparent !important; }
+#hxSidePage > .panel-view > .panel-head { padding: 0 0 12px !important; font-size: 28px; font-weight: 700; letter-spacing: -0.02em; }
+#hxSidePage #todoPanel { padding: 0 !important; overflow: visible !important; color: var(--hx-text-2, var(--muted)); font-size: 15px; }
+@media (max-width: 640px) { #hxSidePage > .panel-view { padding: calc(64px + env(safe-area-inset-top)) 16px 24px; } }
+
+/* Archived chats: the last row of the list */
+.hx-gpt-side #sessionList > .hx-arch-row, html #sessionList > .hx-arch-row { margin-top: 6px; width: 100%; }
+
+/* chat list loading: placeholder rows + one line saying what's going on */
+.hx-list-loading { display: flex; flex-direction: column; gap: 6px; padding: 6px 18px 10px; }
+.hx-list-loading i { display: block; height: 14px; margin: 5px 0; border-radius: 6px; background: var(--hx-fill-2, rgba(127,127,127,.16));
+  animation: hx-skel 1.4s ease-in-out infinite; }
+.hx-list-loading i:nth-child(2n) { width: 72%; } .hx-list-loading i:nth-child(3n) { width: 86%; } .hx-list-loading i:nth-child(5n) { width: 60%; }
+.hx-list-loading p { margin: 8px 0 0; font: 400 12.5px/1.4 var(--font-ui, system-ui); color: var(--hx-text-2, var(--muted)); }
+@keyframes hx-skel { 50% { opacity: .45; } }
+@media (prefers-reduced-motion: reduce) { .hx-list-loading i { animation: none; } }
+
+/* Recents ⋯ menu: one source to pick (tick), then switches */
+.hx-rec-menu { min-width: 250px; }
+.hx-rec-menu .hx-more-item { justify-content: space-between; }
+.hx-rec-menu .hx-sep { margin-top: 6px; position: relative; }
+.hx-rec-menu .hx-sep::before { content: ''; position: absolute; left: 10px; right: 10px; top: -4px; height: 0.5px; background: var(--hx-hair, rgba(127,127,127,.25)); }
+.hx-tick { display: inline-flex; width: 16px; height: 16px; color: var(--hx-accent, #3054FD); font-style: normal; }
+.hx-tick svg { width: 16px; height: 16px; }
+/* Tabbie switch (used everywhere: Recents menu, Settings › Liquid glass…). Apple-style: the thumb is drawn by
+ * its left and right edges, and the leading edge moves first, so on the way across it stretches into a pill
+ * and settles back into a circle at the far end. Pressing it widens the thumb, like iOS. */
+.hx-switch { --sw-w: 40px; --sw-h: 24px; --sw-pad: 2px; --sw-k: calc(var(--sw-h) - 2 * var(--sw-pad));
+  --sw-far: calc(var(--sw-w) - var(--sw-pad) - var(--sw-k));
+  position: relative; display: inline-block; vertical-align: middle; flex: none; width: var(--sw-w); height: var(--sw-h);
+  border-radius: 999px; background: var(--hx-fill-2, rgba(120,120,128,.32));
+  box-shadow: inset 0 0 0 0.5px rgba(0,0,0,.06);
+  transition: background-color .28s cubic-bezier(.2,.8,.2,1); }
+.hx-switch::after { content: ''; position: absolute; top: var(--sw-pad); bottom: var(--sw-pad);
+  left: var(--sw-pad); right: var(--sw-far); border-radius: 999px; background: #fff;
+  box-shadow: 0 3px 8px rgba(0,0,0,.15), 0 3px 1px rgba(0,0,0,.06), 0 0 0 0.5px rgba(0,0,0,.04);
+  /* turning off: the left edge leads, the right edge follows */
+  transition: left .3s cubic-bezier(.3,1.3,.5,1), right .3s cubic-bezier(.3,1.3,.5,1) .07s; }
+[aria-checked="true"] > .hx-switch { background: var(--hx-accent, #34C759); }
+[aria-checked="true"] > .hx-switch::after { left: var(--sw-far); right: var(--sw-pad);
+  /* turning on: the right edge leads */
+  transition: right .3s cubic-bezier(.3,1.3,.5,1), left .3s cubic-bezier(.3,1.3,.5,1) .07s; }
+:active > .hx-switch::after { right: calc(var(--sw-far) - 6px); }
+[aria-checked="true"]:active > .hx-switch::after { left: calc(var(--sw-far) - 6px); right: var(--sw-pad); }
+@media (prefers-reduced-motion: reduce) { .hx-switch, .hx-switch::after { transition: none !important; } }
+
+/* Account button, bottom left: its lower-left corner is concentric with the window's rounded corner
+ * (window radius minus the 8px gap), so the two curves run parallel instead of fighting. */
+@media (min-width: 641px) {
+  :root { --hx-win-radius: 26px; }
+  .hx-side-acct { border-bottom-left-radius: calc(var(--hx-win-radius) - 8px); }
+}
+/* the account menu opens upward from the account button: grow from its bottom edge */
+html .hx-more-menu.hx-acct-menu.hx-pop:not(.is-sheet) { animation-name: hx-pop-up; transform-origin: bottom left; }
+/* Page titles start after the toggle and the Back button (both float top left), never under them */
+main.main:has(> .hx-main-back) > .main-view .main-view-header { padding-left: 104px !important;
+  /* same height as the floating toggle + Back (top 9px, 36px tall): the title sits on their centre line and
+   * the header's rule runs below them, not through them */
+  box-sizing: border-box; min-height: 54px; padding-top: 9px !important; padding-bottom: 9px !important; align-items: center; }
+/* a page's status line (Logs: "Loading logs…") sits beside its title, so the title keeps the buttons' centre line */
+main.main .main-view-header > div:has(> .main-view-title + .logs-status) { display: flex; align-items: baseline; gap: 12px; min-width: 0; }
+main.main .main-view-header .logs-status { margin: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+
+/* Phones: Back sits in the title bar beside the menu button (sidebar.js), not over the page */
+.app-titlebar > .hx-main-back { position: absolute; left: 56px; bottom: 4px; z-index: 5; }
+@media (max-width: 640px) {
+  main.main:has(> .hx-main-back) > .main-view .main-view-header,
+  main.main > .main-view .main-view-header { padding-left: 16px !important; min-height: 0; }
+}
+
+/* Settings has no header row: its title sits in the content column. When that column is too close to the
+ * left edge for the floating Back button (main area under ~976px wide), the column moves down below Back
+ * instead of the button covering the title. */
+@media (min-width: 641px) {
+  main.main:has(> .hx-main-back) > #mainSettings { container-type: inline-size; container-name: hx-settings; }
+  @container hx-settings (max-width: 975px) {
+    .settings-main { padding-top: 64px !important; }
+  }
+}

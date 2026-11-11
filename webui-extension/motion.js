@@ -112,7 +112,8 @@
     const root = document.documentElement;
     const studio = root.classList.contains('hx-studio-open');
     const sid = sidNow();
-    const mo = !!sid && isMotion(sid);
+    // (a motion chat without a film opens as a plain chat: motion-studio.js openBySid)
+    const mo = !!sid && isMotion(sid) && !(window.hxStudio && window.hxStudio.noFilm && window.hxStudio.noFilm(sid));
     if (sid && isRow(sess())) remember(sid);
     // A motion session is never shown as a transcript: the studio is the only way in.
     const leaving = window.hxStudio && window.hxStudio.leaving && window.hxStudio.leaving();

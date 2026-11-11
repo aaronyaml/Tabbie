@@ -1,20 +1,10 @@
 /* Tabbie — new-chat home (plain JS, no build step). Pairs with home.css.
- * Like Claude / ChatGPT: a time-of-day greeting next to the buddy, the composer in the middle and
- * a row of "Try" cards underneath it (above it on phones), plus recent chats on desktop. Everything
- * under the composer fades away as soon as you start typing and comes back if you clear it.
- * Cards fill the composer (or run a slash command) rather than sending a canned prompt.
+ * A small time-of-day greeting, the composer, and one short list: chats that need you (a question or
+ * a plan to approve), chats still working, then the latest few. It fades while you type.
  */
 (function () {
   'use strict';
   const NAME = (window.HX_LOCAL || {}).name || '';  // your first name, from local.js
-  const CARDS = [
-    { icon: 'Video01Icon', title: 'Make a product film', sub: 'An Apple-style motion ad for one of your apps', fill: '/motion ' },
-    { icon: 'Brain01Icon', title: 'Plan a big change', sub: 'Codex plans it, you approve, Claude builds it', fill: '@plan ' },
-    { icon: 'CodeIcon', title: 'Build with Claude', sub: 'Edit code in any of your projects', fill: '@claude ' },
-    { icon: 'Analytics01Icon', title: 'Check my limits', sub: 'Claude, ChatGPT and credits left', fill: '/limit', send: true },
-    { icon: 'KanbanIcon', title: 'Show my board', sub: 'Cards and todos you can edit in chat', fill: '/board', send: true },
-    { icon: 'Note01Icon', title: 'Remember something', sub: 'Save a note Tabbie keeps for later', fill: 'Remember that ' },
-  ];
   const icon = (n, s) => (typeof window.hxIcon === 'function' ? window.hxIcon(n, s) : '');
   const esc = (t) => String(t).replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
   const phone = () => matchMedia('(max-width: 640px)').matches;
@@ -32,31 +22,6 @@
       const [part, name] = want.split(', ');
       h2.innerHTML = `${esc(part)}, <span class="hx-name">${esc(name)}</span>`;
     }
-  }
-
-  // Three cards per new chat, stable for that chat so re-renders don't reshuffle them.
-  let pickedFor = null, picked = [];
-  function pick() {
-    let sid = '';
-    try { sid = (S.session && S.session.session_id) || ''; } catch (_) {}
-    if (pickedFor !== sid || !picked.length) {
-      pickedFor = sid;
-      picked = CARDS.map((c) => [Math.random(), c]).sort((a, b) => a[0] - b[0]).slice(0, 3).map((x) => x[1]);
-    }
-    return picked;
-  }
-
-  function fillComposer(card) {
-    const ta = document.getElementById('msg');
-    if (!ta) return;
-    ta.value = card.fill;
-    ta.dispatchEvent(new Event('input', { bubbles: true }));
-    if (card.send) {
-      const send = document.getElementById('btnSend');
-      if (send) { send.click(); return; }
-    }
-    ta.focus();
-    try { ta.setSelectionRange(ta.value.length, ta.value.length); } catch (_) {}
   }
 
   const ago = (sec) => {
@@ -81,7 +46,7 @@
       const d = await r.json();
       const list = (d.sessions || d || []).filter((s) => s && s.title && (s.message_count || 0) > 0 && !s.archived && !hidden(s));
       list.sort((a, b) => (b.updated_at || b.last_message_at || 0) - (a.updated_at || a.last_message_at || 0));
-      recent = list.slice(0, 12);
+      recent = list.slice(0, 60);
       render();
     } catch (_) {}
   }
@@ -99,51 +64,37 @@
     } catch (_) {}
   }
 
-  // Project launcher: one tap starts a chat in that project's folder (upstream switchToWorkspace).
-  let projects = [], projectsAt = 0;
-  async function loadProjects() {
-    if (Date.now() - projectsAt < 60000) return;
-    projectsAt = Date.now();
-    try {
-      const r = await fetch('api/projects', { credentials: 'same-origin' });
-      if (!r.ok) return;
-      const d = await r.json();
-      projects = (d.projects || d || []).map((p) => ({ name: p.name, path: p.default_workspace || p.workspace || (p.workspaces || [])[0] || '' }))
-        .filter((p) => p.name && p.path).slice(0, 6);
-      render();
-    } catch (_) {}
-  }
-
   let home = null;
+  // One short list under the composer: chats waiting on you, then what's running, then the latest few.
+  // No suggestion cards or project buttons: the composer's project chip already starts a chat anywhere.
+  const MAX = 5;
   function render() {
     if (!home) return;
-    const cards = pick().map((c, i) => `
-      <button type="button" class="hx-try" data-i="${i}">
-        <span class="hx-try-top"><span class="hx-try-ic">${icon(c.icon, 20)}</span><span class="hx-try-pill">Try</span></span>
-        <span class="hx-try-tt">${esc(c.title)}</span><span class="hx-try-sub">${esc(c.sub)}</span>
-      </button>`).join('');
-    const shown = recent.filter((s) => !hidden(s)).slice(0, 3);
-    const rec = !phone() && shown.length ? `
-      <div class="hx-home-head"><span>Jump back in</span></div>
-      <div class="hx-recent">${shown.map((s) => `
-        <button type="button" class="hx-rec" data-sid="${esc(s.session_id)}">
-          <span class="hx-rec-ic">${icon('BubbleChatIcon', 16)}</span>
-          <span class="hx-rec-tt">${esc(titleOf(s))}</span>
-          <span class="hx-rec-when">${esc(ago(s.updated_at || s.last_message_at || 0))}</span>
-        </button>`).join('')}</div>` : '';
-    const need = waiting.length ? `
-      <div class="hx-home-head hx-need-head"><span>${icon('Flag02Icon', 16)} Needs you</span></div>
-      <div class="hx-need">${waiting.map((w) => `
-        <button type="button" class="hx-need-row" data-sid="${esc(w.session)}">
-          <span class="hx-need-pill">${w.kind === 'plan' ? 'Plan' : 'Question'}</span>
-          <span class="hx-need-tt">${esc(w.title)}</span>
-          <span class="hx-need-tx">${esc(w.text)}</span>
-        </button>`).join('')}</div>` : '';
-    const proj = projects.length ? `
-      <div class="hx-home-head"><span>${icon('Folder01Icon', 16)} Start in a project</span></div>
-      <div class="hx-projs">${projects.map((p, i) => `
-        <button type="button" class="hx-proj" data-p="${i}"><span class="hx-proj-ic">${icon('Folder01Icon', 15)}</span>${esc(p.name)}</button>`).join('')}</div>` : '';
-    const html = `${need}${proj}<div class="hx-home-head"><span>${icon('BulbIcon', 16)} Try Tabbie</span></div><div class="hx-tries">${cards}</div>${rec}`;
+    const seen = new Set();
+    const rows = [];
+    waiting.forEach((w) => {
+      if (seen.has(w.session)) return;
+      seen.add(w.session);
+      rows.push({ sid: w.session, title: w.title, tag: w.kind === 'plan' ? 'Plan to approve' : 'Question', tagCls: 'is-need', sub: w.text });
+    });
+    const live = (s) => !!(s.active_stream_id || s.is_streaming || s.has_pending_user_message);
+    // the sidebar's project filter applies here too (All: everything; Unassigned: chats without one)
+    let pf = null;
+    try { pf = typeof _activeProject !== 'undefined' ? _activeProject : null; } catch (_) {}
+    const inProj = (s) => !pf || (pf === '__none__' ? !s.project_id : s.project_id === pf);
+    recent.filter((s) => !hidden(s) && !seen.has(s.session_id) && inProj(s))
+      .sort((x, y) => (live(y) ? 1 : 0) - (live(x) ? 1 : 0))
+      .forEach((s) => {
+        if (rows.length >= MAX) return;
+        seen.add(s.session_id);
+        rows.push({ sid: s.session_id, title: titleOf(s), tag: live(s) ? 'Working' : '', tagCls: 'is-live', when: ago(s.updated_at || s.last_message_at || 0) });
+      });
+    const html = rows.length ? `<div class="hx-list" role="list">${rows.slice(0, MAX).map((r) => `
+      <button type="button" class="hx-row" role="listitem" data-sid="${esc(r.sid)}">
+        <span class="hx-row-tt">${esc(r.title || 'Untitled chat')}</span>
+        ${r.tag ? `<span class="hx-row-tag ${r.tagCls}">${esc(r.tag)}</span>` : ''}
+        <span class="hx-row-meta">${esc(r.sub || r.when || '')}</span>
+      </button>`).join('')}</div>` : '';
     if (home.dataset.html !== html) { home.innerHTML = html; home.dataset.html = html; }
   }
 
@@ -155,14 +106,7 @@
       home.id = 'hxHome';
       home.setAttribute('aria-label', 'Suggestions');
       home.addEventListener('click', (e) => {
-        const t = e.target.closest('.hx-try');
-        if (t) return fillComposer(pick()[+t.dataset.i]);
-        const pj = e.target.closest('.hx-proj');
-        if (pj && typeof switchToWorkspace === 'function') {
-          const p = projects[+pj.dataset.p];
-          if (p) return switchToWorkspace(p.path, p.name).then(() => { const ta = document.getElementById('msg'); if (ta) ta.focus(); });
-        }
-        const r = e.target.closest('.hx-rec, .hx-need-row');
+        const r = e.target.closest('.hx-row');
         if (r && typeof loadSession === 'function') loadSession(r.dataset.sid);
       });
     }
@@ -179,7 +123,7 @@
 
   function tick() { setGreeting(); place(); syncTyping(); }
   function start() {
-    tick(); loadRecent(); loadInbox(); loadProjects();
+    tick(); loadRecent(); loadInbox();
     addEventListener('input', (e) => { if (e.target && e.target.id === 'msg') syncTyping(); }, true);
     addEventListener('resize', place);
     const es = document.getElementById('emptyState');

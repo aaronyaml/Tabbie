@@ -197,7 +197,7 @@
   }, true);
   document.addEventListener('keydown', (e) => {
     if (e.key !== 'Escape' || !isOpen()) return;
-    if (S.sheet) { S.sheet = null; render(); } else if (S.view === 'project') toList(); else close();
+    if (S.sheet) up(); else if (S.view === 'project') toList(); else close();
   });
   addEventListener('resize', place);
 
@@ -342,7 +342,8 @@
     root.replaceChildren(S.view === 'project' ? viewProject() : viewList());
     if (S.sheet) {
       const sc = sheet(S.sheet);
-      if (same) sc.classList.add('is-steady');
+      if (same || S.sheet.steady) sc.classList.add('is-steady');
+      S.sheet.steady = false;
       root.append(sc);
       if (scrolls) {
         const box = sc.querySelector('.hxp-sheet');
@@ -356,16 +357,15 @@
 
   function top(title, sub, left, right) {
     return h('header', { class: 'hxp-top' },
-      left || h('span', { class: 'hxp-ib-spacer' }),
+      left || btn('hx-back', 'Back', close, 'ArrowLeft01Icon', { 'aria-label': 'Back to chats' }),
       h('div', { class: 'hxp-title' }, h('span', { text: title }), sub ? h('em', { text: sub }) : null),
-      ...(right || []),
-      btn('hxp-ib', '', close, 'Cancel01Icon', { 'aria-label': 'Close projects', title: 'Close' }));
+      ...(right || []));
   }
 
   function viewList() {
     const wrap = h('div', { class: 'hxp-page' });
     wrap.append(top('Projects', S.list ? plural(S.list.length, 'project') : '', null,
-      [btn('hxp-primary hxp-sm', 'New project', () => { S.sheet = { kind: 'new', name: '', description: '', folders: [], primary: null }; render(); }, 'Add01Icon')]));
+      [btn('hxp-primary hxp-sm', 'New project', newProject, 'Add01Icon')]));
     const main = h('main', { class: 'hxp-main' });
     if (S.err) main.append(h('p', { class: 'hxp-err', text: S.err }));
     if (!S.list && !S.err) main.append(h('p', { class: 'hxp-muted', text: 'Loading…' }));
@@ -374,7 +374,7 @@
         h('div', { class: 'hxp-empty-i', icon: 'Briefcase01Icon', size: 28 }),
         h('h2', { text: 'One project, all its folders' }),
         h('p', { text: 'Group the repos that make up one product (site, app, API…). Hermes then works across them as one system, and learns from every session in that project.' }),
-        btn('hxp-primary', 'Create your first project', () => { S.sheet = { kind: 'new', name: '', description: '', folders: [], primary: null }; render(); }, 'Add01Icon')));
+        btn('hxp-primary', 'Create your first project', newProject, 'Add01Icon')));
     }
     if (S.list && S.list.length) {
       const grid = h('div', { class: 'hxp-grid' });
@@ -403,7 +403,7 @@
   function viewProject() {
     const p = S.p;
     const wrap = h('div', { class: 'hxp-page' });
-    const back = btn('hxp-ib', '', toList, 'ArrowLeft01Icon', { 'aria-label': 'All projects', title: 'All projects' });
+    const back = btn('hx-back', 'Projects', toList, 'ArrowLeft01Icon', { 'aria-label': 'Back to all projects' });
     if (!p) {
       wrap.append(top('Project', '', back), h('main', { class: 'hxp-main' }, h('p', { class: S.err ? 'hxp-err' : 'hxp-muted', text: S.err || 'Loading…' })));
       return wrap;
@@ -437,6 +437,13 @@
         h('span', { class: 'hxp-i', icon: ico, size: 15 }), h('span', { text: label }), n ? h('b', { text: String(n) }) : null));
     }
     main.append(tabs);
+    // The tab bar scrolls sideways when the tabs don't fit: fade its right edge until the end is reached,
+    // and keep the open tab in view.
+    const edge = () => { tabs.classList.toggle('is-over', tabs.scrollWidth > tabs.clientWidth + 1);
+      tabs.classList.toggle('is-end', tabs.scrollLeft + tabs.clientWidth >= tabs.scrollWidth - 2); };
+    tabs.addEventListener('scroll', edge, { passive: true });
+    requestAnimationFrame(() => { const on = tabs.querySelector('.is-on'); if (on && tabs.scrollWidth > tabs.clientWidth) on.scrollIntoView({ block: 'nearest', inline: 'nearest' }); edge(); });
+    setTimeout(edge, 60);
     const body = h('section', { class: 'hxp-body' });
     const d = S.cache[S.tab];
     if (d && d.error) body.append(h('p', { class: 'hxp-err', text: d.error }));
@@ -817,17 +824,29 @@
   }
 
   // ── sheets ──
+  // Nested sheets (New project → Choose a folder → …) keep a link to the sheet that opened them: Back,
+  // Cancel on a question and Escape go one level up with the parent's state intact; the scrim and a
+  // swipe down close them all.
+  function nest(next) { next.parent = S.sheet || null; S.sheet = next; render(); }
+  function up() {
+    const p = S.sheet && S.sheet.parent;
+    S.sheet = p || null;
+    if (p) p.steady = true;
+    render();
+  }
+  function newProject() { sugCache.clear(); S.sheet = { kind: 'new', name: '', description: '', folders: [], primary: null }; render(); }
   function sheet(sh) {
     const shut = () => { S.sheet = null; render(); };
+    const back = () => { if (S.sheet === sh) up(); };
     const box = h('div', { class: 'hxp-sheet', role: 'dialog', 'aria-modal': 'true' });
     const scrim = h('div', { class: 'hxp-scrim', onclick: (e) => { if (e.target === scrim) shut(); } }, box);
-    const head = (title, sub) => h('div', { class: 'hxp-sheet-h' }, h('div', { class: 'hxp-title' }, h('span', { text: title }), sub ? h('em', { text: sub }) : null),
-      btn('hxp-ib', '', shut, 'Cancel01Icon', { 'aria-label': 'Close' }));
+    const head = (title, sub) => h('div', { class: 'hxp-sheet-h' }, btn('hx-back', 'Back', back, 'ArrowLeft01Icon', { 'aria-label': sh.parent ? 'Back' : 'Close' }),
+      h('div', { class: 'hxp-title' }, h('span', { text: title }), sub ? h('em', { text: sub }) : null));
     const err = sh.error ? h('p', { class: 'hxp-err', text: sh.error }) : null;
     if (sh.kind === 'new') box.append(head('New project'), sheetNew(sh));
     else if (sh.kind === 'picker') box.append(head('Choose a folder', 'on this computer'), sheetPicker(sh));
     else if (sh.kind === 'confirm') box.append(head(sh.title), h('p', { text: sh.text }),
-      h('div', { class: 'hxp-row hxp-row-end' }, btn('hxp-ghost', 'Cancel', shut),
+      h('div', { class: 'hxp-row hxp-row-end' }, btn('hxp-ghost', 'Cancel', back),
         btn(`hxp-primary${sh.danger ? ' is-danger' : ''}`, sh.ok || 'OK', () => act(async () => { await sh.run(); S.sheet = null; }, sh.done || 'Done'))));
     else if (sh.kind === 'attach') box.append(head(sh.chks.length > 1 ? `Attach ${sh.chks.length} folders?` : 'Attach this folder?'), sheetAttach(sh));
     else if (sh.kind === 'delete') box.append(head(`Delete ${sh.p.name}?`), sheetDelete(sh));
@@ -842,7 +861,8 @@
   }
 
   function sheetNew(sh) {
-    const name = h('input', { value: sh.name, placeholder: 'e.g. Acme', maxlength: '80', oninput: (e) => { sh.name = e.target.value; } });
+    const name = h('input', { value: sh.name, placeholder: 'e.g. Acme', maxlength: '80', oninput: (e) => {
+      sh.name = e.target.value; clearTimeout(sh.suggT); sh.suggT = setTimeout(() => loadSugg(sh), 220); } });
     const desc = h('textarea', { rows: '2', value: sh.description, placeholder: 'What is it? (optional)', maxlength: '600', oninput: (e) => { sh.description = e.target.value; } });
     const fl = h('div', { class: 'hxp-list' });
     for (const f of sh.folders) {
@@ -858,6 +878,7 @@
       h('label', {}, h('span', { text: 'Description' }), desc),
       h('div', { class: 'hxp-row' }, h('strong', { text: 'Folders' }), btn('hxp-ghost hxp-sm', 'Add folder', () => openPicker({ forNew: sh }), 'FolderAddIcon')),
       fl,
+      suggBox(sh),
       h('div', { class: 'hxp-row hxp-row-end' }, btn('hxp-primary', 'Create project', () => act(async () => {
         if (!sh.name.trim()) throw new Error('Give the project a name.');
         const p = await call('/projects/create', { name: sh.name, description: sh.description, folders: sh.folders.map((f) => f.path), primary: sh.primary });
@@ -868,13 +889,67 @@
       }, (p) => `Created ${p.name}${p.claimed_sessions ? ` · ${plural(p.claimed_sessions, 'past session')} attached` : ''}`), 'Tick02Icon', { disabled: S.busy || null })));
   }
 
+  // ── repo suggestions: unclaimed git repos, most recently active first, or ranked against the name being
+  // typed (folder / package.json / remote / README title; hmem/repo_suggest.py). The server caches its
+  // disk scan; this caches answers per query so retyping costs nothing.
+  const sugCache = new Map();
+  function suggestFor(q) {
+    const k = (q || '').trim().toLowerCase();
+    if (sugCache.has(k)) return Promise.resolve(sugCache.get(k));
+    return get('/fs/repos', k ? { q: k } : null).then((d) => {
+      sugCache.set(k, d);
+      if (sugCache.size > 50) sugCache.delete(sugCache.keys().next().value);
+      return d;
+    });
+  }
+  const repoSub = (r) => r.why || `${r.display}${r.modified ? ' · ' + ago(new Date(r.modified * 1000).toISOString()) : ''}`;
+  function loadSugg(sh) {
+    const k = (sh.name || '').trim().toLowerCase();
+    if (sh.sugg && sh.suggK === k) return paintSugg(sh);
+    const seq = (sh.suggSeq || 0) + 1; sh.suggSeq = seq;
+    suggestFor(k).then((d) => { if (sh.suggSeq === seq) { sh.sugg = d; sh.suggK = k; paintSugg(sh); } })
+      .catch(() => { if (sh.suggSeq === seq) { sh.sugg = { repos: [], failed: true }; sh.suggK = k; paintSugg(sh); } });
+  }
+  // the list repaints alone while typing: re-rendering the sheet would take the caret out of the name field
+  function paintSugg(sh) { if (sh.suggBox && sh.suggBox.isConnected) sh.suggBox.replaceChildren(...suggRows(sh)); }
+  function suggBox(sh) {
+    sh.suggBox = h('div', { class: 'hxp-sugg', 'aria-live': 'polite' }, ...suggRows(sh));
+    if (!sh.sugg || sh.suggK !== (sh.name || '').trim().toLowerCase()) loadSugg(sh);
+    return sh.suggBox;
+  }
+  function suggRows(sh) {
+    const d = sh.sugg;
+    if (!d) return [h('p', { class: 'hxp-sugg-h', text: 'Suggested repos' }), loading()];
+    const have = new Set(sh.folders.map((f) => f.path));
+    const rows = (d.repos || []).filter((r) => !have.has(r.path)).slice(0, 5);
+    if (!rows.length) return d.failed ? [] : [h('p', { class: 'hxp-sugg-h', text: 'Suggested repos' }),
+      h('p', { class: 'hxp-muted', text: 'No other unclaimed git repos found. Use Add folder to browse.' })];
+    const q = (sh.name || '').trim();
+    const head = d.matched ? `Suggested for “${q}”` : q ? `Nothing named like “${q}” · recently active repos` : 'Suggested repos · recently active';
+    return [h('p', { class: 'hxp-sugg-h', text: head }), h('div', { class: 'hxp-list' }, ...rows.map((r) =>
+      h('button', { type: 'button', class: 'hxp-item hxp-click', title: r.display, onclick: () => addSugg(sh, r), 'aria-label': `Add ${r.name}` },
+        h('span', { class: 'hxp-item-i', icon: 'GitBranchIcon', size: 17 }),
+        h('div', { class: 'hxp-item-b' }, h('strong', { class: 'hxp-clip', text: r.name }), h('div', { class: 'hxp-item-s', text: repoSub(r) })),
+        h('span', { class: 'hxp-i hxp-sugg-add', icon: 'Add01Icon', size: 16 }))))];
+  }
+  async function addSugg(sh, r) {
+    if (S.busy || sh.folders.some((f) => f.path === r.path)) return;
+    const chk = await get('/fs/check', { path: r.path }).catch((e) => ({ ok: false, why: e.message }));
+    if (!chk.ok) return toast(`${r.name}: ${chk.why}`, 'error');
+    if (chk.project) { sugCache.clear(); sh.sugg = null; return toast(`${chk.display} already belongs to “${chk.project}”.`, 'error'); }
+    if (!sh.folders.some((f) => f.path === chk.path)) sh.folders.push({ path: chk.path, display: chk.display });  // the first one is primary
+    if (S.sheet === sh) { sh.steady = true; render(); }
+  }
+
   // folder picker: browse folders on the computer (names only) + suggested repos + a typed path
   function openPicker(ctx) {
-    const back = S.sheet && S.sheet.kind === 'new' ? S.sheet : null;
-    S.sheet = { kind: 'picker', ctx, back, path: null, data: null, repos: null, mode: 'repos', sel: new Map() };
-    render();
+    const sh = { kind: 'picker', ctx, path: null, data: null, repos: null, mode: 'repos', sel: new Map() };
+    if (ctx.forNew && S.sheet === ctx.forNew) nest(sh); else { S.sheet = sh; render(); }
     loadPicker(null);
-    get('/fs/repos').then((d) => { if (S.sheet && S.sheet.kind === 'picker') { S.sheet.repos = d.repos; render(); } }).catch(() => {});
+    // suggestions ranked against the project's name (the one being typed, or the open project's)
+    const q = ((ctx.forNew && ctx.forNew.name) || (ctx.forProject && ctx.forProject.name) || '').trim();
+    suggestFor(q).then((d) => { sh.repos = d.repos; sh.reposQ = d.matched ? d.query : ''; if (S.sheet === sh) render(); })
+      .catch((e) => { sh.repos = []; sh.reposErr = e.message; if (S.sheet === sh) render(); });
   }
   async function loadPicker(path) {
     const sh = S.sheet;
@@ -899,14 +974,13 @@
     if (sh.ctx.forNew) {
       const n = sh.ctx.forNew;
       for (const c of ok) if (!n.folders.some((f) => f.path === c.path)) n.folders.push({ path: c.path, display: c.display });
-      S.sheet = n; render();
+      S.sheet = n; n.steady = true; render();
       return;
     }
     const have = new Set((sh.ctx.forProject.folders || []).map((f) => f.path));
     const fresh = ok.filter((c) => !have.has(c.path));
     if (!fresh.length) return toast('Those folders are already in this project.', 'error');
-    S.sheet = { kind: 'attach', p: sh.ctx.forProject, chks: fresh, primary: null };
-    render();
+    if (S.sheet === sh) nest({ kind: 'attach', p: sh.ctx.forProject, chks: fresh, primary: null });
   }
   const choose = (path) => chooseAll([path]);
   const tick = (sh, path, display) => h('input', { type: 'checkbox', class: 'hxp-tick', checked: sh.sel.has(path) || null,
@@ -921,9 +995,11 @@
     if (sh.mode === 'repos') {
       const l = h('div', { class: 'hxp-list hxp-scroll' });
       if (!sh.repos) l.append(loading());
-      else if (!sh.repos.length) l.append(h('p', { class: 'hxp-muted', text: 'No unclaimed git repos found in ~, ~/Developer, ~/Projects or ~/code. Browse instead.' }));
-      for (const r of sh.repos || []) l.append(h('div', { class: `hxp-item hxp-click${sh.sel.has(r.path) ? ' is-sel' : ''}`, onclick: () => toggle(sh, r.path, r.display) },
-        h('span', { class: 'hxp-item-i', icon: 'GitBranchIcon', size: 17 }), h('div', { class: 'hxp-item-b' }, h('strong', { text: r.name }), h('div', { class: 'hxp-item-s', text: r.display })),
+      else if (!sh.repos.length) l.append(h('p', { class: 'hxp-muted', text: sh.reposErr || 'No unclaimed git repos found in your home folder or code folders (~/Developer, ~/Projects, ~/code…). Browse instead.' }));
+      else out.append(h('p', { class: 'hxp-sugg-h', text: sh.reposQ ? `Best matches for “${sh.reposQ}”` : 'Most recently active' }));
+      const have = new Set(((sh.ctx.forNew && sh.ctx.forNew.folders) || []).map((f) => f.path));  // already on the form
+      for (const r of (sh.repos || []).filter((x) => !have.has(x.path))) l.append(h('div', { class: `hxp-item hxp-click${sh.sel.has(r.path) ? ' is-sel' : ''}`, onclick: () => toggle(sh, r.path, r.display) },
+        h('span', { class: 'hxp-item-i', icon: 'GitBranchIcon', size: 17 }), h('div', { class: 'hxp-item-b' }, h('strong', { text: r.name }), h('div', { class: 'hxp-item-s', text: repoSub(r) })),
         tick(sh, r.path, r.display)));
       out.append(l);
     } else if (sh.mode === 'browse') {
@@ -963,7 +1039,6 @@
         h('span', { text: display.split('/').pop() }), h('span', { class: 'hxp-i', icon: 'Cancel01Icon', size: 12 })))),
       btn('hxp-primary', sh.sel.size === 1 ? 'Add 1 folder' : `Add ${sh.sel.size} folders`, () => act(() => chooseAll([...sh.sel.keys()])), 'Tick02Icon', { disabled: S.busy || null })));
     out.append(h('p', { class: 'hxp-foot', text: 'This is the computer’s filesystem, even when you’re on your phone. Hidden, personal (Documents, Desktop, Downloads…) and Hermes’ own folders can’t be attached.' }));
-    if (sh.back) out.append(h('div', { class: 'hxp-row' }, btn('hxp-ghost hxp-sm', 'Back', () => { S.sheet = sh.back; render(); }, 'ArrowLeft01Icon')));
     return out;
   }
   function sheetAttach(sh) {
@@ -1062,8 +1137,8 @@
       const reason = h('input', { placeholder: 'Why not? (optional, helps the Dreamer)' });
       out.append(h('div', { class: 'hxp-row hxp-row-end' },
         d.blocked ? h('span', { class: 'hxp-err', text: 'Blocked by the safety scan: it can’t be approved as written.' }) : null,
-        btn('hxp-ghost', 'Reject', () => { S.sheet = { kind: 'confirm', title: 'Reject this proposal?', text: 'The Dreamer won’t propose the same thing again for 30 days.', ok: 'Reject', danger: true,
-          run: () => call('/projects/proposal/reject', { id: p.id, pid: d.id, reason: reason.value }).then(() => { S.cache = {}; return loadProject(p.id, true); }), done: 'Rejected' }; render(); }, 'Cancel01Icon'),
+        btn('hxp-ghost', 'Reject', () => { nest({ kind: 'confirm', title: 'Reject this proposal?', text: 'The Dreamer won’t propose the same thing again for 30 days.', ok: 'Reject', danger: true,
+          run: () => call('/projects/proposal/reject', { id: p.id, pid: d.id, reason: reason.value }).then(() => { S.cache = {}; return loadProject(p.id, true); }), done: 'Rejected' }); }, 'Cancel01Icon'),
         btn('hxp-primary', 'Approve', () => act(async () => {
           await call('/projects/proposal/approve', { id: p.id, pid: d.id, confirm: sh.confirm === true });
           S.sheet = null; S.cache = {}; await loadProject(p.id, true);
@@ -1086,7 +1161,7 @@
     const d = sh.data;
     if (!d) return loading();
     const l = h('div', { class: 'hxp-list' });
-    for (const f of d.findings) l.append(h('button', { type: 'button', class: 'hxp-item hxp-click', onclick: () => { S.sheet = { kind: 'finding', f }; render(); } },
+    for (const f of d.findings) l.append(h('button', { type: 'button', class: 'hxp-item hxp-click', onclick: () => nest({ kind: 'finding', f }) },
       h('span', { class: 'hxp-item-i', icon: SPEC_ICON[f.specialist] || 'SparklesIcon', size: 17 }),
       h('div', { class: 'hxp-item-b' }, h('span', { class: 'hxp-clip', text: f.title }), h('div', { class: 'hxp-meta' }, h('span', { text: SPEC_NAME[f.specialist] || f.specialist }))),
       h('span', { class: 'hxp-i', icon: 'ArrowRight01Icon', size: 16 })));

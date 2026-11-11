@@ -1,0 +1,88 @@
+/* Tabbie — smaller frame (declutter.js). */
+
+/* Rail + drawer icon row: only Chat, Motion, Projects, More, Settings */
+html .nav-tab.hx-in-more { display: none !important; }
+.hx-more-btn[hidden] { display: none !important; }
+
+.hx-more-menu {
+  position: fixed; z-index: 1000; min-width: 200px; max-height: calc(100vh - 16px); overflow: auto;
+  padding: 6px; border-radius: 12px; background: var(--hx-raised, var(--bg)); color: var(--hx-text, var(--text));
+  box-shadow: 0 12px 32px rgba(0,0,0,.22), 0 0 0 0.5px var(--hx-hair, rgba(127,127,127,.25));
+  font: 13.5px/1.2 var(--font-ui, -apple-system, system-ui, sans-serif);
+}
+.hx-more-item {
+  display: flex; align-items: center; gap: 10px; width: 100%; height: 34px; padding: 0 10px; border: 0; border-radius: 8px;
+  background: transparent; color: inherit; font: inherit; text-align: left; cursor: pointer;
+}
+.hx-more-item:hover, .hx-more-item:focus-visible { background: var(--hover-bg, var(--hx-fill)); outline: none; }
+.hx-more-item.is-on { background: var(--hx-fill-2, rgba(127,127,127,.18)); }
+.hx-more-ic { display: inline-flex; width: 18px; height: 18px; color: var(--hx-text-2, var(--muted)); }
+.hx-more-ic svg { width: 18px; height: 18px; }
+.hx-more-empty { padding: 8px 10px; color: var(--hx-text-2, var(--muted)); }
+
+/* Phone: a bottom sheet over the drawer */
+.hx-more-menu.is-sheet {
+  left: 8px; right: 8px; bottom: calc(8px + env(safe-area-inset-bottom)); top: auto; min-width: 0;
+  padding: 8px; border-radius: 16px;
+}
+.hx-more-menu.is-sheet .hx-more-item { height: 46px; font-size: 16px; }
+@media (prefers-reduced-motion: no-preference) {
+  .hx-more-menu { animation: hx-more-in .14s var(--hx-ease, ease) both; }
+  @keyframes hx-more-in { from { opacity: 0; transform: translateY(4px); } to { opacity: 1; transform: none; } }
+}
+
+/* "Stopped by you" (upstream's cancel copy, rewritten) */
+.msg-body > p.hx-stopped-line { color: var(--hx-text-2, var(--muted)); }
+
+/* Composer: attach, voice, project, model, send. The profile chip (one profile: "default") and Saved
+ * prompts are rarely used; both stay reachable (More → Agent profiles, Settings → composer controls). */
+html #profileChipWrap, html #btnSavedPrompts { display: none !important; }
+
+/* Back: one control for leaving any page, sheet or viewer, always top left (never a bare ×). A round arrow
+ * button right before the title; the word "Back" stays for screen readers (aria-label) only. */
+.hx-back { display: inline-grid; place-items: center; flex: none; width: 36px; height: 36px; padding: 0; margin-right: 4px; border: 0; border-radius: 50%;
+  background: var(--hx-fill, rgba(127,127,127,.12)); color: var(--hx-text, var(--text)); cursor: pointer;
+  -webkit-tap-highlight-color: transparent; transition: background-color .15s var(--hx-ease, ease), transform .15s var(--hx-ease, ease); }
+.hx-back:hover, .hx-back:focus-visible { background: var(--hx-fill-2, rgba(127,127,127,.22)); outline: none; }
+.hx-back:active { transform: scale(.94); }
+.hx-back > span:not(.hxp-i) { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
+.hx-back svg, .hx-back .hxp-i svg { width: 20px !important; height: 20px !important; color: inherit !important; stroke-width: 2; }
+.hx-back .hxp-i { display: inline-grid; }
+@media (max-width: 640px) { .hx-back { width: 40px; height: 40px; } }
+
+/* First paint of a page opened by URL (/settings, ?panel=tasks…): that page and its sidebar list show
+ * straight away instead of the chat. motion-boot.js sets html[data-hx-boot]; upstream takes over after. */
+html[data-hx-boot="settings"] #panelChat { display: none !important; } html[data-hx-boot="settings"] #panelSettings { display: flex !important; }
+html[data-hx-boot="settings"] main.main > #mainChat { display: none !important; } html[data-hx-boot="settings"] main.main > #mainSettings { display: flex !important; }
+/* Settings sub-page from the hash (/settings#appearance) paints first, not Conversation */
+html[data-hx-boot-sec] #settingsPaneConversation { display: none !important; }
+html[data-hx-boot-sec="appearance"] #settingsPaneAppearance { display: block !important; }
+html[data-hx-boot-sec="preferences"] #settingsPanePreferences { display: block !important; }
+html[data-hx-boot-sec="providers"] #settingsPaneProviders { display: block !important; }
+html[data-hx-boot-sec="plugins"] #settingsPanePlugins { display: block !important; }
+html[data-hx-boot-sec="extensions"] #settingsPaneExtensions { display: block !important; }
+html[data-hx-boot-sec="system"] #settingsPaneSystem { display: block !important; }
+html[data-hx-boot-sec="help"] #settingsPaneHelp { display: block !important; }
+html[data-hx-boot="tasks"] #panelChat { display: none !important; } html[data-hx-boot="tasks"] #panelTasks { display: flex !important; }
+html[data-hx-boot="tasks"] main.main > #mainChat { display: none !important; } html[data-hx-boot="tasks"] main.main > #mainTasks { display: flex !important; }
+html[data-hx-boot="kanban"] #panelChat { display: none !important; } html[data-hx-boot="kanban"] #panelKanban { display: flex !important; }
+html[data-hx-boot="kanban"] main.main > #mainChat { display: none !important; } html[data-hx-boot="kanban"] main.main > #mainKanban { display: flex !important; }
+html[data-hx-boot="skills"] #panelChat { display: none !important; } html[data-hx-boot="skills"] #panelSkills { display: flex !important; }
+html[data-hx-boot="skills"] main.main > #mainChat { display: none !important; } html[data-hx-boot="skills"] main.main > #mainSkills { display: flex !important; }
+html[data-hx-boot="memory"] #panelChat { display: none !important; } html[data-hx-boot="memory"] #panelMemory { display: flex !important; }
+html[data-hx-boot="memory"] main.main > #mainChat { display: none !important; } html[data-hx-boot="memory"] main.main > #mainMemory { display: flex !important; }
+html[data-hx-boot="workspaces"] #panelChat { display: none !important; } html[data-hx-boot="workspaces"] #panelWorkspaces { display: flex !important; }
+html[data-hx-boot="workspaces"] main.main > #mainChat { display: none !important; } html[data-hx-boot="workspaces"] main.main > #mainWorkspaces { display: flex !important; }
+html[data-hx-boot="profiles"] #panelChat { display: none !important; } html[data-hx-boot="profiles"] #panelProfiles { display: flex !important; }
+html[data-hx-boot="profiles"] main.main > #mainChat { display: none !important; } html[data-hx-boot="profiles"] main.main > #mainProfiles { display: flex !important; }
+html[data-hx-boot="insights"] #panelChat { display: none !important; } html[data-hx-boot="insights"] #panelInsights { display: flex !important; }
+html[data-hx-boot="insights"] main.main > #mainChat { display: none !important; } html[data-hx-boot="insights"] main.main > #mainInsights { display: flex !important; }
+html[data-hx-boot="logs"] #panelChat { display: none !important; } html[data-hx-boot="logs"] #panelLogs { display: flex !important; }
+html[data-hx-boot="logs"] main.main > #mainChat { display: none !important; } html[data-hx-boot="logs"] main.main > #mainLogs { display: flex !important; }
+html[data-hx-boot="todos"] #panelChat { display: none !important; } html[data-hx-boot="todos"] #panelTodos { display: flex !important; }
+
+/* Font size (Settings › Appearance): the sidebar and the page area scale as a whole (declutter.js).
+ * Popovers live on <body> and keep their size, so their positions (measured from the page) stay right. */
+html[data-hx-scale="small"]  :is(aside.sidebar, main.main) { zoom: .9; }
+html[data-hx-scale="large"]  :is(aside.sidebar, main.main) { zoom: 1.1; }
+html[data-hx-scale="xlarge"] :is(aside.sidebar, main.main) { zoom: 1.2; }

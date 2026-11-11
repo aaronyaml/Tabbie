@@ -28,7 +28,9 @@ html.hx-proj-open #hxProjects { display: block; position: fixed; top: 0; right: 
 #hxProjects :focus-visible { outline: 2px solid var(--hx-ink, #3054FD); outline-offset: 2px; }
 
 /* header */
-.hxp-top { position: sticky; top: 0; z-index: 3; display: flex; align-items: center; gap: 6px; height: 52px; padding: 0 12px 0 16px;
+/* the header reaches up through the safe-area strip (iPhone status bar), so scrolled content never shows above it */
+.hxp-top { position: sticky; top: calc(-1 * env(safe-area-inset-top, 0px)); margin-top: calc(-1 * env(safe-area-inset-top, 0px)); z-index: 3; display: flex; align-items: center; gap: 6px;
+  height: calc(52px + env(safe-area-inset-top, 0px)); padding: env(safe-area-inset-top, 0px) 12px 0 10px;
   background: color-mix(in srgb, var(--hx-bg, #fff) 94%, transparent); -webkit-backdrop-filter: saturate(1.6) blur(18px); backdrop-filter: saturate(1.6) blur(18px); }
 .hxp-title { flex: 1; min-width: 0; display: flex; align-items: baseline; gap: 8px; font-size: 17px; font-weight: 600; letter-spacing: -0.015em; }
 .hxp-title span { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
@@ -181,8 +183,21 @@ html.hx-proj-open #hxProjects { display: block; position: fixed; top: 0; right: 
 @media (prefers-reduced-motion: reduce) { .hxp-scrim, .hxp-sheet { animation: none; } }
 
 @media (max-width: 640px) {
-  .hxp-stats { grid-template-columns: repeat(3, 1fr); }
+  /* five tiles: three across, then two wider ones, so no row ends in a hole */
+  .hxp-stats { grid-template-columns: repeat(6, 1fr); }
+  .hxp-stats > * { grid-column: span 2; }
+  .hxp-stats > :nth-child(4):nth-last-child(2), .hxp-stats > :nth-child(5):last-child { grid-column: span 3; }
   .hxp-stats-sm { grid-template-columns: repeat(2, 1fr); }
+  .hxp-stats-sm > * { grid-column: auto !important; }
+  .hxp-stats-sm .hxp-stat { padding: 9px 12px; flex-direction: row; align-items: baseline; gap: 8px; }
+  .hxp-stats-sm .hxp-stat strong { font-size: 15px; }
+  .hxp-stats-sm .hxp-stat span { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; min-width: 0; }
+  /* a status tag drops under a long title instead of squeezing it */
+  .hxp-item-t { flex-wrap: wrap; row-gap: 2px; }
+  /* a row with a text button (Make primary): the button drops under the details instead of squeezing them */
+  .hxp-item:has(> .hxp-item-a .hxp-sm) { flex-wrap: wrap; row-gap: 8px; }
+  .hxp-item:has(> .hxp-item-a .hxp-sm) > .hxp-item-b { flex-basis: calc(100% - 46px); }
+  .hxp-item:has(> .hxp-item-a .hxp-sm) > .hxp-item-a { margin-left: 46px; }
   .hxp-hero .hxp-row > * { flex: 1; }
   .hxp-scrim { place-items: end stretch; padding: 0; }
   .hxp-sheet { width: 100%; max-height: 92vh; border-radius: 22px 22px 0 0; padding-bottom: calc(20px + env(safe-area-inset-bottom)); }
@@ -239,3 +254,9 @@ html.hx-proj-open .nav-tab.active:not(.hxp-nav) svg[data-hi] { stroke-width: 1.5
 .hxp-mo-c em { width: 16px; height: 16px; border-radius: 50%; margin-left: -5px; box-shadow: 0 0 0 1.5px var(--hx-bg, #1c1c1e); }
 .hxp-mo-c em:first-child { margin-left: 0; }
 @media (max-width: 640px) { .hxp-mo-h { flex-direction: column; } .hxp-mo-h .hxp-primary { align-self: stretch; justify-content: center; } }
+
+/* repo suggestions (New project sheet + picker): a quiet label, one-tap rows with a + on the right */
+.hxp-sugg { display: flex; flex-direction: column; gap: 4px; min-width: 0; }
+.hxp-sugg:empty { display: none; }
+.hxp-sugg-h { margin: 6px 2px 0; font-size: 12.5px; font-weight: 500; color: var(--hx-text-2, #6B6B70); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.hxp-item > .hxp-sugg-add { color: var(--hx-ink, #3054FD); flex: none; }

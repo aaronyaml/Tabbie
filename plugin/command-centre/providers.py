@@ -496,6 +496,12 @@ def planner_config(cfg: dict) -> dict:
         pcfg.update(provider="claude-cli", model=pcfg.get("claude_model") or None)
     elif pcfg.get("provider") == "claude-cli" and "claude" not in on:
         pcfg.update(provider="codex-cli", model=pcfg.get("codex_model") or "gpt-6-astra")
+    # router.yaml names a model once; each run uses that family's newest (model_latest)
+    from . import model_latest
+    if pcfg.get("model"):
+        new = model_latest.upgrade(str(pcfg["model"]))
+        if new != pcfg["model"]:
+            pcfg.update(model=new, label=model_latest.display_name(new))
     return pcfg
 
 
@@ -592,8 +598,9 @@ WORKER_RULES = """You are the execution worker of the user's command centre (dis
   the IMAGES FOR THE USER folder given below, and write a line `ATTACH: /absolute/path.png` (png,
   jpg, webp or gif), during the work or in your final message. It appears in the chat straight
   away. Images saved anywhere else are NOT shown. Only images the user should see.
-  A PDF for the user (a report, an export) works the same way: `ATTACH: /absolute/path.pdf` in your
-  final message; it shows as a file card they can open and download.
+  Any other file for the user (a PDF report, a .md/.txt/.csv, a zip, a build) works the same way:
+  `ATTACH: /absolute/path.pdf` in your final message; it shows as a file card they can open (readable
+  types view in the browser) and download. Never attach secrets or key files.
 - Verify your work (tests/build/typecheck/visual check as appropriate) before reporting.
 - Final message, short bullets only:
     Done: <what changed>
@@ -1028,6 +1035,8 @@ def build_codex_exec_cmd(*, model: str, effort: str | None, out_file: Path, cwd:
     """`codex exec` argv for an executor run (new thread or `exec resume`). sandbox read-only for a
     read-mode delegate; ephemeral (no saved session) for delegates; extra: e.g. codex_mcp_overrides()."""
     from .executor_choice import codex_effort_args
+    from . import model_latest
+    model = model_latest.upgrade(model) or model
     common = ["--skip-git-repo-check", "--json", "-m", model, "-o", str(out_file),
               *codex_effort_args(effort), "-c", "sandbox_workspace_write.network_access=true",
               *(["--ephemeral"] if ephemeral else []), *(extra or [])]

@@ -994,8 +994,8 @@ def _claude_prompt(r: Request, manifest: Manifest, history: bool = False) -> str
     parts += ["", manifest.render(), "", _memory_context(r)]
     parts += ["", f"IMAGES FOR THE USER: save screenshots/renders to show under {(r.dir / 'attach').resolve()} "
                   "(or inside the project folders above), then write `ATTACH: <absolute path>` on its own line. "
-                  "Images anywhere else are not shown. A PDF for the user: the same `ATTACH:` line in your final "
-                  "message; it shows as a file card."]
+                  "Images anywhere else are not shown. Any other file for the user (PDF, .md, .csv, zip…): the same "
+                  "`ATTACH:` line in your final message; it shows as a file card."]
     return "\n".join(parts)
 
 
@@ -1392,7 +1392,7 @@ def _takeover_prompt(r: Request) -> str:
              "Be exhaustive in execution, minimal in words. Final message: Done / Verified / Note bullets.",
              "To show the user an image while you work (screenshot, render), write a line "
              "`ATTACH: /absolute/path.png` (png/jpg/webp/gif inside the project); it appears in the chat at once. "
-             "A PDF for the user: `ATTACH: /absolute/path.pdf` in your final message (a file card).",
+             "Any other file for the user (PDF, .md, .csv, zip…): `ATTACH: /absolute/path.pdf` in your final message (a file card).",
              questions.QUESTION_RULES,
              "", _claude_prompt(r, Manifest(r.dir)),
              "", "RECENT SESSION CONVERSATION (compacted):", convo or "(none)",

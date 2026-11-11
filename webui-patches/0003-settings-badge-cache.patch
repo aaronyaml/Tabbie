@@ -1,0 +1,43 @@
+diff --git a/api/updates.py b/api/updates.py
+index 136cab0f6..05315a26c 100644
+--- a/api/updates.py
++++ b/api/updates.py
+@@ -822,7 +822,38 @@ def _read_update_channel() -> str:
+         return DEFAULT_UPDATE_CHANNEL
+ 
+ 
++# Tabbie patch (webui-patches/0003): GET /api/settings computes this badge on every call, and page load
++# asks for settings several times at once; each call forked three git processes (0.25-1 s), which held up
++# the first chat render. The badge only changes when the checkout does, so keep it per channel until
++# .git/HEAD or .git/index changes, and at most 5 minutes.
++_HX_BADGE_CACHE = {}
++
++
++def _hx_badge_stamp():
++    stamp = []
++    for name in ('HEAD', 'index'):
++        try:
++            stamp.append(os.stat(os.path.join(str(REPO_ROOT), '.git', name)).st_mtime_ns)
++        except OSError:
++            stamp.append(None)
++    return tuple(stamp)
++
++
+ def channel_version_badge(channel=None) -> str:
++    if channel is None:
++        channel = _read_update_channel()
++    channel = _normalize_channel(channel)
++    stamp = _hx_badge_stamp()
++    hit = _HX_BADGE_CACHE.get(channel)
++    now = time.monotonic()
++    if hit and hit[0] == stamp and now - hit[1] < 300:
++        return hit[2]
++    value = _channel_version_badge_uncached(channel)
++    _HX_BADGE_CACHE[channel] = (stamp, now, value)
++    return value
++
++
++def _channel_version_badge_uncached(channel=None) -> str:
+     """Return a channel-scoped version string for the Settings display badge ONLY.
+ 
+     This is DELIBERATELY separate from ``WEBUI_VERSION``. ``WEBUI_VERSION`` is

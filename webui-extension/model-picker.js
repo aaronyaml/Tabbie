@@ -4,7 +4,10 @@
  *   step 3: Providers: add an API key (Anthropic, OpenAI, DeepSeek, Kimi, GLM...), a local Ollama or a
  *           custom endpoint. Keys go straight to the computer's keychain; the page never keeps or shows one.
  *   GET/POST api/extensions/cc-agents/sidecar/providers  (list | {action: key|check|enable|disable|remove|add})
- * Phone: bottom sheet. Desktop: popover above the chip.
+ *   step 4: Agents & behaviour (Claude Code / Codex on-off, Hand-offs, Takeover, Small commits, Test before done),
+ *           reached from one compact row under the models so step 1 stays about picking a model.
+ * Phone: bottom sheet. Desktop: popover above (or below) the chip. Each pane scrolls on its own inside a
+ * frame sized to the room on screen, so long lists (More models) always reach the bottom.
  * Data: cc-agents sidecar via the WebUI's authenticated, consent-gated proxy:
  *   GET  api/extensions/cc-agents/sidecar/executor?id=<session>  -> {choice, catalog}
  *   GET  api/extensions/cc-agents/sidecar/executor  (no id: new-chat home) -> {choice: the default, catalog}
@@ -40,7 +43,7 @@
     providers: {
       anthropic: { name: 'Anthropic', worker: 'Claude Code', models: [
         { id: 'claude-opus-5-5', name: 'Opus 5.5', desc: 'Most capable' },
-        { id: 'claude-fable-5-1', name: 'Fable 5.1', desc: 'Deepest reasoning, slower' },
+        { id: 'claude-fable-5-2', name: 'Fable 5.2', desc: 'Deepest reasoning, slower' },
         { id: 'claude-sonnet-5-5', name: 'Sonnet 5.5', desc: 'Fast and capable' },
         { id: 'claude-haiku-5-5', name: 'Haiku 5.5', desc: 'Quickest' }] },
       openai: { name: 'OpenAI', worker: 'Codex', models: [
@@ -81,6 +84,27 @@
   const modelOf = (p, m) => ((catalog.providers[p] || {}).models || []).find((x) => x.id === m);
   const nameOf = (c) => (modelOf(c.provider, c.model) || {}).name || c.name || 'Model';
   const pick = (c) => ({ provider: c.provider, model: c.model, effort: c.effort || null });
+  // The model new chats start on, shared with Settings → Preferences (settings-tidy.js): the last pick here,
+  // or the one set there. The helper keeps it (executor_choice, POST /executor {default}); this browser
+  // copy covers an older helper and other tabs. Window event 'hx:new-chat-model' {provider, model, effort, from}.
+  const DKEY = 'hx-new-chat-model';
+  const readDefault = () => { try { const d = JSON.parse(localStorage.getItem(DKEY) || 'null'); return d && d.provider && d.model ? pick(d) : null; } catch (_) { return null; } };
+  const keepDefault = (c) => { try { localStorage.setItem(DKEY, JSON.stringify(pick(c))); } catch (_) {} };
+  function shareDefault(c) {
+    keepDefault(c);
+    // in a chat, the helper saves the chat's pick as the default too; on the new-chat home there's no chat yet
+    if (!sid()) post(API, Object.assign({ default: true }, pick(c), { effort: c.effort || '' })).catch(() => {});
+    window.dispatchEvent(new CustomEvent('hx:new-chat-model', { detail: Object.assign(pick(c), { from: 'picker' }) }));
+  }
+  // On the new-chat home: show it. Not held as `pending` (that would also land on any chat opened from the
+  // home): the helper starts new chats on its saved default, which Settings / a pick here keep current.
+  function useDefault(c) {
+    if (sid() || pending || !c || !modelOf(c.provider, c.model)) return;
+    choice = pick(c);
+    paintChip(); if (open) paint();
+  }
+  window.addEventListener('hx:new-chat-model', (e) => { if (e.detail && e.detail.from !== 'picker') useDefault(e.detail); });
+  window.addEventListener('storage', (e) => { if (e.key === DKEY) useDefault(readDefault()); });
   function setOffline(on) {
     offline = on;
     retryAt = on ? Date.now() + 10000 : 0;
@@ -101,6 +125,12 @@
       setOffline(false);
       if (j.catalog && j.catalog.providers) catalog = j.catalog;
       if (j.choice && !(s === '' && pending)) choice = pick(j.choice);
+      // new-chat home: a default saved by the helper wins; without one (or an older helper) use this browser's
+      if (s === '' && j.choice && !pending) {
+        const d = readDefault();
+        if (j.choice.default_saved) keepDefault(j.choice);
+        else if (d && modelOf(d.provider, d.model)) { choice = pick(d); post(API, Object.assign({ default: true }, d, { effort: d.effort || '' })).catch(() => {}); }
+      }
       if (notice === NO_CONSENT) notice = '';
       if (pending && !modelOf(pending.provider, pending.model)) { pending = null; choice = pick(j.choice); }
     } catch (_) { setOffline(true); /* sidecar down: keep showing the last known pick */ }
@@ -170,6 +200,7 @@
   async function save(next, flushing) {
     const prev = flushing ? next : choice;
     choice = next;
+    if (!flushing) shareDefault(next);  // a pick here is also what new chats start on
     paintChip();
     const s = sid();
     if (!s) { pending = next; return; }
@@ -254,10 +285,11 @@
     root = document.createElement('div');
     root.className = 'hx-mp-root';
     root.innerHTML = '<div class="hx-mp-scrim"></div>'
-      + '<div class="hx-mp-panel" role="dialog" aria-modal="true" aria-label="Choose a model">'
+      + '<div class="hx-mp-panel hx-pop" role="dialog" aria-modal="true" aria-label="Choose a model">'
       + '<div class="hx-mp-grab" aria-hidden="true"></div>'
       + '<div class="hx-mp-frame"><div class="hx-mp-track"><section class="hx-mp-pane" data-step="1"></section>'
-      + '<section class="hx-mp-pane" data-step="2"></section><section class="hx-mp-pane" data-step="3"></section></div></div></div>';
+      + '<section class="hx-mp-pane" data-step="2"></section><section class="hx-mp-pane" data-step="3"></section>'
+      + '<section class="hx-mp-pane" data-step="4"></section></div></div></div>';
     document.body.appendChild(root);
     panel = root.querySelector('.hx-mp-panel');
     frame = root.querySelector('.hx-mp-frame');
@@ -267,10 +299,16 @@
     panel.addEventListener('keydown', onKey);
     panel.addEventListener('input', onInput);
     let y0 = null;  // phone: drag the sheet down to dismiss
-    panel.addEventListener('touchstart', (e) => { y0 = panel.scrollTop <= 0 ? e.touches[0].clientY : null; }, { passive: true });
+    panel.addEventListener('touchstart', (e) => {
+      const p = activePane();
+      const inInput = e.target.closest && e.target.closest('input');
+      y0 = (!p || p.scrollTop <= 0) && !inInput ? e.touches[0].clientY : null;
+    }, { passive: true });
     panel.addEventListener('touchmove', (e) => {
       if (y0 == null || !phone()) return;
       const dy = Math.max(0, e.touches[0].clientY - y0);
+      const p = activePane();
+      if (p && p.scrollTop > 0) { y0 = null; panel.style.transition = ''; panel.style.transform = ''; return; }
       panel.style.transition = 'none'; panel.style.transform = `translateY(${dy}px)`;
     }, { passive: true });
     panel.addEventListener('touchend', (e) => {
@@ -281,6 +319,9 @@
     });
   }
 
+  const BACK = () => `<button type="button" class="hx-back" data-back aria-label="Back">${icon('ArrowLeft01Icon', 20)}</button>`;
+  const subHead = (title) => `<header class="hx-mp-head hx-mp-head-2">${BACK()}<span class="hx-mp-title">${esc(title)}</span><span class="hx-mp-spacer"></span></header>`;
+
   function paneOne() {
     const rows = Object.keys(catalog.providers).map((p) => {
       const pv = catalog.providers[p];
@@ -288,35 +329,59 @@
       const sub = cur ? nameOf(choice) : pv.worker;
       const badge = pv.billing_label ? `<span class="hx-mp-badge" data-billing="${esc(pv.billing)}">${esc(pv.billing_label)}</span>` : '';
       return `<button type="button" class="hx-mp-row hx-mp-prov${cur ? ' is-current' : ''}" data-provider="${esc(p)}">`
-        + `<span class="hx-mp-tile">${icon(iconFor(p, pv), 22)}</span>`
+        + `<span class="hx-mp-tile">${icon(iconFor(p, pv), 18)}</span>`
         + `<span class="hx-mp-text"><span class="hx-mp-name">${esc(pv.name)}${badge}</span><span class="hx-mp-desc">${esc(sub)}</span></span>`
-        + `<span class="hx-mp-go">${icon('ArrowRight01Icon', 16)}</span></button>`;
+        + `<span class="hx-mp-go">${icon('ArrowRight01Icon', 15)}</span></button>`;
     }).join('');
-    // Agents: one card of switch rows (Claude Code, Codex, Hand-offs, Takeover, Small commits, Test before done). Same data attributes
-    // and handlers as before; unavailable ones are dimmed with the reason as their subtitle.
+    // Agents and behaviour switches live on their own page (step 4); here one row sums them up.
+    const on = catalog.agents || AGENTS.map((x) => x[0]);
+    const names = on.map((a) => (a === 'claude' ? 'Claude Code' : a === 'codex' ? 'Codex' : a)).join(' & ');
+    const flags = handoffs.known ? flagStates() : [];
+    const off = flags.filter((f) => !f.on).length;
+    const sum = names + (flags.length ? (off ? ` · ${off} option${off > 1 ? 's' : ''} off` : ' · all options on') : '');
+    return `<header class="hx-mp-head"><span class="hx-mp-title">Model</span><span class="hx-mp-scope">${sid() ? 'This chat' : 'New chat'}</span></header>`
+      + `<div class="hx-mp-list">${rows}`
+      + `<button type="button" class="hx-mp-row hx-mp-add" data-manage><span class="hx-mp-tile">${icon('Add01Icon', 17)}</span>`
+      + `<span class="hx-mp-text"><span class="hx-mp-name">More models</span><span class="hx-mp-desc">DeepSeek, Kimi, GLM, OpenRouter, Ollama…</span></span>`
+      + `<span class="hx-mp-go">${icon('ArrowRight01Icon', 15)}</span></button></div>`
+      + `<div class="hx-mp-sep" role="separator"></div>`
+      + `<button type="button" class="hx-mp-row hx-mp-agentsnav" data-agentsnav><span class="hx-mp-tile">${icon('SlidersHorizontalIcon', 17)}</span>`
+      + `<span class="hx-mp-text"><span class="hx-mp-name">Agents &amp; behaviour</span><span class="hx-mp-desc">${esc(sum)}</span></span>`
+      + `<span class="hx-mp-go">${icon('ArrowRight01Icon', 15)}</span></button>`
+      + (notice ? noteHtml() : '');
+  }
+
+  // Hand-offs, Takeover, Small commits, Test before done: current state and whether each can be used.
+  function flagStates() {
     const on = catalog.agents || AGENTS.map((x) => x[0]);
     const bothOn = on.includes('claude') && on.includes('codex');
     const extra = Object.values(catalog.providers || {}).some((p) => p.endpoint);
     const unavail = handoffs.known && handoffs.available === false;
-    const tile = (attr, ic, name, sub, isOn, off) => `<button type="button" class="hx-mp-tog${isOn ? ' is-on' : ''}${off ? ' is-unavail' : ''}" ${attr}`
+    return [
+      { attr: 'data-handoffs', ic: 'ShuffleIcon', name: 'Hand-offs', sub: unavail ? 'Needs Claude Code and Codex' : 'Agents share parts of a job',
+        on: handoffs.dynamic && !unavail, off: unavail },
+      { attr: 'data-takeover', ic: 'RefreshIcon', name: 'Takeover', sub: bothOn || extra ? 'Switch agent at a usage limit' : 'Needs a second agent or provider',
+        on: handoffs.takeover !== false && (bothOn || extra), off: !(bothOn || extra) },
+      { attr: 'data-flag="step_commits"', ic: 'GitBranchIcon', name: 'Small commits', sub: 'Commit each working step', on: handoffs.step_commits !== false, off: false },
+      { attr: 'data-flag="uat"', ic: 'CheckListIcon', name: 'Test before done', sub: 'Test every code change', on: handoffs.uat !== false, off: false },
+    ];
+  }
+
+  // step 4: Agents & behaviour. Same data attributes and handlers as before; unavailable ones are dimmed
+  // with the reason as their one-line description.
+  function paneFour() {
+    const on = catalog.agents || AGENTS.map((x) => x[0]);
+    const tog = (attr, ic, name, sub, isOn, off) => `<button type="button" class="hx-mp-tog${isOn ? ' is-on' : ''}${off ? ' is-unavail' : ''}" ${attr}`
       + ` role="switch" aria-checked="${isOn}"${off ? ' aria-disabled="true" disabled' : ''}>`
-      + `<span class="hx-mp-tog-ic">${icon(ic, 16)}</span><span class="hx-mp-tog-tx"><span class="hx-mp-tog-name">${name}</span>`
-      + `<span class="hx-mp-tog-sub">${sub}</span></span><span class="hx-mp-switch" aria-hidden="true"></span></button>`;
-    const tiles = tile('data-agent="claude"', 'AiBrain01Icon', 'Claude Code', 'Claude plan', on.includes('claude'), false)
-      + tile('data-agent="codex"', 'AiMagicIcon', 'Codex', 'ChatGPT plan', on.includes('codex'), false)
-      + (!handoffs.known ? '' : tile('data-handoffs', 'ShuffleIcon', 'Hand-offs', unavail ? 'Needs Claude Code and Codex signed in' : 'Pass parts of a job along',
-        handoffs.dynamic && !unavail, unavail))
-      + (!handoffs.known ? '' : tile('data-takeover', 'RefreshIcon', 'Takeover', bothOn || extra ? 'Carry on elsewhere at a limit' : 'Needs a second agent or provider',
-        handoffs.takeover !== false && (bothOn || extra), !(bothOn || extra)))
-      + (!handoffs.known ? '' : tile('data-flag="step_commits"', 'GitBranchIcon', 'Small commits', 'Commit each working step', handoffs.step_commits !== false, false))
-      + (!handoffs.known ? '' : tile('data-flag="uat"', 'CheckListIcon', 'Test before done', 'Test every code change', handoffs.uat !== false, false));
-    return `<header class="hx-mp-head"><span class="hx-mp-title">Model</span></header>`
-      + `<div class="hx-mp-list">${rows}`
-      + `<button type="button" class="hx-mp-row hx-mp-add" data-manage><span class="hx-mp-tile">${icon('Add01Icon', 20)}</span>`
-      + `<span class="hx-mp-text"><span class="hx-mp-name">More models</span><span class="hx-mp-desc">DeepSeek, Kimi, GLM, OpenRouter, API keys, Ollama…</span></span>`
-      + `<span class="hx-mp-go">${icon('ArrowRight01Icon', 16)}</span></button></div>`
-      + `<p class="hx-mp-group">Agents</p><div class="hx-mp-togs" role="group" aria-label="Coding agents on this computer">${tiles}</div>`
-      + (notice ? noteHtml() : `<p class="hx-mp-cap">${sid() ? 'For this conversation' : 'For this new chat'}</p>`);
+      + `<span class="hx-mp-tog-ic">${icon(ic, 15)}</span><span class="hx-mp-tog-tx"><span class="hx-mp-tog-name">${name}</span>`
+      + `<span class="hx-mp-tog-sub">${esc(sub)}</span></span><span class="hx-mp-switch" aria-hidden="true"></span></button>`;
+    const agents = tog('data-agent="claude"', 'AiBrain01Icon', 'Claude Code', 'Claude plan', on.includes('claude'), false)
+      + tog('data-agent="codex"', 'AiMagicIcon', 'Codex', 'ChatGPT plan', on.includes('codex'), false);
+    const flags = handoffs.known ? flagStates().map((f) => tog(f.attr, f.ic, f.name, f.sub, f.on, f.off)).join('') : '';
+    return subHead('Agents & behaviour')
+      + `<p class="hx-mp-group">Coding agents</p><div class="hx-mp-togs" role="group" aria-label="Coding agents on this computer">${agents}</div>`
+      + (flags ? `<p class="hx-mp-group">How jobs run</p><div class="hx-mp-togs" role="group" aria-label="How jobs run">${flags}</div>` : '')
+      + (notice ? noteHtml() : '<p class="hx-mp-cap">Applies to every chat. A request that says otherwise wins for that request.</p>');
   }
 
   function paneTwo() {
@@ -333,8 +398,7 @@
     const levels = ['', ...(catalog.efforts || [])];
     const eff = choice.effort || '';
     const seg = levels.map((l) => `<button type="button" class="hx-mp-seg${eff === l ? ' is-on' : ''}" data-effort="${l}" aria-pressed="${eff === l}">${EFFORT_LABEL[l] || l}</button>`).join('');
-    return `<header class="hx-mp-head hx-mp-head-2"><button type="button" class="hx-mp-back" data-back aria-label="Back">${icon('ArrowLeft01Icon', 18)}</button>`
-      + `<span class="hx-mp-title">${esc(pv.name || '')}</span><span class="hx-mp-spacer"></span></header>`
+    return subHead(pv.name || '')
       + (pv.billing_label ? `<p class="hx-mp-cap hx-mp-bill">${esc((BILLING_NOTE[pv.billing] || (() => ''))(pv.name))}</p>` : '')
       + (many ? `<div class="hx-mp-searchwrap">${icon('Search01Icon', 15)}<input type="search" class="hx-mp-search" data-search placeholder="Search ${(pv.models || []).length} models" value="${esc(query)}" autocomplete="off" spellcheck="false"></div>` : '')
       + `<div class="hx-mp-list${many ? ' is-long' : ''}">${rows}</div>`
@@ -416,8 +480,7 @@
       + `<span class="hx-mp-go hx-mp-chev">${icon('ArrowDown01Icon', 14)}</span></button>${body}</div>`;
   }
   function paneThree() {
-    const head = `<header class="hx-mp-head hx-mp-head-2"><button type="button" class="hx-mp-back" data-back aria-label="Back">${icon('ArrowLeft01Icon', 18)}</button>`
-      + '<span class="hx-mp-title">More models</span><span class="hx-mp-spacer"></span></header>';
+    const head = subHead('More models');
     if (!provs) return head + '<p class="hx-mp-cap">Loading…</p>';
     if (provs.error) return head + `<p class="hx-mp-cap">${esc(provs.error)}</p>`;
     const all = provs.providers || [];
@@ -438,52 +501,87 @@
   }
 
   function paint() {
-    const [a, b, c] = track.querySelectorAll('.hx-mp-pane');
+    const [a, b, c, d] = track.querySelectorAll('.hx-mp-pane');
     // keep what's typed in step 3 across repaints (a key being pasted, the custom form)
     const kept = {};
     c.querySelectorAll('input').forEach((i) => { if (i.value) kept[(i.dataset.key || '') + '|' + (i.dataset.c || '')] = i.value; });
     const focused = c.contains(document.activeElement) && document.activeElement.tagName === 'INPUT'
       ? (document.activeElement.dataset.key || '') + '|' + (document.activeElement.dataset.c || '') : null;
     const worker = (c.querySelector('[data-cworker].is-on') || {}).dataset;
-    const scrolls = [...track.querySelectorAll('.hx-mp-provlist, .hx-mp-list.is-long')].map((l) => [l.closest('.hx-mp-pane').dataset.step, l.scrollTop]);
+    const panes = [a, b, c, d];
+    const scrolls = panes.map((p) => [p.scrollTop, (p.querySelector('.hx-mp-list.is-long') || {}).scrollTop || 0]);
     a.innerHTML = paneOne();
     b.innerHTML = paneTwo();
     c.innerHTML = step === 3 ? paneThree() : '';
+    d.innerHTML = paneFour();
     c.querySelectorAll('input').forEach((i) => {
       const k = (i.dataset.key || '') + '|' + (i.dataset.c || '');
       if (kept[k]) i.value = kept[k];
       if (k === focused) i.focus({ preventScroll: true });
     });
     if (worker && worker.cworker) setWorker(c, worker.cworker);
-    scrolls.forEach(([st, top]) => { const l = track.querySelector(`.hx-mp-pane[data-step="${st}"] .hx-mp-provlist, .hx-mp-pane[data-step="${st}"] .hx-mp-list.is-long`); if (l) l.scrollTop = top; });
-    a.inert = step !== 1; b.inert = step !== 2; c.inert = step !== 3;
-    track.style.transform = step > 1 ? `translateX(-${(step - 1) * 100 / 3}%)` : '';
     fit();
+    // panes are the scrollers: put back where each was (a pane's own scroll survives a repaint)
+    panes.forEach((p, i) => {
+      p.scrollTop = scrolls[i][0];
+      const l = p.querySelector('.hx-mp-list.is-long');
+      if (l) l.scrollTop = scrolls[i][1];
+    });
+    a.inert = step !== 1; b.inert = step !== 2; c.inert = step !== 3; d.inert = step !== 4;
+    track.style.transform = step > 1 ? `translateX(-${(step - 1) * 25}%)` : '';
   }
+  const activePane = () => (track ? track.querySelectorAll('.hx-mp-pane')[step - 1] : null);
+  // Every pane is capped at the room on screen and scrolls inside itself; the frame takes the active
+  // pane's height (animated), so the popover/sheet never runs off-screen and its bottom is reachable.
   function fit() {
-    const pane = track.querySelectorAll('.hx-mp-pane')[step - 1];
-    const h = pane.scrollHeight;
-    const room = place(h + 24) - 24;  // a short window: the pane scrolls inside the popover instead of running off-screen
-    frame.style.height = Math.min(h, Math.max(200, room)) + 'px';
-    frame.style.overflowY = h > room ? 'auto' : '';
+    const pane = activePane();
+    if (!pane) return;
+    const panes = track.querySelectorAll('.hx-mp-pane');
+    pane.style.maxHeight = 'none';
+    const natural = pane.scrollHeight;
+    const room = Math.max(160, Math.floor(place(natural + chrome()) - chrome()));
+    panes.forEach((p) => { p.style.maxHeight = room + 'px'; });
+    frame.style.height = Math.min(natural, room) + 'px';
+  }
+  // vertical space the panel adds around the frame (sheet grab handle, safe-area padding, border)
+  function chrome() {
+    const cs = getComputedStyle(panel);
+    const grab = root.classList.contains('is-sheet') ? 13 : 0;
+    return grab + (parseFloat(cs.paddingTop) || 0) + (parseFloat(cs.paddingBottom) || 0) + 2;
   }
   // Desktop popover: above the chip, or below it when the composer sits high (new-chat home). Returns
   // the room on that side.
   function place(h) {
-    if (phone()) { panel.style.left = panel.style.bottom = panel.style.top = panel.style.width = ''; return Infinity; }
+    if (phone()) {
+      panel.style.left = panel.style.bottom = panel.style.top = panel.style.width = '';
+      return window.innerHeight - safeTop() - 16;  // the sheet stops short of the status bar / Dynamic Island
+    }
     const r = chip.getBoundingClientRect();
     const w = 320;
     const need = h || panel.offsetHeight || 320;
     panel.style.width = w + 'px';
     panel.style.left = Math.max(12, Math.min(r.left, window.innerWidth - w - 12)) + 'px';
-    const below = r.top - 8 < need + 12 && window.innerHeight - r.bottom > r.top;
+    // pick the side once per opening (sub-pages are taller than step 1: don't flip mid-way); below only
+    // when a typical sub-page wouldn't fit above and there's more room below (new-chat home)
+    if (side == null) side = r.top - 8 < Math.max(need, 460) + 12 && window.innerHeight - r.bottom > r.top ? 'below' : 'above';
+    const below = side === 'below';
     panel.classList.toggle('is-below', below);
     if (below) { panel.style.bottom = ''; panel.style.top = (r.bottom + 8) + 'px'; }
     else { panel.style.top = ''; panel.style.bottom = Math.max(12, window.innerHeight - r.top + 8) + 'px'; }
     return below ? window.innerHeight - r.bottom - 20 : r.top - 20;  // height the popover has on that side
   }
 
+  let side = null;  // 'above' | 'below' the chip, fixed while the popover is open
+  let probe = null;
+  function safeTop() {
+    if (!probe) { probe = document.createElement('div'); probe.style.cssText = 'position:fixed;top:0;left:0;width:0;visibility:hidden;pointer-events:none;height:env(safe-area-inset-top,0px)'; document.body.appendChild(probe); }
+    return probe.offsetHeight || 0;
+  }
+  // where Back / Escape / ArrowLeft lands on step 1: the row that opened this page
+  const backSel = () => (step === 3 ? '[data-manage]' : step === 4 ? '[data-agentsnav]' : `[data-provider="${browsing}"]`);
+
   function go(n, focusSel) {
+    if (n !== step && track) { const p = track.querySelectorAll('.hx-mp-pane')[n - 1]; if (p) p.scrollTop = 0; }
     step = n;
     paint();
     const pane = track.querySelectorAll('.hx-mp-pane')[n - 1];
@@ -499,6 +597,7 @@
     browsing = choice.provider;
     step = 1;
     root.classList.toggle('is-sheet', phone());
+    side = null;
     place();
     paint();
     root.classList.add('is-mounted');
@@ -520,7 +619,7 @@
     if (chip && panel.contains(document.activeElement)) chip.focus({ preventScroll: true });
   }
   function outside(e) { if (!panel.contains(e.target) && !(chip && chip.contains(e.target))) close(); }
-  function onResize() { root.classList.toggle('is-sheet', phone()); place(); fit(); }
+  function onResize() { root.classList.toggle('is-sheet', phone()); side = null; fit(); }
 
   function onClick(e) {
     const t = e.target.closest('button');
@@ -531,7 +630,8 @@
     if (t.hasAttribute('data-takeover')) { toggleFlag('takeover'); return; }
     if (t.dataset.flag) { toggleFlag(t.dataset.flag); return; }
     if (t.dataset.provider) { if (browsing !== t.dataset.provider) query = ''; browsing = t.dataset.provider; go(2); return; }
-    if (t.hasAttribute('data-back')) { go(1, step === 3 ? '[data-manage]' : `[data-provider="${browsing}"]`); return; }
+    if (t.hasAttribute('data-back')) { go(1, backSel()); return; }
+    if (t.hasAttribute('data-agentsnav')) { go(4, '.hx-mp-tog'); return; }
     if (t.hasAttribute('data-manage')) { loadProviders(); go(3, '[data-prov]'); return; }
     if (t.dataset.prov) {
       provOpen = provOpen === t.dataset.prov ? '' : t.dataset.prov;
@@ -594,7 +694,7 @@
     fit();
   }
   function onKey(e) {
-    if (e.key === 'Escape') { e.preventDefault(); step > 1 ? go(1, step === 3 ? '[data-manage]' : `[data-provider="${browsing}"]`) : close(); return; }
+    if (e.key === 'Escape') { e.preventDefault(); step > 1 ? go(1, backSel()) : close(); return; }
     if (e.key === 'Enter' && e.target.dataset && e.target.dataset.key) {
       e.preventDefault();
       const b = track.querySelector(`[data-savekey="${CSS.escape(e.target.dataset.key)}"]`);
@@ -602,9 +702,9 @@
       return;
     }
     if (e.target.tagName === 'INPUT') return;  // typing a key or a search: arrows move the caret
-    if (e.key === 'ArrowLeft' && step > 1 && !e.target.closest('.hx-mp-segs')) { go(1, step === 3 ? '[data-manage]' : `[data-provider="${browsing}"]`); return; }
+    if (e.key === 'ArrowLeft' && step > 1 && !e.target.closest('.hx-mp-segs')) { go(1, backSel()); return; }
     if (e.key === 'ArrowDown' || e.key === 'ArrowUp') {
-      const rows = [...track.querySelectorAll('.hx-mp-pane')[step - 1].querySelectorAll('.hx-mp-row:not([hidden])')];
+      const rows = [...track.querySelectorAll('.hx-mp-pane')[step - 1].querySelectorAll('.hx-mp-row:not([hidden]), .hx-mp-tog:not([disabled])')];
       const i = rows.indexOf(document.activeElement);
       if (i < 0) return;
       e.preventDefault();

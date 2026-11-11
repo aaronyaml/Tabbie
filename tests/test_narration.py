@@ -262,3 +262,30 @@ def test_pdf_attach_becomes_file_card(tmp_path):
 
 def test_worker_rules_mention_pdf():
     assert "ATTACH: /absolute/path.pdf" in providers.worker_rules("claude")
+
+
+def test_any_file_type_attach_becomes_file_card(tmp_path):
+    proj, chat = tmp_path / "proj", tmp_path / "webui" / "attachments" / "abc123"
+    proj.mkdir(parents=True)
+    for name, data in (("notes.md", b"# Hi\n"), ("data.csv", b"a,b\n1,2\n"), ("build.zip", b"PK\x03\x04" + b"z" * 40),
+                       ("deck.pptx", b"PK\x03\x04" + b"p" * 40), ("tiny.txt", b"x")):
+        (proj / name).write_bytes(data)
+    text = "\n".join(f"ATTACH: {proj / n}" for n in ("notes.md", "data.csv", "build.zip", "deck.pptx", "tiny.txt"))
+    out = agents.attach_docs(text, [str(proj)], chat)
+    for n in ("notes.md", "data.csv", "build.zip", "deck.pptx", "tiny.txt"):
+        assert f"MEDIA: {chat / n}" in out and (chat / n).read_bytes() == (proj / n).read_bytes()
+    # same name, different content: both kept
+    (proj / "sub").mkdir(); (proj / "sub" / "notes.md").write_bytes(b"# Other\n")
+    out2 = agents.attach_docs(f"ATTACH: {proj / 'sub' / 'notes.md'}", [str(proj)], chat)
+    assert "MEDIA: " in out2 and "notes-" in out2
+
+
+def test_secret_files_are_never_attached(tmp_path):
+    proj, chat = tmp_path / "proj", tmp_path / "chat"
+    proj.mkdir()
+    for n in (".env", ".env.local", "id_rsa", "server.pem", "api.key", "aws-credentials.json"):
+        (proj / n).write_bytes(b"SECRET=1\n" * 4)
+        out = agents.attach_docs(f"ATTACH: {proj / n}", [str(proj)], chat)
+        assert "looks like a secret or key file" in out, n
+        assert not (chat / n).exists()
+    assert agents.is_doc("/x/y.md") and not agents.is_doc("/x/y.png")

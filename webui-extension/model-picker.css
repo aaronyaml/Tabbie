@@ -52,49 +52,60 @@
 .hx-mp-root.is-sheet.is-open .hx-mp-panel { transform: none; }
 .hx-mp-root.is-sheet .hx-mp-grab { display: block; width: 36px; height: 5px; border-radius: 3px; background: var(--hx-fill-2); margin: 8px auto 0; }
 
-/* two steps side by side; the frame animates to the active pane's height */
+/* four steps side by side; the frame animates to the active pane's height. Each pane is capped (JS sets
+ * max-height to the room on screen) and scrolls inside itself, so nothing is cut off at the bottom. */
 .hx-mp-frame { overflow: hidden; transition: height .28s var(--hx-ease); }
-.hx-mp-track { display: flex; width: 200%; align-items: flex-start; transition: transform .32s cubic-bezier(.32,.72,0,1); }
-.hx-mp-pane { width: 50%; box-sizing: border-box; padding: 6px 6px 8px; transition: opacity .2s var(--hx-ease); }
+.hx-mp-track { display: flex; width: 400%; align-items: flex-start; transition: transform .32s cubic-bezier(.32,.72,0,1); }
+.hx-mp-pane {
+  flex: 0 0 25%; width: 25%; box-sizing: border-box; padding: 4px 6px 8px; transition: opacity .2s var(--hx-ease);
+  overflow-y: auto; overflow-x: hidden; overscroll-behavior: contain; -webkit-overflow-scrolling: touch; scrollbar-width: thin;
+}
 .hx-mp-pane[inert] { opacity: 0; }
 .is-sheet .hx-mp-pane { padding: 4px 12px 12px; }
 
 /* ── header ───────────────────────────────────────────────────────────── */
-.hx-mp-head { display: flex; align-items: center; min-height: 40px; padding: 4px 10px 2px; }
+.hx-mp-head { display: flex; align-items: center; gap: 8px; min-height: 34px; padding: 2px 10px 0; }
 .hx-mp-title { font-size: 13px; font-weight: 600; color: var(--hx-text-2); letter-spacing: -.005em; }
-.hx-mp-head-2 { padding: 4px 2px 2px; }
-.hx-mp-head-2 .hx-mp-title { flex: 1; text-align: center; color: var(--hx-text); font-size: 15px; }
-.hx-mp-spacer { width: 36px; }
-.is-sheet .hx-mp-head { min-height: 48px; }
-.is-sheet .hx-mp-title { font-size: 15px; color: var(--hx-text); }
-.is-sheet .hx-mp-head:not(.hx-mp-head-2) .hx-mp-title { flex: 1; text-align: center; }
-.hx-mp-back {
-  width: 36px; height: 36px; display: inline-flex; align-items: center; justify-content: center;
-  border: 0; border-radius: 10px; background: transparent; color: var(--hx-ink); cursor: pointer;
+.hx-mp-scope { margin-left: auto; font-size: 12px; color: var(--hx-text-2); opacity: .8; }
+/* sub-pages: round back button (shared .hx-back from declutter.css) top-left, title centred; the header
+ * stays put while the page scrolls under it */
+.hx-mp-head-2 {
+  position: sticky; top: -4px; z-index: 2; min-height: 44px; padding: 4px 2px 4px; margin-top: -4px;
+  background: var(--hx-raised);
 }
-.hx-mp-back:hover { background: var(--hover-bg); }
+:root.dark .hx-mp-head-2 { background: #1C1D23; }
+.hx-mp-head-2 .hx-back { margin-right: 0; }
+.hx-mp-head-2 .hx-mp-title { flex: 1; text-align: center; color: var(--hx-text); font-size: 15px; }
+.hx-mp-spacer { width: 36px; flex: none; }
+.is-sheet .hx-mp-head { min-height: 44px; }
+.is-sheet .hx-mp-head-2 { min-height: 52px; }
+.is-sheet .hx-mp-spacer { width: 40px; }
+.is-sheet .hx-mp-title { font-size: 15px; color: var(--hx-text); }
 
 /* ── rows ─────────────────────────────────────────────────────────────── */
 .hx-mp-list { display: flex; flex-direction: column; gap: 2px; }
 .hx-mp-row {
-  display: flex; align-items: center; gap: 12px; width: 100%; min-height: 56px; padding: 8px 10px; box-sizing: border-box;
+  display: flex; align-items: center; gap: 10px; width: 100%; min-height: 46px; padding: 6px 8px; box-sizing: border-box;
   border: 0; border-radius: 12px; background: transparent; color: var(--hx-text); text-align: left; cursor: pointer;
   font: inherit; transition: background-color .15s var(--hx-ease);
 }
 .hx-mp-row:hover { background: var(--hover-bg); }
-.hx-mp-row:focus-visible, .hx-mp-back:focus-visible, .hx-mp-seg:focus-visible { outline: 2px solid var(--focus-ring); outline-offset: -2px; }
+.hx-mp-row:focus-visible, .hx-mp-seg:focus-visible { outline: 2px solid var(--focus-ring); outline-offset: -2px; }
 .hx-mp-row:active { background: var(--hx-fill); }
-.hx-mp-prov { min-height: 64px; }
-.is-sheet .hx-mp-row { min-height: 60px; }
-.is-sheet .hx-mp-prov { min-height: 72px; }
+.hx-mp-prov { min-height: 50px; }
+.is-sheet .hx-mp-row { min-height: 52px; padding: 6px 10px; gap: 12px; }
+.is-sheet .hx-mp-prov { min-height: 56px; }
 .hx-mp-tile {
-  width: 40px; height: 40px; flex-shrink: 0; display: inline-flex; align-items: center; justify-content: center;
-  border-radius: 11px; background: var(--hx-fill); color: var(--hx-text);
+  width: 32px; height: 32px; flex-shrink: 0; display: inline-flex; align-items: center; justify-content: center;
+  border-radius: 9px; background: var(--hx-fill); color: var(--hx-text);
 }
+.is-sheet .hx-mp-tile { width: 36px; height: 36px; border-radius: 10px; }
+.hx-mp-sep { height: 0.5px; margin: 4px 10px; background: var(--hx-hair); }
 .hx-mp-prov.is-current .hx-mp-tile { background: var(--hx-tint); color: var(--hx-ink); }
 .hx-mp-text { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 2px; }
-.hx-mp-name { font-size: 15px; font-weight: 500; letter-spacing: -.01em; line-height: 1.25; }
-.hx-mp-desc { font-size: 13px; color: var(--hx-text-2); line-height: 1.3; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.hx-mp-name { font-size: 14px; font-weight: 500; letter-spacing: -.01em; line-height: 1.25; }
+.is-sheet .hx-mp-name { font-size: 15px; }
+.hx-mp-desc { font-size: 12px; color: var(--hx-text-2); line-height: 1.3; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .hx-mp-go { color: var(--hx-text-2); display: inline-flex; opacity: .8; }
 .hx-mp-check { width: 20px; display: inline-flex; justify-content: center; color: var(--hx-ink); }
 .hx-mp-model.is-on .hx-mp-name { font-weight: 600; }
@@ -111,41 +122,9 @@
 .hx-mp-seg:hover { color: var(--hx-text); }
 .hx-mp-seg.is-on { background: var(--hx-raised); color: var(--hx-text); box-shadow: 0 1px 2px rgba(0,0,0,.08), 0 0 0 0.5px var(--hx-hair); }
 :root.dark .hx-mp-seg.is-on { background: var(--hx-fill-2); box-shadow: none; }
-/* Agents is an on/off toggle per agent (both can be on), so "on" needs to read at a glance:
- * accent tint + ring + ink text; off stays flat and dimmer. Doubled class beats upstream button fills. */
+/* doubled class beats upstream button fills */
 .hx-mp-segs .hx-mp-seg:not(.is-on) { background: transparent; box-shadow: none; }
-/* Agents: separate compact pills (not a full-width segmented bar), right-aligned with a gap.
- * On = accent tint + check; off = hairline ring, dimmer text. Doubled classes beat upstream button styles. */
-.hx-mp-agents .hx-mp-segs { flex: 1; justify-content: flex-end; gap: 8px; padding: 0; background: transparent; }
-.hx-mp-agents .hx-mp-segs .hx-mp-seg {
-  flex: 0 0 auto; display: inline-flex; align-items: center; gap: 6px; height: 30px; padding: 0 14px; margin: 0;
-  border: 0; border-radius: 999px; font: 500 13px/1 var(--font-ui); min-width: 0;
-}
-.hx-mp-agents .hx-mp-segs .hx-mp-seg:not(.is-on) {
-  background: transparent; color: var(--hx-text-2); box-shadow: inset 0 0 0 1px var(--hx-hair); opacity: 1;
-}
-.hx-mp-agents .hx-mp-segs .hx-mp-seg:not(.is-on):hover { color: var(--hx-text); background: var(--hover-bg); }
-.hx-mp-agents .hx-mp-segs .hx-mp-seg.is-on, :root.dark .hx-mp-agents .hx-mp-segs .hx-mp-seg.is-on {
-  background: var(--hx-tint); color: var(--hx-ink); font-weight: 600;
-  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--hx-ink) 35%, transparent);
-}
-.hx-mp-agents .hx-mp-segs .hx-mp-seg.is-on::before {
-  content: ""; width: 10px; height: 6px; margin-top: -3px; border: solid currentColor; border-width: 0 0 2px 2px;
-  transform: rotate(-45deg); flex-shrink: 0;
-}
-.hx-mp-agents .hx-mp-segs .hx-mp-seg { transition: background-color .15s var(--hx-ease), color .15s var(--hx-ease), box-shadow .15s var(--hx-ease); }
 .is-sheet .hx-mp-seg { height: 32px; font-size: 13px; }
-.is-sheet .hx-mp-agents .hx-mp-segs .hx-mp-seg { height: 34px; padding: 0 16px; }
-/* Hand-offs (third Agents pill): same pill; greyed out when Claude Code or Codex isn't signed in. Three
- * pills may not fit a narrow popover/sheet beside the label: they wrap, still right-aligned. */
-.hx-mp-agents .hx-mp-segs { flex-wrap: wrap; row-gap: 8px; }
-.hx-mp-agents .hx-mp-segs .hx-mp-seg.is-unavail, .hx-mp-agents .hx-mp-segs .hx-mp-seg.is-unavail:hover {
-  opacity: .45; cursor: not-allowed; color: var(--hx-text-2); background: transparent;
-  box-shadow: inset 0 0 0 1px var(--hx-hair);
-}
-.hx-mp-ho-cap { margin-top: 2px; text-align: right; }
-.is-sheet .hx-mp-ho-cap { text-align: center; }
-
 .hx-mp-cap, .hx-mp-note { margin: 6px 10px 2px; font-size: 12px; color: var(--hx-text-2); }
 .hx-mp-note { color: var(--hx-orange); display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
 .hx-mp-note > span { flex: 1 1 160px; min-width: 0; line-height: 1.35; }
@@ -165,8 +144,6 @@
 }
 
 /* ── step 3 (providers) + billing badges + model search ─────────────────── */
-.hx-mp-track { width: 300%; }
-.hx-mp-pane { width: 33.3334%; }
 .hx-mp-badge {
   display: inline-block; margin-left: 8px; padding: 2px 7px; border-radius: 999px; vertical-align: 1px;
   font: 600 10.5px/1.3 var(--font-ui); letter-spacing: .01em; background: var(--hx-fill); color: var(--hx-text-2); white-space: nowrap;
@@ -179,18 +156,18 @@
   border-radius: 10px; background: var(--hx-fill); color: var(--hx-text-2);
 }
 .hx-mp-search { flex: 1; min-width: 0; border: 0; outline: 0; background: transparent; color: var(--hx-text); font: 400 14px/1 var(--font-ui); }
-.hx-mp-list.is-long, .hx-mp-provlist { max-height: min(52vh, 440px); overflow-y: auto; overscroll-behavior: contain; }
-.is-sheet .hx-mp-list.is-long, .is-sheet .hx-mp-provlist { max-height: 58vh; }
+.hx-mp-list.is-long { max-height: min(52vh, 440px); overflow-y: auto; overscroll-behavior: contain; }
+.is-sheet .hx-mp-list.is-long { max-height: 50vh; }
 .hx-mp-add .hx-mp-tile { background: transparent; box-shadow: inset 0 0 0 1px var(--hx-hair); color: var(--hx-text-2); }
-.hx-mp-group { margin: 10px 10px 2px; font: 600 11px/1.2 var(--font-ui); letter-spacing: .04em; text-transform: uppercase; color: var(--hx-text-2); }
-.hx-mp-provlist .hx-mp-row { min-height: 52px; }
-.hx-mp-provlist .hx-mp-tile { width: 34px; height: 34px; border-radius: 9px; }
+.hx-mp-group { margin: 8px 10px 4px; font: 600 11px/1.2 var(--font-ui); letter-spacing: .04em; text-transform: uppercase; color: var(--hx-text-2); }
+.hx-mp-provlist .hx-mp-row { min-height: 48px; }
+.hx-mp-provlist .hx-mp-name { display: flex; align-items: center; flex-wrap: wrap; gap: 2px 0; }
 .hx-mp-provlist .hx-mp-desc { display: inline-flex; align-items: center; gap: 4px; }
 .hx-mp-chev { transition: transform .2s var(--hx-ease); }
 .hx-mp-provitem.is-open .hx-mp-chev { transform: rotate(180deg); }
 .hx-mp-provitem.is-open { background: var(--hx-fill); border-radius: 12px; }
 .hx-mp-provitem.is-open > .hx-mp-row:hover { background: transparent; }
-.hx-mp-form { display: flex; flex-direction: column; gap: 8px; padding: 0 10px 12px 56px; }
+.hx-mp-form { display: flex; flex-direction: column; gap: 8px; padding: 0 10px 12px 50px; }
 .hx-mp-form .hx-mp-cap { margin: 0; line-height: 1.4; }
 .hx-mp-keyrow { display: flex; gap: 8px; align-items: center; }
 .hx-mp-input {
@@ -219,21 +196,21 @@
 .is-sheet .hx-mp-btn { height: 40px; padding: 0 18px; }
 .hx-mp-row[hidden] { display: none; }
 
-/* ── Agents: one inset card of switch rows ──────────────────────────────── */
-.hx-mp-togs { display: flex; flex-direction: column; margin: 2px 4px 2px; border-radius: 12px; background: var(--hx-fill); overflow: hidden; }
+/* ── step 4, Agents & behaviour: inset cards of compact switch rows ─────────── */
+.hx-mp-togs { display: flex; flex-direction: column; margin: 0 4px 4px; border-radius: 12px; background: var(--hx-fill); overflow: hidden; }
 .hx-mp-togs .hx-mp-tog {
-  position: relative; display: flex; align-items: center; gap: 10px; width: 100%; min-height: 46px; padding: 7px 12px; margin: 0;
+  position: relative; display: flex; align-items: center; gap: 10px; width: 100%; min-height: 44px; padding: 6px 12px; margin: 0;
   border: 0; border-radius: 0; background: transparent; color: var(--hx-text); text-align: left; cursor: pointer;
   font: inherit; box-shadow: none; transition: background-color .15s var(--hx-ease), opacity .15s var(--hx-ease);
 }
 .hx-mp-togs .hx-mp-tog + .hx-mp-tog::before {
-  content: ""; position: absolute; top: 0; left: 50px; right: 0; height: 0.5px; background: var(--hx-hair);
+  content: ""; position: absolute; top: 0; left: 46px; right: 0; height: 0.5px; background: var(--hx-hair);
 }
 .hx-mp-togs .hx-mp-tog:hover { background: var(--hover-bg); }
 .hx-mp-togs .hx-mp-tog:focus-visible { outline: 2px solid var(--focus-ring); outline-offset: -2px; }
 .hx-mp-tog-ic {
-  width: 28px; height: 28px; flex-shrink: 0; display: inline-flex; align-items: center; justify-content: center;
-  border-radius: 8px; background: var(--hx-raised); color: var(--hx-text-2); transition: color .15s, background-color .15s;
+  width: 24px; height: 24px; flex-shrink: 0; display: inline-flex; align-items: center; justify-content: center;
+  border-radius: 7px; background: var(--hx-raised); color: var(--hx-text-2); transition: color .15s, background-color .15s;
 }
 .hx-mp-tog.is-on .hx-mp-tog-ic { background: var(--hx-tint); color: var(--hx-ink); }
 .hx-mp-tog-tx { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 1px; }
@@ -252,8 +229,8 @@
 .hx-mp-togs .hx-mp-tog.is-unavail { opacity: .5; cursor: not-allowed; }
 .hx-mp-togs .hx-mp-tog.is-unavail:hover { background: transparent; }
 .is-sheet .hx-mp-togs { margin: 2px 0; }
-.is-sheet .hx-mp-togs .hx-mp-tog { min-height: 56px; padding: 9px 14px; gap: 12px; }
-.is-sheet .hx-mp-togs .hx-mp-tog + .hx-mp-tog::before { left: 54px; }
+.is-sheet .hx-mp-togs .hx-mp-tog { min-height: 52px; padding: 7px 14px; gap: 12px; }
+.is-sheet .hx-mp-togs .hx-mp-tog + .hx-mp-tog::before { left: 50px; }
 .is-sheet .hx-mp-tog-name { font-size: 15px; }
 .is-sheet .hx-mp-tog-sub { font-size: 12.5px; }
 .is-sheet .hx-mp-switch { width: 46px; height: 28px; }

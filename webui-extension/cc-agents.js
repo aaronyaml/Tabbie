@@ -78,7 +78,7 @@
   }
 
   window.hxAgentsData = () => (data && dataSid === sid() ? data : null); // cc-narration.js reads the same payload
-  const allAgents = () => (data ? data.requests.flatMap((r) => (r.agents_list || []).map((a) => Object.assign({ request: r.id }, a))) : []);
+  const allAgents = () => (data ? data.requests.flatMap((r) => (r.agents_list || []).map((a) => Object.assign({ request: r.id, reqStatus: r.status }, a))) : []);
 
   // ── formatting ──────────────────────────────────────────────────────────
   function fmtTokens(n) {
@@ -121,7 +121,19 @@
       <div class="hx-ag-meta">${esc(meta)}</div></div>`;
   }
 
-  function summaryText(all) {
+  // One status line per reply: outcome first, then time, agents, tokens, files changed.
+  //   "Done · 15m 27s · 5 agents · 66k tokens · 3 files"   "Working · 2m 10s · 2 agents · 1 background task"
+  // From the agents that did the work (background shell tasks are steps, not outcomes) and the request.
+  function outcome(all) {
+    const list = all.filter((a) => !isBg(a));
+    if (all.some((a) => a.status === 'running')) return 'Working';
+    if (list.some((a) => a.status === 'waiting')) return 'Needs you';
+    if (all.some((a) => a.reqStatus === 'stopped' || a.reqStatus === 'cancelled') || list.some(isStopped)) return 'Stopped';
+    const bad = list.filter((a) => a.status === 'failed');
+    if (bad.length) return bad.length === list.length ? 'Failed' : 'Done with errors';
+    return 'Done';
+  }
+  function summaryText(all, nFiles) {
     const list = all.filter((a) => !isBg(a));
     const run = list.filter((a) => a.status === 'running').length;
     const tokens = list.reduce((t, a) => t + (a.tokens || 0), 0);
@@ -129,20 +141,22 @@
     const ends = all.map((a) => a.ended).filter(Boolean);
     const span = run ? Date.now() / 1000 - Math.min(...starts) : (ends.length ? Math.max(...ends) - Math.min(...starts) : 0);
     const n = list.length;
-    const parts = [`${n} agent${n === 1 ? '' : 's'}`];
-    if (run) parts.push(`${run} running`);
+    const parts = [outcome(all)];
+    if (span) parts.push(fmtDur(span));
+    parts.push(`${n} agent${n === 1 ? '' : 's'}`);
+    if (run > 1) parts.push(`${run} running`);
     const failed = list.filter((a) => a.status === 'failed' && !isStopped(a)).length;
-    const stopped = list.filter(isStopped).length;
-    if (stopped) parts.push(n === 1 || stopped === n ? 'stopped' : `${stopped} stopped`);
-    if (failed) parts.push(`${failed} failed`);
+    if (failed && failed < n) parts.push(`${failed} failed`);
     const handoffs = list.filter((a) => a.kind === 'delegate').length;
     if (handoffs) parts.push(`${handoffs} hand-off${handoffs === 1 ? '' : 's'}`);
     const bg = all.filter((a) => isBg(a) && a.status === 'running').length;
     if (bg) parts.push(`${bg} background task${bg === 1 ? '' : 's'}`);
     if (tokens) parts.push(fmtTokens(tokens) + ' tokens');
-    if (span) parts.push(fmtDur(span));
+    if (nFiles) parts.push(`${nFiles} file${nFiles === 1 ? '' : 's'} changed`);
     return parts.join(' · ');
   }
+  const OUTCOME_ICON = { Working: 'Loading03Icon', Done: 'CheckmarkCircle02Icon', 'Done with errors': 'InformationCircleIcon', Failed: 'CancelCircleIcon', Stopped: 'StopIcon', 'Needs you': 'HelpCircleIcon' };
+  const filesCount = (rids) => rids.map((r) => files.get(r)).filter((f) => f && f.state === 'ok').reduce((t, f) => t + (f.d.total || 0), 0);
 
   // ── 1. per-reply Agents block ───────────────────────────────────────────
   const userTs = (row) => {
@@ -165,6 +179,7 @@
       }
       out.push({ row, start: start == null ? 0 : start, end });
     });
+    out.slice(-3).forEach((w) => { w.recent = true; });
     return out;
   }
 
@@ -190,12 +205,14 @@
       if (!live) stopUi.delete(key);
       const rids = [...new Set(list.map((a) => a.request))];
       el.dataset.rids = rids.join(',');
-      if (open && !live) rids.forEach(loadFiles);
+      // Files-changed count on the line: open blocks, and the newest few replies (each is one cached lookup).
+      if (!live && (open || w.recent)) rids.forEach(loadFiles);
       const html = `<div class="hx-agents-bar"><button type="button" class="hx-agents-head" aria-expanded="${open}">
-          ${icon('UserMultiple02Icon', 14)}<span>${esc(summaryText(list))}</span>${live ? '' : `<span class="hx-agents-caret">${icon('ArrowDown01Icon', 12)}</span>`}
+          ${icon(OUTCOME_ICON[outcome(list)] || 'UserMultiple02Icon', 14)}<span>${esc(summaryText(list, live ? 0 : filesCount(rids)))}</span>${live ? '' : `<span class="hx-agents-caret">${icon('ArrowDown01Icon', 12)}</span>`}
         </button>${live && stoppable(list) ? stopHtml(key, list) : ''}</div>${open ? `<div class="hx-agents-list">${list.map((a) => agentRow(a, list)).join('')}</div>${live ? '' : extraHtml(rids)}` : ''}`;
       el.classList.toggle('is-live', live);
       el.classList.toggle('is-open', open);
+      el.dataset.outcome = outcome(list).toLowerCase().replace(/\s+/g, '-');
       el.classList.toggle('is-stopped', !live && list.some(isStopped) && !list.some((a) => a.status === 'failed' && !isStopped(a)));
       if (el.__html !== html) { el.innerHTML = html; el.__html = html; }
       tighten(el, group);
@@ -230,6 +247,45 @@
     }
     renderBlocks();
   }
+
+  // The composer's Stop (and /stop, and the sidebar's "Stop response") only cancels the hub's turn
+  // upstream; the Claude Code / Codex worker it is waiting on kept running with nobody to report to.
+  // Stop means stop: after an explicit stop, end this chat's worker too (no-op when none is running).
+  // Interrupts (/interrupt, sending while busy in interrupt mode) are left alone: a new message follows.
+  const STOP_REASONS = new Set(['explicit-cancel', 'slash-stop']);
+  function stopWorkerOf(s) {
+    if (!s) return;
+    post('worker/stop', { session: s })
+      .then((j) => { if (j && j.ok && s === sid()) refresh(true); })
+      .catch(() => {});
+  }
+  function wrapCancel() {
+    let done = 0;
+    if (typeof window.cancelStream === 'function' && !window.cancelStream.__hxStop) {
+      const orig = window.cancelStream;
+      window.cancelStream = async function (reason) {
+        const s = sid();
+        const out = await orig.apply(this, arguments);
+        if (STOP_REASONS.has(reason || 'explicit-cancel')) stopWorkerOf(s);
+        return out;
+      };
+      window.cancelStream.__hxStop = true;
+    }
+    if (typeof window.cancelStream === 'function') done++;
+    if (typeof window.cancelSessionStream === 'function' && !window.cancelSessionStream.__hxStop) {
+      const orig = window.cancelSessionStream;
+      window.cancelSessionStream = async function (session) {
+        const s = session && session.session_id;
+        const out = await orig.apply(this, arguments);
+        stopWorkerOf(s);
+        return out;
+      };
+      window.cancelSessionStream.__hxStop = true;
+    }
+    if (typeof window.cancelSessionStream === 'function') done++;
+    return done === 2;
+  }
+  if (!wrapCancel()) { let n = 0; const t = setInterval(() => { if (wrapCancel() || ++n > 100) clearInterval(t); }, 100); }
 
   // Settled block, expanded: files the worker edited + "Copy resume command" (Claude Code).
   const files = new Map(); // request id -> {state: 'loading'|'ok'|'err', d}
@@ -337,8 +393,10 @@
     if (!show) return;
     const list = agents.filter((a) => !isBg(a)); // same count as the sheet's "N agents · N running"
     const run = list.filter((a) => a.status === 'running').length;
-    const wait = list.some((a) => a.status === 'waiting');
-    const html = `${icon('UserMultiple02Icon', 16)}<span class="hx-pill-tx">Agents</span>${list.length ? `<span class="hx-pill-n${run ? ' is-live' : ''}${wait && !run ? ' is-wait' : ''}">${run || list.length}</span>` : ''}`;
+    const wait = list.filter((a) => a.status === 'waiting').length;
+    // The number is what needs attention now (running, or waiting on you); a settled chat shows none.
+    const n = run || wait;
+    const html = `${icon('UserMultiple02Icon', 16)}<span class="hx-pill-tx">Agents</span>${n ? `<span class="hx-pill-n${run ? ' is-live' : ' is-wait'}">${n}</span>` : ''}`;
     if (pill.__html !== html) { pill.innerHTML = html; pill.__html = html; }
     placePill();
   }
@@ -347,21 +405,28 @@
     if (!sheet) {
       sheet = document.createElement('div');
       sheet.className = 'hx-as';
-      sheet.innerHTML = '<div class="hx-as-scrim"></div><aside class="hx-as-panel" role="dialog" aria-modal="true" aria-label="Agents in this chat"><header class="hx-as-head"><div class="hx-as-title">Agents</div><div class="hx-as-sub"></div><button type="button" class="hx-as-close" aria-label="Close">' + icon('Cancel01Icon', 18) + '</button></header><div class="hx-as-body"></div></aside>';
+      sheet.innerHTML = '<div class="hx-as-scrim"></div><aside class="hx-as-panel" role="dialog" aria-modal="true" aria-label="Agents in this chat"><header class="hx-as-head"><button type="button" class="hx-back hx-as-close" aria-label="Back to chat">' + icon('ArrowLeft01Icon', 18) + '<span>Back</span></button><div class="hx-as-title">Agents</div><div class="hx-as-sub"></div></header><div class="hx-as-body"></div></aside>';
       sheet.querySelector('.hx-as-scrim').addEventListener('click', () => openSheet(false));
-      sheet.querySelector('.hx-as-close').addEventListener('click', () => openSheet(false));
+      sheet.querySelector('.hx-as-close').addEventListener('click', () => (nav.length ? navBack() : openSheet(false)));
       sheet.addEventListener('click', (e) => {
+        if (e.target.closest('.hx-ad-retry')) return onDetailClick(e);
         if (e.target.closest('.hx-as-allow')) return grantConsent();
         const retry = e.target.closest('.hx-as-retry');
         if (retry) { retry.disabled = true; retry.textContent = 'Trying…'; body.__html = ''; return refresh(true); }
+        if (onDetailClick(e)) return;
         const head = e.target.closest('.hx-as-req-head[data-rid]');
-        if (head) jumpTo(head.dataset.rid);
+        if (head) navPush({ type: 'req', rid: head.dataset.rid });
+      });
+      sheet.addEventListener('keydown', (e) => {
+        const t = e.target.closest && e.target.closest('.hx-as-ag[role="button"], .hx-ad-step-h[role="button"]');
+        if (t && e.target === t && (e.key === 'Enter' || e.key === ' ')) { e.preventDefault(); t.click(); }
       });
       const body = sheet.querySelector('.hx-as-body');
-      document.addEventListener('keydown', (e) => { if (e.key === 'Escape' && sheet.classList.contains('is-open')) openSheet(false); });
+      document.addEventListener('keydown', (e) => { if (e.key === 'Escape' && sheet.classList.contains('is-open')) { if (nav.length) navBack(); else openSheet(false); } });
       document.body.appendChild(sheet);
     }
     sheet.classList.toggle('is-open', on);
+    if (!on && nav.length) { nav.length = 0; stopDetailPoll(); }
     if (on) { refresh(true); renderSheet(); }
   }
 
@@ -369,6 +434,8 @@
     if (!sheet || !sheet.classList.contains('is-open')) return;
     const body = sheet.querySelector('.hx-as-body');
     const sub = sheet.querySelector('.hx-as-sub');
+    setHead();
+    if (nav.length) { renderDetail(body, sub); return; }
     let html;
     if (state === 'consent') {
       sub.textContent = '';
@@ -380,8 +447,8 @@
       const reqs = (data ? data.requests : []).filter((r) => (r.agents_list || []).length).slice().reverse();
       sub.textContent = reqs.length ? summaryText(allAgents()) : '';
       html = reqs.length ? reqs.map((r) => `<section class="hx-as-req">
-          <button type="button" class="hx-as-req-head" data-rid="${esc(r.id)}" title="${esc(r.prompt || r.id)}" aria-label="Go to the reply for: ${esc(r.prompt || r.id)}"><span class="hx-as-req-p">${esc(r.prompt || r.id)}</span><span class="hx-as-chip" data-s="${esc(r.status)}">${esc(reqLabel(r.status))}</span>${icon('ArrowRight01Icon', 12)}</button>
-          <div class="hx-agents-list">${r.agents_list.map((a) => agentRow(a, r.agents_list)).join('')}</div></section>`).join('')
+          <button type="button" class="hx-as-req-head" data-rid="${esc(r.id)}" title="${esc(r.prompt || r.id)}" aria-label="Request details: ${esc(r.prompt || r.id)}"><span class="hx-as-req-p">${esc(r.prompt || r.id)}</span><span class="hx-as-chip" data-s="${esc(r.status)}">${esc(reqLabel(r.status))}</span>${icon('ArrowRight01Icon', 12)}</button>
+          <div class="hx-agents-list">${r.agents_list.map((a) => drillRow(a, r.agents_list, r.id)).join('')}</div></section>`).join('')
         : '<div class="hx-as-empty"><p>No agents have run in this chat yet.</p></div>';
     }
     if (body.__html !== html) { body.innerHTML = html; body.__html = html; }
@@ -402,6 +469,249 @@
     });
   }
   const reqLabel = (s) => ({ executing: 'Running', planning: 'Planning', done: 'Done', failed: 'Failed', awaiting_answer: 'Needs you', awaiting_answers: 'Needs you', awaiting_approval: 'Awaiting approval', answered: 'Resuming', approved: 'Approved', cancelled: 'Cancelled', claude_limited: 'Usage limit', limit_blocked: 'Usage limit', stopped: 'Stopped', unanswered: 'Skipped' }[s] || s || '');
+
+  // ── 2c. sheet click-through: everything an agent did ────────────────────
+  // Push navigation inside the sheet: request → agent → its sub-agents / hand-offs. The header's round
+  // back button pops one level (closes the sheet at the top). One line per step, tap to expand; long
+  // fields arrive in full only on "Show more". Data: sidecar agent/detail (paged steps), agent/part (one
+  // field in full), request/detail + request/part. Polled while the agent / request is still running.
+  const nav = [];                 // [{type: 'req'|'agent', rid, aid?, scroll}]
+  let listScroll = 0;
+  const dcache = new Map();       // view key -> {state: loading|ok|err, d, busy, at}
+  const fullText = new Map();     // field key -> {state: loading|ok|err, text, len, truncated}
+  const openSteps = new Set();    // `${view}|${i}` expanded steps
+  const openBlocks = new Set();   // `${view}|${block}` expanded blocks (brief, output, files…)
+  let pollT = null;
+  const enc = encodeURIComponent;
+  const viewKey = (v) => (v.type === 'req' ? 'req|' + v.rid : 'ag|' + v.rid + '|' + v.aid);
+  const reqRowsOf = (rid) => { const r = data && data.requests.find((x) => x.id === rid); return r ? (r.agents_list || []) : null; };
+  const flip = (set, k) => (set.has(k) ? set.delete(k) : set.add(k));
+  const fmtChars = (n) => (n >= 1000 ? (n / 1000).toFixed(n >= 1e4 ? 0 : 1).replace(/\.0$/, '') + 'k' : String(n)) + ' chars';
+  const clock = (t) => { try { return new Date(t * 1000).toLocaleString([], { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' }); } catch (_) { return ''; } };
+  const setTitle = (t) => { const el = sheet && sheet.querySelector('.hx-as-title'); if (el && el.textContent !== t) el.textContent = t; };
+
+  async function getJ(path) {
+    const r = await fetch(API + path, { credentials: 'same-origin', cache: 'no-store' });
+    if (r.status === 401 || r.status === 403) throw new Error('consent');
+    if (r.status === 404) throw new Error('missing');
+    if (!r.ok) throw new Error(String(r.status));
+    return r.json();
+  }
+
+  async function loadDetail(v, mode) { // mode: undefined (first load / reload) | 'more' (next page) | 'poll'
+    const k = viewKey(v);
+    const cur = dcache.get(k) || { state: 'loading' };
+    if (cur.busy) return;
+    cur.busy = true; dcache.set(k, cur);
+    try {
+      let d;
+      if (v.type === 'req') d = await getJ('request/detail?rid=' + enc(v.rid));
+      else {
+        const have = cur.d ? cur.d.steps.length : 0;
+        const base = 'agent/detail?rid=' + enc(v.rid) + '&agent=' + enc(v.aid);
+        if (cur.d && (mode === 'more' || mode === 'poll')) {
+          // next page, or (live) the last few steps again (a running tool finishes) plus anything new
+          const off = mode === 'more' ? have : Math.max(0, have - 5);
+          const p = await getJ(`${base}&offset=${off}&limit=150`);
+          d = Object.assign({}, p, { steps: cur.d.steps.slice(0, off).concat(p.steps) });
+        } else d = await getJ(`${base}&offset=0&limit=150`);
+      }
+      cur.state = 'ok'; cur.d = d; cur.at = Date.now();
+    } catch (e) { cur.err = e.message; if (!cur.d) cur.state = 'err'; }
+    finally { cur.busy = false; renderSheet(); schedulePoll(); }
+  }
+  function stopDetailPoll() { clearTimeout(pollT); pollT = null; }
+  function schedulePoll() {
+    stopDetailPoll();
+    const v = nav[nav.length - 1];
+    if (!v || !sheet || !sheet.classList.contains('is-open')) return;
+    const e = dcache.get(viewKey(v));
+    const live = e && e.d && (v.type === 'req' ? /^(executing|planning|answered|approved)$/.test(e.d.status || '') : e.d.running);
+    if (live) pollT = setTimeout(() => { if (!document.hidden && nav[nav.length - 1] === v) loadDetail(v, 'poll'); else schedulePoll(); }, 3000);
+  }
+
+  function navPush(v) {
+    const body = sheet.querySelector('.hx-as-body');
+    if (nav.length) nav[nav.length - 1].scroll = body.scrollTop; else listScroll = body.scrollTop;
+    nav.push(v);
+    const e = dcache.get(viewKey(v));
+    if (!e || !e.d || Date.now() - (e.at || 0) > 2000) loadDetail(v);
+    renderSheet();
+    body.scrollTop = 0;
+    schedulePoll();
+    const back = sheet.querySelector('.hx-as-close'); if (back && document.activeElement && sheet.contains(document.activeElement)) back.focus({ preventScroll: true });
+  }
+  function navBack() {
+    nav.pop();
+    const body = sheet.querySelector('.hx-as-body');
+    renderSheet();
+    body.scrollTop = nav.length ? (nav[nav.length - 1].scroll || 0) : listScroll;
+    schedulePoll();
+  }
+  function setHead() {
+    const back = sheet.querySelector('.hx-as-close');
+    const lbl = nav.length ? 'Back' : 'Back to chat';
+    if (back && back.getAttribute('aria-label') !== lbl) back.setAttribute('aria-label', lbl);
+    sheet.querySelector('.hx-as-panel').classList.toggle('is-detail', nav.length > 0);
+    if (!nav.length) setTitle('Agents');
+  }
+
+  // A row in the sheet that opens its agent (the same row the reply's Agents block shows).
+  const drillRow = (a, list, rid) => `<div class="hx-as-ag" role="button" tabindex="0" data-rid="${esc(rid)}" data-aid="${esc(a.id)}" aria-label="Details: ${esc(shown(a.name))}">${agentRow(a, list)}<span class="hx-as-ag-go" aria-hidden="true">${icon('ArrowRight01Icon', 12)}</span></div>`;
+
+  // Text with "Show more" (fetches the field in full) / "Show less".
+  function fieldBox(fk, prev, part, i, mono) {
+    if (!prev) return '';
+    const f = fullText.get(fk);
+    const txt = f && f.state === 'ok' ? f.text : prev.text;
+    const lbl = !f ? 'Show more · ' + fmtChars(prev.len) : (f.state === 'loading' ? 'Loading…' : (f.state === 'err' ? "Couldn't load. Try again" : 'Show less'));
+    const btn = prev.more ? `<button type="button" class="hx-ad-sm" data-full="${esc(fk)}" data-part="${esc(part)}" data-i="${esc(i)}">${esc(lbl)}</button>` : '';
+    const cut = f && f.state === 'ok' && f.truncated ? `<div class="hx-ad-cut">First ${fmtChars(f.text.length)} of ${fmtChars(f.len)}</div>` : '';
+    return `<pre class="hx-ad-pre${mono ? ' is-mono' : ''}${f && f.state === 'ok' ? ' is-full' : ''}">${esc(txt)}${!f && prev.more ? '…' : ''}</pre>${cut}${btn}`;
+  }
+  // A titled block (brief, output, result…): clamped to a few lines until opened.
+  function block(vk, name, title, prev, part, extra) {
+    if (!prev) return '';
+    const bk = vk + '|' + name;
+    const open = openBlocks.has(bk);
+    const fk = vk + '|' + part + '|-1';
+    const long = prev.more || prev.text.length > 360 || (prev.text.match(/\n/g) || []).length > 5;
+    return `<section class="hx-ad-sec"><h3 class="hx-ad-h">${esc(title)}${extra ? `<span>${esc(extra)}</span>` : ''}</h3>
+      <div class="hx-ad-blk${open || !long ? ' is-open' : ''}">${open ? fieldBox(fk, prev, part, -1, false) : `<pre class="hx-ad-pre">${esc(prev.text)}</pre>`}</div>
+      ${long ? `<button type="button" class="hx-ad-sm" data-block="${esc(bk)}" data-fk="${esc(fk)}" data-part="${esc(part)}" data-more="${prev.more ? 1 : ''}">${open ? 'Show less' : 'Show more' + (prev.more ? ' · ' + fmtChars(prev.len) : '')}</button>` : ''}</section>`;
+  }
+
+  const TAG = { text: 'Said', thinking: 'Thought', user: 'You', prompt: 'Brief', event: 'Event', error: 'Error' };
+  const toolTag = (t) => { t = String(t || 'tool'); const m = /^mcp__[^_]+(?:_[^_]+)*?__(.+)$/.exec(t); return (m ? m[1] : t.split('.').pop()).slice(0, 14); };
+  function stepHtml(vk, s, d) {
+    const sk = vk + '|' + s.i;
+    const open = openSteps.has(sk);
+    const isTool = s.kind === 'tool';
+    const first = isTool ? s.label : (s.label || (s.text ? s.text.text.split('\n').find((x) => x.trim()) || '' : ''));
+    const bad = (isTool && s.ok === false) || s.kind === 'error';
+    const live = isTool && !s.done && d.running;
+    const rel = s.t && d.agent.started ? '+' + fmtDur(s.t - d.agent.started) : '';
+    const go = s.agent ? `<button type="button" class="hx-ad-open" data-rid="${esc(d.rid)}" data-aid="${esc(s.agent)}" aria-label="Open this agent">${icon('ArrowRight01Icon', 12)}</button>` : '';
+    let inner = '';
+    if (open) {
+      if (isTool) {
+        inner = (s.in ? `<div class="hx-ad-io"><span>Input</span>${fieldBox(sk + '|in', s.in, 'in', s.i, true)}</div>` : '')
+          + (s.out ? `<div class="hx-ad-io"><span>${bad ? 'Error' : 'Output'}</span>${fieldBox(sk + '|out', s.out, 'out', s.i, true)}</div>` : (live ? '<div class="hx-ad-io"><span>Running…</span></div>' : ''))
+          + (s.files && s.files.length ? `<div class="hx-ad-io"><span>Files</span><pre class="hx-ad-pre is-mono">${esc(s.files.join('\n'))}</pre></div>` : '');
+        if (!inner) inner = '<div class="hx-ad-io"><span>No input or output was recorded for this step.</span></div>';
+      } else inner = fieldBox(sk + '|text', s.text, 'text', s.i, false);
+    }
+    return `<li class="hx-ad-step" data-k="${esc(s.kind)}"${bad ? ' data-bad="1"' : ''}${live ? ' data-live="1"' : ''}>
+      <div class="hx-ad-step-h" role="button" tabindex="0" data-sk="${esc(sk)}" aria-expanded="${open}"><span class="hx-ad-tag">${esc(isTool ? toolTag(s.tool) : (TAG[s.kind] || s.kind))}</span><span class="hx-ad-lbl">${esc(first || '…')}</span><span class="hx-ad-t">${esc(rel)}</span>${go}</div>
+      ${open ? `<div class="hx-ad-step-b">${inner}</div>` : ''}</li>`;
+  }
+
+  function agentView(v, d, sub) {
+    const vk = viewKey(v);
+    const a = d.agent;
+    const st = statusOf(a);
+    setTitle(shown(a.name));
+    const dur = st === 'running' ? fmtDur(elapsed(a)) : (a.duration_s != null ? fmtDur(a.duration_s) : '');
+    const c = d.counts || {};
+    sub.textContent = [STATUS[st] || st, a.model || PROVIDER_LABEL(a.provider), a.tokens ? fmtTokens(a.tokens) + ' tokens' : '', dur,
+      c.tools ? `${c.tools} tool call${c.tools === 1 ? '' : 's'}` : '', c.failed ? `${c.failed} failed` : ''].filter(Boolean).join(' · ');
+    const list = reqRowsOf(v.rid) || [];
+    const kids = list.filter((x) => x.parent === a.id);
+    const kv = [['Role', a.kind === 'delegate' ? 'Hand-off' : (a.kind === 'background' ? 'Background task' : (a.description || (a.parent ? 'Sub-agent' : 'Main agent')))],
+      ['Model', a.model || PROVIDER_LABEL(a.provider)], ['Started', a.started ? clock(a.started) : ''],
+      ['Output', a.output_tokens ? fmtTokens(a.output_tokens) + ' tokens' : ''], ['Turns', a.turns || ''],
+      ['Record', d.source && d.source !== 'none' ? d.source : 'none']].filter((x) => x[1]);
+    const par = d.parent ? `<div class="hx-ad-parent">Started by <button type="button" class="hx-ad-link" data-rid="${esc(d.rid)}" data-aid="${esc(d.parent.id)}">${esc(shown(d.parent.name))}</button></div>` : '';
+    const steps = d.steps || [];
+    const more = d.total > steps.length ? `<button type="button" class="hx-ad-more-steps">Show ${d.total - steps.length} more step${d.total - steps.length === 1 ? '' : 's'}</button>` : '';
+    const hidden = c.thinking_hidden ? `<p class="hx-ad-note">${c.thinking_hidden} reasoning block${c.thinking_hidden === 1 ? ' is' : 's are'} encrypted by the provider and can't be shown.</p>` : '';
+    const fk = vk + '|files';
+    const fopen = openBlocks.has(fk);
+    const files = (d.files || []).length ? `<section class="hx-ad-sec"><h3 class="hx-ad-h">Files changed<span>${d.files_total}</span></h3><ul class="hx-ad-files">${(fopen ? d.files : d.files.slice(0, 8)).map((f) => { const i = f.lastIndexOf('/'); return `<li title="${esc(f)}"><b>${esc(f.slice(i + 1))}</b><span>${esc(i > 0 ? f.slice(0, i) : '')}</span></li>`; }).join('')}</ul>${d.files.length > 8 ? `<button type="button" class="hx-ad-sm" data-block="${esc(fk)}">${fopen ? 'Show fewer' : `Show all ${d.files.length}`}</button>` : ''}</section>` : '';
+    return `<div class="hx-ad">
+      <dl class="hx-ad-kv">${kv.map(([k, x]) => `<div><dt>${esc(k)}</dt><dd>${esc(x)}</dd></div>`).join('')}</dl>
+      ${par}${d.note ? `<p class="hx-ad-note">${esc(d.note)}</p>` : ''}
+      ${block(vk, 'prompt', a.parent ? 'Brief it was given' : 'Prompt', d.prompt, 'prompt')}
+      ${kids.length ? `<section class="hx-ad-sec"><h3 class="hx-ad-h">Sub-agents and hand-offs<span>${kids.length}</span></h3><div class="hx-agents-list">${kids.map((x) => drillRow(x, list, v.rid)).join('')}</div></section>` : ''}
+      ${!d.total && d.note && st !== 'running' ? '' : `<section class="hx-ad-sec"><h3 class="hx-ad-h">Steps<span>${d.total}</span></h3>${steps.length ? `<ol class="hx-ad-steps">${steps.map((s) => stepHtml(vk, s, d)).join('')}</ol>` : `<p class="hx-ad-note">${st === 'running' ? 'Nothing recorded yet.' : 'No steps were recorded.'}</p>`}${more}${hidden}</section>`}
+      ${block(vk, 'output', st === 'running' ? 'Latest output' : 'Final output', d.output, 'output')}
+      ${files}</div>`;
+  }
+
+  function reqView(v, d, sub) {
+    const vk = viewKey(v);
+    setTitle('Request');
+    const ex = d.executor || {};
+    const u = d.usage || {};
+    sub.textContent = [reqLabel(d.status), d.created ? clock(Date.parse(d.created) / 1000) : '', (d.agents || []).length ? `${d.agents.length} agent${d.agents.length === 1 ? '' : 's'}` : ''].filter(Boolean).join(' · ');
+    const route = { astra: 'Planned first', claude: 'Claude Code', codex: 'Codex', hermes: 'Answered by Tabbie' }[d.route] || d.route;
+    const kv = [['Route', [route, d.route_reason].filter(Boolean).join(' · ')], ['Planner', d.planner || ''],
+      ['Worker', [ex.model || ex.provider, ex.effort ? ex.effort + ' effort' : '', ex.resumed ? 'resumed' : ''].filter(Boolean).join(' · ')],
+      ['Tokens', u.input || u.output ? [u.input ? fmtTokens(u.input) + ' in' : '', u.cached ? fmtTokens(u.cached) + ' cached' : '', u.output ? fmtTokens(u.output) + ' out' : ''].filter(Boolean).join(' · ') : ''],
+      ['Project', d.project || '']].filter((x) => x[1]);
+    const list = reqRowsOf(v.rid) || d.agents || [];
+    return `<div class="hx-ad">
+      <dl class="hx-ad-kv">${kv.map(([k, x]) => `<div><dt>${esc(k)}</dt><dd>${esc(x)}</dd></div>`).join('')}</dl>
+      ${block(vk, 'prompt', 'You asked', d.prompt, 'prompt')}
+      ${(d.modifications || []).length ? `<section class="hx-ad-sec"><h3 class="hx-ad-h">Changes you asked for</h3><pre class="hx-ad-pre">${esc(d.modifications.join('\n\n'))}</pre></section>` : ''}
+      ${block(vk, 'brief', 'Brief', d.brief, 'brief')}
+      ${list.length ? `<section class="hx-ad-sec"><h3 class="hx-ad-h">Agents<span>${list.filter((a) => !isBg(a)).length}</span></h3><div class="hx-agents-list">${list.map((a) => drillRow(a, list, v.rid)).join('')}</div></section>` : ''}
+      ${d.error ? block(vk, 'error', 'Error', d.error, 'error') : ''}
+      ${block(vk, 'result', 'Result', d.result, 'result')}
+      <button type="button" class="hx-agents-btn hx-ad-jump" data-rid="${esc(v.rid)}">${icon('ArrowRight01Icon', 12)}Go to the reply</button></div>`;
+  }
+
+  function renderDetail(body, sub) {
+    const v = nav[nav.length - 1];
+    const e = dcache.get(viewKey(v));
+    let html;
+    if (e && e.d) html = v.type === 'req' ? reqView(v, e.d, sub) : agentView(v, e.d, sub);
+    else {
+      const row = v.type === 'agent' ? (reqRowsOf(v.rid) || []).find((x) => x.id === v.aid) : null;
+      setTitle(v.type === 'req' ? 'Request' : (row ? shown(row.name) : 'Agent'));
+      sub.textContent = '';
+      html = e && e.state === 'err'
+        ? `<div class="hx-as-empty"><p>${esc(e.err === 'missing' ? 'Nothing was recorded for this one.' : (e.err === 'consent' ? 'Allow this panel to read agent details first.' : DOWN))}</p><button type="button" class="hx-as-allow hx-ad-retry">Try again</button></div>`
+        : '<div class="hx-ad-load" role="status">Loading…</div>';
+    }
+    if (body.__html !== html) { body.innerHTML = html; body.__html = html; }
+  }
+
+  async function fetchFull(fk, part, i) {
+    const v = nav[nav.length - 1];
+    if (!v) return;
+    fullText.set(fk, { state: 'loading' }); renderSheet();
+    try {
+      const j = v.type === 'req' ? await getJ(`request/part?rid=${enc(v.rid)}&part=${enc(part)}`)
+        : await getJ(`agent/part?rid=${enc(v.rid)}&agent=${enc(v.aid)}&part=${enc(part)}&i=${enc(i)}`);
+      fullText.set(fk, { state: 'ok', text: j.text, len: j.len, truncated: j.truncated });
+    } catch (_) { fullText.set(fk, { state: 'err' }); }
+    renderSheet();
+  }
+  function onDetailClick(e) {
+    const t = e.target;
+    let el;
+    if ((el = t.closest('.hx-ad-retry'))) { const v = nav[nav.length - 1]; if (v) { dcache.delete(viewKey(v)); loadDetail(v); renderSheet(); } return true; }
+    if ((el = t.closest('.hx-ad-jump'))) { jumpTo(el.dataset.rid); return true; }
+    if ((el = t.closest('[data-aid][data-rid]'))) { e.stopPropagation(); navPush({ type: 'agent', rid: el.dataset.rid, aid: el.dataset.aid }); return true; }
+    if ((el = t.closest('.hx-ad-more-steps'))) { el.disabled = true; el.textContent = 'Loading…'; loadDetail(nav[nav.length - 1], 'more'); return true; }
+    if ((el = t.closest('[data-full]'))) {
+      const f = fullText.get(el.dataset.full);
+      if (f && f.state === 'loading') return true;
+      if (f && f.state === 'ok') { fullText.delete(el.dataset.full); renderSheet(); } else fetchFull(el.dataset.full, el.dataset.part, el.dataset.i);
+      return true;
+    }
+    if ((el = t.closest('[data-block]'))) {
+      const bk = el.dataset.block;
+      flip(openBlocks, bk);
+      if (el.dataset.fk && !openBlocks.has(bk)) fullText.delete(el.dataset.fk);
+      if (openBlocks.has(bk) && el.dataset.more && !fullText.has(el.dataset.fk)) fetchFull(el.dataset.fk, el.dataset.part, -1);
+      else renderSheet();
+      return true;
+    }
+    if ((el = t.closest('.hx-ad-step-h'))) { flip(openSteps, el.dataset.sk); renderSheet(); return true; }
+    return false;
+  }
 
   // ── 3. question cards ───────────────────────────────────────────────────
   const drafts = new Map(); // `${rid}:${round}:${questions}` -> {sel: [[...labels]], other: [...]}
@@ -715,6 +1025,7 @@
     document.querySelectorAll('#messages .assistant-turn').forEach((turn) => {
       const m = ROUTE_RX.exec((turn.textContent || '').slice(0, 400));
       if (!m || /^Tabbie\b/.test(m[1].trim())) return;
+      turn.classList.add('hx-wturn');  // a worker did this reply: its own line carries the tokens (CSS hides the hub's)
       turn.querySelectorAll('.lf-tokens, .msg-usage-inline').forEach((el) => {
         if (el.closest('.live-run-status')) return;  // the live "Running" strip: leave it alone
         const txt = el.textContent || '';

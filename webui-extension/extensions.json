@@ -18,6 +18,16 @@
       "stylesheets": []
     },
     {
+      "id": "needs",
+      "name": "Asks for anything Tabbie needs that is missing (first name, \u2026)",
+      "scripts": [
+        "needs.js?v=1"
+      ],
+      "stylesheets": [
+        "needs.css?v=1"
+      ]
+    },
+    {
       "id": "spaces-projects",
       "name": "Spaces & Projects",
       "scripts": [
@@ -46,6 +56,36 @@
       "stylesheets": []
     },
     {
+      "id": "declutter",
+      "name": "Smaller frame (rail More menu, settings order)",
+      "scripts": [
+        "declutter.js?v=8"
+      ],
+      "stylesheets": [
+        "declutter.css?v=9"
+      ]
+    },
+    {
+      "id": "glass",
+      "name": "Liquid glass (composer, menus, floating buttons; Settings \u203a Appearance)",
+      "scripts": [
+        "glass.js?v=3"
+      ],
+      "stylesheets": [
+        "glass.css?v=18"
+      ]
+    },
+    {
+      "id": "sidebar",
+      "name": "Chat sidebar (ChatGPT-style)",
+      "scripts": [
+        "sidebar.js?v=20"
+      ],
+      "stylesheets": [
+        "sidebar.css?v=20"
+      ]
+    },
+    {
       "id": "hugeicons",
       "name": "Hugeicons",
       "scripts": [
@@ -67,10 +107,10 @@
       "id": "files",
       "name": "File cards & viewer",
       "scripts": [
-        "files.js?v=3"
+        "files.js?v=4"
       ],
       "stylesheets": [
-        "files.css?v=5"
+        "files.css?v=6"
       ]
     },
     {
@@ -94,14 +134,6 @@
       "name": "Empty session reload fix",
       "scripts": [
         "empty-session-fix.js?v=2"
-      ],
-      "stylesheets": []
-    },
-    {
-      "id": "share-in",
-      "name": "Share into Tabbie (iOS Shortcut)",
-      "scripts": [
-        "share-in.js?v=1"
       ],
       "stylesheets": []
     },
@@ -145,10 +177,10 @@
       "id": "cc-agents",
       "name": "Agents & questions",
       "scripts": [
-        "cc-agents.js?v=19"
+        "cc-agents.js?v=24"
       ],
       "stylesheets": [
-        "cc-agents.css?v=10"
+        "cc-agents.css?v=13"
       ],
       "sidecar": {
         "type": "loopback",
@@ -186,14 +218,6 @@
       "stylesheets": []
     },
     {
-      "id": "notify",
-      "name": "Chat-named notifications",
-      "scripts": [
-        "notify.js?v=1"
-      ],
-      "stylesheets": []
-    },
-    {
       "id": "shortcuts",
       "name": "Keyboard shortcuts",
       "scripts": [
@@ -215,17 +239,17 @@
       "id": "home",
       "name": "New-chat home",
       "scripts": [
-        "home.js?v=8"
+        "home.js?v=10"
       ],
       "stylesheets": [
-        "home.css?v=6"
+        "home.css?v=7"
       ]
     },
     {
       "id": "auto-title",
       "name": "Auto title",
       "scripts": [
-        "auto-title.js?v=2"
+        "auto-title.js?v=3"
       ],
       "stylesheets": []
     },
@@ -249,9 +273,9 @@
       "id": "motion",
       "name": "Motion studio (Zoetie)",
       "scripts": [
-        "motion.js?v=9",
+        "motion.js?v=10",
         "motion-scrub.js?v=6",
-        "motion-studio.js?v=64"
+        "motion-studio.js?v=68"
       ],
       "stylesheets": [
         "motion.css?v=8",
@@ -262,17 +286,17 @@
       "id": "projects",
       "name": "Projects (multi-folder, memory, Dreamer)",
       "scripts": [
-        "projects.js?v=12"
+        "projects.js?v=16"
       ],
       "stylesheets": [
-        "projects.css?v=8"
+        "projects.css?v=12"
       ]
     },
     {
       "id": "routes",
       "name": "Page addresses (/kanban, /projects, \u2026)",
       "scripts": [
-        "routes.js?v=2"
+        "routes.js?v=3"
       ],
       "stylesheets": []
     },
@@ -280,20 +304,50 @@
       "id": "updates",
       "name": "Tabbie updates (asks before downloading)",
       "scripts": [
-        "updates.js?v=8"
+        "updates.js?v=9"
       ],
       "stylesheets": [
-        "updates.css?v=4"
+        "updates.css?v=5"
+      ]
+    },
+    {
+      "id": "settings-tidy",
+      "name": "Honest Settings (Accounts, hub model, updates)",
+      "scripts": [
+        "settings-tidy.js?v=4"
+      ],
+      "stylesheets": [
+        "settings-tidy.css?v=4"
+      ]
+    },
+    {
+      "id": "dropdowns",
+      "name": "One dropdown look and behaviour (from the model picker)",
+      "scripts": [
+        "dropdowns.js?v=2"
+      ],
+      "stylesheets": [
+        "dropdowns.css?v=2"
       ]
     },
     {
       "id": "model-picker",
       "name": "Model picker",
       "scripts": [
-        "model-picker.js?v=18"
+        "model-picker.js?v=26"
       ],
       "stylesheets": [
-        "model-picker.css?v=11"
+        "model-picker.css?v=14"
+      ]
+    },
+    {
+      "id": "composer-workspace",
+      "name": "Workspace chip and menu (matches the model picker)",
+      "scripts": [
+        "composer-workspace.js?v=3"
+      ],
+      "stylesheets": [
+        "composer-workspace.css?v=4"
       ]
     },
     {
@@ -366,21 +420,37 @@
       "id": "custom-controls",
       "name": "Custom checkboxes & dropdowns",
       "scripts": [
-        "custom-controls.js?v=2"
+        "custom-controls.js?v=3"
       ],
       "stylesheets": [
-        "custom-controls.css?v=2"
+        "custom-controls.css?v=3"
       ]
     },
     {
-      "id": "worker-tokens",
-      "name": "Worker tokens on Insights",
+      "id": "insights-usage",
+      "name": "Insights page: Claude Code, Codex and hub tokens, API-equivalent cost",
       "scripts": [
-        "worker-tokens.js?v=2"
+        "insights-usage.js?v=7"
       ],
       "stylesheets": [
-        "worker-tokens.css?v=1"
+        "insights-usage.css?v=7"
       ]
+    },
+    {
+      "id": "share-in",
+      "name": "Share into Tabbie (iOS Shortcut)",
+      "scripts": [
+        "share-in.js?v=1"
+      ],
+      "stylesheets": []
+    },
+    {
+      "id": "notify",
+      "name": "Chat-named notifications",
+      "scripts": [
+        "notify.js?v=1"
+      ],
+      "stylesheets": []
     }
   ]
 }

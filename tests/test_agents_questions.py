@@ -221,7 +221,11 @@ def test_clean_title():
     assert m.clean_title('Title: "Apple-Style Internet Money Motion."\n') == "Apple-Style Internet Money Motion"
     assert m.clean_title("\n\n**Fix Greeting Size**") == "Fix Greeting Size"
     assert m.clean_title("") == ""
-    assert len(m.clean_title("x" * 200)) == 60
+    assert len(m.clean_title("x" * 200)) == 48
+    # never more than four words; a dangling joiner is dropped
+    assert m.clean_title("Landlord Email Choice For Smart Import Rightmove") == "Landlord Email Choice For".rsplit(" ", 1)[0]
+    assert m.clean_title("Android Port From iOS App") == "Android Port From iOS"
+    assert m.clean_title("Tenancy Rules Explained") == "Tenancy Rules Explained"
     # Haiku echoing our wrapper, or a title built from envelope text, keeps only the user's words
     assert m.clean_title("<message>\n/limit\n</message>") == "/limit"
     assert m.clean_title('<pasted_content id="90a5"> Web3 Audit Leads') == "Web3 Audit Leads"

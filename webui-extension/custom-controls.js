@@ -145,7 +145,7 @@
     const host = sel.closest('dialog[open]') || document.body;
     const sheet = phone();
     const pop = document.createElement('div');
-    pop.className = 'hx-cc-pop' + (sheet ? ' is-sheet' : '');
+    pop.className = 'hx-cc-pop hx-pop' + (sheet ? ' is-sheet' : '');  // .hx-pop: shared dropdown look (dropdowns.css)
     pop.id = 'hxCcPop' + (++seq);
     pop.setAttribute('role', 'listbox');
     pop.tabIndex = -1;

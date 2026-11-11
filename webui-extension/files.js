@@ -324,9 +324,9 @@
     V.setAttribute('role', 'dialog');
     V.setAttribute('aria-modal', 'true');
     V.innerHTML = '<div class="hx-v-scrim"></div><div class="hx-v-sheet">'
-      + '<header class="hx-v-head"><span class="hx-v-ic"></span><div class="hx-v-tt"><div class="hx-v-nm"></div><div class="hx-v-mt"></div></div>'
-      + `<a class="hx-v-btn hx-v-dl" title="Download">${icon('Download04Icon', 18)}</a>`
-      + `<button type="button" class="hx-v-btn hx-v-x" title="Close" aria-label="Close">${icon('Cancel01Icon', 18)}</button></header>`
+      + `<header class="hx-v-head"><button type="button" class="hx-back hx-v-x" aria-label="Back">${icon('ArrowLeft01Icon', 18)}<span>Back</span></button>`
+      + '<span class="hx-v-ic"></span><div class="hx-v-tt"><div class="hx-v-nm"></div><div class="hx-v-mt"></div></div>'
+      + `<a class="hx-v-btn hx-v-dl" title="Download">${icon('Download04Icon', 18)}</a></header>`
       + '<div class="hx-v-body"></div></div>';
     document.body.appendChild(V);
     V.querySelector('.hx-v-scrim').addEventListener('click', close);

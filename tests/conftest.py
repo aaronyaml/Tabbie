@@ -11,6 +11,7 @@ os.environ["HMEM_WEBUI_SESSIONS"] = os.path.join(_TMP, "webui", "sessions")  # n
 os.environ["HMEM_AUTO_APPROVE"] = "0"  # proposals stay pending unless a test passes its own policy
 os.environ["HMEM_NO_LLM"] = "1"  # never a real `claude -p` call; tests stub the LLM where they need it
 os.environ["TABBIE_LIMITS_GATE"] = "off"  # never a real usage-endpoint call (tests pass their own rows)
+os.environ["TABBIE_NEW_CHAT_FILE"] = os.path.join(_TMP, "new-chat-choice.json")  # never the real new-chat model
 os.environ["TABBIE_LINKED"] = ""  # no `claude auth` / `codex login` subprocess: nothing linked unless a test says so
 os.environ["TABBIE_NO_SERVICES"] = "1"  # never install or reload real LaunchAgents
 os.environ["TABBIE_SIDECAR_PEER_CHECK"] = "off"  # test clients are not the WebUI process
@@ -50,3 +51,21 @@ def _isolated_worker_slots(tmp_path, monkeypatch):
         m = sys.modules.get(name)
         if m is not None and hasattr(m, "LOCKS_DIR"):
             monkeypatch.setattr(m, "LOCKS_DIR", tmp_path / "locks")
+
+
+@pytest.fixture(autouse=True)
+def _isolated_model_latest(tmp_path, monkeypatch):
+    """No real ~/.codex model list or state/model-latest.json: tests see the built-in catalog."""
+    import sys
+    for name in ("command_centre.model_latest", "cc.model_latest"):
+        m = sys.modules.get(name)
+        if m is not None:
+            monkeypatch.setattr(m, "CACHE", tmp_path / "model-latest.json")
+            monkeypatch.setattr(m, "CODEX_CACHE", tmp_path / "codex-models.json")
+            m._mem.update(data=None, mtime=0.0)
+
+
+@pytest.fixture(autouse=True)
+def _isolated_new_chat_model(tmp_path, monkeypatch):
+    """The new-chat model (executor_choice.set_default / last composer pick) is per test, never ~/hermes/state."""
+    monkeypatch.setenv("TABBIE_NEW_CHAT_FILE", str(tmp_path / "new-chat-choice.json"))

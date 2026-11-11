@@ -1,0 +1,165 @@
+/* Hermes — composer workspace chip + dropdown, matched to the model picker (model-picker.css).
+ * Ids + !important: beats upstream style.css and apple-skin.css's soft-pill workspace group. */
+
+/* ── chip (desktop): same metrics as .hx-mp-chip ─────────────────────── */
+#composerWorkspaceGroup.composer-workspace-group {
+  display: inline-flex !important; align-items: center; gap: 2px; padding: 0 !important; height: auto !important;
+  background: transparent !important; border: 0 !important; box-shadow: none !important; border-radius: 10px !important;
+}
+#composerWorkspaceGroup #composerWorkspaceChip {
+  display: inline-flex !important; align-items: center; gap: 6px !important; height: 32px !important; padding: 0 9px 0 8px !important;
+  flex-shrink: 0; border: 0 !important; border-radius: 10px !important; background: transparent !important; box-shadow: none !important;
+  color: var(--hx-text-2) !important; font: 500 13px/1 var(--font-ui) !important; letter-spacing: -.005em; white-space: nowrap; cursor: pointer;
+  transition: background-color .18s var(--hx-ease), color .18s var(--hx-ease);
+}
+#composerWorkspaceGroup #composerWorkspaceChip:hover,
+#composerWorkspaceGroup #composerWorkspaceChip.active,
+#composerWorkspaceGroup #composerWorkspaceChip[aria-expanded="true"] { background: var(--hover-bg) !important; color: var(--hx-text) !important; }
+#composerWorkspaceChip:focus-visible { outline: 2px solid var(--focus-ring); outline-offset: 1px; }
+#composerWorkspaceChip:disabled { opacity: .5; cursor: default; }
+#composerWorkspaceChip .hx-wsc-ic, #composerWorkspaceChip .composer-workspace-chevron { display: inline-flex !important; align-items: center; margin: 0 !important; }
+#composerWorkspaceChip .hx-wsc-ic svg { width: 15px !important; height: 15px !important; }
+#composerWorkspaceChip .composer-workspace-label { font: inherit !important; color: inherit !important; max-width: 220px; overflow: hidden; text-overflow: ellipsis; }
+#composerWorkspaceChip .composer-workspace-chevron { opacity: .7; transition: transform .2s var(--hx-ease); }
+#composerWorkspaceChip .composer-workspace-chevron svg { width: 12px !important; height: 12px !important; }
+#composerWorkspaceChip[aria-expanded="true"] .composer-workspace-chevron { transform: rotate(180deg); }
+/* "show workspace files": a plain composer icon button, like attach / mic */
+#composerWorkspaceGroup #btnWorkspacePanelToggle {
+  display: inline-flex !important; align-items: center; justify-content: center; width: 34px !important; height: 34px !important; padding: 0 !important;
+  border: 0 !important; border-radius: 8px !important; background: transparent !important; box-shadow: none !important; color: var(--hx-text-2) !important;
+}
+#composerWorkspaceGroup #btnWorkspacePanelToggle:hover,
+#composerWorkspaceGroup #btnWorkspacePanelToggle[aria-pressed="true"] { background: var(--hover-bg) !important; color: var(--hx-text) !important; }
+#btnWorkspacePanelToggle .composer-workspace-icon { display: inline-flex; }
+#btnWorkspacePanelToggle .composer-workspace-icon svg { width: 16px !important; height: 16px !important; }
+
+/* ── phone pill (apple-skin's workspace label in #composerMobileConfigBtn): like the phone model chip ── */
+@media (max-width: 640px) {
+  #composerMobileConfigBtn { gap: 6px; color: var(--hx-text-2) !important; font: 500 14px/1 var(--font-ui) !important; }
+  #composerMobileConfigBtn .hx-ws-label { color: inherit !important; }
+  #composerMobileConfigBtn .hx-ws-label::after { content: none !important; }
+  #composerMobileConfigBtn .hx-ws-label::before { color: var(--hx-text-2); width: 15px !important; height: 15px !important; }
+  #composerMobileConfigBtn .hx-wsc-chev { display: inline-flex; flex: none; opacity: .7; color: var(--hx-text); transition: transform .2s var(--hx-ease); }
+  #composerMobileConfigBtn[aria-expanded="true"] .hx-wsc-chev { transform: rotate(180deg); }
+  /* while the workspace sheet is up, the config panel it came from steps aside */
+  html.hx-wsc-sheet-open #composerMobileConfigPanel { visibility: hidden !important; }
+}
+@media (min-width: 641px) { #composerMobileConfigBtn .hx-wsc-chev { display: none; } }
+
+/* ── dropdown shell: the shared popover (dropdowns.css .hx-pop, placed by dropdowns.js) ── */
+#composerWsDropdown.hx-wsc {
+  padding: 0 6px 6px !important; overflow: hidden !important; color: var(--hx-text); font-family: var(--font-ui);
+  background: var(--hx-pop-bg) !important; border: 0.5px solid var(--hx-pop-line) !important; border-radius: var(--hx-pop-radius) !important; box-shadow: var(--hx-pop-shadow) !important;
+}
+#composerWsDropdown.hx-wsc.open { display: flex !important; flex-direction: column; }
+#composerWsDropdown.hx-wsc.is-sheet { border-radius: 20px 20px 0 0 !important; border-width: 0.5px 0 0 !important; padding: 0 12px calc(12px + env(safe-area-inset-bottom, 0px)) !important; }
+
+/* header */
+#composerWsDropdown .hx-wsc-head { flex: none; display: flex; flex-direction: column; justify-content: center; min-height: 34px; padding: 4px 10px 0; }
+#composerWsDropdown .hx-wsc-title { font-size: 13px; font-weight: 600; color: var(--hx-text-2); letter-spacing: -.005em; }
+#composerWsDropdown .hx-wsc-grab { display: none; }
+#composerWsDropdown.is-sheet .hx-wsc-head { min-height: 52px; padding: 0 10px; align-items: center; touch-action: none; }
+#composerWsDropdown.is-sheet .hx-wsc-grab { display: block; width: 36px; height: 5px; border-radius: 3px; background: var(--hx-fill-2); margin: 8px auto 10px; }
+#composerWsDropdown.is-sheet .hx-wsc-title { font-size: 15px; color: var(--hx-text); }
+
+/* search: the model picker's search field */
+#composerWsDropdown .ws-search-row { flex: none; position: relative; display: flex; align-items: center; gap: 0; padding: 2px 0 6px !important; margin: 0 !important; border: 0 !important; background: transparent !important; }
+#composerWsDropdown .ws-search-row::before {
+  content: ""; position: absolute; left: 11px; top: calc(50% - 2px); width: 15px; height: 15px; transform: translateY(-50%); pointer-events: none;
+  background: var(--hx-text-2);
+  -webkit-mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='1.6' stroke-linecap='round'%3E%3Ccircle cx='11' cy='11' r='7.5'/%3E%3Cpath d='M17 17l4 4'/%3E%3C/svg%3E") center / contain no-repeat;
+  mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='1.6' stroke-linecap='round'%3E%3Ccircle cx='11' cy='11' r='7.5'/%3E%3Cpath d='M17 17l4 4'/%3E%3C/svg%3E") center / contain no-repeat;
+}
+#composerWsDropdown .ws-search-input {
+  flex: 1; min-width: 0; height: 36px; box-sizing: border-box; padding: 0 34px 0 34px !important; margin: 0;
+  border: 0 !important; border-radius: 10px !important; outline: 0; background: var(--hx-fill) !important; color: var(--hx-text) !important;
+  font: 400 14px/1 var(--font-ui) !important; box-shadow: none !important;
+}
+#composerWsDropdown .ws-search-input::placeholder { color: var(--hx-text-2); }
+#composerWsDropdown .ws-search-input:focus { outline: 2px solid var(--focus-ring); outline-offset: -1px; }
+#composerWsDropdown .ws-search-clear {
+  position: absolute; right: 6px; top: calc(50% - 2px); transform: translateY(-50%); width: 24px !important; height: 24px !important;
+  border: 0 !important; border-radius: 50% !important; background: transparent !important; color: var(--hx-text-2) !important;
+  display: inline-flex; align-items: center; justify-content: center;
+}
+#composerWsDropdown .ws-search-clear:hover { background: var(--hover-bg) !important; color: var(--hx-text) !important; }
+#composerWsDropdown .ws-search-input:placeholder-shown + .ws-search-clear { display: none !important; }
+#composerWsDropdown.is-sheet .ws-search-input { height: 42px; font-size: 16px !important; }  /* iOS: no zoom on focus */
+
+/* list: the only part that scrolls, so search and actions stay put */
+#composerWsDropdown .ws-list-container {
+  flex: 1 1 auto; min-height: 96px; max-height: none !important; overflow-y: auto; overscroll-behavior: contain;
+  -webkit-overflow-scrolling: touch; scrollbar-width: thin; display: flex; flex-direction: column; gap: 2px;
+}
+#composerWsDropdown .hxsp-ws-head {
+  margin: 8px 10px 4px !important; padding: 0 !important; border: 0 !important; background: transparent !important;
+  font: 600 11px/1.2 var(--font-ui) !important; letter-spacing: .04em; text-transform: uppercase; color: var(--hx-text-2) !important;
+}
+#composerWsDropdown .ws-list-container > .hxsp-ws-head:first-child { margin-top: 2px !important; }
+
+/* rows: the model picker's rows (32px tile, name over a one-line description) */
+#composerWsDropdown .ws-opt {
+  position: relative; display: flex !important; flex-direction: column; justify-content: center; gap: 2px; box-sizing: border-box;
+  min-height: 46px; margin: 0 !important; padding: 6px 8px 6px 50px !important; border: 0 !important; border-radius: 12px !important;
+  background: transparent !important; color: var(--hx-text) !important; cursor: pointer; transition: background-color .15s var(--hx-ease);
+}
+/* upstream's search hides rows with an inline display:none */
+#composerWsDropdown .ws-opt[style*="display: none"], #composerWsDropdown .ws-no-results[style*="display: none"] { display: none !important; }
+#composerWsDropdown .ws-opt:hover { background: var(--hover-bg) !important; }
+#composerWsDropdown .ws-opt:active { background: var(--hx-fill) !important; }
+#composerWsDropdown .ws-opt:not(.ws-opt-action)::before {
+  content: ""; position: absolute; left: 8px; top: 7px; width: 32px; height: 32px; border-radius: 9px; background: var(--hx-fill);
+}
+#composerWsDropdown .ws-opt:not(.ws-opt-action)::after {
+  content: ""; position: absolute; left: 16px; top: 15px; width: 16px; height: 16px; background: var(--hx-text);
+  -webkit-mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='1.6' stroke-linejoin='round'%3E%3Cpath d='M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z'/%3E%3C/svg%3E") center / contain no-repeat;
+  mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='1.6' stroke-linejoin='round'%3E%3Cpath d='M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z'/%3E%3C/svg%3E") center / contain no-repeat;
+}
+/* projects (multi-folder workspaces): briefcase */
+#composerWsDropdown .ws-opt.hxsp-ws-project::after {
+  -webkit-mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='1.6' stroke-linejoin='round'%3E%3Crect x='2.5' y='7' width='19' height='13.5' rx='2.5'/%3E%3Cpath d='M8.5 7V5.5a2 2 0 0 1 2-2h3a2 2 0 0 1 2 2V7M2.5 13h19'/%3E%3C/svg%3E") center / contain no-repeat;
+  mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='1.6' stroke-linejoin='round'%3E%3Crect x='2.5' y='7' width='19' height='13.5' rx='2.5'/%3E%3Cpath d='M8.5 7V5.5a2 2 0 0 1 2-2h3a2 2 0 0 1 2 2V7M2.5 13h19'/%3E%3C/svg%3E") center / contain no-repeat;
+}
+#composerWsDropdown .ws-opt.active::before { background: var(--hx-tint); }
+#composerWsDropdown .ws-opt.active::after { background: var(--hx-ink); }
+#composerWsDropdown .ws-opt.active .ws-opt-name { font-weight: 600; }
+#composerWsDropdown .ws-opt-name { display: block; font: 500 14px/1.25 var(--font-ui) !important; letter-spacing: -.01em; color: var(--hx-text) !important;
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+#composerWsDropdown .ws-opt-path, #composerWsDropdown .ws-opt-meta {
+  display: block; font: 400 12px/1.3 var(--font-ui) !important; color: var(--hx-text-2) !important; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+}
+#composerWsDropdown .ws-opt.hxsp-ws-opt { padding-right: 44px !important; }
+/* names only: no path line under each workspace (search still matches paths) */
+#composerWsDropdown .ws-opt:not(.ws-opt-action) .ws-opt-path { display: none !important; }
+#composerWsDropdown .ws-opt:not(.ws-opt-action) { min-height: 44px; }
+#composerWsDropdown .ws-opt:not(.ws-opt-action)::before { top: 6px; }
+#composerWsDropdown .ws-opt:not(.ws-opt-action)::after { top: 14px; }
+#composerWsDropdown .hxsp-ws-toggle { top: 7px !important; right: 6px !important; width: 30px; height: 30px; border-radius: 8px; color: var(--hx-text-2); }
+#composerWsDropdown .hxsp-ws-children { padding: 6px 0 2px; }
+
+/* actions (new worktree chat, choose a path, manage): rows with an icon tile */
+#composerWsDropdown .ws-divider { flex: none; height: 0.5px !important; margin: 4px 10px !important; background: var(--hx-hair) !important; border: 0 !important; }
+#composerWsDropdown .ws-opt-action + .ws-divider { display: none !important; }
+#composerWsDropdown .ws-opt-action { flex: none; flex-direction: row !important; align-items: center; justify-content: flex-start; gap: 10px; padding: 6px 8px !important; }
+#composerWsDropdown .ws-opt-action .ws-opt-icon {
+  width: 32px; height: 32px; flex-shrink: 0; display: inline-flex !important; align-items: center; justify-content: center;
+  border-radius: 9px; background: var(--hx-fill); color: var(--hx-text) !important; opacity: 1 !important; margin: 0 !important;
+}
+#composerWsDropdown .ws-opt-action .ws-opt-icon svg { width: 17px !important; height: 17px !important; }
+#composerWsDropdown .ws-opt-action > span:last-child { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 2px; }
+#composerWsDropdown .ws-no-results { padding: 12px 14px; text-align: center; color: var(--hx-text-2); font-size: 12px; }
+
+/* phone: roomier rows, like the model picker's sheet */
+#composerWsDropdown.is-sheet .ws-opt { min-height: 52px; padding-left: 56px !important; }
+#composerWsDropdown.is-sheet .ws-opt:not(.ws-opt-action)::before { top: 8px !important; }
+#composerWsDropdown.is-sheet .ws-opt:not(.ws-opt-action)::after { top: 17px !important; }
+#composerWsDropdown.is-sheet .ws-opt:not(.ws-opt-action)::before { left: 10px; top: 8px; width: 36px; height: 36px; border-radius: 10px; }
+#composerWsDropdown.is-sheet .ws-opt:not(.ws-opt-action)::after { left: 19px; top: 17px; width: 18px; height: 18px; }
+#composerWsDropdown.is-sheet .ws-opt-action { padding: 6px 10px !important; gap: 12px; }
+#composerWsDropdown.is-sheet .ws-opt-action .ws-opt-icon { width: 36px; height: 36px; border-radius: 10px; }
+#composerWsDropdown.is-sheet .ws-opt-name { font-size: 15px !important; }
+#composerWsDropdown.is-sheet .hxsp-ws-toggle { top: 11px !important; right: 8px !important; }
+
+@media (prefers-reduced-motion: reduce) {
+  #composerWorkspaceChip, #composerWorkspaceChip .composer-workspace-chevron { transition: none !important; }
+}

@@ -13,9 +13,13 @@ Only models verified to run on the user's subscriptions are listed (tiny `say hi
 
 from __future__ import annotations
 
+import json
+import os
 import re
 from pathlib import Path
 
+from . import model_latest
+from .common import STATE_DIR, write_json
 from .state import save_session_state, session_state
 
 KEY = "executor_choice"
@@ -27,7 +31,7 @@ CATALOG: dict[str, dict] = {
         "worker": "Claude Code",
         "models": [
             {"id": "claude-opus-5-5", "name": "Opus 5.5", "desc": "Most capable", "tier": "top"},
-            {"id": "claude-fable-5-1", "name": "Fable 5.1", "desc": "Deepest reasoning, slower", "tier": "top"},
+            {"id": "claude-fable-5-2", "name": "Fable 5.2", "desc": "Deepest reasoning, slower", "tier": "top"},
             {"id": "claude-sonnet-5-5", "name": "Sonnet 5.5", "desc": "Fast and capable", "tier": "mid"},
             {"id": "claude-haiku-5-5", "name": "Haiku 5.5", "desc": "Quickest", "tier": "fast"},
         ],
@@ -95,18 +99,58 @@ def providers_on() -> list[str]:
     return [p for p in CATALOG if AGENT_OF[p] in on] + endpoints_on()
 
 
+# The model new chats start on: the last one picked in the composer, or the one set in Settings →
+# Preferences (POST /executor {default: true}). Absent / no longer runnable = the built-in default below.
+def _new_chat_file() -> Path:
+    return Path(os.environ.get("TABBIE_NEW_CHAT_FILE") or STATE_DIR / "new-chat-choice.json")
+
+
+def saved_default() -> dict | None:
+    try:
+        raw = json.loads(_new_chat_file().read_text(encoding="utf-8"))
+    except (OSError, ValueError):
+        return None
+    if not isinstance(raw, dict):
+        return None
+    p, m, e = raw.get("provider"), raw.get("model"), raw.get("effort") or None
+    if not (isinstance(p, str) and isinstance(m, str)):
+        return None
+    m = model_latest.upgrade(m) or m
+    if not valid(p, m, e) or p not in providers_on():
+        return None
+    return {"provider": p, "model": m, "effort": e}
+
+
+def set_default(provider: str, model: str, effort: str | None = None) -> dict:
+    effort = (effort or "").strip().lower() or None
+    model = model_latest.upgrade(model) or model
+    if not valid(provider, model, effort) or provider not in providers_on():
+        raise ValueError("unknown provider/model/effort")
+    write_json(_new_chat_file(), {"provider": provider, "model": model, "effort": effort})
+    return new_chat_choice()
+
+
 def default_choice() -> dict:
+    saved = saved_default()
+    if saved:
+        return saved
     on = providers_on()
     p = on[0] if on else DEFAULT["provider"]
     if p == DEFAULT["provider"]:
-        return dict(DEFAULT)
+        return {**DEFAULT, "model": model_latest.upgrade(DEFAULT["model"])}
     ms = _models(p)
     return {"provider": p, "model": ms[0]["id"] if ms else DEFAULT["model"], "effort": None}
 
 
 def _models(provider: str) -> list[dict]:
     if provider in CATALOG:
-        return CATALOG[provider]["models"]
+        # each family's newest model (model_latest): Fable 5.1 becomes Fable 5.2 the day 5.2 ships
+        model_latest.refresh_soon()
+        out = []
+        for m in CATALOG[provider]["models"]:
+            nid = model_latest.upgrade(m["id"])
+            out.append(m if nid == m["id"] else {**m, "id": nid, "name": model_latest.display_name(nid)})
+        return out
     mp = _mp()
     label = mp.BILLING_LABEL.get((mp.get(provider) or {}).get("billing"), "")
     return [{**m, "desc": m.get("desc") or " · ".join(x for x in (TIER_DESC.get(m.get("tier"), ""), label) if x)}
@@ -120,6 +164,7 @@ def provider_name(provider: str) -> str:
 
 
 def model_info(provider: str, model: str) -> dict | None:
+    model = model_latest.upgrade(model) or model
     for m in _models(provider) if (provider in CATALOG or _mp().get(provider)) else []:
         if m["id"] == model:
             return m
@@ -153,6 +198,8 @@ def get_choice(session_id: str) -> dict:
     """The conversation's choice, or the default. Always a complete, valid dict."""
     raw = session_state(session_id).get(KEY) or {}
     p, m, e = raw.get("provider"), raw.get("model"), raw.get("effort") or None
+    if isinstance(m, str):
+        m = model_latest.upgrade(m)  # a chat set to an older model runs its family's newest
     ok = isinstance(p, str) and isinstance(m, str) and valid(p, m, e)
     on = providers_on()
     if ok and p not in on and len(on) > 0 and not is_endpoint(p):
@@ -170,16 +217,22 @@ def new_chat_choice() -> dict:
     d = default_choice()
     info = model_info(d["provider"], d["model"]) or {"name": d["model"], "desc": ""}
     return {**d, "name": info["name"], "desc": info.get("desc", ""), "worker": _worker_label(d["provider"]),
-            "agent": worker_of(d["provider"]), "endpoint": is_endpoint(d["provider"]), "default": True}
+            "agent": worker_of(d["provider"]), "endpoint": is_endpoint(d["provider"]), "default": True,
+            "default_saved": saved_default() is not None}
 
 
 def set_choice(session_id: str, provider: str, model: str, effort: str | None = None) -> dict:
     effort = (effort or "").strip().lower() or None
+    model = model_latest.upgrade(model) or model
     if not valid(provider, model, effort) or provider not in providers_on():
         raise ValueError("unknown provider/model/effort")
     st = session_state(session_id)
     st[KEY] = {"provider": provider, "model": model, "effort": effort}
     save_session_state(session_id, st)
+    try:  # the composer's last pick is what the next new chat starts on (Settings → Preferences shows it)
+        write_json(_new_chat_file(), st[KEY])
+    except OSError:
+        pass
     return get_choice(session_id)
 
 
@@ -222,6 +275,7 @@ def auto_effort(text: str | None) -> str:
 
 
 def claude_args(model: str | None, effort: str | None) -> list[str]:
+    model = model_latest.upgrade(model)
     out = ["--model", model] if model else []
     return out + (["--effort", effort] if effort else [])
 
@@ -233,11 +287,29 @@ def codex_effort_args(effort: str | None) -> list[str]:
 # Same-tier model on the other provider, for hand-offs and limit switches. Override per model in
 # router.yaml: dynamic_agents.models: {claude-opus-5-5: gpt-6-astra, ...}.
 PEER = {
-    "claude-opus-5-5": "gpt-6.1-sol", "claude-fable-5-1": "gpt-6-astra",
+    "claude-opus-5-5": "gpt-6.1-sol", "claude-fable-5-2": "gpt-6-astra",
     "claude-sonnet-5-5": "gpt-6.1-terra", "claude-haiku-5-5": "gpt-6-luna",
-    "gpt-6.1-sol": "claude-opus-5-5", "gpt-6-astra": "claude-fable-5-1",
+    "gpt-6.1-sol": "claude-opus-5-5", "gpt-6-astra": "claude-fable-5-2",
     "gpt-6.1-terra": "claude-sonnet-5-5", "gpt-6-luna": "claude-haiku-5-5",
 }
+
+
+# by family, so the pairing survives new versions on either side
+PEER_FAMILY = {"opus": "sol", "fable": "astra", "sonnet": "terra", "haiku": "luna"}
+PEER_FAMILY.update({v: k for k, v in list(PEER_FAMILY.items())})
+
+
+def _peer_by_family(model: str | None) -> str | None:
+    p = model_latest.parse(model or "")
+    if not p or p[1] not in PEER_FAMILY:
+        return None
+    other = "openai" if p[0] == "anthropic" else "anthropic"
+    fam = PEER_FAMILY[p[1]]
+    for m in _models(other):
+        q = model_latest.parse(m["id"])
+        if q and q[1] == fam:
+            return m["id"]
+    return None
 
 
 def tier_of(provider: str, model: str | None) -> str:
@@ -266,8 +338,9 @@ def peer_model(provider: str, model: str | None, overrides: dict | None = None,
                 return {"provider": pid, "model": pick["id"], "name": pick.get("name") or pick["id"]}
         if provider not in CATALOG:  # nothing else is on: the subscriptions' defaults
             other = "anthropic"
-    want = (overrides or {}).get(model or "") or PEER.get(model or "")
-    ids = [m["id"] for m in CATALOG[other]["models"]]
+    want = (overrides or {}).get(model or "") or PEER.get(model or "") or _peer_by_family(model)
+    want = model_latest.upgrade(want)
+    ids = [m["id"] for m in _models(other)]
     if other == "openai" and available_openai:
         ids = [i for i in ids if i in available_openai] or ids
     if want not in ids:

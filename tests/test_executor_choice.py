@@ -36,7 +36,7 @@ def test_set_and_get_per_session():
     a, b = ec.get_choice("a"), ec.get_choice("b")
     assert (a["provider"], a["model"], a["effort"], a["worker"]) == ("openai", "gpt-6.1-sol", "low", "Codex")
     assert (b["model"], b["effort"], b["default"]) == ("claude-sonnet-5-5", None, False)
-    assert ec.get_choice("c")["model"] == "claude-opus-5-5"
+    assert ec.get_choice("c")["model"] == "claude-sonnet-5-5"  # a chat with no pick starts on the last one picked
     # stored next to the rest of the session state, other keys untouched
     s = st.session_state("a"); s["takeover"] = False; st.save_session_state("a", s)
     ec.set_choice("a", "openai", "gpt-6-astra")
@@ -156,7 +156,7 @@ def test_new_chat_choice_follows_enabled_agents(monkeypatch):
     monkeypatch.setattr(ec, "providers_on", lambda: ["openai"])  # Claude agent switched off
     d = ec.new_chat_choice()
     assert (d["provider"], d["model"], d["name"], d["worker"]) == ("openai", "gpt-6-astra", "GPT-6 Astra", "Codex")
-    assert d == {**ec.get_choice("never-saved"), "default": True}
+    assert {k: v for k, v in d.items() if k != "default_saved"} == {**ec.get_choice("never-saved"), "default": True}
 
 
 def _sidecar():
@@ -200,3 +200,29 @@ def test_auto_effort_is_mostly_medium_and_rarely_high():
     assert ae("what is wrong here? " + "context " * 40) == "medium"  # long: not a quick question
     assert ae("think hard about the migration plan") == "high" and ae("ultrathink: why does it leak") == "high"
     assert ae("") == "medium"
+
+
+def test_new_chat_model_follows_last_pick_and_settings():
+    _tmp_state()
+    assert ec.new_chat_choice()["model"] == "claude-opus-5-5" and ec.new_chat_choice()["default_saved"] is False
+    ec.set_choice("a", "openai", "gpt-6.1-sol", "low")  # a composer pick: new chats start on it
+    n = ec.new_chat_choice()
+    assert (n["provider"], n["model"], n["effort"], n["default_saved"]) == ("openai", "gpt-6.1-sol", "low", True)
+    assert ec.get_choice("untouched")["model"] == "gpt-6.1-sol"  # chats without their own pick follow it
+    assert ec.get_choice("a")["default"] is False
+    ec.set_default("anthropic", "claude-haiku-5-5")  # Settings → Preferences
+    assert ec.new_chat_choice()["model"] == "claude-haiku-5-5"
+    assert ec.get_choice("a")["model"] == "gpt-6.1-sol"  # a chat's own pick is kept
+    import pytest
+    with pytest.raises(ValueError):
+        ec.set_default("anthropic", "gpt-6.1-sol")
+
+
+def test_saved_new_chat_model_ignored_when_unrunnable(tmp_path, monkeypatch):
+    _tmp_state()
+    f = tmp_path / "nc.json"
+    monkeypatch.setenv("TABBIE_NEW_CHAT_FILE", str(f))
+    f.write_text(json.dumps({"provider": "anthropic", "model": "claude-nope-1-0"}))
+    assert ec.new_chat_choice()["model"] == "claude-opus-5-5"
+    f.write_text("not json")
+    assert ec.saved_default() is None

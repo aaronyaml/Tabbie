@@ -93,7 +93,7 @@ html.hx-viewer-open, html.hx-viewer-open body { overflow: hidden; }
 
 .hx-v-head {
   flex: none; display: flex; align-items: center; gap: 10px; min-width: 0;
-  padding: 10px 10px 10px 16px; border-bottom: 1px solid var(--hx-hair, #E6E5E1);
+  padding: 10px 10px 10px 10px; border-bottom: 1px solid var(--hx-hair, #E6E5E1);
 }
 .hx-v-ic { flex: none; display: grid; color: var(--hx-text-2, #6B6B70); }
 .hx-v-tt { flex: 1; min-width: 0; }
@@ -157,7 +157,7 @@ html.hx-viewer-open, html.hx-viewer-open body { overflow: hidden; }
     width: 100vw; height: 100vh; height: 100dvh; border-radius: 0; box-shadow: none;
     padding-bottom: env(safe-area-inset-bottom);
   }
-  .hx-v-head { padding-top: calc(10px + env(safe-area-inset-top)); padding-left: calc(16px + env(safe-area-inset-left)); padding-right: calc(10px + env(safe-area-inset-right)); }
+  .hx-v-head { padding-top: calc(10px + env(safe-area-inset-top)); padding-left: calc(10px + env(safe-area-inset-left)); padding-right: calc(10px + env(safe-area-inset-right)); }
   .hx-viewer[data-kind="audio"] .hx-v-body { justify-content: center; }
   .hx-v-btn { width: 40px; height: 40px; }
 }
