@@ -372,7 +372,7 @@
       "id": "limits-view",
       "name": "Usage limit cards",
       "scripts": [
-        "limits-view.js?v=5"
+        "limits-view.js?v=6"
       ],
       "stylesheets": [
         "limits-view.css?v=2"

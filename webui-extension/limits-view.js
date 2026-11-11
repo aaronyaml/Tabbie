@@ -146,7 +146,7 @@
         ? `<span class="hx-lim-off-fix">Fix: <code>${esc(fix[1])}</code></span>` : ''}</span></div>`;
     }
     // credits balance
-    const cl = note.match(/([\d,]+) credits left/);
+    const cl = note.match(/(\d[\d,]*(?:\.\d+)?) credits left/);  // decimals too: Higgsfield reports 11.75
     if (cl && r.pct == null) {
       return `<div class="hx-lim-credits"><span class="hx-lim-big">${esc(cl[1])}</span><span class="hx-lim-unit">credits left</span></div>`;
     }
