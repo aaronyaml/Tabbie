@@ -83,6 +83,12 @@ html #sessionList .session-item:not(.unread):not(.needs-attention):not(.streamin
   background: var(--hx-accent, #3054FD); color: #fff; }
 
 @media (max-width: 640px) {
+  /* upstream's phone drawer leaves 52px for its icon column (hidden here) and floats its close X at the top right:
+   * the lists start at the edge like the rows above them, and search moves left of the X */
+  html .sidebar .panel-view { margin-left: 0 !important; }
+  html .sidebar .panel-head { padding-right: 0; }
+  html .sidebar .hx-side-brand { padding-right: 48px; }
+  html .sidebar .panel-head-btn.mobile-sidebar-close { top: calc(var(--app-titlebar-safe-top) + 6px); }
   .hx-side-foot { padding-bottom: calc(8px + env(safe-area-inset-bottom)); }
   .hx-side-row, html .session-search-field, html #sessionList .session-item { height: 44px; min-height: 44px; }
   html .session-search-field input { height: 44px; font-size: 16px !important; }
