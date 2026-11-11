@@ -136,6 +136,7 @@
         const d = r.ok ? await r.json() : null;
         if (d && d.path) {
           ST = d;
+          if (typeof d.claude === 'boolean' && window.hxMotion && window.hxMotion.ready && window.hxMotion.ready() !== d.claude && window.hxMotion.check) window.hxMotion.check();
           if (d.path !== HOME) { HOME = d.path; if (window.hxMotion && window.hxMotion.setHome) window.hxMotion.setHome(HOME); }
         }
       } catch (_) {}
@@ -152,6 +153,9 @@
     if (needsInstall()) throw new Error('Motion isn’t installed yet: press Download Motion studio first.');
   }
   const linked = (k) => !ST || !ST[k] || ST[k].linked !== false;
+  // Motion runs on Claude Code only (renders need a browser Codex's sandbox can't start)
+  const noClaude = () => !!(ST && ST.claude === false);
+  const NEED_CLAUDE = 'Motion runs on Claude Code. Link Claude (sign in to Claude Code) and turn it on in the model picker → Agents.';
   // ElevenLabs can be connected right here: paste the API key, the sidecar checks it with ElevenLabs and saves it
   // in the studio's .env (never in the browser's storage, never sent back). Not a <form>: forms keep drafts.
   const EL = { open: false, busy: false, err: '', key: '' };
@@ -512,6 +516,7 @@
   // ── jobs: "/motion [studio:<kind> job=<id>] …" in the project's chat session ──────────────────
   const running = () => (P && (P.jobs || []).find((j) => j.status === 'running')) || null;
   async function dispatch(kind, text) {
+    if (noClaude()) throw new Error(NEED_CLAUDE);
     if (running()) throw new Error(`${NAME} is still on the last step.`);
     if (chat.pending.some((p) => p.state !== 'failed')) throw new Error(`${NAME} is still answering your message.`);
     if (sidNow() !== P.sessionId) {
@@ -541,7 +546,7 @@
     await window.send();
     // upstream puts the draft back when the turn could not start
     if (box.value.trim() === msg.trim()) { box.value = ''; box.dispatchEvent(new Event('input', { bubbles: true })); throw new Error('Could not reach the chat to start that step. Try again in a moment.'); }
-    P.jobs = [...(P.jobs || []), { id, kind, at: Date.now(), status: 'running' }];
+    P.jobs = [...(P.jobs || []), { id, kind, at: Date.now(), status: 'running', text: text.slice(0, 12000) }];
     await saveProject();
     watchAdd(P, { id, kind });
     startPoll();
@@ -557,9 +562,10 @@
       const done = await readJSON(P.sessionId, `${pdir()}/jobs/${j.id}.json`);
       if (view === 'editor' || j.kind === 'render' || j.kind === 'revision') await refreshEditorFiles();
       if (done && done.status === 'running') { j.stage = done.stage || ''; j.progress = typeof done.progress === 'number' ? done.progress : null; }
-      if (!done || !/^(done|failed)$/.test(done.status)) { if (root) paintJob(); return; }
+      if (!done || !/^(done|failed|paused)$/.test(done.status)) { if (root) paintJob(); return; }
       delete j.stage; delete j.progress;
       j.status = done.status; j.note = done.note || ''; j.endedAt = Date.now();
+      if (done.status === 'paused') j.started = done.started !== false;
       announce(P.project, j.id, done);
       await loadFiles();
       P.jobs = P.jobs.map((x) => (x.id === j.id ? j : x));
@@ -587,9 +593,10 @@
     const l = watchList(), w = l.find((x) => x.id === id && x.project === project);
     if (!w) return;  // already announced (the film poll and the background poll both see it)
     watchSave(l.filter((x) => x !== w));
-    const ok = done.status === 'done';
-    const msg = ok ? (DONE_SAY[w.kind] || 'Step finished') : `${JOBNAME[w.kind] || 'Studio step'} failed${done.note ? `: ${done.note}` : ''}`;
-    try { if (typeof window.showToast === 'function') window.showToast(`${w.title ? `${w.title} · ` : ''}${msg}`, ok ? 4000 : 6000, ok ? undefined : 'error'); } catch (_) {}
+    const ok = done.status === 'done', paused = done.status === 'paused';
+    const msg = ok ? (DONE_SAY[w.kind] || 'Step finished') : paused ? `${JOBNAME[w.kind] || 'Studio step'} paused${done.note ? `: ${done.note}` : ''}. Press Continue when you’re ready.`
+      : `${JOBNAME[w.kind] || 'Studio step'} failed${done.note ? `: ${done.note}` : ''}`;
+    try { if (typeof window.showToast === 'function') window.showToast(`${w.title ? `${w.title} · ` : ''}${msg}`, ok ? 4000 : 6000, ok || paused ? undefined : 'error'); } catch (_) {}
     if (document.hidden || !isOpen()) {
       try { if (typeof window.sendBrowserNotification === 'function') window.sendBrowserNotification(`Motion · ${w.title || 'Film'}`, ok && w.kind === 'render' ? 'Your film is ready.' : msg, { sid: w.sid, forceHidden: true }); } catch (_) {}
     }
@@ -609,7 +616,7 @@
         if (P && P.project === w.project && pollT) continue;  // the open film's own poll handles it (and updates its files)
         if (Date.now() - (w.at || 0) > 6 * 3600000) { watchSave(watchList().filter((x) => x.id !== w.id)); continue; }  // a step that died long ago
         const done = await readJSON(w.sid, `studio/${w.project}/jobs/${w.id}.json`).catch(() => null);
-        if (!done || !/^(done|failed)$/.test(done.status)) continue;
+        if (!done || !/^(done|failed|paused)$/.test(done.status)) continue;
         announce(w.project, w.id, done);
         await markJobEnded(w, done);
       }
@@ -1319,6 +1326,12 @@
     const foot = top && run && j && !j.starting ? (stopping
       ? `<div class="hxs-jc-ask"><span>Stop this step? Claude stops straight away; anything it already made stays.</span><span class="hxs-jc-askb"><button type="button" class="hxs-ghost hxs-sm" data-act="stop-no">Keep going</button><button type="button" class="hxs-ghost hxs-sm hxs-danger" data-act="job-drop">Stop</button></span></div>`
       : `<div class="hxs-jc-foot"><button type="button" class="hxs-quiet" data-act="stop-ask">Stop…</button></div>`) : '';
+    if (st === 'paused' || st === 'continued') {
+      const live = st === 'paused' && j && pausedJob() === j;
+      return `<div class="hxs-jc is-paused${top ? ' is-top' : ''}"><div class="hxs-jc-top"><span class="hxs-jc-ic">${icon('PauseIcon', 16)}</span><span class="hxs-jc-title">${esc(name)}</span><span class="hxs-jc-st">${st === 'paused' ? 'Paused' : 'Continued'}</span>${time}</div>
+        ${st === 'paused' ? `<p class="hxs-jc-n">${esc(String((j && j.note) || 'Claude hit its usage limit').replace(/([^.!?])$/, '$1.'))} ${j && j.started === false ? 'Nothing was started yet.' : 'What it already made is kept.'}</p>` : ''}
+        ${live ? `<div class="hxs-jc-foot"><button type="button" class="hxs-primary hxs-sm" data-act="continue-job"${active() || chatBusy() ? ' disabled' : ''}>${icon('PlayIcon', 14)}<span>Continue</span></button><button type="button" class="hxs-quiet" data-act="drop-paused">Stop</button></div>` : ''}</div>`;
+    }
     if (!run) {
       return `<div class="hxs-jc is-${esc(st)}"><div class="hxs-jc-top"><span class="hxs-jc-ic">${icon(st === 'done' ? 'CheckmarkCircle02Icon' : 'Alert02Icon', 16)}</span><span class="hxs-jc-title">${esc(name)}</span><span class="hxs-jc-st">${st === 'done' ? 'Done' : st === 'failed' ? 'Failed' : esc(st)}</span>${time}</div>
         ${note ? `<p class="hxs-jc-n">${md(note)}</p>` : ''}${det}${last && st === 'failed' ? `<div class="hxs-jc-foot"><button type="button" class="hxs-ghost hxs-sm" data-act="retry-job" data-kind="${esc(it.kind)}" data-note="${esc(note.slice(0, 300))}"${active() || chatBusy() ? ' disabled' : ''}>${icon('RefreshIcon', 14)}<span>Try again</span></button></div>` : ''}</div>`;
@@ -1513,6 +1526,18 @@
 
   // ── jobs start optimistically: the button disables and the card shows "Starting" before any await ──
   let starting = null, failedStart = null;
+  // The newest step, when it is paused at a usage limit (the rail: Continue picks it up, same Claude session).
+  const pausedJob = () => { const l = (P && P.jobs) || [], j = l[l.length - 1]; return j && j.status === 'paused' ? j : null; };
+  function continueJob() {
+    const j = pausedJob();
+    if (!j) return;
+    const name = (JOBNAME[j.kind] || 'studio step').toLowerCase();
+    const how = `Continuing paused step ${j.id}: the ${name} step was paused at a usage limit part-way through. Carry on from where it stopped: check what is already done in the files, don't redo finished work, and finish the step.`;
+    startJob(j.kind, async () => {
+      await dispatch(j.kind, `${how}${j.text ? ` The step was: ${j.text}` : ''}`);  // sent, or queued behind a reply
+      { P.jobs = P.jobs.map((x) => (x.id === j.id ? { ...x, status: 'continued', endedAt: x.endedAt || Date.now() } : x)); await saveProject(); }
+    });
+  }
   const active = () => running() || starting;
   const blocked = () => !!active() || chatBusy() || !!(P && P.queued);
   function startJob(kind, fn) {
@@ -1533,6 +1558,8 @@
   function jobLine() {
     const j = active();
     if (j) return jobCard(j.starting ? j : { type: 'job', kind: j.kind, id: j.id, at: j.at }, true);
+    const pj = pausedJob();
+    if (pj) return jobCard({ type: 'job', kind: pj.kind, id: pj.id, at: pj.at }, true);
     if (P && P.queued) return `<div class="hxs-jc is-queued"><div class="hxs-jc-top"><span class="hxs-jc-ic">${icon('Clock01Icon', 16)}</span><span class="hxs-jc-title">Queued: ${esc(JOBNAME[P.queued.kind] || 'next step')}</span></div><p class="hxs-jc-n">Starts as soon as ${NAME} finishes replying in this film’s chat.</p><div class="hxs-jc-foot"><button type="button" class="hxs-quiet" data-act="unqueue">Cancel</button></div></div>`;
     if (failedStart) return `<div class="hxs-jc is-failed"><div class="hxs-jc-top"><span class="hxs-jc-ic">${icon('Alert02Icon', 16)}</span><span class="hxs-jc-title">Couldn’t start: ${esc(JOBNAME[failedStart.kind] || 'step')}</span></div><p class="hxs-jc-n">${esc(failedStart.msg)}</p><div class="hxs-jc-foot"><button type="button" class="hxs-ghost hxs-sm" data-act="retry-start">Retry</button><button type="button" class="hxs-quiet" data-act="dismiss-start">Dismiss</button></div></div>`;
     return '';
@@ -1959,6 +1986,11 @@ ${editSystem(s)}
   // what's typed on the new-film form survives re-renders (the gallery, projects loading) until the film starts
   const NEWF = { title: '', brief: '' };
   function vHome() {
+    if (noClaude()) return `<section class="hxs-hero">
+        <div class="hxs-buddy hxs-buddy-xl" data-buddy="zoetie" aria-hidden="true"></div>
+        <div class="hxs-eyebrow">${NAME} <span>· Motion studio</span></div>
+        <h1>Motion needs Claude</h1>
+        <p>${esc(NEED_CLAUDE)}</p></section>`;
     if (needsInstall()) return vInstall();
     loadStyles();
     const list = loadIdx();
@@ -2061,7 +2093,14 @@ ${editSystem(s)}
       const r = await fetchT(`${EXEC}?id=${encodeURIComponent(P.sessionId)}`, 8000);
       const d = r.ok ? await r.json() : null;
       MODEL.choice = d && d.choice; MODEL.catalog = d && d.catalog;
-    } catch (_) { MODEL.catalog = null; }
+      // an older film may still be on a GPT model: Motion runs on Claude, so it moves to the default Claude model
+      const ch = MODEL.choice, an = MODEL.catalog && MODEL.catalog.providers && MODEL.catalog.providers.anthropic;
+      if (ch && ch.provider !== 'anthropic' && an && (an.models || []).length) {
+        const m = (an.models.find((x) => x.id === (MODEL.catalog.default || {}).model) || an.models[0]).id;
+        const sv = await post(EXEC, { id: P.sessionId, provider: 'anthropic', model: m, effort: ch.effort || null });
+        MODEL.choice = sv.choice; MODEL.catalog = sv.catalog;
+      }
+    } catch (_) { MODEL.catalog = MODEL.catalog || null; }
     if (view === 'storyboard') render();
   }
   const modelLabel = (c) => (c ? `${c.worker} · ${c.name}${c.effort ? ` (${c.effort})` : ''}` : '');
@@ -2070,7 +2109,7 @@ ${editSystem(s)}
     if (!c || !ch) return '';
     if (locked) return `<p class="hxs-note">Built with ${esc(modelLabel(ch))}.</p>`;
     const dis = busy ? ' disabled' : '';
-    const opts = Object.entries(c.providers || {}).map(([pid, pv]) => `<optgroup label="${esc(pv.worker)}">${(pv.models || []).map((m) =>
+    const opts = Object.entries(c.providers || {}).filter(([pid]) => pid === 'anthropic').map(([pid, pv]) => `<optgroup label="${esc(pv.worker)}">${(pv.models || []).map((m) =>
       `<option value="${esc(pid)}|${esc(m.id)}"${ch.provider === pid && ch.model === m.id ? ' selected' : ''}>${esc(m.name)} · ${esc(m.desc)}</option>`).join('')}</optgroup>`).join('');
     const effs = ['', ...(c.efforts || [])].map((e) => `<option value="${esc(e)}"${(ch.effort || '') === e ? ' selected' : ''}>${e ? `${e[0].toUpperCase()}${e.slice(1)} effort` : 'Auto effort'}</option>`).join('');
     return `<div class="hxs-card hxs-dir hxs-model"><b>Model <em>draws the storyboard and builds the film</em></b>
@@ -2742,6 +2781,8 @@ ${editSystem(s)}
       if (act === 'stop-no') { stopAsk = null; return paintJob(); }
       if (act === 'job-drop') { const j = running(); stopAsk = null; if (j) { j.status = 'failed'; j.note = 'Stopped by you'; j.endedAt = Date.now(); saveProject(); stopWorker(); } return render(); }
       if (act === 'retry-job') { retryJob(a.dataset.kind, a.dataset.note || ''); return; }
+      if (act === 'continue-job') { continueJob(); return; }
+      if (act === 'drop-paused') { const j = pausedJob(); if (j) { j.status = 'failed'; j.note = `Stopped by you (paused: ${j.note || 'usage limit'})`; saveProject(); } return render(); }
       if (act === 'retry-start') { const f = failedStart; failedStart = null; if (f) f.retry(); else render(); return; }
       if (act === 'dismiss-start') { failedStart = null; return render(); }
       if (act === 'unqueue') { const q = P.queued; delete P.queued; if (q && q.kind === 'analyze' && P.audio && P.audio.status === 'analysing') P.audio.status = 'trim'; saveProject(); return render(); }

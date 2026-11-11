@@ -468,7 +468,7 @@
       row.__hxFlash = setTimeout(() => row.classList.remove('hx-flash'), 2400);
     });
   }
-  const reqLabel = (s) => ({ executing: 'Running', planning: 'Planning', done: 'Done', failed: 'Failed', awaiting_answer: 'Needs you', awaiting_answers: 'Needs you', awaiting_approval: 'Awaiting approval', answered: 'Resuming', approved: 'Approved', cancelled: 'Cancelled', claude_limited: 'Usage limit', limit_blocked: 'Usage limit', stopped: 'Stopped', unanswered: 'Skipped' }[s] || s || '');
+  const reqLabel = (s) => ({ executing: 'Running', planning: 'Planning', done: 'Done', failed: 'Failed', awaiting_answer: 'Needs you', awaiting_answers: 'Needs you', awaiting_approval: 'Awaiting approval', answered: 'Resuming', approved: 'Approved', cancelled: 'Cancelled', claude_limited: 'Usage limit', limit_blocked: 'Usage limit', paused: 'Paused', continued: 'Continued', stopped: 'Stopped', unanswered: 'Skipped' }[s] || s || '');
 
   // ── 2c. sheet click-through: everything an agent did ────────────────────
   // Push navigation inside the sheet: request → agent → its sub-agents / hand-offs. The header's round

@@ -107,21 +107,50 @@ def test_motion_command_installs_motion_first(monkeypatch):
     monkeypatch.setattr(motion, "installed", lambda p=None: False)
     monkeypatch.setattr(motion, "install", lambda: started.append(1) or {"state": "running", "step": "node", "error": ""})
     monkeypatch.setattr(cc, "log_decision", lambda **kw: None)
+    monkeypatch.setattr(cc, "motion_ready", lambda: True)
     out = cc._route_motion("s1", "/motion advertise to students", "/motion advertise to students")
     assert started and "isn't installed" in out and "installing Node.js" in out and "Do not call any tools" in out
 
 
-def test_motion_render_steps_run_on_claude(monkeypatch, tmp_path):
-    """Codex's sandbox can't start Remotion's Chrome: studio render/revision steps go to Claude Code,
-    other studio steps (storyboard, music) and other folders stay on the picked model."""
+def test_motion_needs_claude(monkeypatch):
+    """Motion runs on Claude Code only: without Claude linked nothing starts (no install, no request)."""
+    from hmem import motion
+    monkeypatch.setattr(cc, "motion_ready", lambda: False)
+    monkeypatch.setattr(motion, "install", lambda: (_ for _ in ()).throw(AssertionError("installed")))
+    monkeypatch.setattr(cc, "log_decision", lambda **kw: None)
+    out = cc._route_motion("s1", "/motion advertise", "/motion advertise")
+    assert "Claude" in out and "Nothing was started" in out and "Do not call any tools" in out
+
+
+def test_motion_studio_folder(monkeypatch, tmp_path):
     monkeypatch.setenv("TABBIE_MOTION_STUDIO", str(tmp_path / "motion"))
     assert cc._in_motion_studio(str(tmp_path / "motion" / "studio" / "film"))
     assert not cc._in_motion_studio(str(tmp_path / "app"))
 
-    class R:
-        def __init__(self, text):
-            self.data = {"raw_message": text}
-    job = lambda kind: f'/motion [studio:{kind} job={kind}-1] Motion studio project "Ad". render it, rendered frames'  # noqa: E731
-    assert cc._renders(R(job("render"))) and cc._renders(R(job("revision")))
-    assert not any(cc._renders(R(job(k))) for k in ("storyboard", "analyze", "generate-audio"))
-    assert cc._renders(R("can you re-render the ending")) and not cc._renders(R("make the logo bigger"))
+
+def test_motion_pause_and_continue(monkeypatch, tmp_path):
+    """At a usage limit a Motion step pauses: the request keeps its Claude session, the step's job file
+    says paused, and a "Continuing paused step <id>" message in the same chat finds that request."""
+    import json
+    st = sys.modules[cc.Request.__module__]
+    studio = tmp_path / "motion"
+    monkeypatch.setenv("TABBIE_MOTION_STUDIO", str(studio))
+    monkeypatch.setattr(cc, "REQUESTS_DIR", tmp_path / "req")
+    monkeypatch.setattr(st, "REQUESTS_DIR", tmp_path / "req")
+    monkeypatch.setattr(cc, "log_decision", lambda **kw: None)
+    film = studio / "studio" / "ad"
+    mk = lambda sid, raw: cc.Request.create(session_id=sid, route=cc.CLAUDE, reason="motion", forced=True,  # noqa: E731
+                                            prompt="p", raw_message=raw, project=str(studio), project_source="/motion")
+    r = mk("s1", f'/motion [studio:render job=render-abc] Motion studio project "Ad" (slug ad; its files are in {film}/). '
+                 "Build and render the film now.")
+    r["executor"] = {"session_id": "claude-sess-1"}
+    r.save()
+    out = cc._studio_pause(r, "Claude hit its usage limit (resets 9pm)", started=True)
+    assert out["paused"] and not out["ok"] and "Continue" in out["note"]
+    job = json.loads((film / "jobs" / "render-abc.json").read_text())
+    assert job["status"] == "paused" and "resets 9pm" in job["note"] and job["request"] == r.id
+    assert cc.Request(r.id)["status"] == "paused"
+    found = cc._paused_for(mk("s1", "/motion [studio:render job=render-def] Continuing paused step render-abc: carry on"))
+    assert found and found["id"] == r.id and found["executor"]["session_id"] == "claude-sess-1"
+    assert cc._paused_for(mk("s2", "/motion [studio:render job=x] Continuing paused step render-abc")) is None
+    assert cc._paused_for(mk("s1", "/motion [studio:render job=y] Build it")) is None

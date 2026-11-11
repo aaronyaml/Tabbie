@@ -166,7 +166,7 @@ def _request_row(rid: str) -> dict:
 
 
 BACKFILL = "images-backfill.json"
-_FINISHED = ("done", "failed", "stopped", "awaiting_answer", "claude_limited")
+_FINISHED = ("done", "failed", "stopped", "awaiting_answer", "claude_limited", "paused")
 
 
 def request_roots(rid: str, req: dict) -> list[str]:
@@ -707,6 +707,16 @@ def new_chat_payload() -> dict:
             "catalog": executor_choice.public_catalog(available)}
 
 
+def motion_status(create: bool = False) -> dict:
+    """hmem/motion.py's status + "claude": Motion runs on Claude Code only, so the studio is offered only when
+    Claude is enabled (config/agents.yaml) and signed in."""
+    try:
+        claude = "claude" in agent_set.enabled() and bool(providers.linked("claude"))
+    except Exception:
+        claude = False
+    return {**motion_studio.status(create=create), "claude": claude}
+
+
 def agents_payload() -> dict:
     """dynamic: the Hand-offs setting (default on). linked: each agent installed AND signed in to its
     subscription (auth cached 10 min). The picker greys Hand-offs out unless both are linked + enabled."""
@@ -878,7 +888,7 @@ class Handler(BaseHTTPRequestHandler):
             if u.path == "/agents":
                 return self._send(200, agents_payload())
             if u.path == "/motion/status":
-                return self._send(200, motion_studio.status())
+                return self._send(200, motion_status())
             if u.path == "/motion/films":
                 return self._send(200, motion_studio.films())
             if u.path == "/motion/styles":
@@ -973,15 +983,15 @@ class Handler(BaseHTTPRequestHandler):
             if u.path == "/push/test":
                 return self._send(200, {"sent": push.send_all()})
             if u.path == "/motion/ensure":
-                return self._send(200, motion_studio.status(create=True))
+                return self._send(200, motion_status(create=True))
             if u.path == "/motion/install":
                 motion_studio.install()
-                return self._send(200, motion_studio.status())
+                return self._send(200, motion_status())
             if u.path == "/motion/films":
                 return self._send(200, motion_studio.films())
             if u.path == "/motion/elevenlabs" and isinstance(body, dict):
                 code, res = motion_studio.set_elevenlabs_key(str(body.get("key") or ""))
-                return self._send(code, {**res, **({"status": motion_studio.status()} if code == 200 else {})})
+                return self._send(code, {**res, **({"status": motion_status()} if code == 200 else {})})
             if u.path == "/needs" and isinstance(body, dict):
                 try:
                     for k, v in (body.get("values") or {}).items():

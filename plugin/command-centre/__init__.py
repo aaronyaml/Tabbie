@@ -649,16 +649,58 @@ def _left_unfinished(result: str, run: AgentRun) -> bool:
     return bg and bool(_UNFINISHED_RX.search(result[-600:]))
 
 
-_STUDIO_JOB = re.compile(r"\[studio:([a-z-]+) job=")
-_RENDER_WORD = re.compile(r"\b(re-?)?render(s|ing)?\b", re.I)
+_STUDIO_JOB_ID = re.compile(r"\[studio:([a-z-]+) job=([\w-]+)\]")
+_STUDIO_DIR = re.compile(r"its files are in (\S.*?)/\)")
+_STUDIO_CONT = re.compile(r"Continuing paused step ([\w-]+)")
 
 
-def _renders(r: Request) -> bool:
-    """A Motion step that renders the film: the studio's render/revision jobs (its other jobs mention
-    rendering too, so the job kind decides), or a plain studio chat that asks to render."""
-    text = str(r.data.get("raw_message") or r.data.get("original_prompt") or "")
-    job = _STUDIO_JOB.search(text)
-    return job.group(1) in ("render", "revision") if job else bool(_RENDER_WORD.search(text))
+def motion_ready() -> bool:
+    """Motion runs on Claude Code only (renders need a browser Codex's sandbox can't start, and the studio's
+    skill is Claude's): it is offered only when Claude is enabled and signed in."""
+    try:
+        return agents().has("claude") and providers.linked("claude")
+    except Exception:
+        return False
+
+
+def _studio_pause(r: Request, msg: str, *, started: bool) -> dict:
+    """Motion's rail at a usage limit: the step pauses instead of failing or handing over. The request keeps
+    its Claude session; the step's job file says "paused", and Continue in the studio resumes it."""
+    r = Request(r.id)
+    raw = str(r.data.get("raw_message") or "")
+    r["status"] = "paused"
+    r["paused"] = {"reason": msg, "at": time.time(), "started": started}
+    r.save()
+    job, where = _STUDIO_JOB_ID.search(raw), _STUDIO_DIR.search(raw)
+    if job and where:
+        _hmem()
+        from hmem import motion as motion_studio
+        try:
+            f = (Path(where.group(1)) / "jobs" / f"{job.group(2)}.json").resolve()
+            if f.is_relative_to(motion_studio.studio_dir().resolve()):
+                f.parent.mkdir(parents=True, exist_ok=True)
+                write_json(f, {"status": "paused", "note": msg, "request": r.id, "started": started})
+        except (OSError, ValueError) as exc:
+            log_decision(event="motion_pause_file_failed", request=r.id, error=type(exc).__name__)
+    log_decision(event="motion_paused", request=r.id, started=started, job=job.group(2) if job else None)
+    left = ("What it finished before the limit is kept. " if started else "Nothing was started. ")
+    return {"request_id": r.id, "ok": False, "paused": True, "usage_limit": msg,
+            "note": f"Tell the user in one or two short lines: Motion paused this step: {msg}. {left}"
+                    "They press Continue on the step in Motion when they're ready (once the limit resets)."}
+
+
+def _paused_for(r: Request) -> dict | None:
+    """The paused request a studio Continue picks up: same chat, the job id named in the message."""
+    m = _STUDIO_CONT.search(str(r.data.get("raw_message") or ""))
+    if not m:
+        return None
+    tag = f"job={m.group(1)}]"
+    for f in sorted(REQUESTS_DIR.glob("*/request.json"))[-120:][::-1]:
+        d = read_json(f, {}) or {}
+        if (d.get("session_id") == r["session_id"] and d.get("status") == "paused"
+                and tag in str(d.get("raw_message") or "")):
+            return d
+    return None
 
 
 def _in_motion_studio(cwd: str) -> bool:
@@ -940,6 +982,12 @@ def _route_motion(session_id: str, user_message, text: str):
     from hmem import motion as motion_studio
     cfg = load_config()
     studio = motion_studio.studio_dir()
+    if not motion_ready():
+        log_decision(event="motion_needs_claude")
+        return (f"{TAG} Motion runs on Claude Code only, and Claude isn't linked to Tabbie on this computer (or is "
+                "turned off in the model picker's Agents). Tell the user that in one or two short sentences: link Claude "
+                "(sign in to Claude Code, then turn it on in the model picker → Agents) to use Motion. Nothing was "
+                "started. Do not call any tools.")
     if not motion_studio.installed(studio):
         st = motion_studio.install()
         log_decision(event="motion_install", state=st["state"], step=st["step"])
@@ -1141,18 +1189,15 @@ def _run_request(r: Request, feed=None, force: dict | None = None) -> dict:
     # a linked model provider (DeepSeek, an API key, Ollama...): no subscription limits, its own sessions
     endpoint = choice["provider"] if executor_choice.is_endpoint(choice["provider"]) else None
     on_claude = executor_choice.worker_of(choice["provider"]) == "claude"
-    # Motion studio renders: Remotion renders in a headless Chrome, which Codex's macOS sandbox won't
-    # start, so a render or revision step runs on Claude Code whatever the picker says. Storyboard, music
-    # and chat stay on the picked model. Codex itself stays sandboxed.
-    studio_note = None
-    studio = (_in_motion_studio(cwd) and _renders(r) and agents().has("claude")
+    # Motion runs on Claude Code only: Remotion renders in a headless Chrome that Codex's macOS sandbox
+    # won't start, and the studio's motion skill is Claude's. A non-Claude pick (an older film, the
+    # composer's picker) becomes the default Claude model. At a usage limit the step pauses (no hand-over).
+    studio = (_in_motion_studio(cwd) and agents().has("claude")
               and not (answer and q.get("source") == "astra"))
-    if studio and not on_claude:
+    if studio and (not on_claude or endpoint):
         d = executor_choice.DEFAULT
         info = executor_choice.model_info(d["provider"], d["model"]) or {"name": d["model"]}
-        studio_note = (f"Note: Claude Code rendered this, not {choice['name']}: Motion renders in a browser "
-                       "that Codex's sandbox can't start.")
-        log_decision(event="motion_render_on_claude", request=r.id, picked=choice["model"])
+        log_decision(event="motion_on_claude", request=r.id, picked=choice["model"])
         choice = {**choice, **d, "name": info["name"], "worker": executor_choice.WORKER_NAME["claude"]}
         endpoint, on_claude = None, True
     picked = None if on_claude else choice
@@ -1168,7 +1213,10 @@ def _run_request(r: Request, feed=None, force: dict | None = None) -> dict:
     if endpoint and not executor_choice.takes_effort(endpoint):
         claude_effort = None
     ecfg = dict(cfg.get("executor", {}) or {})
-    blocked = None if endpoint else _limit_block(r, "claude", claude_model or ecfg.get("model"), offer=not force)
+    blocked = None if endpoint else _limit_block(r, "claude", claude_model or ecfg.get("model"),
+                                                 offer=not force and not studio)
+    if blocked and studio and not blocked.get("switch"):
+        return _studio_pause(r, blocked.get("usage_limit") or "Claude is at its usage limit", started=False)
     if blocked and blocked.get("switch") and executor_choice.is_endpoint(blocked["switch"]["provider"]):
         return _execute(r, force={**blocked["switch"], "effort": claude_effort}, feed=feed)
     if blocked and blocked.get("switch"):  # Claude is at its limit: its GPT equivalent does this one
@@ -1195,7 +1243,12 @@ def _run_request(r: Request, feed=None, force: dict | None = None) -> dict:
         prompt = questions.answer_prompt(q, answer)
         r.write_text(f"answer-{len(r.data.get('question_log') or [])}.md", prompt)
     else:
-        if r["route"] == CLAUDE and ecfg.get("resume_project_session", True):
+        cont = _paused_for(r) if studio else None
+        if cont:  # Continue on a paused Motion step: the same Claude session picks up where it stopped
+            resume = (cont.get("executor") or {}).get("session_id")
+            old = Request(cont["id"]); old["status"] = "continued"; old["continued_by"] = r.id; old.save()
+            log_decision(event="motion_continued", request=r.id, paused=cont["id"], resumed=bool(resume))
+        elif r["route"] == CLAUDE and ecfg.get("resume_project_session", True):
             prev = sessions.get(rkey)
             if (prev and time.time() - prev.get("at", 0) < 60 * int(ecfg.get("resume_max_age_minutes", 120))
                     and (prev.get("ctx") or 0) < int(ecfg.get("resume_max_context", 120000))):
@@ -1273,9 +1326,6 @@ def _run_request(r: Request, feed=None, force: dict | None = None) -> dict:
         if extra:
             clean = (clean or (res.get("result") or "")).rstrip() + "\n\n" + extra
             res["result"] = (res.get("result") or "").rstrip() + "\n\n" + extra
-    if studio_note and res.get("ok") and not asked:
-        clean = (clean or (res.get("result") or "")).rstrip() + "\n" + studio_note
-        res["result"] = (res.get("result") or "").rstrip() + "\n" + studio_note
     with run.lock:
         run.finish_main(bool(res.get("ok")), step=None if res.get("ok") else res.get("error"),
                         stopped=bool(res.get("stopped_by_user")))
@@ -1304,6 +1354,8 @@ def _run_request(r: Request, feed=None, force: dict | None = None) -> dict:
         r.save()
         log_decision(event="claude_limit", request=r.id, detail=limit)
         mine = _limit_text("claude", limit, claude_model)
+        if studio:
+            return _studio_pause(r, mine, started=True)
         theirs = None
         if not force and _handover_on() and agents().has("codex") and providers.linked("codex"):
             # the same task carries on in Codex from where Claude stopped (takeover prompt), no question asked

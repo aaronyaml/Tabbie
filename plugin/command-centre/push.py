@@ -29,7 +29,7 @@ PUSH_HOSTS = re.compile(r"(^|\.)(push\.apple\.com|fcm\.googleapis\.com|googleapi
                         r"notify\.windows\.com)$")
 CONTACT = "https://github.com"  # VAPID "sub": an https origin (no path) or a mailto: address
 EVENTS = {"done": "done", "failed": "failed", "awaiting_answer": "question", "awaiting_answers": "question",
-          "awaiting_approval": "plan", "limit_blocked": "limit", "claude_limited": "limit"}
+          "awaiting_approval": "plan", "limit_blocked": "limit", "claude_limited": "limit", "paused": "limit"}
 _lock = threading.Lock()
 
 

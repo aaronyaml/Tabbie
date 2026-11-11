@@ -210,7 +210,7 @@
     const panel = currentPanel();
     const rows = [
       ['new', 'Edit02Icon', 'New chat', false],
-      ['motion', 'Video01Icon', 'Motion', studio()],
+      !document.documentElement.classList.contains('hx-no-motion') && ['motion', 'Video01Icon', 'Motion', studio()],
       ['projects', 'Briefcase01Icon', 'Projects', projOpen()],
       ['panel:tasks', 'Clock01Icon', 'Scheduled', panel === 'tasks'],
     ].filter(Boolean);
@@ -573,6 +573,7 @@
   document.documentElement.classList.add('hx-gpt-side');
   if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', sync); else sync();
   if (window.hxDom) window.hxDom.on(sync); else setInterval(sync, 1000);
+  addEventListener('hx-motion-ready', () => ensureFrame());
   // Chip/tab clicks only flip classes: repaint the highlight shortly after any click in the sidebar.
   document.addEventListener('click', (e) => { if (e.target.closest && e.target.closest('.sidebar, .rail, .hx-more-menu')) setTimeout(() => { ensureFrame(); paint(); }, 80); }, true);
 })();

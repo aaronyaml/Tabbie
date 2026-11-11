@@ -432,6 +432,7 @@
     // tabs
     const tabs = h('nav', { class: 'hxp-tabs', role: 'tablist' });
     for (const [id, label, ico] of TABS) {
+      if (id === 'motion' && document.documentElement.classList.contains('hx-no-motion')) continue;
       const n = id === 'dreamer' && s.pending ? s.pending : null;
       tabs.append(h('button', { type: 'button', role: 'tab', 'aria-selected': String(S.tab === id), class: `hxp-tab${S.tab === id ? ' is-on' : ''}`, onclick: () => tab(id) },
         h('span', { class: 'hxp-i', icon: ico, size: 15 }), h('span', { text: label }), n ? h('b', { text: String(n) }) : null));
@@ -447,6 +448,7 @@
     const body = h('section', { class: 'hxp-body' });
     const d = S.cache[S.tab];
     if (d && d.error) body.append(h('p', { class: 'hxp-err', text: d.error }));
+    else if (S.tab === 'motion' && document.documentElement.classList.contains('hx-no-motion')) body.append(h('p', { class: 'hxp-muted', text: 'Motion needs Claude Code. Link Claude and turn it on in the model picker → Agents.' }));
     else body.append(({ folders: tabFolders, motion: tabMotion, sessions: tabSessions, memory: tabMemory, dreamer: tabDreamer, skills: tabSkills,
                         instructions: tabInstructions, architecture: tabArchitecture, settings: tabSettings })[S.tab](p, d));
     main.append(body);

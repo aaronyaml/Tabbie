@@ -61,7 +61,7 @@
   }
   const PHRASE = {
     awaiting_answer: 'needs your answer', awaiting_answers: 'needs your answer',
-    awaiting_approval: 'plan ready to approve', failed: "didn't finish", claude_limited: 'hit the usage limit',
+    awaiting_approval: 'plan ready to approve', failed: "didn't finish", claude_limited: 'hit the usage limit', paused: 'paused at the usage limit',
   };
 
   // Would upstream show anything at all? If not, call straight through without the sidecar round trip.

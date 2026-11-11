@@ -38,3 +38,4 @@ html.hx-mo-boot .layout > .main, html.hx-mo-boot .layout > .rightpanel { visibil
   html:is(.hx-proj-open, .hx-studio-open) .sidebar .sidebar-nav .nav-tab:not([data-label])::after { content: attr(data-tooltip); }
   html:is(.hx-proj-open, .hx-studio-open) .sidebar .sidebar-nav .nav-tab::before { display: none !important; }
 }
+html.hx-no-motion .hx-mo-nav { display: none !important; }

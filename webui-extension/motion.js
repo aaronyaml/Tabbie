@@ -52,6 +52,34 @@
   }
   window.hxMotion = { isMotion, remember, hides, NAME, MARK, setHome: (p) => { HOME = p; } };
 
+  // ── Motion runs on Claude Code only: hidden (html.hx-no-motion) unless Claude is enabled and signed in.
+  // The last answer is remembered so the entry doesn't flash in on load; re-checked on focus and every 5 min.
+  const OFF_KEY = 'hx-motion-off';
+  function setOff(off) {
+    const root = document.documentElement;
+    if (root.classList.contains('hx-no-motion') === off) return;
+    root.classList.toggle('hx-no-motion', off);
+    try { if (off) localStorage.setItem(OFF_KEY, '1'); else localStorage.removeItem(OFF_KEY); } catch (_) {}
+    window.dispatchEvent(new CustomEvent('hx-motion-ready', { detail: { ready: !off } }));
+  }
+  try { if (localStorage.getItem(OFF_KEY)) document.documentElement.classList.add('hx-no-motion'); } catch (_) {}
+  let readyAt = 0;
+  async function checkReady(force) {
+    if (!force && Date.now() - readyAt < 60000) return;
+    readyAt = Date.now();
+    try {
+      const r = await fetch('api/extensions/cc-agents/sidecar/agents', { credentials: 'same-origin', cache: 'no-store' });
+      if (!r.ok) return;  // sidecar down: keep the last answer
+      const d = await r.json();
+      setOff(!((d.enabled || []).includes('claude') && d.linked && d.linked.claude));
+    } catch (_) {}
+  }
+  window.hxMotion.ready = () => !document.documentElement.classList.contains('hx-no-motion');
+  window.hxMotion.check = () => checkReady(true);
+  checkReady(true);
+  setInterval(() => checkReady(true), 300000);
+  document.addEventListener('visibilitychange', () => { if (!document.hidden) checkReady(false); });
+
   // ── keep them out of the chat sidebar (desktop list, phone drawer, search) ──
   function wrapRows() {
     const orig = window._sessionRowsWithActiveEphemeralSession;

@@ -79,7 +79,7 @@
       "id": "sidebar",
       "name": "Chat sidebar (ChatGPT-style)",
       "scripts": [
-        "sidebar.js?v=20"
+        "sidebar.js?v=21"
       ],
       "stylesheets": [
         "sidebar.css?v=22"
@@ -177,7 +177,7 @@
       "id": "cc-agents",
       "name": "Agents & questions",
       "scripts": [
-        "cc-agents.js?v=24"
+        "cc-agents.js?v=25"
       ],
       "stylesheets": [
         "cc-agents.css?v=13"
@@ -273,12 +273,12 @@
       "id": "motion",
       "name": "Motion studio (Zoetie)",
       "scripts": [
-        "motion.js?v=10",
+        "motion.js?v=11",
         "motion-scrub.js?v=6",
-        "motion-studio.js?v=68"
+        "motion-studio.js?v=70"
       ],
       "stylesheets": [
-        "motion.css?v=8",
+        "motion.css?v=9",
         "motion-studio.css?v=39"
       ]
     },
@@ -286,7 +286,7 @@
       "id": "projects",
       "name": "Projects (multi-folder, memory, Dreamer)",
       "scripts": [
-        "projects.js?v=17"
+        "projects.js?v=18"
       ],
       "stylesheets": [
         "projects.css?v=12"
@@ -448,7 +448,7 @@
       "id": "notify",
       "name": "Chat-named notifications",
       "scripts": [
-        "notify.js?v=1"
+        "notify.js?v=2"
       ],
       "stylesheets": []
     }

@@ -834,9 +834,16 @@ the moments, approve a storyboard, and Claude Code builds and renders the film w
 
 - **Claude Code only**: Motion runs on Claude Code and nothing else. Codex and the other providers
   aren't offered: Remotion renders in a headless Chrome, which Codex's macOS sandbox won't start, and the
-  studio's skill and rules are written for Claude Code. Without Claude Code enabled, Motion can't make
-  films. The Storyboard step has a model picker (e.g. Opus 5.5, Sonnet 5.5, plus effort); that model
-  draws the storyboard, writes the film and renders it.
+  studio's skill and rules are written for Claude Code. Until Claude Code is signed in and turned on (model
+  picker → Agents), Motion is hidden from the sidebar and the project pages, and `/motion` says what to do.
+  The Storyboard step has a model picker with Claude models only (e.g. Opus 5.5, Sonnet 5.5, plus effort);
+  that model draws the storyboard, writes the film and renders it. A film still set to a GPT model moves to
+  the default Claude model.
+
+- **Pauses at usage limits**: when Claude reaches its usage limit before or during a step, the step pauses
+  instead of failing or handing over to another agent. What it already made is kept, and the step shows
+  **Paused** with the reset time and a **Continue** button. Continue picks up the same Claude session where
+  it stopped; **Stop** ends the step.
 
 - **Styles**: every film is made in one style from the studio's library (`styles/`): Premium Minimal,
   Digital Brutalism, Retro Editorial, Nature Organic, Industrial Brand, Kinetic Type, Digital Scrapbook,
