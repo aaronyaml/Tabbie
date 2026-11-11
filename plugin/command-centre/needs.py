@@ -21,7 +21,7 @@ def _local() -> dict:
     """webui-extension/local.js (written by bin/setup) as a dict of its simple "key: value" lines."""
     out = {}
     try:
-        text = LOCAL_JS.read_text()
+        text = LOCAL_JS.read_text(encoding="utf-8")
     except OSError:
         return out
     for m in re.finditer(r'^\s*([A-Za-z_]\w*):\s*("(?:[^"\\]|\\.)*"|\'(?:[^\'\\]|\\.)*\'),?\s*(?://.*)?$', text, re.M):
@@ -40,7 +40,7 @@ def _write_local(values: dict) -> None:
     lines += [f"  {k}: {json.dumps(str(v), ensure_ascii=False)}," for k, v in cur.items()]
     lines.append("};")
     tmp = LOCAL_JS.with_suffix(".tmp")
-    tmp.write_text("\n".join(lines) + "\n")
+    tmp.write_text("\n".join(lines) + "\n", encoding="utf-8")
     tmp.replace(LOCAL_JS)
 
 

@@ -31,6 +31,7 @@ import json
 import os
 import re
 import sqlite3
+import tempfile
 import threading
 import time
 from pathlib import Path
@@ -41,7 +42,7 @@ HOME = Path(__file__).resolve().parents[2]  # ~/hermes
 STATE = HOME / "state"
 CACHE_FILE = STATE / "usage-insights.json"
 CLAUDE_DIR = Path.home() / ".claude" / "projects"
-CODEX_DIR = Path.home() / ".codex" / "sessions"
+CODEX_DIR = Path(os.environ.get("CODEX_HOME") or Path.home() / ".codex") / "sessions"
 HUB_DB: Path | None = None  # None: the Hermes home's state.db (hmem.paths)
 HORIZON_DAYS = 92        # files untouched for longer can't hold anything in the 90-day window
 FRESH_S = 60             # reuse the last scan for this long
@@ -308,7 +309,7 @@ def _load_cache() -> dict:
     if _mem["files"] is not None:
         return _mem["files"]
     try:
-        d = json.loads(CACHE_FILE.read_text())
+        d = json.loads(CACHE_FILE.read_text(encoding="utf-8"))
         files = d.get("files") if d.get("v") == CACHE_VERSION else None
     except (OSError, ValueError):
         files = None
@@ -320,7 +321,7 @@ def _save_cache(files: dict) -> None:
     try:
         CACHE_FILE.parent.mkdir(parents=True, exist_ok=True)
         tmp = CACHE_FILE.with_suffix(".tmp")
-        tmp.write_text(json.dumps({"v": CACHE_VERSION, "files": files}, separators=(",", ":")))
+        tmp.write_text(json.dumps({"v": CACHE_VERSION, "files": files}, separators=(",", ":")), encoding="utf-8")
         tmp.replace(CACHE_FILE)
     except OSError:
         pass
@@ -494,7 +495,7 @@ def chat_map(requests_dir: Path | None = None, sessions_dir: Path | None = None)
         if n in dirs and dirs[n][0]:
             continue
         try:
-            r = json.loads((requests_dir / n / "request.json").read_text())
+            r = json.loads((requests_dir / n / "request.json").read_text(encoding="utf-8"))
         except (OSError, ValueError):
             continue
         ex = r.get("executor") or {}
@@ -507,7 +508,7 @@ def chat_map(requests_dir: Path | None = None, sessions_dir: Path | None = None)
             continue
         if sid not in titles:
             try:
-                s = json.loads((Path(sessions_dir) / f"{sid}.json").read_text())
+                s = json.loads((Path(sessions_dir) / f"{sid}.json").read_text(encoding="utf-8"))
                 titles[sid] = str(s.get("title") or "Untitled chat")[:80]
             except (OSError, ValueError):
                 titles[sid] = "Tabbie chat"
@@ -529,9 +530,11 @@ def _project(cwd: str) -> str:
     if not cwd:
         return "Unknown folder"
     p = Path(cwd)
-    if p == Path.home():
+    norm = os.path.normcase  # Windows paths compare without case
+    if norm(str(p)) == norm(str(Path.home())):
         return "Home folder"
-    if str(p).startswith(("/tmp", "/private/tmp", "/var/folders")):
+    temps = ("/tmp", "/private/tmp", "/var/folders", tempfile.gettempdir())  # %TEMP% on Windows
+    if any(norm(str(p)).startswith(norm(t)) for t in temps if t):
         return "Temporary folder"
     return p.name or cwd
 

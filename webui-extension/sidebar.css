@@ -209,3 +209,9 @@ main.main .main-view-header .logs-status { margin: 0; white-space: nowrap; overf
     .settings-main { padding-top: 64px !important; }
   }
 }
+
+/* Windows (html.hx-win, set at first paint): classic scrollbars are 17px gray slabs that sit on top of the glass
+ * pages. Make them thin, with a soft thumb on a clear track, like macOS's. Mac and phones keep overlay scrollbars. */
+/* :where() = no specificity, so anything that hides a scrollbar on purpose (tab bars, chip rows) still wins */
+:where(html.hx-win, html.hx-win *) { scrollbar-width: thin; scrollbar-color: rgba(127,127,127,.38) transparent; }
+:where(html.hx-win.dark, html.hx-win.dark *) { scrollbar-color: rgba(255,255,255,.2) transparent; }

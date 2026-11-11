@@ -288,3 +288,14 @@ def test_hub_tokens_spread_over_assistant_messages(tmp_path):
     assert {p["name"] for p in w["by_project"]} == {"alpha", "Temporary folder"}
     assert r["by_day"][-1]["hub"]["tokens"] == w["by_source"]["hub"]["tokens"]
     assert ui.hub_rows(tmp_path / "missing.db") == []
+
+
+def test_project_names_windows_style(monkeypatch, tmp_path):
+    # Windows: home and %TEMP% compare without case, and a project folder is named by its last part
+    import os
+    monkeypatch.setattr(ui.os.path, "normcase", lambda s: s.lower())
+    monkeypatch.setattr(ui.tempfile, "gettempdir", lambda: str(tmp_path / "Temp"))
+    monkeypatch.setattr(ui.Path, "home", classmethod(lambda cls: tmp_path / "Alex"))
+    assert ui._project(str(tmp_path / "ALEX")) == "Home folder"
+    assert ui._project(str(tmp_path / "temp" / "x")) == "Temporary folder"
+    assert ui._project(str(tmp_path / "Alex" / "acme-app")) == "acme-app"

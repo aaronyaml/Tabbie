@@ -129,6 +129,8 @@
 
   // liquid glass (glass.css/js): on unless turned off, set before first paint so nothing flips after load
   try { if (localStorage.getItem('hx-glass') !== 'off') D.documentElement.classList.add('hx-glass'); } catch (_) {}
+  // Windows draws classic, always-on scrollbars: sidebar.css slims them (html.hx-win) so they sit quietly on glass
+  try { if (/Win/.test((navigator.userAgentData && navigator.userAgentData.platform) || navigator.platform || navigator.userAgent)) D.documentElement.classList.add('hx-win'); } catch (_) {}
 
   var m = L.pathname.match(MO);
   if (!m) {

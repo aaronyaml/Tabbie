@@ -82,7 +82,7 @@
         "sidebar.js?v=20"
       ],
       "stylesheets": [
-        "sidebar.css?v=20"
+        "sidebar.css?v=22"
       ]
     },
     {
@@ -286,7 +286,7 @@
       "id": "projects",
       "name": "Projects (multi-folder, memory, Dreamer)",
       "scripts": [
-        "projects.js?v=16"
+        "projects.js?v=17"
       ],
       "stylesheets": [
         "projects.css?v=12"

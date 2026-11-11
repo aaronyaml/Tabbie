@@ -766,7 +766,7 @@
     }
     out.append(h('p', { class: 'hxp-muted', text: 'Auto-approval of Dreamer proposals is off. It can only be turned on in Hermes’ config on the computer, and never covers global memory or skills.' }));
     out.append(h('h3', { class: 'hxp-h3', text: 'Project' }));
-    out.append(h('p', { class: 'hxp-muted', text: `id ${p.id} · workspace ${p.workspace.replace(/^\/Users\/[^/]+/, '~')}` }));
+    out.append(h('p', { class: 'hxp-muted', text: `id ${p.id} · workspace ${p.workspace.replace(/^(\/Users\/[^/]+|[A-Za-z]:\\Users\\[^\\]+)/, '~')}` }));
     const actions = h('div', { class: 'hxp-row' });
     if (p.status === 'active') actions.append(btn('hxp-ghost hxp-sm', 'Archive', () => { S.sheet = { kind: 'confirm', title: `Archive ${p.name}?`, text: 'Hermes stops routing work to it and its folders become free to use elsewhere. Memory and sessions are kept; you can unarchive any time.', ok: 'Archive', run: () => call('/projects/status', { id: p.id, hash: p.hash, status: 'archived' }).then(() => loadProject(p.id, true)) }; render(); }, 'Archive02Icon'));
     else {

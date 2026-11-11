@@ -23,7 +23,10 @@ from . import projects
 CODE_DIRS = ("Developer", "Projects", "projects", "code", "Code", "src", "dev", "repos", "git", "GitHub", "github",
              "work", "Work", "Sites", "workspace", "Workspace")
 _SKIP = {"Library", "Desktop", "Documents", "Downloads", "Movies", "Music", "Pictures", "Public", "Applications",
-         "node_modules", "venv", "Pictures Library"}
+         "node_modules", "venv", "Pictures Library",
+         # Windows' own home folders
+         "AppData", "OneDrive", "Videos", "Saved Games", "Contacts", "Favorites", "Links", "Searches", "3D Objects",
+         "Application Data", "Local Settings", "NetHood", "PrintHood", "Recent", "SendTo", "Start Menu", "Templates"}
 MAX_ENTRIES = 300   # children looked at per folder
 MAX_REPOS = 600     # repos kept from one scan
 TTL = 60.0          # seconds a scan is reused

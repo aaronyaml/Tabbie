@@ -23,6 +23,16 @@ GROUP: dict = ({"creationflags": subprocess.CREATE_NEW_PROCESS_GROUP} if WINDOWS
 DETACHED: dict = ({"creationflags": subprocess.CREATE_NEW_PROCESS_GROUP | 0x00000008}  # type: ignore[attr-defined]
                   if WINDOWS else {"start_new_session": True})
 
+# a short background command (e.g. `claude -p` from the helper): no console window flashes up on Windows
+NO_WINDOW: dict = {"creationflags": 0x08000000} if WINDOWS else {}  # CREATE_NO_WINDOW
+
+
+def local_bin(name: str) -> str:
+    """A CLI on PATH, else its installer's default ~/.local/bin/<name> (`<name>.exe` on Windows)."""
+    from pathlib import Path
+    return shutil.which(name) or str(Path.home() / ".local" / "bin" / (name + (".exe" if WINDOWS else "")))
+
+
 # Exit codes of a worker we stopped: killed by SIGTERM/SIGKILL (negative, or 128+n through a shell);
 # on Windows taskkill /F leaves 1.
 STOP_CODES = ((1, 0xC000013A, -1073741510) if WINDOWS

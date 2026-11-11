@@ -56,3 +56,14 @@ def test_catalog_and_choices_show_newest(tmp_path, monkeypatch):
     assert ec.model_info("anthropic", "claude-fable-5-1")["id"] == "claude-fable-5-2"
     assert ec.claude_args("claude-fable-5-1", None) == ["--model", "claude-fable-5-2"]
     assert ec.peer_model("openai", "gpt-6-astra")["model"] == "claude-fable-5-2"
+
+
+def test_local_bin_windows_exe(monkeypatch, tmp_path):
+    # Windows: a CLI not on PATH falls back to ~/.local/bin/<name>.exe (the Claude Code installer's spot)
+    from hmem import procutil
+    monkeypatch.setattr(procutil, "WINDOWS", True)
+    monkeypatch.setattr(procutil.shutil, "which", lambda n: None)
+    monkeypatch.setattr(Path, "home", classmethod(lambda cls: tmp_path))
+    assert procutil.local_bin("claude") == str(tmp_path / ".local" / "bin" / "claude.exe")
+    monkeypatch.setattr(procutil, "WINDOWS", False)
+    assert procutil.local_bin("claude") == str(tmp_path / ".local" / "bin" / "claude")

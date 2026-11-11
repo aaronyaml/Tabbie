@@ -110,3 +110,14 @@ def test_field_score_basics(env):
     assert fs("acme", "acme-web") > fs("acme", "my-acme") > fs("acme", "xyz") == 0
     assert fs("", "acme") == 0
     assert env.rs.clean_remote("git@github.com:o/r.git") == "github.com/o/r"
+
+
+def test_tilde_windows_paths(monkeypatch):
+    # Windows: home is C:\Users\Alex, paths use backslashes and compare without case
+    from hmem import projects
+    from pathlib import Path
+    monkeypatch.setattr(Path, "home", classmethod(lambda cls: "C:\\Users\\Alex"))
+    monkeypatch.setattr(projects.os.path, "normcase", lambda s: s.replace("/", "\\").lower())
+    assert projects.tilde("C:\\Users\\Alex\\acme-app") == "~\\acme-app"
+    assert projects.tilde("c:\\users\\alex") == "~"
+    assert projects.tilde("D:\\code\\acme") == "D:\\code\\acme"

@@ -631,7 +631,7 @@ def make_title(text: str) -> str:
     text = strip_envelope(text.strip()[:2000])
     if not text or not agent_set.has("claude"):
         return ""  # Codex-only install: the WebUI keeps its own default title
-    claude = shutil.which("claude") or str(Path.home() / ".local/bin/claude")
+    claude = procutil.local_bin("claude")
     with tempfile.TemporaryDirectory() as cwd:
         out = subprocess.run(
             [claude, "-p", "--model", "haiku", "--tools", "", "--strict-mcp-config", "--no-session-persistence",

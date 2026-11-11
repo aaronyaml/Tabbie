@@ -64,8 +64,10 @@ def _pfile(pid: str) -> Path:
 
 
 def tilde(p: str) -> str:
+    """Home shortened to ~ (C:\\Users\\x\\app -> ~\\app on Windows, where paths compare without case)."""
     h = str(Path.home())
-    return "~" + p[len(h):] if p == h or p.startswith(h + "/") else p
+    n = os.path.normcase
+    return "~" + p[len(h):] if n(p) == n(h) or n(p).startswith((n(h) + "/", n(h) + "\\")) else p
 
 
 _PERSONAL = {"Library", "Applications", "Public", "Desktop", "Documents", "Downloads", "Movies", "Music", "Pictures",

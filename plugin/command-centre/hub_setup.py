@@ -94,7 +94,7 @@ def use(provider: str, model: str | None = None) -> dict:
 
 def claude_login() -> dict:
     """Start Claude Code's own sign-in on this computer (opens claude.ai in that computer's browser)."""
-    exe = shutil.which("claude") or str(Path.home() / ".local" / "bin" / "claude")
+    exe = procutil.local_bin("claude")
     if not shutil.which(exe) and not os.access(exe, os.X_OK):
         return {"ok": False, "error": "Claude Code isn't installed on this computer. Run bin/setup there."}
     subprocess.Popen([exe, "auth", "login", "--claudeai"], stdin=subprocess.DEVNULL, stdout=subprocess.DEVNULL,

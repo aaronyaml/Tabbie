@@ -21,10 +21,12 @@ import threading
 import time
 from pathlib import Path
 
+from .procutil import procutil
+
 HOME = Path(__file__).resolve().parents[2]
 CACHE = HOME / "state" / "model-latest.json"
 LOCK = HOME / "state" / "locks" / "model-latest.lock"
-CODEX_CACHE = Path.home() / ".codex" / "models_cache.json"
+CODEX_CACHE = Path(os.environ.get("CODEX_HOME") or Path.home() / ".codex") / "models_cache.json"
 MAX_AGE = 12 * 3600
 ANTHROPIC_FAMILIES = ("opus", "fable", "sonnet", "haiku")
 OPENAI_FAMILIES = ("astra", "sol", "terra", "luna")
@@ -67,7 +69,7 @@ def _read_cache() -> dict:
     if _mem["data"] is not None and _mem["mtime"] == st.st_mtime:
         return _mem["data"]
     try:
-        data = json.loads(CACHE.read_text())
+        data = json.loads(CACHE.read_text(encoding="utf-8"))
     except (OSError, ValueError):
         data = {}
     _mem.update(data=data, mtime=st.st_mtime)
@@ -77,7 +79,7 @@ def _read_cache() -> dict:
 def _codex_latest() -> dict:
     """Newest listed Codex model per family, from Codex's own copy of the server's model list."""
     try:
-        models = json.loads(CODEX_CACHE.read_text()).get("models") or []
+        models = json.loads(CODEX_CACHE.read_text(encoding="utf-8")).get("models") or []
     except (OSError, ValueError, AttributeError):
         return {}
     best: dict[str, tuple] = {}
@@ -93,14 +95,15 @@ def _codex_latest() -> dict:
 
 
 def _claude_resolve(alias: str) -> str | None:
-    claude = shutil.which("claude") or str(Path.home() / ".local/bin/claude")
+    claude = procutil.local_bin("claude")
     env = {k: v for k, v in os.environ.items() if k not in _SCRUB}
     try:
         with tempfile.TemporaryDirectory() as cwd:
             out = subprocess.run(
                 [claude, "-p", "--model", alias, "--output-format", "json", "--max-turns", "1", "--tools", "",
                  "--strict-mcp-config", "--no-session-persistence", "--setting-sources", ""],
-                input="Reply with just OK", capture_output=True, text=True, timeout=120, cwd=cwd, env=env,
+                input="Reply with just OK", capture_output=True, text=True, encoding="utf-8", errors="replace",
+                timeout=120, cwd=cwd, env=env, **procutil.NO_WINDOW,
             ).stdout
         usage = (json.loads(out or "{}").get("modelUsage") or {})
     except (OSError, ValueError, subprocess.SubprocessError):
@@ -143,10 +146,10 @@ def refresh(force: bool = False) -> dict:
         return data
     try:
         new = {"checked_at": time.time(),
-               "anthropic": _claude_latest(data.get("anthropic") or {}) if shutil.which("claude") or (Path.home() / ".local/bin/claude").exists() else data.get("anthropic") or {},
+               "anthropic": _claude_latest(data.get("anthropic") or {}) if Path(procutil.local_bin("claude")).exists() else data.get("anthropic") or {},
                "openai": _codex_latest() or data.get("openai") or {}}
         tmp = CACHE.with_suffix(".tmp")
-        tmp.write_text(json.dumps(new, indent=1))
+        tmp.write_text(json.dumps(new, indent=1), encoding="utf-8")
         tmp.replace(CACHE)
         _mem.update(data=None, mtime=0.0)
         return new
