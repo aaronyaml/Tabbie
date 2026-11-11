@@ -982,6 +982,7 @@ Use Claude Code's own permission settings for hard limits.
 | `plugin/workboard/` | Kanban cards and todos shared with the WebUI |
 | `hmem/`, `bin/hmem` | Memory store, tracer, Dreamer, Projects registry, CLI, HTTP API |
 | `webui-extension/` | WebUI extension: Apple-style skin, Projects, agents, questions, limits, workboard, motion studio |
+| `webui-patches/`, `bin/webui-patches` | Small patches Tabbie carries on the upstream WebUI (e.g. lighter chat loads: screenshots left out of the transcript JSON, first page capped at 96 KB). `bin/webui-patches` applies any that are missing (safe to re-run; run it after a fresh install or if `status` shows one missing); upstream's updater keeps them across updates |
 | `brand/` | Icons, mascot animation frames, login skin |
 | `services/` | LaunchAgent templates and the Caddyfile |
 | `templates/motion-studio/` | The Motion studio's starting point (Remotion project, audio analysis, music and edit-map scripts) |

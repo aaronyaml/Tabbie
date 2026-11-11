@@ -300,7 +300,7 @@
       "id": "fast-switch",
       "name": "Fast session switch",
       "scripts": [
-        "fast-switch.js?v=2"
+        "fast-switch.js?v=3"
       ],
       "stylesheets": []
     },

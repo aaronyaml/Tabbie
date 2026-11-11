@@ -1,0 +1,26 @@
+#!/bin/bash
+# Apply Tabbie's small patches to the upstream WebUI checkout (hermes-webui/).
+#   bin/webui-patches          apply any patch that isn't in the tree yet
+#   bin/webui-patches status   show which patches are applied
+# Safe to re-run. A patch that no longer applies (upstream changed that code) is reported and
+# skipped, never forced. The running WebUI picks changes up on its next restart.
+set -u
+ROOT="$(cd "$(dirname "$0")/.." && pwd)"
+WEB="$ROOT/hermes-webui"
+mode="${1:-apply}"
+[ -d "$WEB/.git" ] || { echo "no hermes-webui checkout at $WEB"; exit 1; }
+rc=0
+for p in "$ROOT"/webui-patches/*.patch; do
+  [ -e "$p" ] || continue
+  name="$(basename "$p")"
+  if git -C "$WEB" apply --reverse --check "$p" 2>/dev/null; then
+    echo "applied   $name"
+  elif [ "$mode" = status ]; then
+    echo "missing   $name"; rc=1
+  elif git -C "$WEB" apply --check "$p" 2>/dev/null && git -C "$WEB" apply "$p"; then
+    echo "applied   $name (now)"
+  else
+    echo "CONFLICT  $name: upstream changed this code; patch not applied"; rc=1
+  fi
+done
+exit $rc

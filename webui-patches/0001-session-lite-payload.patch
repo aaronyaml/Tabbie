@@ -1,0 +1,215 @@
+diff --git a/api/routes.py b/api/routes.py
+index 2f33a9f8c..a6338f60e 100644
+--- a/api/routes.py
++++ b/api/routes.py
+@@ -15603,6 +15603,51 @@ def _render_index_shell_base() -> str:
+     return base
+ 
+ 
++# Hermes patch (webui-patches/0001): helpers for ?hx_strip_images / ?msg_bytes.
++_HX_MIN_ROWS = 6
++_HX_IMAGE_PART_TYPES = {"image_url", "input_image", "image"}
++
++
++def _hx_inline_image_bytes(part) -> int:
++    """Size of an inline (data: / base64) image carried by a content part, else 0."""
++    if not isinstance(part, dict) or part.get("type") not in _HX_IMAGE_PART_TYPES:
++        return 0
++    for holder, key in ((part.get("image_url"), "url"), (part, "image_url"), (part, "url")):
++        value = holder.get(key) if isinstance(holder, dict) else None
++        if isinstance(value, str) and value.startswith("data:"):
++            return len(value)
++    source = part.get("source")
++    if isinstance(source, dict) and source.get("type") == "base64" and isinstance(source.get("data"), str):
++        return len(source["data"])
++    return 0
++
++
++def _hx_strip_inline_images(messages) -> list:
++    """Copy-on-write: replace inline image parts with a small stub. Never mutates inputs."""
++    out = []
++    for msg in messages or []:
++        content = msg.get("content") if isinstance(msg, dict) else None
++        if isinstance(content, list) and any(_hx_inline_image_bytes(p) for p in content):
++            parts = []
++            for part in content:
++                size = _hx_inline_image_bytes(part)
++                if size:
++                    parts.append({"type": part.get("type"), "image_url": {"url": ""}, "hx_omitted_bytes": size})
++                else:
++                    parts.append(part)
++            msg = dict(msg)
++            msg["content"] = parts
++        out.append(msg)
++    return out
++
++
++def _hx_payload_bytes(messages) -> int:
++    try:
++        return len(json.dumps(messages, ensure_ascii=False, default=str))
++    except (TypeError, ValueError):
++        return 0
++
++
+ def _handle_session_get(handler, parsed) -> bool:
+     """GET /api/session — full session payload (messages, tool calls, lineage...). Extracted verbatim from handle_get; every early-return path calls _diag.finish() (see the tier2c note inside)."""
+     import time as _time
+@@ -15630,6 +15675,16 @@ def _handle_session_get(handler, parsed) -> bool:
+     # (only needs metadata). The full message array is loaded lazily
+     # via ?messages=1 when the message panel opens.
+     load_messages = query.get("messages", ["1"])[0] != "0"
++    # Hermes patch (webui-patches/0001): ?hx_strip_images=1 swaps inline base64
++    # images in the returned rows for a stub (the transcript never renders them;
++    # attachments show from their file path). ?msg_bytes=N shrinks a fresh tail
++    # window (msg_limit, no msg_before) until it fits N bytes, never below
++    # _HX_MIN_ROWS visible rows; the client pages the rest in afterwards.
++    _hx_strip_images = query.get("hx_strip_images", ["0"])[0] == "1"
++    try:
++        _hx_msg_bytes = max(0, int(query.get("msg_bytes", ["0"])[0] or 0))
++    except ValueError:
++        _hx_msg_bytes = 0
+     resolve_model_default = "1" if load_messages else "0"
+     resolve_model = query.get("resolve_model", [resolve_model_default])[0] != "0"
+     # ?msg_limit=N returns a tail window containing the last N visible
+@@ -15899,20 +15954,32 @@ def _handle_session_get(handler, parsed) -> bool:
+                 _display_tool_calls, _display_owner_positions
+             )
+         if load_messages:
+-            _truncated_msgs, _messages_offset = _message_window_for_display(
+-                _all_msgs,
+-                msg_limit=msg_limit,
+-                msg_before=msg_before,
+-                expand_renderable=expand_renderable,
+-            )
+-            if msg_limit is not None:
+-                _truncated_msgs = _messages_for_limited_payload(_truncated_msgs)
+-            _truncated_msgs = _hydrate_anchor_activity_scenes(
+-                _truncated_msgs,
+-                getattr(s, "anchor_activity_scenes", None),
+-                message_offset=_messages_offset,
+-                tool_calls=_display_tool_calls,
+-            )
++            def _hx_window(_limit):
++                _msgs, _offset = _message_window_for_display(
++                    _all_msgs,
++                    msg_limit=_limit,
++                    msg_before=msg_before,
++                    expand_renderable=expand_renderable,
++                )
++                if _limit is not None:
++                    _msgs = _messages_for_limited_payload(_msgs)
++                # Hermes patch (webui-patches/0001): lighter payloads, opt-in per request.
++                if _hx_strip_images:
++                    _msgs = _hx_strip_inline_images(_msgs)
++                _msgs = _hydrate_anchor_activity_scenes(
++                    _msgs,
++                    getattr(s, "anchor_activity_scenes", None),
++                    message_offset=_offset,
++                    tool_calls=_display_tool_calls,
++                )
++                return _msgs, _offset
++
++            _truncated_msgs, _messages_offset = _hx_window(msg_limit)
++            if _hx_msg_bytes and msg_limit is not None and msg_before is None:
++                _hx_lim = msg_limit
++                while _hx_lim > _HX_MIN_ROWS and _hx_payload_bytes(_truncated_msgs) > _hx_msg_bytes:
++                    _hx_lim = max(_HX_MIN_ROWS, _hx_lim // 2)
++                    _truncated_msgs, _messages_offset = _hx_window(_hx_lim)
+         else:
+             _truncated_msgs = []
+             _messages_offset = 0
+diff --git a/tests/test_hermes_patch_0001_lite_payload.py b/tests/test_hermes_patch_0001_lite_payload.py
+new file mode 100644
+index 000000000..ac5677db4
+--- /dev/null
++++ b/tests/test_hermes_patch_0001_lite_payload.py
+@@ -0,0 +1,89 @@
++"""Hermes patch 0001: ?hx_strip_images=1 and ?msg_bytes=N on GET /api/session."""
++import copy
++
++from tests.test_session_tail_payload import _FakeSession, _invoke
++
++BIG = "data:image/png;base64," + "A" * 200_000
++
++
++def _img_msg(text="see attached"):
++    return {
++        "role": "user",
++        "content": [
++            {"type": "text", "text": text},
++            {"type": "image_url", "image_url": {"url": BIG}},
++        ],
++    }
++
++
++def _q(extra):
++    return "session_id=tail_payload_001&messages=1&resolve_model=0&msg_limit=30" + extra
++
++
++def _convo(n, size=2_000):
++    msgs = []
++    for i in range(n):
++        msgs.append({"role": "user", "content": f"q{i} " + "x" * size})
++        msgs.append({"role": "assistant", "content": f"a{i} " + "y" * size})
++    return msgs
++
++
++def test_without_params_payload_is_unchanged():
++    session = _FakeSession([_img_msg(), {"role": "assistant", "content": "ok"}])
++    payload = _invoke(session, query=_q(""))
++    assert payload["messages"][0]["content"][1]["image_url"]["url"] == BIG
++
++
++def test_strip_images_stubs_inline_images_without_mutating_the_session():
++    session = _FakeSession([_img_msg(), {"role": "assistant", "content": "ok"}])
++    before = copy.deepcopy(session.messages)
++    payload = _invoke(session, query=_q("&hx_strip_images=1"))
++    part = payload["messages"][0]["content"][1]
++    assert part["type"] == "image_url"
++    assert part["image_url"]["url"] == ""
++    assert part["hx_omitted_bytes"] == len(BIG)
++    assert payload["messages"][0]["content"][0] == {"type": "text", "text": "see attached"}
++    assert session.messages == before
++
++
++def test_strip_images_keeps_remote_urls():
++    msg = {"role": "user", "content": [{"type": "image_url", "image_url": {"url": "https://x/y.png"}}]}
++    session = _FakeSession([msg, {"role": "assistant", "content": "ok"}])
++    payload = _invoke(session, query=_q("&hx_strip_images=1"))
++    assert payload["messages"][0]["content"][0]["image_url"]["url"] == "https://x/y.png"
++
++
++def test_msg_bytes_shrinks_a_fresh_tail_and_marks_it_truncated():
++    session = _FakeSession(_convo(20))  # 40 rows, ~2KB each
++    full = _invoke(session, query=_q(""))
++    small = _invoke(session, query=_q("&msg_bytes=20000"))
++    assert len(full["messages"]) == 30
++    assert 6 <= len(small["messages"]) < 30
++    assert small["messages"] == session.messages[-len(small["messages"]):]
++    assert small["_messages_truncated"] is True
++    assert small["_messages_offset"] == len(session.messages) - len(small["messages"])
++
++
++def test_msg_bytes_never_goes_below_the_row_floor():
++    session = _FakeSession(_convo(20, size=50_000))
++    payload = _invoke(session, query=_q("&msg_bytes=1000"))
++    assert len(payload["messages"]) == 6
++
++
++def test_msg_bytes_leaves_small_tails_alone():
++    session = _FakeSession(_convo(5, size=10))
++    payload = _invoke(session, query=_q("&msg_bytes=100000"))
++    assert payload["messages"] == session.messages
++
++
++def test_msg_bytes_is_ignored_for_msg_before_paging():
++    session = _FakeSession(_convo(20))
++    q = "session_id=tail_payload_001&messages=1&resolve_model=0&msg_before=30&msg_limit=10&msg_bytes=1000"
++    payload = _invoke(session, query=q)
++    assert payload["messages"] == session.messages[20:30]
++
++
++def test_bad_msg_bytes_value_is_ignored():
++    session = _FakeSession(_convo(20))
++    payload = _invoke(session, query=_q("&msg_bytes=lots"))
++    assert len(payload["messages"]) == 30
