@@ -1,0 +1,33 @@
+/* Tabbie — inline colour chips + their big view (swatches.js). Apple skin tokens, light + dark. */
+.hx-sw { display: inline-block; width: .95em; height: .95em; margin: 0 .3em 0 .05em; vertical-align: -0.12em;
+  border-radius: 4px; background: var(--sw); cursor: pointer; -webkit-tap-highlight-color: transparent;
+  box-shadow: inset 0 0 0 1px rgba(0,0,0,.14); transition: transform .15s ease; }
+:root.dark .hx-sw { box-shadow: inset 0 0 0 1px rgba(255,255,255,.18); }
+.hx-sw:hover { transform: scale(1.15); }
+.hx-sw:focus-visible { outline: 2px solid var(--focus-ring-strong, #3054FD); outline-offset: 2px; }
+/* bigger tap target on touch without moving the text */
+@media (hover: none) { .hx-sw { position: relative; } .hx-sw::after { content: ''; position: absolute; inset: -8px; } }
+
+.hx-sw-pop { position: fixed; z-index: 10050; width: 232px; padding: 8px; border-radius: 16px;
+  background: var(--hx-surface, #fff); color: var(--hx-text, #141413);
+  box-shadow: 0 0 0 1px rgba(0,0,0,.08), 0 12px 32px rgba(0,0,0,.18);
+  animation: hx-sw-in .14s ease-out; }
+:root.dark .hx-sw-pop { background: var(--hx-fill, #1D1F25); box-shadow: 0 0 0 1px rgba(255,255,255,.1), 0 12px 32px rgba(0,0,0,.5); }
+@keyframes hx-sw-in { from { opacity: 0; transform: translateY(4px) scale(.98); } }
+@media (prefers-reduced-motion: reduce) { .hx-sw-pop { animation: none; } .hx-sw { transition: none; } }
+.hx-sw-big { height: 112px; border-radius: 10px; background: var(--sw);
+  /* checkerboard under see-through colours */
+  background-image: linear-gradient(var(--sw), var(--sw)), repeating-conic-gradient(#ccc 0 25%, #fff 0 50%);
+  background-size: auto, 14px 14px; box-shadow: inset 0 0 0 1px rgba(0,0,0,.08); }
+:root.dark .hx-sw-big { box-shadow: inset 0 0 0 1px rgba(255,255,255,.12); }
+.hx-sw-info { padding: 6px 2px 0; font-size: 13px; font-variant-numeric: tabular-nums; }
+.hx-sw-row { display: flex; align-items: center; justify-content: space-between; gap: 8px; min-height: 32px; }
+.hx-sw-row b { font-weight: 600; letter-spacing: .01em; }
+.hx-sw-row span { color: var(--hx-text-2, #6B6B70); }
+.hx-sw-copy { flex: none; min-width: 64px; height: 28px; padding: 0 10px; border: 0; border-radius: 14px; font: inherit; font-size: 12.5px;
+  background: var(--hx-fill, #F1F1EF); color: var(--hx-text, #141413); cursor: pointer; -webkit-tap-highlight-color: transparent; }
+:root.dark .hx-sw-copy { background: rgba(255,255,255,.08); }
+.hx-sw-copy:hover { filter: brightness(.96); }
+.hx-sw-copy.is-done { color: #1a7f37; }
+:root.dark .hx-sw-copy.is-done { color: #4ac26b; }
+.hx-sw-copy:focus-visible { outline: 2px solid var(--focus-ring-strong, #3054FD); outline-offset: 2px; }

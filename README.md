@@ -767,6 +767,11 @@ Design notes: `docs/memory/ARCHITECTURE.md`, `docs/projects/ARCHITECTURE.md`.
   `bin/attach-images <request-id> --allow <dir>` adds images to a finished reply by hand.
 - **PDFs in the chat**: a worker can attach a PDF (a report, an export) the same way, with an
   `ATTACH: <path>.pdf` line in its final message. The reply shows it as a file card you can open and download.
+- **Pictures, colours and charts inside the answer**: an image the worker attaches in its final message
+  renders right where it wrote it, mid-answer, at reading size (e.g. the app icon a colour was sampled from).
+  Every hex colour in a reply (`#FDBB1B`) gets a colour chip; tap it to see the colour big, with its RGB, and
+  copy either. A fenced ` ```chart ` block of JSON draws a chart in place (bar, line, area, pie, donut) that
+  follows the theme, shows values on hover and flips to a table.
 - **Plans**: a plan card has **Approve**, **Change** and **Cancel** buttons (typing `yes` still works).
 - **Questions**: when a worker needs a decision it asks a structured question card (number keys pick
   an option; a half-typed answer is kept), and your reply resumes the same session.

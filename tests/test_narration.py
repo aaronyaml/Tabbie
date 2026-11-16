@@ -249,7 +249,8 @@ def test_pdf_attach_becomes_file_card(tmp_path):
     out = agents.attach_docs(text, [str(proj)], chat)
     assert f"MEDIA: {chat / 'Q3-report.pdf'}" in out and (chat / "Q3-report.pdf").read_bytes() == pdf.read_bytes()
     assert "(Couldn't attach fake.pdf: not a valid pdf.)" in out
-    assert "ATTACH: /a/b.png" in out  # images stay for the Agents block
+    assert "(Couldn't attach b.png: " in out  # a picture outside the project says why, in place
+    assert "ATTACH: /a/b.png" in agents.attach_docs("ATTACH: /a/b.png", [str(proj)], None)  # no chat: Agents block
     assert agents.strip_attach(out).count("ATTACH") == 0
     outside = tmp_path / "elsewhere.pdf"; outside.write_bytes(b"%PDF-1.4\n" + b"y" * 64)
     assert "outside the project folders" in agents.attach_docs(f"ATTACH: {outside}", [str(proj)], chat)
@@ -258,6 +259,16 @@ def test_pdf_attach_becomes_file_card(tmp_path):
     run.start_main("Claude Code", "claude")
     assert run.attach(str(pdf), run.main(), 1.0) is False
     assert not run.data.get("images") and not run.data.get("attach_rejected")
+
+
+def test_picture_attach_renders_inline_where_written(tmp_path):
+    proj, chat = tmp_path / "proj", tmp_path / "webui" / "attachments" / "abc123"
+    proj.mkdir(parents=True)
+    png = proj / "icon swatch.png"
+    png.write_bytes(b"\x89PNG\r\n\x1a\n" + b"p" * 64)
+    out = agents.attach_docs(f"Gaff Yellow is #FDBB1B.\nATTACH: {png}\nUse it as a fill.", [str(proj)], chat)
+    assert out == f"Gaff Yellow is #FDBB1B.\nMEDIA: {chat / 'icon-swatch.png'}\nUse it as a fill."
+    assert (chat / "icon-swatch.png").read_bytes() == png.read_bytes()
 
 
 def test_worker_rules_mention_pdf():

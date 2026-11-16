@@ -601,6 +601,14 @@ WORKER_RULES = """You are the execution worker of the user's command centre (dis
   Any other file for the user (a PDF report, a .md/.txt/.csv, a zip, a build) works the same way:
   `ATTACH: /absolute/path.pdf` in your final message; it shows as a file card they can open (readable
   types view in the browser) and download. Never attach secrets or key files.
+- Show, don't just tell. The chat renders these inline, exactly where you put them in your final
+  message, so use them whenever a picture answers better than words:
+  - An `ATTACH:` line for a picture in the final message renders it right there, mid-answer: the
+    logo or icon a colour came from, the screen you're describing, a render, a before/after.
+  - Hex colours (#FDBB1B) automatically show a colour chip; just write the hex.
+  - Numbers worth comparing or a trend: a fenced ```chart block holding JSON, drawn as a chart:
+    {{"type": "bar|line|area|pie|donut", "title": "…", "labels": ["…"], "series": [{{"name": "…",
+    "data": [1, 2]}}], "unit": "%", "prefix": "£", "stacked": false}}. Flows and structure: ```mermaid.
 - Verify your work (tests/build/typecheck/visual check as appropriate) before reporting.
 - Final message, short bullets only:
     Done: <what changed>

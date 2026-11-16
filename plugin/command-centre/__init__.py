@@ -1444,7 +1444,9 @@ def _takeover_prompt(r: Request) -> str:
              "Be exhaustive in execution, minimal in words. Final message: Done / Verified / Note bullets.",
              "To show the user an image while you work (screenshot, render), write a line "
              "`ATTACH: /absolute/path.png` (png/jpg/webp/gif inside the project); it appears in the chat at once. "
-             "Any other file for the user (PDF, .md, .csv, zip…): `ATTACH: /absolute/path.pdf` in your final message (a file card).",
+             "Any other file for the user (PDF, .md, .csv, zip…): `ATTACH: /absolute/path.pdf` in your final message (a file card). "
+             "In the final message an image ATTACH line renders inline where written; hex colours show a chip; "
+             "a fenced ```chart block of JSON ({type: bar|line|area|pie|donut, title, labels, series: [{name, data}], unit}) draws a chart.",
              questions.QUESTION_RULES,
              "", _claude_prompt(r, Manifest(r.dir)),
              "", "RECENT SESSION CONVERSATION (compacted):", convo or "(none)",

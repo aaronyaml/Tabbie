@@ -97,17 +97,18 @@ def _sha1_file(p: Path) -> str:
 
 
 def attach_docs(text: str, roots: list[str], dest: Path | None) -> str:
-    """A reply's ATTACH lines naming any non-picture file -> `MEDIA: <copy>` (the chat shows a file card it can open and
-    download); the copy goes into the chat's own attachments folder (dest), which the WebUI serves.
-    Other ATTACH lines are left for strip_attach (images show in the Agents block)."""
+    """A reply's ATTACH lines -> `MEDIA: <copy>` right where they were written: a picture renders inline in the message
+    (like a chat app attaching it mid-answer), any other file as a card it can open and download. The copy goes into
+    the chat's own attachments folder (dest), which the WebUI serves. Lines that can't be attached say why."""
     if not text or "ATTACH" not in text:
         return text
 
     def sub(m):
         raw = m.group(1).strip().strip("`'\"<>").strip()
-        if not is_doc(raw):
+        doc = is_doc(raw)
+        if not doc and dest is None:  # no chat to put it in (Telegram, a task): the Agents block shows it
             return m.group(0)
-        p, why = check_doc(raw, roots)
+        p, why = check_doc(raw, roots) if doc else check_image(raw, roots)
         if p is None or dest is None:
             return f"(Couldn't attach {_short(Path(raw).name or raw, 120)}: {why if p is None else 'no chat to attach it to'}.)"
         try:

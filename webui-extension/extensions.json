@@ -451,6 +451,26 @@
         "notify.js?v=2"
       ],
       "stylesheets": []
+    },
+    {
+      "id": "swatches",
+      "name": "Colour chips next to hex codes in replies",
+      "scripts": [
+        "swatches.js?v=2"
+      ],
+      "stylesheets": [
+        "swatches.css?v=1"
+      ]
+    },
+    {
+      "id": "charts",
+      "name": "Charts drawn inside replies (```chart blocks)",
+      "scripts": [
+        "charts.js?v=2"
+      ],
+      "stylesheets": [
+        "charts.css?v=5"
+      ]
     }
   ]
 }
