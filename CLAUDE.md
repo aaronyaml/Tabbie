@@ -20,3 +20,8 @@ Rules:
 - Don't edit `memory/` by hand; use `bin/hmem propose`. Most tasks propose nothing.
 - Any new feature or UI change: run the full UI test process (`docs/testing/UI_TESTING.md`: real browser, reload tests, iPhone 15 Pro Max) and fix what it finds BEFORE committing or pushing.
 - Commits: NEVER add `Co-Authored-By` or `Claude-Session` lines (or any co-author/attribution trailer). Plain messages only.
+
+Secrets (1Password CLI, vault "Personal"):
+- NEVER run `op read`, `op item get`, `op inject` to stdout, or print environment variables (`echo $VAR`, `env`, `printenv`, `set`, `export -p`). Never read `.env` files.
+- ALWAYS run anything that needs a secret as `bin/with-secrets -- <command>` (Tabbie vault, via the service account; `--list` for names) or `op run --env-file=".env.tpl" -- <command>`: values go into that process's memory only, never into output, files, logs, git or memory. Never echo a secret even inside `op run` (it masks, but don't).
+- New secret: add a reference line (`NAME="op://Personal/<item>/<field>"`) to `.env.tpl`; the user stores the value in 1Password. `op whoami` / `op vault list` are fine (no secret values).

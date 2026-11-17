@@ -229,6 +229,8 @@ runbook, written for the agent.
 5. "Do you want the **Motion studio** (makes product films; installs Node.js, about 300 MB)?" (yes / no)
 6. "Do you have **Higgsfield** (image/video generation) or **ElevenLabs** (voice/music) accounts to
    link? Both are optional." (Motion greys out their buttons when they aren't linked.)
+7. "Do you want to keep **API keys in 1Password**, so Claude Code and Codex can use them without
+   anyone seeing them? Needs a 1Password account." (yes / no / later)
 
 #### Step 1: Clone and run the unattended parts (agent)
 
@@ -282,6 +284,9 @@ waiting for an answer after each:
 
 - Higgsfield: the user runs `higgsfield auth login` in the Terminal (browser login).
 - ElevenLabs: see [Sign in](#sign-in-once-per-provider). The user signs in themselves.
+- 1Password: the user runs `cd ~/hermes && bin/setup` and follows its **Secrets (1Password)** step
+  (Touch ID sign-in, a "Tabbie" vault, a service account they create at my.1password.com, then they
+  paste its token). Never ask for the token in chat and never handle it yourself.
 
 #### Step 5: Check (agent)
 
@@ -353,8 +358,9 @@ developer tools (git and Python). Leave the Terminal window open until the page 
 | 7. Background services | Installs and starts the services so Tabbie runs whenever your Mac is on |
 | 8. Secure address | Sets up `https://hermes.local` and offers to trust its certificate on this Mac |
 | 9. Motion studio | Optional. Installs Node.js (official build, Apple silicon or Intel) and creates the Motion studio from Tabbie's template, with its packages ([details](#motion-studio)) |
-| 10. Your phone | Home Wi-Fi instructions, and optionally Tailscale for anywhere ([details](#use-tabbie-on-your-phone-anywhere-tailscale)) |
-| 11. Check | Runs `bin/hub health` and shows the address to open |
+| 10. Secrets (1Password) | Optional. Walks you through all of it: a 1Password account and app, its command-line tool, a "Tabbie" vault (made for you with Touch ID, or in the app), and a service account with Read + Write on that vault only (1Password.com → Developer → Directory → Other → Create a Service Account). Its token goes straight into your Mac's Keychain. Settings → Accounts → Secrets has the same walkthrough ([details](#attachments-agents-questions-takeover)) |
+| 11. Your phone | Home Wi-Fi instructions, and optionally Tailscale for anywhere ([details](#use-tabbie-on-your-phone-anywhere-tailscale)) |
+| 12. Check | Runs `bin/hub health` and shows the address to open |
 
 It's safe to run again any time: finished steps are ticked and skipped, and anything marked `!`
 tells you exactly what to do. When services are already running it asks before restarting them.
@@ -772,6 +778,34 @@ Design notes: `docs/memory/ARCHITECTURE.md`, `docs/projects/ARCHITECTURE.md`.
   Every hex colour in a reply (`#FDBB1B`) gets a colour chip; tap it to see the colour big, with its RGB, and
   copy either. A fenced ` ```chart ` block of JSON draws a chart in place (bar, line, area, pie, donut) that
   follows the theme, shows values on hover and flips to a table.
+- **Answers read like a chat app**: a finished reply opens with one quiet line ("Worked for 56s ›"); agents,
+  tokens, steps and changed files open from it. While it works, the status line under the reply is the only
+  indicator; tap it for the same details.
+- **Replies type out live**: while Claude Code writes its answer, the words appear in the chat as they come
+  (like ChatGPT), above the live status line; the finished reply then takes their place.
+- **Secrets in 1Password** (optional): API keys live in a 1Password vault ("Tabbie") that a 1Password service
+  account can use; its token sits in the macOS Keychain. **Settings → Accounts → Secrets** lists each key by
+  name and variable (`RESEND_API_KEY`), never its value; add, replace or delete keys there. **Rotate**
+  (Resend, Cloudflare API tokens) makes a new key with the provider, saves it to 1Password and shows it once
+  to copy. Workers run commands as `bin/with-secrets -- <command>`, which puts the keys into that one process
+  (masked in its output) and never hands over the vault token; ask for a task that needs a key ("check my
+  Resend key works") and the worker uses it without you pasting anything. Keys you add straight in the
+  1Password app (Tabbie vault) are picked up too: the variable comes from the title ("OpenAI API key" →
+  `OPENAI_API_KEY`). Set up in `bin/setup` (step 10), `bin/setup --only secrets`, or Settings → Accounts → Secrets.
+- **New setup steps after an update**: when an update adds a setup step this Mac hasn't been through (like
+  Secrets), a small **New in Tabbie setup** card offers it once. **Set up** opens the place to do it; **Not now**
+  hides it for good. Optional steps say so, and a step that's already set up is never offered.
+- **Sources, galleries, videos, follow-ups**: web facts the worker cites show as small source chips (site icon
+  and name) right where they're stated, gathered into a **Sources** panel under the answer. Several pictures in
+  a row become one gallery. A YouTube link on its own line becomes a video card that plays in place. Replies can
+  always end with 2-3 suggested follow-up questions; tap one to send it. Workers cite their sources, attach
+  relevant pictures and draw charts (3+ comparable numbers) without being asked. Site icons and video thumbnails are fetched by
+  the sidecar (one fixed icon service, bare domain only), never by the page, so replies still can't load remote
+  images.
+- **Memory proposals from chat**: type "approve p-20261117-6fef86" (or "reject p-…", or "approve the memory
+  proposal" when only one is waiting) and Tabbie decides it straight from your message. Workers still can't
+  approve memories themselves: only your own typed message counts, so a web page or file can't. Flagged proposals
+  ask for "approve p-… anyway".
 - **Plans**: a plan card has **Approve**, **Change** and **Cancel** buttons (typing `yes` still works).
 - **Questions**: when a worker needs a decision it asks a structured question card (number keys pick
   an option; a half-typed answer is kept), and your reply resumes the same session.

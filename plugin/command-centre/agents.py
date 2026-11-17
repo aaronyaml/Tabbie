@@ -41,6 +41,8 @@ from .common import REQUESTS_DIR, STATE_DIR, read_json, write_json
 AGENTS_INDEX_DIR = STATE_DIR / "agents"
 _SUB_TOOLS = ("Agent", "Task")
 
+DRAFT_MAX = 60_000             # chars of the live draft kept (the reply being typed)
+DRAFT_EVERY = 0.2             # s between draft.json writes while text streams in
 NARRATION_MAX = 80            # timeline entries kept per request (narration lines + operations)
 NARRATION_CHARS = 280         # one line, after cleaning
 SHOTS_MAX = 24                # images per request
@@ -124,7 +126,7 @@ def attach_docs(text: str, roots: list[str], dest: Path | None) -> str:
                 os.replace(tmp, out)
         except OSError:
             return f"(Couldn't attach {_short(p.name, 120)}: couldn't copy it.)"
-        return f"MEDIA: {out}"
+        return f"MEDIA:{out}"  # no space: the renderer drops back-to-back "MEDIA: " lines
     return _ATTACH_RX.sub(sub, text)
 
 
@@ -382,6 +384,11 @@ class AgentRun:
         now = time.time() if now is None else now
         main = self.main() or self.start_main("Claude Code", "claude", now=now)
         t, st = ev.get("type"), ev.get("subtype")
+        if t == "stream_event":
+            self.take_partial(ev, now)
+            return False  # the draft has its own small file; agents.json is untouched
+        if t == "result":
+            self.draft_write("", now, force=True)
         if t in ("assistant", "user"):
             step_log_claude(self, ev, now)  # planner / hand-off runs keep no transcript: their own step log
         if t == "system" and st == "init":
@@ -535,6 +542,55 @@ class AgentRun:
         background task finishing. Activity after that means the main agent is running again."""
         if main["status"] in ("done", "failed"):
             main["status"], main["ended"], main["duration_s"], main["reopened"] = "running", None, None, True
+
+    # -- live draft: the main worker's words as it writes them (draft.json, typed out by live-draft.js) --
+    def take_partial(self, ev: dict, now: float) -> None:
+        """One --include-partial-messages chunk. Only the main worker's text counts (a sub-agent's chunks
+        carry parent_tool_use_id); a tool call starting means that text was narration, so the draft clears."""
+        if ev.get("parent_tool_use_id") or self.file_name != "agents.json":
+            return
+        e = ev.get("event") or {}
+        et = e.get("type")
+        if et == "content_block_start":
+            kind = (e.get("content_block") or {}).get("type")
+            if kind == "text":
+                self._draft = ""
+            elif kind == "tool_use":
+                self._draft = ""
+                self.draft_write("", now, force=True)
+        elif et == "content_block_delta":
+            d = e.get("delta") or {}
+            if d.get("type") == "text_delta" and d.get("text"):
+                self._draft = (getattr(self, "_draft", "") + d["text"])[-DRAFT_MAX:]
+                self.draft_write(self._draft, now)
+
+    def draft_write(self, text: str, now: float, force: bool = False) -> None:
+        last = getattr(self, "_draft_saved", 0.0)
+        if not force and now - last < DRAFT_EVERY:
+            if getattr(self, "_draft_timer", None) is None:  # the tail still lands if no more chunks come
+                def later():
+                    with self.lock:
+                        self._draft_timer = None
+                        self.draft_write(getattr(self, "_draft", ""), time.time(), force=True)
+                self._draft_timer = threading.Timer(DRAFT_EVERY, later)
+                self._draft_timer.daemon = True
+                self._draft_timer.start()
+            return
+        if force and getattr(self, "_draft_timer", None) is not None:
+            self._draft_timer.cancel()
+            self._draft_timer = None
+        if not text and not getattr(self, "_draft_shown", False):
+            return
+        self._draft_saved, self._draft_shown = now, bool(text)
+        self._draft_seq = getattr(self, "_draft_seq", 0) + 1
+        # only whole words go out: a secret is never shown half-written (and so un-scrubbable)
+        cut = max(text.rfind(" "), text.rfind("\n"))
+        text = text[:cut + 1] if cut >= 0 else ""
+        try:
+            write_json((self.base or REQUESTS_DIR) / self.request_id / "draft.json",
+                       {"text": _scrub(text) if text else "", "at": now, "seq": self._draft_seq})
+        except OSError:
+            pass
 
     # -- narration + attached images -------------------------------------------------------
     def _act(self, a: dict) -> None:

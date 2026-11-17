@@ -79,10 +79,10 @@
       "id": "sidebar",
       "name": "Chat sidebar (ChatGPT-style)",
       "scripts": [
-        "sidebar.js?v=21"
+        "sidebar.js?v=23"
       ],
       "stylesheets": [
-        "sidebar.css?v=24"
+        "sidebar.css?v=29"
       ]
     },
     {
@@ -99,7 +99,7 @@
       "id": "status-words",
       "name": "Status words",
       "scripts": [
-        "status-words.js?v=26"
+        "status-words.js?v=27"
       ],
       "stylesheets": []
     },
@@ -177,10 +177,10 @@
       "id": "cc-agents",
       "name": "Agents & questions",
       "scripts": [
-        "cc-agents.js?v=25"
+        "cc-agents.js?v=26"
       ],
       "stylesheets": [
-        "cc-agents.css?v=13"
+        "cc-agents.css?v=16"
       ],
       "sidecar": {
         "type": "loopback",
@@ -193,7 +193,7 @@
       "id": "cc-narration",
       "name": "Worker narration & attached images",
       "scripts": [
-        "cc-narration.js?v=15"
+        "cc-narration.js?v=16"
       ],
       "stylesheets": [
         "cc-narration.css?v=9"
@@ -314,7 +314,7 @@
       "id": "settings-tidy",
       "name": "Honest Settings (Accounts, hub model, updates)",
       "scripts": [
-        "settings-tidy.js?v=4"
+        "settings-tidy.js?v=5"
       ],
       "stylesheets": [
         "settings-tidy.css?v=4"
@@ -456,20 +456,60 @@
       "id": "swatches",
       "name": "Colour chips next to hex codes in replies",
       "scripts": [
-        "swatches.js?v=2"
+        "swatches.js?v=4"
       ],
       "stylesheets": [
-        "swatches.css?v=1"
+        "swatches.css?v=2"
       ]
     },
     {
       "id": "charts",
       "name": "Charts drawn inside replies (```chart blocks)",
       "scripts": [
-        "charts.js?v=2"
+        "charts.js?v=4"
       ],
       "stylesheets": [
-        "charts.css?v=5"
+        "charts.css?v=7"
+      ]
+    },
+    {
+      "id": "rich-replies",
+      "name": "Sources, galleries, video cards and follow-ups in replies",
+      "scripts": [
+        "rich-replies.js?v=7"
+      ],
+      "stylesheets": [
+        "rich-replies.css?v=10"
+      ]
+    },
+    {
+      "id": "live-draft",
+      "name": "The reply types itself out while the worker writes it",
+      "scripts": [
+        "live-draft.js?v=1"
+      ],
+      "stylesheets": [
+        "live-draft.css?v=1"
+      ]
+    },
+    {
+      "id": "secrets",
+      "name": "Secrets: API keys in 1Password (names only, never values)",
+      "scripts": [
+        "secrets.js?v=6"
+      ],
+      "stylesheets": [
+        "secrets.css?v=3"
+      ]
+    },
+    {
+      "id": "setup-news",
+      "name": "New in setup (offers setup steps an update added, once)",
+      "scripts": [
+        "setup-news.js?v=2"
+      ],
+      "stylesheets": [
+        "setup-news.css?v=1"
       ]
     }
   ]

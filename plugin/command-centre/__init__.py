@@ -781,6 +781,16 @@ def _route_turn(session_id: str, user_message, history=None):
         return _route_motion(session_id, user_message, text)
     if not text or text.startswith("/") or text.startswith(TAG):
         return None
+    # "approve memory proposal p-…": decided here from the user's own words, never by a worker (memory_chat.py)
+    try:
+        from . import memory_chat
+        said = memory_chat.handle(text)
+    except Exception as e:  # noqa: BLE001
+        said = f"Couldn't reach the memory store ({e})."
+    if said:
+        log_decision(event="memory_decision_from_chat")
+        return (f"{TAG} Route: Memory (done by Tabbie from your message). Result: {said}\nACTION: tell the user this "
+                "result in one or two short lines, nothing else. Do not call any tools.")
     cfg = load_config()
     st = session_state(session_id)
     overridden = classify(text, cfg).forced
@@ -1446,7 +1456,12 @@ def _takeover_prompt(r: Request) -> str:
              "`ATTACH: /absolute/path.png` (png/jpg/webp/gif inside the project); it appears in the chat at once. "
              "Any other file for the user (PDF, .md, .csv, zip…): `ATTACH: /absolute/path.pdf` in your final message (a file card). "
              "In the final message an image ATTACH line renders inline where written; hex colours show a chip; "
-             "a fenced ```chart block of JSON ({type: bar|line|area|pie|donut, title, labels, series: [{name, data}], unit}) draws a chart.",
+             "a fenced ```chart block of JSON ({type: bar|line|area|pie|donut, title, labels, series: [{name, data}], unit}) draws a chart; "
+             "API keys: run commands as `~/hermes/bin/with-secrets -- <cmd>` (`--list` for names); never print or store a secret value. "
+             "ALWAYS cite every web source you used inline as [Site](url) (source chips + a Sources panel); "
+             "attach relevant pictures and add charts for comparable numbers on your own, unasked; a YouTube link alone on a line plays as a video; "
+             "ALWAYS end the final message with a ```tabbie-followups block (2-3 short next steps or questions, one per line, "
+             "as the user would say them); they show as tappable suggestions.",
              questions.QUESTION_RULES,
              "", _claude_prompt(r, Manifest(r.dir)),
              "", "RECENT SESSION CONVERSATION (compacted):", convo or "(none)",

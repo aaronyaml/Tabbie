@@ -10,7 +10,7 @@
 
   // #abc only counts with a letter in it (#123 is usually an issue number); 4-digit forms are skipped.
   const RX = /(^|[^\w&#/=])#([0-9a-fA-F]{8}|[0-9a-fA-F]{6}|[0-9a-fA-F]{3})(?![\w-])/g;
-  const SKIP = 'pre, a, textarea, input, script, style, svg, .hx-sw, .hx-chart, .katex, .mermaid';
+  const SKIP = 'pre, a, textarea, input, script, style, svg, .hx-sw, .hx-hex, [data-hx-sw], .hx-chart, .katex, .mermaid';
   const HOST = '[data-role="assistant"] .msg-body, .assistant-turn .msg-body, .assistant-segment .msg-body';
   const SETTLE = 900; // ms a message must stay unchanged before it's decorated (never mid-stream)
 
@@ -51,9 +51,12 @@
       const start = m.index + m[1].length;
       const hex = norm(m[2]);
       frag.appendChild(document.createTextNode(t.slice(last, start)));
-      // inside inline code or bold, the chip goes in front of the whole element instead
-      frag.appendChild(chip(hex));
-      frag.appendChild(document.createTextNode(t.slice(start, start + 1 + m[2].length)));
+      // chip + code in one wrapper, so a later look at this message never chips the same code twice
+      const wrap = document.createElement('span');
+      wrap.className = 'hx-hex';
+      wrap.appendChild(chip(hex));
+      wrap.appendChild(document.createTextNode(t.slice(start, start + 1 + m[2].length)));
+      frag.appendChild(wrap);
       last = start + 1 + m[2].length;
       found.push(hex);
       hit = true;
@@ -73,9 +76,11 @@
     while (walker.nextNode()) nodes.push(walker.currentNode);
     nodes.forEach((n) => decorateText(n, found));
     // chips that landed inside <code>: move them out so the code pill stays clean
-    body.querySelectorAll('code > .hx-sw').forEach((s) => {
-      const code = s.parentElement;
-      if (!code.closest('pre')) code.parentNode.insertBefore(s, code);
+    body.querySelectorAll('code .hx-hex > .hx-sw').forEach((s) => {
+      const code = s.closest('code');
+      if (code.closest('pre')) return;
+      code.dataset.hxSw = '1';
+      code.parentNode.insertBefore(s, code);
     });
     return found;
   }
@@ -168,13 +173,19 @@
       const text = body.textContent;
       const d = done.get(body);
       if (!text.includes('#') || (d && d.text === text && (!d.n || body.querySelector('.hx-sw')))) { seen.delete(body); return; }
-      if (seen.get(body) === text) { seen.delete(body); decorate(body); return; }
+      if (seen.get(body) === text || !streaming(body)) { seen.delete(body); decorate(body); return; }
       seen.set(body, text);
       again = true;
     });
     if (again) schedule();
   }
-  function schedule() { if (!timer) timer = setTimeout(sweep, SETTLE); }
+  // a finished message is chipped at once; one still being written waits until its text holds still
+  function streaming(body) {
+    const row = body ? body.closest('.msg-row') : null;
+    return !!((row && row.querySelector('[data-live-assistant="1"]')) || (row && row.nextElementSibling && row.nextElementSibling.id === 'hxLiveStatus'));
+  }
+  const anyStreaming = () => !!document.querySelector('#hxLiveStatus, [data-live-assistant="1"]');
+  function schedule() { if (!timer) timer = setTimeout(sweep, anyStreaming() ? SETTLE : 30); }
   new MutationObserver((list) => {
     for (const m of list) {
       const el = m.target.nodeType === 1 ? m.target : m.target.parentElement;

@@ -8,7 +8,7 @@
   <key>RunAtLoad</key><true/>
   <key>KeepAlive</key><true/>
   <key>ThrottleInterval</key><integer>10</integer>
-  <key>ProcessType</key><string>Background</string>
+  <key>ProcessType</key><string>Standard</string>
   <key>StandardOutPath</key><string>__HOME__/hermes/state/logs/cc-sidecar.log</string>
   <key>StandardErrorPath</key><string>__HOME__/hermes/state/logs/cc-sidecar.log</string>
 </dict></plist>

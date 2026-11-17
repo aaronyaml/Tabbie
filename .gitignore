@@ -15,9 +15,16 @@ tests/fixtures/out/
 .env.*
 *.env
 !*.env.example
+!.env.tpl
 *token*
 *credential*
 *secret*
+# Tabbie's secrets *code* (no values: those live in 1Password)
+!plugin/command-centre/secrets.py
+!webui-extension/secrets.js
+!webui-extension/secrets.css
+!bin/with-secrets
+!tests/test_secrets.py
 auth.json
 mcp-tokens/
 *.pem

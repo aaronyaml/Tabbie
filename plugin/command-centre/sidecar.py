@@ -12,6 +12,8 @@ GET /agent/detail?rid=&agent=[&offset=&limit=] -> everything one agent did (Agen
                                      brief, steps (tool calls, words, reasoning when recorded), files, sub-agents
 GET /agent/part?rid=&agent=&part=&i=, GET /request/detail?rid=, GET /request/part?rid=&part=
                                      -> one field in full ("Show more"), the request itself (scrubbed, capped)
+GET /favicon?host=<domain>, GET /yt/thumb?id=<video id>, GET /yt/meta?id= -> link pictures + video titles for replies
+                                     (linkicons.py: two fixed services, registrable domain / 11-char id only, cached)
 GET /plan?id=<request id>           -> the planner's final brief for that request (chat Plan chip)
 GET /worker?session=, POST /worker/message {session, text, mode}, GET /worker/ack?request=&id=
                                      -> chat messages to the running Claude Code worker (queue / Send now)
@@ -26,6 +28,11 @@ POST /executor {id, provider, model, effort} -> set it (composer model picker)
 POST /executor {default: true, provider, model, effort} -> the model new chats start on (Settings → Preferences;
                                      a composer pick also sets it)
 GET /agents, POST /agents {enabled}  -> which coding agents this install uses (Claude Code, Codex, both)
+GET /setup-news, POST /setup-news/seen {id} -> setup steps added since install, offered once (hmem/setup_news.py)
+GET /secrets[?force=1], POST /secrets/{add,update,delete,rotate,connect} -> Settings → Accounts → Secrets (secrets.py):
+                                     1Password vault names/variables only; values go in, never out (rotate
+                                     returns the new value once)
+GET /draft?id=<session>              -> the reply the running worker is writing right now (live typing)
 GET /connections[?force=1]           -> Settings → Providers: Claude Code / Codex sign-in + plan, services set up
                                        (MCP servers, CLIs) and linked model providers (connections.py; names only)
 GET /update[?force=1], POST /update, POST /update/restart -> Tabbie updates from GitHub (asked first;
@@ -59,6 +66,7 @@ import subprocess
 import sys
 import tempfile
 import threading
+import time
 import hashlib
 import types
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
@@ -78,8 +86,10 @@ providers =importlib.import_module("cc_sidecar_pkg.providers")
 updates = importlib.import_module("cc_sidecar_pkg.updates")
 needs = importlib.import_module("cc_sidecar_pkg.needs")
 hub_setup = importlib.import_module("cc_sidecar_pkg.hub_setup")
+secrets_store = importlib.import_module("cc_sidecar_pkg.secrets")
 push = importlib.import_module("cc_sidecar_pkg.push")
 usage_insights = importlib.import_module("cc_sidecar_pkg.usage_insights")
+linkicons = importlib.import_module("cc_sidecar_pkg.linkicons")
 procutil = importlib.import_module("cc_sidecar_pkg.procutil").procutil
 _HERMES_HOME = str(PKG.parents[1])  # ~/hermes: hmem (memory + Projects) lives here
 if _HERMES_HOME not in sys.path:
@@ -88,6 +98,7 @@ from hmem import api as projects_api  # noqa: E402  (Projects UI backend: /proje
 from hmem import agents as agent_set  # noqa: E402  (config/agents.yaml: Claude Code, Codex or both)
 from hmem import motion as motion_studio  # noqa: E402  (Motion studio folder + linked providers)
 from hmem.paths import webui_state  # noqa: E402
+from hmem import setup_news  # noqa: E402  (setup steps added after install: offered once after an update)
 
 EXT_ID = "cc-agents"
 HOST, PORT = "127.0.0.1", int(os.environ.get("CC_SIDECAR_PORT", "8794"))
@@ -585,6 +596,75 @@ def detail_route(path: str, q: dict) -> tuple[int, dict]:
     return (200, got) if got is not None else (404, {"error": "not found"})
 
 
+_SECRETS_CACHE: dict = {}
+
+
+def secrets_get(force: bool = False) -> tuple[int, dict]:
+    """Settings → Secrets: 1Password status + each secret's name, variable and provider. Never a value.
+    Cached 30 s (each 1Password call takes about a second); any change clears it."""
+    hit = _SECRETS_CACHE.get("v")
+    if hit and not force and time.time() - hit[0] < 30:
+        return 200, hit[1]
+    st = {"op": bool(shutil.which("op")), "token": bool(secrets_store._token()), "connected": False,
+          "vault": secrets_store.VAULT, "error": ""}
+    out = {"status": st, "providers": {k: {"label": v["label"], "env": v["env"], "rotate": v["rotate"]}
+                                       for k, v in secrets_store.PROVIDERS.items()}, "items": []}
+    if st["op"] and secrets_store._token():  # listing the vault is the connection check (one round trip, not two)
+        try:
+            out["items"] = secrets_store.items(force=force)
+            st["connected"] = True
+        except secrets_store.SecretError as exc:
+            st["error"] = str(exc)
+    if st["connected"] and not st["error"]:
+        _SECRETS_CACHE["v"] = (time.time(), out)
+    return 200, out
+
+
+def _setup_done() -> dict:
+    """Setup steps already done some other way (so they're never offered): 1Password = a token in the Keychain."""
+    try:
+        return {"secrets": bool(secrets_store._token())}
+    except Exception:  # noqa: BLE001
+        return {}
+
+
+def secrets_post(path: str, body: dict) -> tuple[int, dict]:
+    """add / update / delete / rotate / connect. Values arrive here once and go straight to 1Password; they are
+    never logged (errors carry only SecretError text, which never includes a value). Rotate returns the NEW
+    value once, for the user to copy; nothing keeps it."""
+    acts = {"/secrets/add": secrets_store.add, "/secrets/update": secrets_store.update,
+            "/secrets/delete": secrets_store.delete, "/secrets/rotate": secrets_store.rotate}
+    _SECRETS_CACHE.clear()
+    try:
+        if path == "/secrets/connect":
+            secrets_store.save_token(str(body.get("token") or ""))
+            return secrets_get(force=True)
+        fn = acts.get(path)
+        if not fn:
+            return 404, {"error": "not found"}
+        return 200, fn(body)
+    except secrets_store.SecretError as exc:
+        return 400, {"ok": False, "error": str(exc)}
+    except Exception as exc:  # never echo: the body holds a secret
+        sys.stderr.write(f"cc-sidecar secrets {path}: {type(exc).__name__}\n")
+        return 500, {"ok": False, "error": "Something went wrong talking to 1Password."}
+
+
+def draft_payload(sid: str) -> dict:
+    """The reply the session's running worker is writing right now (typed out live by live-draft.js).
+    Cheap: the session index names the newest request; only a running one has a draft."""
+    idx = common.read_json(agents.AGENTS_INDEX_DIR / f"{agents._safe(sid)}.json", None) or {}
+    rids = sorted((idx.get("requests") or {}).keys())
+    if not rids:
+        return {}
+    rid = rids[-1]
+    req = common.read_json(common.REQUESTS_DIR / rid / "request.json", {}) or {}
+    if req.get("status") not in ("executing", "planning") or req.get("session_id") != sid:
+        return {"id": rid, "text": ""}
+    d = common.read_json(common.REQUESTS_DIR / rid / "draft.json", {}) or {}
+    return {"id": rid, "text": str(d.get("text") or "")[:agents.DRAFT_MAX], "seq": d.get("seq"), "at": d.get("at")}
+
+
 def session_payload(sid: str) -> dict:
     view = agents.session_view(sid)
     rows = []
@@ -872,6 +952,15 @@ class Handler(BaseHTTPRequestHandler):
                 if not _SID.match(sid):
                     return self._send(400, {"error": "bad session id"})
                 return self._send(200, session_payload(sid))
+            if u.path == "/secrets":
+                return self._send(*secrets_get(q.get("force") == "1"))
+            if u.path == "/setup-news":
+                return self._send(200, {"steps": setup_news.pending(_setup_done())})
+            if u.path == "/draft":
+                sid = q.get("id", "")
+                if not _SID.match(sid):
+                    return self._send(400, {"error": "bad session id"})
+                return self._send(200, draft_payload(sid))
             if u.path == "/executor":
                 sid = q.get("id", "")
                 if not sid:
@@ -931,6 +1020,11 @@ class Handler(BaseHTTPRequestHandler):
                 if got is None:
                     return self._send(404, {"error": "not found"})
                 return self._send_bytes(*got)
+            if u.path in ("/favicon", "/yt/thumb"):  # link pictures, fetched server-side (linkicons.py)
+                got = linkicons.favicon(q.get("host", "")) if u.path == "/favicon" else linkicons.yt_thumb(q.get("id", ""))
+                return self._send_bytes(*got) if got else self._send(404, {"error": "none"})
+            if u.path == "/yt/meta":
+                return self._send(200, linkicons.yt_meta(q.get("id", "")))
             if u.path == "/plan":
                 rid = q.get("id", "")
                 if not _RID.match(rid):
@@ -999,6 +1093,11 @@ class Handler(BaseHTTPRequestHandler):
                 except ValueError as exc:
                     return self._send(400, {"ok": False, "error": str(exc)})
                 return self._send(200, {"ok": True, "needs": needs.missing()})
+            if u.path == "/setup-news/seen" and isinstance(body, dict):
+                setup_news.mark([str(body.get("id") or "")])
+                return self._send(200, {"ok": True, "steps": setup_news.pending(_setup_done())})
+            if u.path.startswith("/secrets/") and isinstance(body, dict):
+                return self._send(*secrets_post(u.path, body))
             if u.path == "/update":
                 res = updates.apply()
                 return self._send(200 if res["ok"] else 409, res)
@@ -1027,6 +1126,8 @@ def main():
     srv.daemon_threads = True
     updates.resume(after_reply=_exit_soon)  # a restart deferred until Tabbie is idle
     push.Watcher(WEBUI_STATE).start()  # phone / browser push when a job finishes or needs you
+    # 1Password's first call in a fresh process is slow (~10 s); make it now so Settings → Secrets opens fast
+    threading.Thread(target=lambda: secrets_get(force=True), daemon=True).start()
     srv.serve_forever()
 
 

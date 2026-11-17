@@ -565,7 +565,32 @@
   }
   addEventListener('hx-sessload', () => requestAnimationFrame(listLoading));
 
-  function sync() { listLoading(); sidePage(); ensureFrame(); ensureNav(); searchLabel(); loadInbox(); tagRows(); loadMeta(); groupForks(); }
+  // ── child chats under a chat (upstream's nested list) ─────────────────────
+  // Upstream nests some forks inside their parent's row as plain text ("-> Title (fork) - 1d") behind a
+  // blue "1 child" toggle. Tabbie shows every fork the same way (see groupForks): its own row under the
+  // chat, indented, with the branch icon. So the nested list is always open, its toggle hidden, and each
+  // entry drawn like those rows.
+  const KID = /^->\s*(.*?)\s+-\s+([^-]+)$/;
+  const opened = new Set();
+  function tidyKids() {
+    document.querySelectorAll('#sessionList .session-child-count').forEach((c) => {
+      const row = c.closest('.session-item');
+      if (!row) return;
+      const open = !!row.querySelector('.session-child-sessions');
+      row.classList.toggle('hx-has-kids-open', open);
+      if (!open && !opened.has(row.dataset.sid)) { opened.add(row.dataset.sid); c.click(); }
+    });
+    document.querySelectorAll('#sessionList .session-child-session-main, #sessionList .session-lineage-segment').forEach((b) => {
+      if (b.querySelector('input')) return;  // being renamed
+      const m = KID.exec((b.textContent || '').trim());
+      if (!m) return;
+      const title = m[1].replace(/\s*\(fork\)(?=\s|$)/i, '').trim() || 'Untitled';
+      b.innerHTML = `<span class="hx-kid-ico">${icon('GitBranchIcon', 12)}</span><span class="hx-kid-t">${esc(title)}</span>`;
+      b.title = `${title} · ${m[2].trim()}`;
+    });
+  }
+
+  function sync() { listLoading(); sidePage(); ensureFrame(); ensureNav(); searchLabel(); loadInbox(); tagRows(); loadMeta(); groupForks(); tidyKids(); }
   // the filter closes again when it's emptied and loses focus
   document.addEventListener('focusout', (e) => {
     if (e.target && e.target.id === 'sessionSearch' && !e.target.value) setTimeout(() => { searchOpen = false; ensureNav(); }, 120);

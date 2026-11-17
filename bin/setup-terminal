@@ -19,7 +19,7 @@ warn() { printf '  %s!%s %s\n' "$Y" "$N" "$1"; }
 fail() { printf '  %s✗%s %s\n' "$R" "$N" "$1"; }
 say()  { printf '  %s\n' "$1"; }
 dim()  { printf '  %s%s%s\n' "$D" "$1" "$N"; }
-TOTAL=11; STEP=0
+TOTAL=12; STEP=0
 step() { STEP=$((STEP + 1)); printf '\n%s━━ Step %d of %d · %s %s%s\n' "$C$B" "$STEP" "$TOTAL" "$1" "$(printf '━%.0s' $(seq 1 $((60 - ${#1}))))" "$N"; [ -n "${2:-}" ] && dim "$2"; echo; }
 
 # ── answers ───────────────────────────────────────────────────────────────────────────────────────
@@ -72,9 +72,9 @@ cat <<EOF
   ${D}Your coding agents, one inbox — on your Mac and your phone.${N}
 
   This screen walks you through everything, one step at a time:
-    1 About you          4 Sign in              7 Background services   10 Your phone
-    2 Coding agents      5 Local files          8 Secure address        11 Check it all works
-    3 Tools              6 WebUI password       9 Motion studio
+    1 About you          4 Sign in              7 Background services   10 Secrets (1Password)
+    2 Coding agents      5 Local files          8 Secure address        11 Your phone
+    3 Tools              6 WebUI password       9 Motion studio         12 Check it all works
 
   It asks before installing or changing anything. Takes about 10–15 minutes the first time.
   Safe to run again later: finished steps are ticked and skipped.
@@ -391,7 +391,60 @@ else
 fi
 fi
 
-# ── 10. phone ──────────────────────────────────────────────────────────────────────────────────────
+# ── 10. secrets (1Password) ───────────────────────────────────────────────────────────────────────
+if want secrets; then
+step "Secrets (1Password)" "Optional. Keep API keys (Resend, Supabase, Stripe…) in 1Password; Tabbie uses them without ever showing them."
+python3 -m hmem.setup_news mark secrets 2>/dev/null || true  # this Mac has been offered it: no "new in setup" card for it later
+SECPY='import sys, types, importlib; sys.path.insert(0, ".")
+p = types.ModuleType("cc_sidecar_pkg"); p.__path__ = ["plugin/command-centre"]; sys.modules["cc_sidecar_pkg"] = p
+s = importlib.import_module("cc_sidecar_pkg.secrets")'
+sec_status() { python3 -c "$SECPY
+st = s.status(); print('connected' if st['connected'] else ('token' if s._token() else 'none'))" 2>/dev/null; }
+if [ "$(sec_status)" = connected ]; then
+  ok "1Password connected (vault \"Tabbie\"). Manage keys in Settings → Accounts → Secrets."
+elif [ "$ASK" = 1 ] && [ -z "$ONLY" ] && ! yn "Set up 1Password for API keys now?" n; then
+  dim "Skipped. Later: bin/setup --only secrets, or Settings → Accounts → Secrets."
+elif ! have op; then
+  warn "Needs the 1Password app and its command-line tool first:"
+  say "  1. No account yet? https://1password.com/sign-up. Install the app from https://1password.com/downloads/mac and sign in."
+  say "  2. Install the CLI: https://developer.1password.com/docs/cli/get-started (or: brew install 1password-cli)."
+  dim "Then run: bin/setup --only secrets"
+else
+  say "In the 1Password app: ${B}Settings → Developer → Integrate with 1Password CLI${N} (leave \"MCP clients\" off),"
+  say "and ${B}Settings → Security → Touch ID${N} on."
+  pause "Press Return when that's on"
+  say "Signing in: approve with Touch ID when 1Password asks."
+  if ! op vault list >/dev/null 2>&1; then
+    warn "1Password didn't sign in. Check the setting above, then: bin/setup --only secrets"
+  else
+    ok "Signed in to 1Password"
+    if op vault get Tabbie >/dev/null 2>&1; then ok "Vault \"Tabbie\" is there"
+    else op vault create Tabbie --description "Secrets Tabbie can use (names visible in Tabbie, values never shown)" >/dev/null && ok "Made the vault \"Tabbie\""; fi
+    say "Making a service account so Tabbie can use the vault without asking each time…"
+    if op service-account create Tabbie --vault Tabbie:read_items,write_items --raw 2>/dev/null \
+         | python3 -c "$SECPY
+s.save_token(sys.stdin.read())" 2>/dev/null; then
+      ok "Service account made; its token is in your Keychain (never shown)"
+    else
+      say "Make it on the web instead (1 minute):"
+      say "  At my.1password.com: ${B}Developer → Directory${N}, then ${B}Other${N} (Infrastructure Secrets Management) → ${B}Create a Service Account${N}."
+      say "  Name it Tabbie, give it the \"Tabbie\" vault with ${B}Read + Write${N} (leave Share off), then Create."
+      say "  Save the token in 1Password when it offers, then copy it (starts ops_, shown once; its access can't be changed later)."
+      read -r -s -p "  Paste the token here (hidden) and press Return: " SA_TOKEN; echo
+      if printf '%s' "$SA_TOKEN" | python3 -c "$SECPY
+s.save_token(sys.stdin.read())" 2>/dev/null; then ok "Token saved in your Keychain"; else warn "That didn't look like a service account token (starts ops_)."; fi
+      unset SA_TOKEN
+    fi
+    if [ "$(sec_status)" = connected ]; then
+      ok "1Password connected. Add your keys in ${B}Settings → Accounts → Secrets${N} (names show, values never)."
+    else
+      warn "Not connected yet. Fix it any time in Settings → Accounts → Secrets."
+    fi
+  fi
+fi
+fi
+
+# ── 11. phone ──────────────────────────────────────────────────────────────────────────────────────
 if want phone; then
 step "Your phone" "Optional. Use Tabbie from your phone, at home or anywhere."
 PORT=8788
@@ -442,7 +495,7 @@ else
 fi
 fi
 
-# ── 11. check ─────────────────────────────────────────────────────────────────────────────────────
+# ── 12. check ─────────────────────────────────────────────────────────────────────────────────────
 if want check; then
 step "Check it all works" "One line per part, with the fix command if something's off."
 bin/hub health

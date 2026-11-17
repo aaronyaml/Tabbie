@@ -1,0 +1,28 @@
+/* Tabbie — "New in setup" card (setup-news.js). Same place and shape as the update card. */
+#hxSetupNews {
+  position: fixed; right: 16px; bottom: 16px; z-index: 900; width: 340px; max-width: calc(100vw - 32px);
+  padding: 14px 14px 12px; border-radius: 16px; background: var(--hx-raised, var(--bg)); color: var(--hx-text, var(--text));
+  box-shadow: 0 12px 32px rgba(0,0,0,.18), 0 0 0 0.5px var(--hx-hair, rgba(127,127,127,.25));
+  font: 13px/1.4 var(--font-ui, -apple-system, system-ui, sans-serif);
+  opacity: 0; transform: translateY(8px); transition: opacity .2s var(--hx-ease, ease), transform .2s var(--hx-ease, ease);
+}
+#hxSetupNews.is-in { opacity: 1; transform: none; }
+.hx-sn-head { display: flex; align-items: center; gap: 7px; color: var(--hx-text-2, var(--muted)); font-size: 12px; }
+.hx-sn-head b { font-weight: 600; }
+.hx-sn-ico { display: inline-grid; color: var(--hx-ink, var(--hx-accent, #3054FD)); }
+.hx-sn-tag { margin-left: auto; padding: 2px 8px; border-radius: 999px; font-size: 11px; font-weight: 600;
+  background: var(--hx-fill, rgba(127,127,127,.12)); color: var(--hx-text-2, var(--muted)); }
+.hx-sn-title { margin: 8px 0 0; font-size: 14.5px; font-weight: 600; letter-spacing: -.01em; }
+.hx-sn-blurb { margin: 4px 0 0; color: var(--hx-text-2, var(--muted)); }
+.hx-sn-btns { display: flex; justify-content: flex-end; gap: 8px; margin-top: 12px; }
+.hx-sn-btns button { height: 30px; padding: 0 14px; border: 0; border-radius: 9px; cursor: pointer;
+  background: var(--hx-fill, rgba(127,127,127,.12)); color: var(--hx-text, var(--text)); font: 500 13px/1 var(--font-ui, system-ui); }
+.hx-sn-btns .hx-sn-go { background: var(--hx-accent, #3054FD); color: #fff; }
+.hx-sn-btns button:focus-visible { outline: 2px solid var(--focus-ring, var(--hx-accent, #3054FD)); outline-offset: 2px; }
+html.hx-glass #hxSetupNews { background: linear-gradient(180deg, var(--glass-tint-top), var(--glass-tint-bottom)), var(--glass-menu-surface);
+  border: 1px solid var(--glass-border); box-shadow: var(--glass-menu-shadow), inset 0 1px 0 var(--glass-rim-top); }
+@media (max-width: 640px) {
+  #hxSetupNews { left: 12px; right: 12px; bottom: calc(84px + env(safe-area-inset-bottom)); width: auto; }
+  .hx-sn-btns button { height: 40px; font-size: 15px; }
+}
+@media (prefers-reduced-motion: reduce) { #hxSetupNews { transition: none; } }

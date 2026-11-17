@@ -326,9 +326,15 @@
       el = document.createElement('div');
       el.id = 'hxLiveStatus';
       el.setAttribute('role', 'status');
+      // tap: the reply's details (agents, steps) open under it, like a chat app's "Thinking ›"
+      el.addEventListener('click', () => {
+        if (typeof window.hxAgentsToggleLive !== 'function') return;
+        el.classList.toggle('hx-ls-open', !!window.hxAgentsToggleLive());
+      });
       el.innerHTML = '<span class="hx-ls-buddy" aria-hidden="true"></span><div class="hx-ls-text">'
         + '<div class="hx-ls-line"><span class="hx-ls-word"></span><span class="hx-dots" aria-hidden="true">'
-        + '<i>.</i><i>.</i><i>.</i></span><span class="hx-ls-meta"></span></div><div class="hx-ls-sub"></div></div>';
+        + '<i>.</i><i>.</i><i>.</i></span><span class="hx-ls-meta"></span><span class="hx-ls-caret" aria-hidden="true">'
+        + (typeof window.hxIcon === 'function' ? window.hxIcon('ArrowRight01Icon', 12) : '›') + '</span></div><div class="hx-ls-sub"></div></div>';
     }
     if (inner.lastElementChild !== el) inner.appendChild(el);
     // Flush under a bare "Working" line; breathing room under cards, text or an open group.
@@ -392,6 +398,10 @@
     .hx-ls-line .hx-dots { color: var(--hx-ls-base); }
     .hx-ls-meta { margin-left: 8px; font-size: 13px; font-weight: 500; letter-spacing: 0; color: var(--hx-text-2, var(--muted));
       opacity: .8; font-variant-numeric: tabular-nums; }
+    .msg-row.assistant-turn:has(.hx-agents.is-live) + #hxLiveStatus { cursor: pointer; }
+    .hx-ls-caret { display: none; margin-left: 4px; vertical-align: -1px; color: var(--hx-text-2, var(--muted)); transition: transform .2s ease-out; }
+    .msg-row.assistant-turn:has(.hx-agents.is-live) + #hxLiveStatus .hx-ls-caret { display: inline-flex; }
+    .msg-row.assistant-turn:has(.hx-agents.is-live.is-open) + #hxLiveStatus .hx-ls-caret { transform: rotate(90deg); }
     .hx-ls-sub { font-size: 12.5px; line-height: 1.35; color: var(--hx-text-2, var(--muted)); opacity: .75; margin-top: 2px;
       white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
     .hx-ls-sub:empty { display: none; }

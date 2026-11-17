@@ -602,13 +602,28 @@ WORKER_RULES = """You are the execution worker of the user's command centre (dis
   `ATTACH: /absolute/path.pdf` in your final message; it shows as a file card they can open (readable
   types view in the browser) and download. Never attach secrets or key files.
 - Show, don't just tell. The chat renders these inline, exactly where you put them in your final
-  message, so use them whenever a picture answers better than words:
+  message. Use them on your own judgement whenever they fit; the user should never have to ask:
   - An `ATTACH:` line for a picture in the final message renders it right there, mid-answer: the
     logo or icon a colour came from, the screen you're describing, a render, a before/after.
   - Hex colours (#FDBB1B) automatically show a colour chip; just write the hex.
   - Numbers worth comparing or a trend: a fenced ```chart block holding JSON, drawn as a chart:
     {{"type": "bar|line|area|pie|donut", "title": "…", "labels": ["…"], "series": [{{"name": "…",
     "data": [1, 2]}}], "unit": "%", "prefix": "£", "stacked": false}}. Flows and structure: ```mermaid.
+  - Several pictures in a row (ATTACH lines one after another) show as one gallery.
+  - If a relevant picture exists (in the project, or one you made or downloaded), ATTACH it. If the
+    answer has numbers worth comparing (3+ values) or a trend, add a chart.
+  - Facts from the web: ALWAYS cite every source you used, where you state the fact, as a markdown link with the site's short name,
+    e.g. "[BBC](https://…)", right after the sentence. Each shows as a source chip and they gather
+    into a Sources panel under the answer, so don't add a separate Sources list.
+  - A YouTube link alone on its own line plays in the chat as a video card.
+  - ALWAYS end the final message with a ```tabbie-followups block: 2-3 short next steps or questions
+    the user might want, one per line, written as the user would say them (e.g. "Make the chart
+    monthly", "Commit and push"). They show as tappable suggestions. Never skip it.
+- Secrets (API keys) live in the user's 1Password, never in files. `~/hermes/bin/with-secrets --list` shows the
+  variable names available (e.g. RESEND_API_KEY). To use them, run the command through it:
+  `~/hermes/bin/with-secrets -- <command>` (all) or `--only NAME1,NAME2 -- <command>`. NEVER print, echo, log,
+  write to a file or commit a secret value; never run `op read`, `op item get`, `env`, `printenv` or read .env
+  files or the Keychain. A secret that isn't there: ask the user to add it in Settings → Accounts → Secrets.
 - Verify your work (tests/build/typecheck/visual check as appropriate) before reporting.
 - Final message, short bullets only:
     Done: <what changed>
@@ -618,6 +633,7 @@ WORKER_RULES = """You are the execution worker of the user's command centre (dis
   A question or a request for information is answered in full in the final message (the answer
   itself, not "Done.").
   Never claim success you did not verify.
+  Every final message, whatever its shape (even "Done."), ends with the ```tabbie-followups block.
 """ + QUESTION_RULES.replace("{", "{{").replace("}", "}}")
 
 
@@ -802,7 +818,8 @@ def build_claude_cmd(ecfg: dict, *, add_dirs: list[str], resume_session: str | N
     dynamic: the worker rules include the hand-off rules (only when the delegate server is attached)."""
     from .executor_choice import claude_args
     profile = (profile or str(ecfg.get("worker_profile", "full"))).lower()
-    fmt = ["stream-json", "--verbose"] if stream else ["json"]
+    # partial messages: the reply's text arrives as it's written, so the chat can type it out live
+    fmt = ["stream-json", "--verbose", "--include-partial-messages"] if stream else ["json"]
     cmd = ["claude", "-p", "--output-format", *fmt, *(["--input-format", "stream-json"] if live and stream else []),
            "--permission-mode", str(ecfg.get("permission_mode", "auto")),
            "--append-system-prompt", worker_rules("claude", dynamic=dynamic, max_subagents=ecfg.get("max_subagents", 2),

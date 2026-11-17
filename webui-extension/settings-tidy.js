@@ -48,7 +48,7 @@
     const title = deI18n(pane.querySelector('.settings-section-title'));
     const meta = deI18n(pane.querySelector('.settings-section-meta'));
     if (title) title.textContent = 'Accounts';
-    if (meta) meta.textContent = 'What Tabbie runs on and what it can use. Your subscriptions do the work, so there are no API keys to manage here.';
+    if (meta) meta.textContent = 'What Tabbie runs on and what it can use. Your subscriptions do the work; API keys for other services live in 1Password, under Secrets.';
     provBody = document.createElement('div');
     provBody.id = 'hxAccounts';
     provBody.innerHTML = skeleton();

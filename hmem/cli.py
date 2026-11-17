@@ -91,7 +91,8 @@ def _run(a) -> int:
     if os.environ.get("HERMES_WORKER"):
         # a worker (possibly steered by a repo file or web page) is not the user. It may propose; the user decides.
         if c in _USER_ONLY or (c == "project" and a.action in _USER_ONLY_PROJECT) or (c == "doctor" and a.accept):
-            raise ValueError(f"`hmem {c}` is for the user (WebUI or their own terminal), not a worker; use `hmem propose`")
+            raise ValueError(f"`hmem {c}` is for the user, not a worker; use `hmem propose`. The user can decide in the WebUI, "
+                             f"in their own terminal, or by typing \"approve <id>\" / \"reject <id>\" as a chat message to Tabbie")
         if c == "add" and a.actor == "user":
             a.actor = "agent"
     if c in _NEEDS_TTY and not sys.stdin.isatty() and os.environ.get("HMEM_ALLOW_NO_TTY") != "1":

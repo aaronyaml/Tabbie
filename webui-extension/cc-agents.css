@@ -311,3 +311,22 @@
 @media (prefers-reduced-motion: reduce) { .hx-ad-step[data-live] .hx-ad-tag::before { animation: none; } }
 .hx-as-panel.is-detail { width: min(520px, 100vw); }
 @media (max-width: 640px) { .hx-as-panel.is-detail { width: 100vw; height: 82vh; } }
+
+/* ── reply format (chat-app style) ─────────────────────────────────────────
+   Finished: one quiet line ("Worked for 56s ›"); agents, tokens, steps and files open from it.
+   Live: the status line under the reply is the only indicator; tapping it opens the same details.
+   Pictures the worker showed mid-run stay as thumbnails only when the answer doesn't show them inline. */
+.hx-agents-head .hx-agents-caret { transition: transform .2s ease-out; }
+.hx-agents.is-open .hx-agents-caret { transform: rotate(90deg); }
+.hx-agents-sum { padding: 4px 4px 2px; font-size: 12px; color: var(--hx-text-2, #6B6B70); font-variant-numeric: tabular-nums; }
+.hx-agents:not(.is-open) + .hx-narr > :not(.hx-narr-shots):not(.hx-narr-rej) { display: none !important; }
+.hx-agents:not(.is-open) + .hx-narr:not(:has(.hx-narr-shots, .hx-narr-rej)) { display: none; }
+.msg-row.assistant-turn:has(+ #hxLiveStatus) .hx-agents.is-live:not(.is-open) .hx-agents-head { display: none; }
+.msg-row.assistant-turn:has(+ #hxLiveStatus) .hx-agents.is-live:not(.is-open):not(:has(.hx-agents-confirm)) { display: none; }
+:is(.hx-wturn .assistant-turn-blocks, .assistant-turn-blocks:has(> .hx-agents)) > :is(.agent-activity-group, .tool-call-group) { display: none !important; }
+.assistant-turn-blocks:has(.msg-body img.msg-media-img[src*="api/media"]) .hx-narr-shots { display: none !important; }
+.hx-agents.is-live .hx-agents-head { cursor: pointer; }
+
+/* "Worked for 53s ›" sits right above the reply it produced: no 20 px gap (12 margin + the body's 8 padding) */
+.assistant-turn-blocks > .hx-agents { margin-bottom: 6px; }
+.assistant-turn-blocks > .hx-agents ~ .assistant-segment:not(.assistant-segment-worklog-source) > .msg-body { padding-top: 0; }

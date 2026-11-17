@@ -77,6 +77,15 @@
     refresh(true);
   }
 
+  // The live status line under a reply ("Wrangling… · Running: npm test") opens/closes that reply's details.
+  window.hxAgentsToggleLive = () => {
+    const blocks = document.querySelectorAll('#messages .hx-agents.is-live');
+    const el = blocks[blocks.length - 1];
+    if (!el || !el.dataset.key) return false;
+    expanded.has(el.dataset.key) ? expanded.delete(el.dataset.key) : expanded.add(el.dataset.key);
+    renderBlocks();
+    return expanded.has(el.dataset.key);
+  };
   window.hxAgentsData = () => (data && dataSid === sid() ? data : null); // cc-narration.js reads the same payload
   const allAgents = () => (data ? data.requests.flatMap((r) => (r.agents_list || []).map((a) => Object.assign({ request: r.id, reqStatus: r.status }, a))) : []);
 
@@ -155,6 +164,18 @@
     if (nFiles) parts.push(`${nFiles} file${nFiles === 1 ? '' : 's'} changed`);
     return parts.join(' · ');
   }
+  // The reply's one quiet line, like a chat app's "Thought for 5s": what happened and how long.
+  // Agents, tokens and hand-offs live inside it (summaryText, shown when it's opened).
+  function headText(all, nFiles) {
+    const starts = all.map((a) => a.started).filter(Boolean);
+    const ends = all.map((a) => a.ended).filter(Boolean);
+    const o = outcome(all);
+    const span = o === 'Working' ? Date.now() / 1000 - Math.min(...starts) : (ends.length && starts.length ? Math.max(...ends) - Math.min(...starts) : 0);
+    const d = span ? fmtDur(span) : '';
+    const lead = { Working: d ? `Working · ${d}` : 'Working', Done: d ? `Worked for ${d}` : 'Done', 'Done with errors': d ? `Worked for ${d} · some steps failed` : 'Done with errors',
+      Failed: d ? `Failed after ${d}` : 'Failed', Stopped: d ? `Stopped after ${d}` : 'Stopped', 'Needs you': 'Needs you' }[o] || o;
+    return nFiles ? `${lead} · ${nFiles} file${nFiles === 1 ? '' : 's'} changed` : lead;
+  }
   const OUTCOME_ICON = { Working: 'Loading03Icon', Done: 'CheckmarkCircle02Icon', 'Done with errors': 'InformationCircleIcon', Failed: 'CancelCircleIcon', Stopped: 'StopIcon', 'Needs you': 'HelpCircleIcon' };
   const filesCount = (rids) => rids.map((r) => files.get(r)).filter((f) => f && f.state === 'ok').reduce((t, f) => t + (f.d.total || 0), 0);
 
@@ -201,15 +222,15 @@
       const key = `${list[0].request}:${list[0].id}`;
       el.dataset.key = key;
       const live = list.some((a) => a.status === 'running');
-      const open = live || expanded.has(key);
+      const open = expanded.has(key);
       if (!live) stopUi.delete(key);
       const rids = [...new Set(list.map((a) => a.request))];
       el.dataset.rids = rids.join(',');
       // Files-changed count on the line: open blocks, and the newest few replies (each is one cached lookup).
       if (!live && (open || w.recent)) rids.forEach(loadFiles);
       const html = `<div class="hx-agents-bar"><button type="button" class="hx-agents-head" aria-expanded="${open}">
-          ${icon(OUTCOME_ICON[outcome(list)] || 'UserMultiple02Icon', 14)}<span>${esc(summaryText(list, live ? 0 : filesCount(rids)))}</span>${live ? '' : `<span class="hx-agents-caret">${icon('ArrowDown01Icon', 12)}</span>`}
-        </button>${live && stoppable(list) ? stopHtml(key, list) : ''}</div>${open ? `<div class="hx-agents-list">${list.map((a) => agentRow(a, list)).join('')}</div>${live ? '' : extraHtml(rids)}` : ''}`;
+          ${icon(OUTCOME_ICON[outcome(list)] || 'UserMultiple02Icon', 14)}<span>${esc(headText(list, live ? 0 : filesCount(rids)))}</span><span class="hx-agents-caret">${icon('ArrowRight01Icon', 12)}</span>
+        </button>${live && stoppable(list) ? stopHtml(key, list) : ''}</div>${open ? `<div class="hx-agents-list"><div class="hx-agents-sum">${esc(summaryText(list).split(' · ').slice(1).join(' · '))}</div>${list.map((a) => agentRow(a, list)).join('')}</div>${live ? '' : extraHtml(rids)}` : ''}`;
       el.classList.toggle('is-live', live);
       el.classList.toggle('is-open', open);
       el.dataset.outcome = outcome(list).toLowerCase().replace(/\s+/g, '-');
@@ -339,7 +360,7 @@
     if (f) { if (typeof window.hxOpenFile === 'function') window.hxOpenFile(f.dataset.path, sid()); return; }
     const c = e.target.closest('.hx-agents-resume');
     if (c) { copyText(c.dataset.cmd).then((ok) => toast(ok ? 'Copied' : "Couldn't copy. The command is in the button's tooltip.")); return; }
-    if (!e.target.closest('.hx-agents-head') || el.classList.contains('is-live')) return;
+    if (!e.target.closest('.hx-agents-head')) return;
     expanded.has(key) ? expanded.delete(key) : expanded.add(key);
     renderBlocks();
   }

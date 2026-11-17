@@ -221,3 +221,35 @@ main.main .main-view-header .logs-status { margin: 0; white-space: nowrap; overf
 /* :where() = no specificity, so anything that hides a scrollbar on purpose (tab bars, chip rows) still wins */
 :where(html.hx-win, html.hx-win *) { scrollbar-width: thin; scrollbar-color: rgba(127,127,127,.38) transparent; }
 :where(html.hx-win.dark, html.hx-win.dark *) { scrollbar-color: rgba(255,255,255,.2) transparent; }
+
+/* child chats under a chat (upstream's nested list): drawn exactly like the fork rows above (.hx-fork):
+   36px rows, a 12px branch icon at 24px, the title at 42px, 14px text. The toggle is hidden (always open). */
+html #sessionList .session-child-count { display: none !important; }
+html #sessionList .session-item.hx-has-kids-open { height: auto !important; min-height: 36px; align-items: flex-start;
+  padding-top: 0 !important; padding-bottom: 0 !important; padding-right: 10px !important; }
+html #sessionList .session-item.hx-has-kids-open .session-title-row { min-height: 36px; align-items: center; padding-right: 24px; }
+html #sessionList .session-item.hx-has-kids-open > .session-attention-indicator,
+html #sessionList .session-item.hx-has-kids-open > .session-actions { top: 18px; }
+html #sessionList .session-child-sessions, html #sessionList .session-lineage-segments { margin: 0 -10px 0 -10px; padding: 0; gap: 0; border: 0; }
+html #sessionList .session-child-session-fork { padding: 0; border-radius: 10px; }
+html #sessionList .session-child-session-fork .session-child-session-main, html #sessionList .session-lineage-segment {
+  display: flex; align-items: center; gap: 6px; height: 36px; padding: 0 0 0 24px; border-radius: 10px; background: none;
+  font: 400 14px/1 var(--font-ui, system-ui); color: var(--hx-text, var(--text)); }
+html #sessionList .session-child-session-fork:hover .session-child-session-main,
+html #sessionList .session-child-session-fork.active .session-child-session-main, html #sessionList .session-lineage-segment:hover {
+  background: none; color: var(--hx-text, var(--text)); }
+html #sessionList .session-child-session-fork:hover, html #sessionList .session-child-session-fork.active { background: var(--hover-bg, var(--hx-fill)); }
+.hx-kid-ico { display: inline-grid; place-items: center; width: 12px; flex: none; color: var(--muted); opacity: .35; transition: opacity .15s ease, color .15s ease; }
+.session-child-session-fork:hover .hx-kid-ico { opacity: .85; color: var(--text); }
+.hx-kid-t { flex: 1 1 auto; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+html #sessionList .session-child-session-fork .session-actions { opacity: 1 !important; margin-right: 6px; }
+html #sessionList .session-child-session-fork .session-actions-trigger { opacity: 0; }
+html #sessionList .session-child-session-fork:hover .session-actions-trigger,
+html #sessionList .session-child-session-fork .session-actions-trigger:focus-visible { opacity: 1; }
+@media (hover: none), (max-width: 640px) {
+  html #sessionList .session-child-session-fork .session-child-session-main, html #sessionList .session-lineage-segment { height: 44px; font-size: 16px; }
+  html #sessionList .session-item.hx-has-kids-open .session-title-row { min-height: 44px; }
+  html #sessionList .session-item.hx-has-kids-open > .session-attention-indicator,
+  html #sessionList .session-item.hx-has-kids-open > .session-actions { top: 22px; }
+  html #sessionList .session-child-session-fork .session-actions-trigger { opacity: .7; }
+}

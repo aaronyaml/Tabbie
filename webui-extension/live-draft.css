@@ -1,0 +1,10 @@
+/* Tabbie — the reply typing itself out (live-draft.js) */
+.hx-draft { margin: 0 0 6px; }
+.hx-draft .hx-draft-body { animation: hx-draft-in .18s ease-out both; }
+.hx-draft .hx-draft-body > :first-child { margin-top: 0; }
+.hx-draft .hx-draft-body > :last-child { margin-bottom: 0; }
+.hx-draft-caret { display: inline-block; width: .55em; height: .55em; margin-left: .3em; border-radius: 50%; vertical-align: .05em;
+  background: currentColor; opacity: .75; animation: hx-draft-pulse 1s ease-in-out infinite; }
+@keyframes hx-draft-pulse { 50% { opacity: .2; transform: scale(.8); } }
+@keyframes hx-draft-in { from { opacity: 0; } to { opacity: 1; } }
+@media (prefers-reduced-motion: reduce) { .hx-draft-caret, .hx-draft .hx-draft-body { animation: none; } }

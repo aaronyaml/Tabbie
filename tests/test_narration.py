@@ -247,7 +247,7 @@ def test_pdf_attach_becomes_file_card(tmp_path):
     (proj / "fake.pdf").write_bytes(b"not a pdf at all, just text")
     text = f"Done: report\nATTACH: {pdf}\nATTACH: {proj / 'fake.pdf'}\nATTACH: /a/b.png"
     out = agents.attach_docs(text, [str(proj)], chat)
-    assert f"MEDIA: {chat / 'Q3-report.pdf'}" in out and (chat / "Q3-report.pdf").read_bytes() == pdf.read_bytes()
+    assert f"MEDIA:{chat / 'Q3-report.pdf'}" in out and (chat / "Q3-report.pdf").read_bytes() == pdf.read_bytes()
     assert "(Couldn't attach fake.pdf: not a valid pdf.)" in out
     assert "(Couldn't attach b.png: " in out  # a picture outside the project says why, in place
     assert "ATTACH: /a/b.png" in agents.attach_docs("ATTACH: /a/b.png", [str(proj)], None)  # no chat: Agents block
@@ -267,7 +267,7 @@ def test_picture_attach_renders_inline_where_written(tmp_path):
     png = proj / "icon swatch.png"
     png.write_bytes(b"\x89PNG\r\n\x1a\n" + b"p" * 64)
     out = agents.attach_docs(f"Gaff Yellow is #FDBB1B.\nATTACH: {png}\nUse it as a fill.", [str(proj)], chat)
-    assert out == f"Gaff Yellow is #FDBB1B.\nMEDIA: {chat / 'icon-swatch.png'}\nUse it as a fill."
+    assert out == f"Gaff Yellow is #FDBB1B.\nMEDIA:{chat / 'icon-swatch.png'}\nUse it as a fill."
     assert (chat / "icon-swatch.png").read_bytes() == png.read_bytes()
 
 
@@ -284,11 +284,11 @@ def test_any_file_type_attach_becomes_file_card(tmp_path):
     text = "\n".join(f"ATTACH: {proj / n}" for n in ("notes.md", "data.csv", "build.zip", "deck.pptx", "tiny.txt"))
     out = agents.attach_docs(text, [str(proj)], chat)
     for n in ("notes.md", "data.csv", "build.zip", "deck.pptx", "tiny.txt"):
-        assert f"MEDIA: {chat / n}" in out and (chat / n).read_bytes() == (proj / n).read_bytes()
+        assert f"MEDIA:{chat / n}" in out and (chat / n).read_bytes() == (proj / n).read_bytes()
     # same name, different content: both kept
     (proj / "sub").mkdir(); (proj / "sub" / "notes.md").write_bytes(b"# Other\n")
     out2 = agents.attach_docs(f"ATTACH: {proj / 'sub' / 'notes.md'}", [str(proj)], chat)
-    assert "MEDIA: " in out2 and "notes-" in out2
+    assert "MEDIA:" in out2 and "notes-" in out2
 
 
 def test_secret_files_are_never_attached(tmp_path):

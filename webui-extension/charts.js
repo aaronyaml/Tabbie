@@ -115,10 +115,10 @@
     const pw = W - pad.l - pad.r, ph = H - pad.t - pad.b;
     const y = (v) => pad.t + ph - ((v - lo) / (hi - lo)) * ph;
     // grid
-    const grid = el('g', { class: 'hx-ch-grid' }, svg);
+    const grid = el('g', { class: 'hx-cht-grid' }, svg);
     tk.forEach((t) => {
       el('line', { x1: pad.l, x2: W - pad.r, y1: y(t), y2: y(t), class: t === 0 ? 'is-zero' : '' }, grid);
-      const tx = el('text', { x: pad.l - 8, y: y(t) + 4, 'text-anchor': 'end', class: 'hx-ch-tick' }, grid);
+      const tx = el('text', { x: pad.l - 8, y: y(t) + 4, 'text-anchor': 'end', class: 'hx-cht-tick' }, grid);
       tx.textContent = fmt(spec, t);
     });
     // x labels, thinned to fit
@@ -127,7 +127,7 @@
     const xc = (i) => (spec.type === 'bar' ? pad.l + band * (i + 0.5) : pad.l + (n === 1 ? pw / 2 : (pw * i) / (n - 1)));
     spec.labels.forEach((lab, i) => {
       if (i % every) return;
-      const t = el('text', { x: xc(i), y: H - 6, 'text-anchor': spec.type === 'bar' || (i > 0 && i < n - 1) ? 'middle' : i ? 'end' : 'start', class: 'hx-ch-tick' }, svg);
+      const t = el('text', { x: xc(i), y: H - 6, 'text-anchor': spec.type === 'bar' || (i > 0 && i < n - 1) ? 'middle' : i ? 'end' : 'start', class: 'hx-cht-tick' }, svg);
       t.textContent = lab.length > 12 ? lab.slice(0, 11) + '…' : lab;
     });
     const marks = el('g', {}, svg);
@@ -152,7 +152,7 @@
           const d = pos
             ? `M${x},${top + h}V${top + r}Q${x},${top} ${x + r},${top}H${x + bw - r}Q${x + bw},${top} ${x + bw},${top + r}V${top + h}Z`
             : `M${x},${top}V${top + h - r}Q${x},${top + h} ${x + r},${top + h}H${x + bw - r}Q${x + bw},${top + h} ${x + bw},${top + h - r}V${top}Z`;
-          el('path', { d, fill: colorOf(spec, si), class: 'hx-ch-bar', 'data-i': i }, marks);
+          el('path', { d, fill: colorOf(spec, si), class: 'hx-cht-bar', 'data-i': i }, marks);
         });
         hits.push({ i, x: pad.l + band * i, w: band });
       }
@@ -179,17 +179,17 @@
             el('path', { d: line + below.map((p) => `L${p[0].toFixed(1)},${p[1].toFixed(1)}`).join('') + 'Z', fill: c, 'fill-opacity': spec.stacked ? 0.78 : 0.22 }, marks);
           }
           el('path', { d: line, fill: 'none', stroke: c, 'stroke-width': 2, 'stroke-linejoin': 'round', 'stroke-linecap': 'round' }, marks);
-          if (sg.length === 1 || n <= 12) sg.forEach((p) => el('circle', { cx: p[0], cy: p[1], r: n <= 12 ? 3 : 4, fill: c, class: 'hx-ch-dot' }, marks));
+          if (sg.length === 1 || n <= 12) sg.forEach((p) => el('circle', { cx: p[0], cy: p[1], r: n <= 12 ? 3 : 4, fill: c, class: 'hx-cht-dot' }, marks));
         });
       });
       for (let i = 0; i < n; i++) {
         const w = n === 1 ? pw : pw / (n - 1);
         hits.push({ i, x: xc(i) - w / 2, w });
       }
-      fig._cross = el('line', { y1: pad.t, y2: pad.t + ph, class: 'hx-ch-cross', visibility: 'hidden' }, svg);
+      fig._cross = el('line', { y1: pad.t, y2: pad.t + ph, class: 'hx-cht-cross', visibility: 'hidden' }, svg);
     }
     // hover targets (bigger than the marks)
-    const hg = el('g', { class: 'hx-ch-hits' }, svg);
+    const hg = el('g', { class: 'hx-cht-hits' }, svg);
     hits.forEach((h) => {
       const r = el('rect', { x: Math.max(pad.l, h.x), y: pad.t, width: Math.max(1, Math.min(h.w, W - pad.r - Math.max(pad.l, h.x))), height: ph, fill: 'transparent', 'data-i': h.i }, hg);
       r.addEventListener('pointerenter', () => hover(fig, spec, h.i, xc(h.i), W));
@@ -222,7 +222,7 @@
           d = `M${x1},${y1}A${R},${R} 0 ${big} 1 ${x2},${y2}L${x3},${y3}A${inner},${inner} 0 ${big} 0 ${x4},${y4}Z`;
         } else d = `M${cx},${cy}L${x1},${y1}A${R},${R} 0 ${big} 1 ${x2},${y2}Z`;
       }
-      const p = el('path', { d, fill: colorOf({ ...spec, series: spec.labels.map(() => ({})) }, i), class: 'hx-ch-slice', 'fill-rule': 'evenodd', 'data-i': i }, svg);
+      const p = el('path', { d, fill: colorOf({ ...spec, series: spec.labels.map(() => ({})) }, i), class: 'hx-cht-slice', 'fill-rule': 'evenodd', 'data-i': i }, svg);
       const show = () => hoverPie(fig, spec, i, v / tot);
       p.addEventListener('pointerenter', show);
       p.addEventListener('pointerdown', show);
@@ -233,26 +233,26 @@
   }
 
   function tip(fig, html, x) {
-    const t = fig.querySelector('.hx-ch-tip');
+    const t = fig.querySelector('.hx-cht-tip');
     t.innerHTML = html;
     t.hidden = false;
-    const plot = fig.querySelector('.hx-ch-plot');
+    const plot = fig.querySelector('.hx-cht-plot');
     const w = t.offsetWidth, max = plot.clientWidth;
     t.style.left = `${Math.round(Math.min(Math.max(0, x - w / 2), max - w))}px`;
   }
   function hover(fig, spec, i, x, W) {
     const rows = spec.series.map((s, si) => ({ s, si, v: s.data[i] })).filter((r) => r.v != null);
     if (spec.type === 'line' || spec.type === 'area') { rows.reverse(); if (!spec.stacked) rows.sort((a, b) => b.v - a.v); }
-    tip(fig, `<b>${esc(spec.labels[i])}</b>` + rows.map((r) => `<span class="hx-ch-tr"><i style="background:${colorOf(spec, r.si)}"></i>${spec.series.length > 1 ? `<span>${esc(r.s.name)}</span>` : ''}<em>${esc(full(spec, r.v))}</em></span>`).join(''), x);
+    tip(fig, `<b>${esc(spec.labels[i])}</b>` + rows.map((r) => `<span class="hx-cht-tr"><i style="background:${colorOf(spec, r.si)}"></i>${spec.series.length > 1 ? `<span>${esc(r.s.name)}</span>` : ''}<em>${esc(full(spec, r.v))}</em></span>`).join(''), x);
     if (fig._cross) { fig._cross.setAttribute('x1', x); fig._cross.setAttribute('x2', x); fig._cross.setAttribute('visibility', 'visible'); }
-    fig.querySelectorAll('.hx-ch-bar').forEach((b) => b.classList.toggle('is-dim', +b.dataset.i !== i));
+    fig.querySelectorAll('.hx-cht-bar').forEach((b) => b.classList.toggle('is-dim', +b.dataset.i !== i));
   }
   function hoverPie(fig, spec, i, share) {
-    tip(fig, `<span class="hx-ch-tr"><i style="background:${colorOf({ ...spec, series: spec.labels.map(() => ({})) }, i)}"></i><span>${esc(spec.labels[i])}</span><em>${esc(full(spec, spec.series[0].data[i]))} · ${Math.round(share * 1000) / 10}%</em></span>`, 100);
-    fig.querySelectorAll('.hx-ch-slice').forEach((p) => p.classList.toggle('is-dim', +p.dataset.i !== i));
+    tip(fig, `<span class="hx-cht-tr"><i style="background:${colorOf({ ...spec, series: spec.labels.map(() => ({})) }, i)}"></i><span>${esc(spec.labels[i])}</span><em>${esc(full(spec, spec.series[0].data[i]))} · ${Math.round(share * 1000) / 10}%</em></span>`, 100);
+    fig.querySelectorAll('.hx-cht-slice').forEach((p) => p.classList.toggle('is-dim', +p.dataset.i !== i));
   }
   function unhover(fig) {
-    const t = fig.querySelector('.hx-ch-tip');
+    const t = fig.querySelector('.hx-cht-tip');
     if (t) t.hidden = true;
     if (fig._cross) fig._cross.setAttribute('visibility', 'hidden');
     fig.querySelectorAll('.is-dim').forEach((b) => b.classList.remove('is-dim'));
@@ -264,27 +264,27 @@
     const items = pie
       ? spec.labels.map((l, i) => [l, colorOf({ ...spec, series: spec.labels.map(() => ({})) }, i), full(spec, spec.series[0].data[i])])
       : spec.series.map((s, i) => [s.name, colorOf(spec, i), '']);
-    return `<div class="hx-ch-legend${pie ? ' is-pie' : ''}">${items.map(([l, c, v]) => `<span><i style="background:${c}"></i>${esc(l)}${v ? `<em>${esc(v)}</em>` : ''}</span>`).join('')}</div>`;
+    return `<div class="hx-cht-legend${pie ? ' is-pie' : ''}">${items.map(([l, c, v]) => `<span><i style="background:${c}"></i>${esc(l)}${v ? `<em>${esc(v)}</em>` : ''}</span>`).join('')}</div>`;
   }
 
   function table(spec) {
     const pie = spec.type === 'pie' || spec.type === 'donut';
     const cols = pie ? [spec.series[0].name || 'Value'] : spec.series.map((s) => s.name);
-    return `<div class="hx-ch-table"><table><thead><tr><th></th>${cols.map((c) => `<th>${esc(c)}</th>`).join('')}</tr></thead><tbody>${
+    return `<div class="hx-cht-table"><table><thead><tr><th></th>${cols.map((c) => `<th>${esc(c)}</th>`).join('')}</tr></thead><tbody>${
       spec.labels.map((l, i) => `<tr><th>${esc(l)}</th>${(pie ? [spec.series[0]] : spec.series).map((s) => `<td>${esc(full(spec, s.data[i]))}</td>`).join('')}</tr>`).join('')
     }</tbody></table></div>`;
   }
 
   function render(fig) {
     const spec = fig._spec;
-    const plot = fig.querySelector('.hx-ch-plot');
+    const plot = fig.querySelector('.hx-cht-plot');
     const W = Math.max(220, Math.floor(plot.clientWidth || fig.clientWidth || 480));
     if (fig._w === W && fig._dark === isDark() && plot.querySelector('svg')) return;
     fig._w = W; fig._dark = isDark(); fig._cross = null;
     plot.querySelector('svg')?.remove();
     const pie = spec.type === 'pie' || spec.type === 'donut';
     plot.insertBefore(pie ? drawPie(fig, spec, W) : drawXY(fig, spec, W), plot.firstChild);
-    const lg = fig.querySelector('.hx-ch-legend');
+    const lg = fig.querySelector('.hx-cht-legend');
     if (lg) lg.outerHTML = legend(spec);
   }
 
@@ -294,27 +294,32 @@
     const pre = code.parentElement;
     if (pre.dataset.hxChart) return;
     const spec = parse(code.textContent);
-    if (!spec) return; // not valid (yet): a streaming block finishes later and is looked at again
+    if (!spec) { // not valid (yet): a streaming block finishes later and is looked at again
+      const row = pre.closest('.msg-row');
+      const live = row && (row.querySelector('[data-live-assistant="1"]') || (row.nextElementSibling && row.nextElementSibling.id === 'hxLiveStatus'));
+      if (!live) pre.classList.add('hx-chart-bad'); // finished but unreadable: show it as plain code
+      return;
+    }
     pre.dataset.hxChart = '1';
     const head = pre.previousElementSibling && pre.previousElementSibling.classList.contains('pre-header') ? pre.previousElementSibling : null;
     const fig = document.createElement('figure');
     fig.className = 'hx-chart';
     fig._spec = spec;
-    fig.innerHTML = `<figcaption>${spec.title ? `<span class="hx-ch-title">${esc(spec.title)}</span>` : '<span></span>'}
-        <button type="button" class="hx-ch-toggle" aria-pressed="false">Table</button></figcaption>
-      <div class="hx-ch-plot"><div class="hx-ch-tip" hidden></div></div>${legend(spec) || ''}
-      ${spec.note ? `<p class="hx-ch-note">${esc(spec.note)}</p>` : ''}${table(spec)}`;
+    fig.innerHTML = `<figcaption>${spec.title ? `<span class="hx-cht-title">${esc(spec.title)}</span>` : '<span></span>'}
+        <button type="button" class="hx-cht-toggle" aria-pressed="false">Table</button></figcaption>
+      <div class="hx-cht-plot"><div class="hx-cht-tip" hidden></div></div>${legend(spec) || ''}
+      ${spec.note ? `<p class="hx-cht-note">${esc(spec.note)}</p>` : ''}${table(spec)}`;
     (head || pre).parentNode.insertBefore(fig, head || pre);
     pre.classList.add('hx-chart-src');
     if (head) head.classList.add('hx-chart-src');
     const wrap = pre.parentElement && pre.parentElement.classList.contains('pre-wrap') ? pre.parentElement : null;
     if (wrap) wrap.classList.add('hx-chart-src');
     render(fig);
-    if (ro) ro.observe(fig.querySelector('.hx-ch-plot'));
+    if (ro) ro.observe(fig.querySelector('.hx-cht-plot'));
   }
 
   document.addEventListener('click', (e) => {
-    const b = e.target.closest('.hx-ch-toggle');
+    const b = e.target.closest('.hx-cht-toggle');
     if (!b) return;
     const fig = b.closest('.hx-chart');
     const on = !fig.classList.contains('is-table');
@@ -330,7 +335,7 @@
     document.querySelectorAll(SEL).forEach(build);
     document.querySelectorAll('.hx-chart').forEach((f) => { if (f._dark !== isDark()) { f._w = 0; render(f); } });
   }
-  const schedule = () => { if (!timer) timer = setTimeout(sweep, 250); };
+  const schedule = () => { if (!timer) timer = setTimeout(sweep, 30); };
   new MutationObserver((list) => {
     for (const m of list) {
       const t = m.target.nodeType === 1 ? m.target : m.target.parentElement;

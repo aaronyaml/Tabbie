@@ -40,6 +40,12 @@ os.environ["PATH"] = os.pathsep.join([str(HOME / ".hermes/bin"), str(HOME / ".lo
 sys.path.insert(0, str(ROOT))
 from hmem import agents as agent_set  # noqa: E402
 from hmem import motion as motion_studio  # noqa: E402
+from hmem import setup_news  # noqa: E402  (steps added since install: the WebUI offers them unless seen here)
+import types as _types  # noqa: E402
+_pkg = _types.ModuleType("cc_sidecar_pkg"); _pkg.__path__ = [str(ROOT / "plugin" / "command-centre")]
+sys.modules.setdefault("cc_sidecar_pkg", _pkg)
+import importlib as _il  # noqa: E402
+vault = _il.import_module("cc_sidecar_pkg.secrets")  # Tabbie's 1Password secrets (names only; never a value)
 
 # Tools install with bin/install-tool: official sources, the right build for Apple silicon or Intel,
 # into ~/.local/bin. No Homebrew and no Mac password. Only Apple's developer tools (git, python3)
@@ -126,7 +132,32 @@ def state() -> dict:
                       "url": ts_url},
         "open_url": "https://hermes.local",
         "motion": _motion(),
+        "onepassword": _onepassword(),
     }
+
+
+_OP_CACHE: dict = {}
+
+
+def _onepassword() -> dict:
+    """The 1Password step (optional): CLI installed, desktop app linked (CLI integration), vault, service
+    account token in the Keychain and working. Booleans only. Cached 20 s (each check asks 1Password)."""
+    hit = _OP_CACHE.get("v")
+    if hit and time.time() - hit[0] < 20:
+        return hit[1]
+    op = have("op")
+    out = {"op": op, "linked": False, "vault": vault.VAULT, "token": bool(vault._token()), "connected": False}
+    if op:
+        rc, txt = sh(["op", "account", "list"], timeout=10)
+        out["linked"] = rc == 0 and bool(txt.strip())
+        if out["token"]:
+            try:
+                vault.items()
+                out["connected"] = True
+            except vault.SecretError:
+                pass
+    _OP_CACHE["v"] = (time.time(), out)
+    return out
 
 
 def _motion() -> dict:
@@ -266,6 +297,34 @@ def do(body: dict) -> dict:
         if not ts:
             return {"ok": False, "error": "Tailscale isn't installed yet."}
         return {"ok": True, "job": job(ts + ["serve", "--bg", "8788"], "Sharing on Tailscale")}
+    if a == "seen":  # a step was shown here (done or skipped): the WebUI won't offer it again after an update
+        setup_news.mark([str(i) for i in (body.get("ids") or [])][:20])
+        return {"ok": True}
+    if a == "op_signup":
+        sh(["open", "https://1password.com/sign-up"])
+        return {"ok": True}
+    if a == "op_download":
+        sh(["open", "https://1password.com/downloads/mac"])
+        return {"ok": True}
+    if a == "op_cli":
+        sh(["open", "https://developer.1password.com/docs/cli/get-started/"])
+        return {"ok": True}
+    if a == "op_vault":  # signs in with Touch ID (1Password asks), then makes the vault if it's missing
+        _OP_CACHE.clear()
+        script = (f'op vault list >/dev/null && echo "Signed in to 1Password" && '
+                  f'(op vault get {shlex.quote(vault.VAULT)} >/dev/null 2>&1 && echo "Vault {vault.VAULT} is there" || '
+                  f'(op vault create {shlex.quote(vault.VAULT)} --description "Secrets Tabbie can use" >/dev/null && echo "Made the vault {vault.VAULT}"))')
+        return {"ok": True, "job": job(["/bin/sh", "-c", script], "1Password")}
+    if a == "op_web":
+        sh(["open", "https://my.1password.com/"])
+        return {"ok": True}
+    if a == "op_token":  # straight into the Keychain; never logged or echoed back
+        _OP_CACHE.clear()
+        try:
+            vault.save_token(str(body.get("token") or ""))
+        except vault.SecretError as exc:
+            return {"ok": False, "error": str(exc)}
+        return {"ok": True}
     if a == "check":
         return {"ok": True, "job": job(["bin/hub", "health"], "Health check")}
     if a == "open":
