@@ -304,10 +304,10 @@
       "id": "updates",
       "name": "Tabbie updates (asks before downloading)",
       "scripts": [
-        "updates.js?v=9"
+        "updates.js?v=11"
       ],
       "stylesheets": [
-        "updates.css?v=5"
+        "updates.css?v=6"
       ]
     },
     {

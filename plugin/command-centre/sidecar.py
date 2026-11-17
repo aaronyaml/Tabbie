@@ -885,6 +885,35 @@ def update_payload(force: bool = False) -> dict:
     return {**updates.check(force), "pending_restart": updates.pending_restart(), "restart_waiting": updates.waiting()}
 
 
+# Downloading an update (ls-remote + fetch + services) can take longer than the WebUI proxy's 10 s, which then
+# answers "Failed to reach extension sidecar" while the download carries on. So POST /update (starts the download; GET /update/result polls it) starts it in the
+# background and answers at once; the card polls GET /update/result until it's done.
+_UPD = {"running": False, "result": None, "at": 0.0}
+_UPD_LOCK = threading.Lock()
+
+
+def update_start() -> tuple[int, dict]:
+    with _UPD_LOCK:
+        if _UPD["running"]:
+            return 202, {"running": True}
+        _UPD.update(running=True, result=None, at=time.time())
+
+    def run():
+        try:
+            res = updates.apply()
+        except Exception as exc:  # noqa: BLE001
+            res = {"ok": False, "error": f"Update failed ({str(exc)[:160]})"}
+        with _UPD_LOCK:
+            _UPD.update(running=False, result=res)
+    threading.Thread(target=run, daemon=True, name="update-apply").start()
+    return 202, {"running": True}
+
+
+def update_result() -> dict:
+    with _UPD_LOCK:
+        return {"running": _UPD["running"], "result": _UPD["result"]}
+
+
 def _exit_soon() -> None:
     """Restart the sidecar after this reply is sent; launchd (KeepAlive) starts the new code."""
     threading.Thread(target=lambda: (__import__("time").sleep(1.0), os._exit(0)), daemon=True).start()
@@ -987,6 +1016,8 @@ class Handler(BaseHTTPRequestHandler):
                 return self._send_bytes(*got) if got else self._send(404, {"error": "not found"})
             if u.path == "/update":
                 return self._send(200, update_payload(q.get("force") == "1"))
+            if u.path == "/update/result":
+                return self._send(200, update_result())
             if u.path == "/title":
                 return self._send(200, title_for(q.get("text", "")))
             if u.path == "/inbox":
@@ -1099,8 +1130,7 @@ class Handler(BaseHTTPRequestHandler):
             if u.path.startswith("/secrets/") and isinstance(body, dict):
                 return self._send(*secrets_post(u.path, body))
             if u.path == "/update":
-                res = updates.apply()
-                return self._send(200 if res["ok"] else 409, res)
+                return self._send(*update_start())
             if u.path == "/hub" and isinstance(body, dict):
                 try:
                     return self._send(200, hub_setup.use(str(body.get("provider") or ""), str(body.get("model") or "") or None))

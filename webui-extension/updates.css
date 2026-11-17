@@ -42,3 +42,22 @@
 [data-panel="settings"] { position: relative; }
 .hx-up-dot { position: absolute; top: 6px; right: 6px; width: 7px; height: 7px; border-radius: 50%;
   background: var(--hx-accent, #3054FD); box-shadow: 0 0 0 2px var(--hx-rail-bg, var(--bg, #111)); pointer-events: none; }
+
+/* restart / download progress */
+.hx-up-bar { position: relative; height: 4px; margin: 12px 0 2px; border-radius: 99px; overflow: hidden; background: var(--hx-fill, rgba(127,127,127,.15)); }
+.hx-up-bar i { position: absolute; inset: 0 auto 0 0; border-radius: inherit; background: var(--hx-accent, #3054FD); transition: width .6s var(--hx-ease, ease); }
+.hx-up-bar i::after { content: ''; position: absolute; inset: 0; background: linear-gradient(90deg, transparent, rgba(255,255,255,.45), transparent);
+  animation: hx-up-shine 1.3s linear infinite; }
+.hx-up-bar.is-wait i { width: 35%; animation: hx-up-slide 1.2s cubic-bezier(.45,0,.55,1) infinite; }
+@keyframes hx-up-shine { from { transform: translateX(-100%); } to { transform: translateX(100%); } }
+@keyframes hx-up-slide { from { transform: translateX(-100%); } to { transform: translateX(290%); } }
+.hx-up-steps { list-style: none; margin: 10px 0 0; padding: 0; display: grid; gap: 5px; font-size: 12.5px; color: var(--hx-text-2, var(--muted)); }
+.hx-up-steps li { display: flex; align-items: center; gap: 8px; }
+.hx-up-steps li::before { content: ''; flex: none; width: 14px; height: 14px; border-radius: 50%; box-sizing: border-box;
+  border: 1.5px solid color-mix(in oklab, currentColor 45%, transparent); }
+.hx-up-steps li.is-now { color: var(--hx-text, var(--text)); }
+.hx-up-steps li.is-now::before { border-color: var(--hx-accent, #3054FD); border-right-color: transparent; animation: hx-up-spin .8s linear infinite; }
+.hx-up-steps li.is-done::before { border: 0; background: var(--hx-green, #1e7d3a)
+  url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 14 14'%3E%3Cpath d='M4 7.2l2 2 4-4.4' fill='none' stroke='white' stroke-width='1.6' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E") center/14px no-repeat; }
+@keyframes hx-up-spin { to { transform: rotate(360deg); } }
+@media (prefers-reduced-motion: reduce) { .hx-up-bar i::after, .hx-up-bar.is-wait i, .hx-up-steps li.is-now::before { animation: none; } }

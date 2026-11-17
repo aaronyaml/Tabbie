@@ -1,7 +1,8 @@
 /* Tabbie — update card. Asks before downloading a new version from GitHub, then finishes it.
  * Data: cc-agents sidecar via the WebUI's authenticated proxy:
  *   GET  …/sidecar/update          -> {available, ahead_by, commits, remote, pending_restart}
- *   POST …/sidecar/update          -> download it (fast-forward; local edits are never overwritten)
+ *   POST …/sidecar/update          -> start the download (fast-forward; local edits are never overwritten)
+ *   GET  …/sidecar/update/result   -> {running, result} until it's done (a big download outlasts the proxy's 10 s)
  *   POST …/sidecar/update/restart  -> restart what it touched now, or once nothing is running ({waiting: true})
  * A background check never pops a card: it puts a dot on Settings, and Settings → System shows
  * "See update" (the card). "Later" there snoozes it for a day; "Later" on a downloaded update
@@ -124,6 +125,50 @@
     show(`<div class="hx-up-head"><b>Couldn't update</b></div><p class="hx-up-note hx-up-err">${esc(msg)}</p>`
       + `<div class="hx-up-btns"><button type="button" data-close>Close</button>${retry ? `<button type="button" class="hx-up-go" data-${retry}>Try again</button>` : ''}</div>`);
   }
+  // ---- restarting: a progress card, then a reload once the WebUI and the sidecar are both back ----
+  const STEPS = ['Stopping Tabbie’s services', 'Starting them again', 'Reloading the page'];
+  function progress(step, note) {
+    if (!card) show('');
+    card.innerHTML = `<div class="hx-up-head"><b>Restarting Tabbie</b><span>${Math.min(step + 1, 3)} of 3</span></div>`
+      + `<div class="hx-up-bar" role="progressbar" aria-label="Restarting" aria-valuemin="0" aria-valuemax="3" aria-valuenow="${step}"><i style="width:${[22, 62, 100][step]}%"></i></div>`
+      + `<ol class="hx-up-steps">${STEPS.map((x, i) => `<li class="${i < step ? 'is-done' : i === step ? 'is-now' : ''}">${esc(x)}</li>`).join('')}</ol>`
+      + `<p class="hx-up-note">${esc(note || 'Keep this tab open. It reloads by itself when Tabbie is back.')}</p>`;
+  }
+  const up = async (url) => { try { const r = await fetch(url, { credentials: 'same-origin', cache: 'no-store' }); return r.ok; } catch (_) { return false; } };
+  const nap = (ms) => new Promise((ok) => setTimeout(ok, ms));
+  async function restartNow() {
+    progress(0);
+    try {
+      const r = await call('/restart', 'POST');
+      if (r && r.waiting) { waitingCard(); return; }
+    } catch (err) {
+      // the sidecar restarting itself can cut the answer off: that means it's restarting, not that it failed
+      if (!/reach|fetch|network|502|503|504/i.test(String(err && err.message))) { error(err.message || 'Try again later.', 'restart'); return; }
+    }
+    const t0 = Date.now();
+    let down = false;
+    // 1) wait to see them go down (or 15 s: a restart that only touched the gateway never takes the page down)
+    while (Date.now() - t0 < 15000) {
+      await nap(1000);
+      const ok = (await up('api/extensions/status')) && (await up(API));
+      if (!ok) { down = true; break; }
+    }
+    progress(1);
+    // 2) both answer again, twice in a row (launchd may start the sidecar, then reload its service)
+    let streak = 0;
+    while (Date.now() - t0 < 120000) {
+      await nap(down ? 1500 : 500);
+      const ok = (await up('api/extensions/status')) && (await up(API));
+      streak = ok ? streak + 1 : 0;
+      if (streak >= 2) break;
+    }
+    if (streak < 2) { progress(1, 'This is taking longer than usual. It reloads by itself when Tabbie is back, or reload the page.'); }
+    while (streak < 2) { await nap(3000); const ok = (await up('api/extensions/status')) && (await up(API)); streak = ok ? streak + 1 : 0; }
+    progress(2);
+    await nap(400);
+    location.reload();
+  }
+
   const busy = (label) => { const b = card && card.querySelector('.hx-up-go'); if (b) { b.disabled = true; b.textContent = label; } };
 
   async function onClick(e) {
@@ -135,22 +180,22 @@
     if (t.hasAttribute('data-reload')) { location.reload(); return; }
     if (t.hasAttribute('data-update')) {
       busy('Downloading…');
-      try { finished(await call('', 'POST')); } catch (err) { error(err.message || 'Try again later.', 'update'); }
+      if (card && !card.querySelector('.hx-up-bar')) card.querySelector('.hx-up-btns').insertAdjacentHTML('beforebegin', '<div class="hx-up-bar is-wait" role="progressbar" aria-label="Downloading"><i></i></div>');
+      try {
+        let r = await call('', 'POST');
+        // newer sidecars download in the background and answer at once; older ones answer when done
+        for (let i = 0; r && r.running && i < 200; i++) {
+          await new Promise((ok) => setTimeout(ok, 1500));
+          const s = await call('/result').catch(() => ({ running: true }));
+          r = s.running ? s : s.result;
+        }
+        if (!r || r.running) throw new Error('Still downloading. Check again in a minute.');
+        if (r.ok === false) throw new Error(r.error || 'Update failed.');
+        finished(r);
+      } catch (err) { error(err.message || 'Try again later.', 'update'); }
       return;
     }
-    if (t.hasAttribute('data-restart')) {
-      busy('Restarting…');
-      try {
-        const r = await call('/restart', 'POST');
-        if (r && r.waiting) { waitingCard(); return; }
-        // gateway, WebUI and sidecar come back in a few seconds: reload once the WebUI answers again
-        const back = async (n) => {
-          try { const x = await fetch('api/extensions/status', { credentials: 'same-origin', cache: 'no-store' }); if (x.ok || n > 20) return location.reload(); } catch (_) {}
-          setTimeout(() => back(n + 1), 2000);
-        };
-        setTimeout(() => back(0), 6000);
-      } catch (err) { error(err.message || 'Try again later.', 'restart'); }
-    }
+    if (t.hasAttribute('data-restart')) { restartNow(); }
   }
 
   let last = 0;
