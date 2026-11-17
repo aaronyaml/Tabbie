@@ -26,7 +26,7 @@ from pathlib import Path
 from .common import ROOT, STATE_DIR
 
 DEFAULTS = {"repo": "aaronyaml/Tabbie", "branch": "main", "check": True}
-CACHE_TTL = 600
+CACHE_TTL = 240  # the page checks every 5 min; a new version shows within ~5
 STATE = STATE_DIR / "updates.json"
 _SHA = re.compile(r"^[0-9a-f]{40}$")
 _REPO = re.compile(r"^[A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+$")

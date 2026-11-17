@@ -4,8 +4,9 @@
  *   POST …/sidecar/update          -> start the download (fast-forward; local edits are never overwritten)
  *   GET  …/sidecar/update/result   -> {running, result} until it's done (a big download outlasts the proxy's 10 s)
  *   POST …/sidecar/update/restart  -> restart what it touched now, or once nothing is running ({waiting: true})
- * A background check never pops a card: it puts a dot on Settings, and Settings → System shows
- * "See update" (the card). "Later" there snoozes it for a day; "Later" on a downloaded update
+ * A background check (on load, every 5 min, and on coming back to the tab) shows the card by itself as soon
+ * as a new version is out, plus a dot on Settings and "See update" in Settings → System. "Later" snoozes that
+ * version for a day (a newer version shows again straight away); "Later" on a downloaded update
  * that still needs a restart snoozes it for 4 h. A scheduled restart is watched (30 s poll) until it has
  * happened, then a "Tabbie restarted · Reload" card appears. Settings → System has a
  * "Tabbie" row with the version and a Check for updates button, any time.
@@ -17,8 +18,8 @@
 
   const API = 'api/extensions/cc-agents/sidecar/update';
   const KEY = 'hx-update-dismissed';
-  const EVERY = 30 * 60 * 1000;
-  const SOON = 10 * 60 * 1000;
+  const EVERY = 5 * 60 * 1000;
+  const SOON = 2 * 60 * 1000;
   const SNOOZE = 24 * 3600 * 1000;
   const RKEY = 'hx-update-restart-later';   // {sig, until}: "Later" on the restart card
   const WKEY = 'hx-update-restart-watch';   // set while a scheduled restart is pending (survives a reload)
@@ -225,9 +226,9 @@
       }
       return;
     }
-    if (force) { offer(j); return; }
-    // Passive check: no card over the composer. A dot on Settings, and Settings → System offers it.
+    // A dot on Settings and Settings → System offer it; the card shows by itself unless "Later" snoozed this version.
     badge(j);
+    if (force || !snoozed(j.remote)) offer(j);
   }
 
   // Update available (found by the background check): a small dot on the Settings icons + the

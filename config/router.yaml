@@ -92,7 +92,7 @@ memory:
   auto_approve: true              # the Dreamer applies its own proposals (never skills, external or flagged ones)
   auto_approve_types: create,modify,deprecate,merge
 
-# Updates: Tabbie checks this GitHub repo for a newer version (read-only, hourly) and asks before
+# Updates: Tabbie checks this GitHub repo for a newer version (read-only, every 5 minutes) and asks before
 # downloading it (WebUI card or `bin/hub update`). check: false turns the check off.
 updates:
   repo: aaronyaml/Tabbie

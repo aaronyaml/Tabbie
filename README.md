@@ -634,12 +634,14 @@ ready for you to add a line and send. Nothing is sent by itself. It opens in Saf
 ### Updates
 
 Tabbie checks GitHub ([aaronyaml/Tabbie](https://github.com/aaronyaml/Tabbie)) for a newer version
-when you open the WebUI, when you come back to its tab, and every 30 minutes while it's open.
+when you open the WebUI, when you come back to its tab, and every 5 minutes while it's open, so a new
+version shows within about 5 minutes without a reload.
 Checking is read-only: nothing is downloaded until you say so. Installs from before the update
 checker existed need one manual update first: `cd ~/hermes && git pull`, then `bin/setup`.
 
 - **In the WebUI**, a card appears bottom-right: *Tabbie update available*, with the list of changes.
-  **Update** downloads it. **Later** hides it until something newer comes out.
+  It pops up by itself (no reload needed). **Update** downloads it. **Later** hides that version for a day;
+  a newer one shows straight away. Settings → System → **Check for updates** works any time.
 - **In the Terminal**, run `bin/hub update`. It shows the changes and asks before downloading.
 
 After downloading:
