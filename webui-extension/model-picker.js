@@ -155,7 +155,7 @@
     if (!handoffs.available) return;
     const next = !handoffs.dynamic;
     handoffs = Object.assign({}, handoffs, { dynamic: next });
-    paint();
+    paintFour();
     try {
       const j = await post(AGENTS_API, { dynamic: next });
       if (j && typeof j.dynamic === 'boolean') handoffs = fromApi(j);
@@ -172,7 +172,7 @@
   async function toggleFlag(key) {
     const next = handoffs[key] === false;
     handoffs = Object.assign({}, handoffs, { [key]: next });
-    paint();
+    paintFour();
     try {
       const j = await post(AGENTS_API, { [key]: next });
       if (j && typeof j[key] === 'boolean') handoffs = Object.assign({}, handoffs, { [key]: j[key] });
@@ -227,12 +227,14 @@
     const on = (catalog.agents || AGENTS.map((x) => x[0])).slice();
     const next = on.includes(a) ? on.filter((x) => x !== a) : on.concat(a);
     if (!next.length) { notice = 'Keep at least one agent on.'; paint(); return; }
+    catalog = Object.assign({}, catalog, { agents: next });  // flip now, like every other switch
+    paintFour();
     try {
       await post(AGENTS_API, { enabled: next });
-      catalog = Object.assign({}, catalog, { agents: next });
       notice = '';
       await load(sid());
     } catch (e) {
+      catalog = Object.assign({}, catalog, { agents: on });
       notice = statusOf(e) === 403 ? 'Allow “Agents & questions” in Settings › Extensions to change agents.' : 'Couldn’t save. Try again.';
       paint();
     }
@@ -517,7 +519,7 @@
     a.innerHTML = paneOne();
     b.innerHTML = paneTwo();
     c.innerHTML = step === 3 ? paneThree() : '';
-    d.innerHTML = paneFour();
+    morph(d, paneFour());
     c.querySelectorAll('input').forEach((i) => {
       const k = (i.dataset.key || '') + '|' + (i.dataset.c || '');
       if (kept[k]) i.value = kept[k];
@@ -533,6 +535,38 @@
     });
     a.inert = step !== 1; b.inert = step !== 2; c.inert = step !== 3; d.inert = step !== 4;
     track.style.transform = step > 1 ? `translateX(-${(step - 1) * 25}%)` : '';
+  }
+  // Agents & behaviour: update the switches in place (aria-checked / is-on / disabled) instead of redrawing
+  // them, so a click plays the same thumb animation as Settings › Liquid glass. Anything else that changed
+  // (a notice, a new row) is swapped node by node; a different layout is drawn fresh.
+  const STATE_ATTRS = ['class', 'aria-checked', 'aria-disabled', 'disabled'];
+  const sigOfTog = (b) => [...b.attributes].filter((a) => !STATE_ATTRS.includes(a.name)).map((a) => a.name + '=' + a.value).join(' ')
+    + '|' + (b.querySelector('.hx-mp-tog-name') || {}).textContent;
+  function morph(pane, html) {
+    const tpl = document.createElement('template');
+    tpl.innerHTML = html;
+    const next = [...tpl.content.children], cur = [...pane.children];
+    if (next.length !== cur.length || next.some((n, i) => n.tagName !== cur[i].tagName || n.className !== cur[i].className)) {
+      pane.innerHTML = html; return;
+    }
+    next.forEach((n, i) => {
+      const o = cur[i];
+      if (!n.classList.contains('hx-mp-togs')) { if (n.outerHTML !== o.outerHTML) o.replaceWith(n); return; }
+      const nt = [...n.querySelectorAll('.hx-mp-tog')], ot = [...o.querySelectorAll('.hx-mp-tog')];
+      if (nt.length !== ot.length || nt.some((b, j) => sigOfTog(b) !== sigOfTog(ot[j]))) { o.replaceWith(n); return; }
+      nt.forEach((b, j) => {
+        const e = ot[j];
+        STATE_ATTRS.forEach((a) => { const v = b.getAttribute(a); if (v === null) e.removeAttribute(a); else if (e.getAttribute(a) !== v) e.setAttribute(a, v); });
+        const ns = b.querySelector('.hx-mp-tog-sub'), es = e.querySelector('.hx-mp-tog-sub');
+        if (ns && es && ns.textContent !== es.textContent) es.textContent = ns.textContent;
+      });
+    });
+  }
+  // A switch click: only the Agents & behaviour pane, in place, so the thumb starts moving on the next frame
+  // (a full paint() rebuilds every pane first). The full paint after the save is a no-op for the switches.
+  function paintFour() {
+    const d = track && track.querySelectorAll('.hx-mp-pane')[3];
+    if (d) morph(d, paneFour()); else paint();
   }
   const activePane = () => (track ? track.querySelectorAll('.hx-mp-pane')[step - 1] : null);
   // Every pane is capped at the room on screen and scrolls inside itself; the frame takes the active

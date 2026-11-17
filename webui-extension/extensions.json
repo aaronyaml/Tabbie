@@ -334,7 +334,7 @@
       "id": "model-picker",
       "name": "Model picker",
       "scripts": [
-        "model-picker.js?v=28"
+        "model-picker.js?v=30"
       ],
       "stylesheets": [
         "model-picker.css?v=15"
