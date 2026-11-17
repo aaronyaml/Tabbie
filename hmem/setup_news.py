@@ -18,12 +18,13 @@ ROOT = Path(__file__).resolve().parents[1]
 SEEN = ROOT / "state" / "setup-seen.json"
 
 # Newest last. `open` is where the WebUI's "Set up" goes: a Settings section (settings:<id>) or a Terminal
-# command shown to the user. `done` names a check in the caller (sidecar) that says it's already set up.
+# command shown to the user. `later` is what "Not now" says: where to find the step again. `done` names a check in the caller (sidecar) that says it's already set up.
 STEPS = [
     {"id": "secrets", "title": "Secrets (1Password)", "added": "2026-11-17", "optional": True,
      "blurb": "Keep API keys (Resend, Supabase, Stripe…) in 1Password, so Claude Code and Codex can use them "
               "while they work without anyone seeing them. Needs a 1Password account.",
-     "open": "settings:secrets", "terminal": "bin/setup --only secrets"},
+     "open": "settings:secrets", "terminal": "bin/setup --only secrets",
+     "later": "No problem. Set up 1Password any time in Settings → Accounts → Secrets."},
 ]
 IDS = [s["id"] for s in STEPS]
 

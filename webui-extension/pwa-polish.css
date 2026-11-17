@@ -63,3 +63,9 @@
     white-space: nowrap; overflow: hidden; text-overflow: ellipsis; pointer-events: none;
     background: var(--hx-fill, rgba(127,127,127,.16)); color: var(--hx-text-2, #8E8E93); }
 }
+
+/* Toasts sit at top: 24px, which on an iPhone puts them under the notch / Dynamic Island. Phones: centred,
+   just below the safe area. */
+@media (max-width: 640px) {
+  .toast { top: calc(env(safe-area-inset-top, 0px) + 10px); left: 16px; right: 16px; max-width: none; }
+}

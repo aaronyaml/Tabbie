@@ -38,6 +38,14 @@ _PLAN_SIGNALS: list[tuple[str, int, str]] = [
     (r"\bonboarding (flow|experience|journey)\b|\buser journey\b|\b(ux|user experience) (flow|overhaul)\b", 2, "product/UX flow"),
     (r"\bmigrat(e|ion)\b|\bport (it|this|the \w+) to\b|\bupgrade (the )?(whole|entire)\b", 3, "migration"),
     (r"\b(architecture|architect)\b|\bsystem design\b", 3, "architecture"),
+    # asks for a plan / an audit / an investigation rather than a single change
+    (r"\b(action|improvement|implementation|remediation) plan\b|\bplan of action\b"
+     r"|\b(propose|suggest|recommend|draw up|put together) (an? )?(plan|approach|roadmap)\b", 3, "action plan"),
+    (r"\b(ui|ux|code|security|performance|accessibility|design|full|site|app) (audit|review)\b"
+     r"|\baudit (the|our|my|this) (whole |entire )?(app|site|ui|ux|codebase|frontend|backend)\b"
+     r"|\banaly[sz]e (the|our|my|this) (whole |entire )?(ui|ux|app|site|codebase|frontend)\b", 2, "audit / review"),
+    (r"\bfeasib(ility|le)\b|\binvestigate (whether|if)\b|\blook into (a way|ways|whether|if|options)\b"
+     r"|\b(compare|evaluate) (the )?(options|approaches|alternatives)\b", 2, "investigation / feasibility"),
     (r"\bintegrat(e|ion) (with|between)\b|\bacross (systems|services|repos)\b|\bmultiple (systems|services|repos)\b", 2, "cross-system"),
     (r"\b(complex|end[- ]to[- ]end|multi[- ]step|full[- ]stack)\b", 1, "complexity"),
     (r"\b(entire|whole|complete|comprehensive|overall|every (page|screen))\b", 1, "broad scope"),
@@ -48,15 +56,19 @@ _PLAN_SIGNALS: list[tuple[str, int, str]] = [
      r"contracts?|compliance|gdpr|security audit)\b", 3, "broad legal / compliance work"),
 ]
 
-_DIRECT_SIGNALS: list[tuple[str, int]] = [
-    (r"^\s*(please\s+)?(change|make|set|fix|rename|move|remove|delete|add|update|bump|tweak|adjust|swap|replace|hide|show|align|center|centre|increase|decrease|shorten|lengthen|revert|undo)\b", 2),
-    (r"\b\d+\s?(px|rem|em|%|ms|s)\b|#[0-9a-fA-F]{3,8}\b", 2),
+# (pattern, weight, short_only). short_only signals are words that mark a small fix in a short message
+# ("fix the broken navbar") but are just vocabulary inside a long multi-part brief ("…users shouldn't hit
+# broken actions…, analyse the UI, give me an action plan"), so they don't count against planning there.
+_DIRECT_SIGNALS: list[tuple[str, int, bool]] = [
+    (r"^\s*(please\s+)?(change|make|set|fix|rename|move|remove|delete|add|update|bump|tweak|adjust|swap|replace|hide|show|align|center|centre|increase|decrease|shorten|lengthen|revert|undo)\b", 2, False),
+    (r"\b\d+\s?(px|rem|em|%|ms|s)\b|#[0-9a-fA-F]{3,8}\b", 2, False),
     (r"\b(run|re-?run) (the )?(tests?|lint|build|typecheck)\b|\bcommit\b|\bpush\b"
-     r"|\bdeploy(ing)? (it|this|that|to|the (app|site|build|changes?))\b", 3),
-    (r"\b(typo|error|exception|traceback|stack trace|failing test|bug|broken|crash(es|ing)?)\b", 2),
-    (r"[\w./-]+\.(ts|tsx|js|jsx|py|rs|go|css|scss|html|json|md|yml|yaml|swift|kt)\b|:\d+\b", 1),
-    (r"\b(button|padding|margin|colou?r|font|copy|text|modal|navbar|icon|label|spacing|border|shadow|animation)\b", 1),
+     r"|\bdeploy(ing)? (it|this|that|to|the (app|site|build|changes?))\b", 3, False),
+    (r"\b(typo|error|exception|traceback|stack trace|failing test|bug|broken|crash(es|ing)?)\b", 2, True),
+    (r"[\w./-]+\.(ts|tsx|js|jsx|py|rs|go|css|scss|html|json|md|yml|yaml|swift|kt)\b|:\d+\b", 1, False),
+    (r"\b(button|padding|margin|colou?r|font|copy|text|modal|navbar|icon|label|spacing|border|shadow|animation)\b", 1, True),
 ]
+LONG_BRIEF = 280  # characters; past this (with several asks in it) a message is a brief, not a quick fix
 
 
 def _strip_override(text: str, overrides: dict) -> tuple[str | None, str]:
@@ -92,10 +104,11 @@ def classify(text: str, cfg: dict) -> Decision:
             plan_score += weight
             if weight > best_weight:
                 best_label, best_weight = label, weight
-    direct_score = sum(w for p, w in _DIRECT_SIGNALS if re.search(p, low))
-
     # Several distinct deliverables ("a logo, a site and a launch video") suggest planning.
     deliverables = len(re.findall(r"\b(and|plus|also|as well as)\b", low))
+    brief = len(low) > LONG_BRIEF and deliverables >= 3
+    direct_score = sum(w for p, w, short_only in _DIRECT_SIGNALS
+                       if not (short_only and brief) and re.search(p, low))
     if deliverables >= 3 and len(low) > 160:
         plan_score += 1
         best_label = best_label or "several deliverables"
@@ -177,3 +190,34 @@ def interpret_reply(text: str) -> tuple[str, str]:
             return "approve_with_changes", rest
         return "approve", ""
     return "revise", text.strip()
+
+
+# ---- writing jobs: documents and notes run on a cheaper model (Agents & behaviour → Cheaper model for writing)
+_WRITE_VERB = re.compile(
+    r"\b(write|re-?write|draft|compose|summari[sz]e|sum up|jot( down)?|take notes|make notes|note down|write[- ]up|"
+    r"put together|prepare|proofread|edit|polish|tidy up|turn (this|these|it|that)\b.{0,40}\binto)\b", re.I)
+_WRITE_THING = re.compile(
+    r"\b(doc|docs|document|documentation|notes?|report|readme|summary|summaries|write-?up|email|e-mail|letter|"
+    r"post|article|blog|newsletter|proposal|memo|brief|changelog|release notes|minutes|guide|how-?to|essay|"
+    r"cover letter|bio|description|copy|spec|outline|faq|announcement|caption|script|recap|digest|one-?pager)\b", re.I)
+# coding / building / visual work is not a writing job even when it mentions a doc
+_NOT_WRITING = re.compile(
+    r"\b(fix|build|implement|refactor|debug|deploy|commit|push|migrate|install|run|render|design|redesign|"
+    r"component|function|endpoint|api|database|schema|page|screen|ui|ux|css|test(s|ing)?|screenshot|animate|video|"
+    r"image|logo|chart|app|website|feature|bug|code)\b"
+    r"|[\w./-]+\.(ts|tsx|js|jsx|py|rs|go|css|scss|html|swift|kt)\b", re.I)
+_SHORT_NOTE = re.compile(r"\b(notes?|minutes|jot|recap|caption|bio|summary|summari[sz]e|sum up|digest)\b", re.I)
+
+
+def writing_task(text: str) -> str | None:
+    """"note" (short notes, summaries: the fastest model), "doc" (documents, reports, emails: the mid model) or
+    None. Only a request that is writing and nothing else: anything with code, UI or building in it is None."""
+    t = " ".join(str(text or "").split())
+    self_evident = re.search(r"\b(summari[sz]e|sum up|take notes|make notes|jot( down)?|proofread)\b", t, re.I)
+    if not t or len(t) > 600 or not _WRITE_VERB.search(t) or not (self_evident or _WRITE_THING.search(t)) \
+            or _NOT_WRITING.search(t):
+        return None
+    if _SHORT_NOTE.search(t) and not re.search(r"\b(report|document|documentation|readme|proposal|guide|essay|spec|"
+                                                   r"article|blog|newsletter|cover letter|release notes|changelog)\b", t, re.I):
+        return "note"
+    return "doc"

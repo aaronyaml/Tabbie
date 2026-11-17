@@ -149,7 +149,8 @@
     finally { if (open) paint(); }
   }
   const fromApi = (j) => ({ dynamic: j.dynamic, available: !!j.dynamic_available, known: true, takeover: j.takeover !== false,
-    step_commits: j.step_commits !== false, uat: j.uat !== false });
+    step_commits: j.step_commits !== false, uat: j.uat !== false, writing_model: j.writing_model !== false,
+    writing_known: typeof j.writing_model === 'boolean' });
   async function toggleHandoffs() {
     if (!handoffs.available) return;
     const next = !handoffs.dynamic;
@@ -364,7 +365,10 @@
         on: handoffs.takeover !== false && (bothOn || extra), off: !(bothOn || extra) },
       { attr: 'data-flag="step_commits"', ic: 'GitBranchIcon', name: 'Small commits', sub: 'Commit each working step', on: handoffs.step_commits !== false, off: false },
       { attr: 'data-flag="uat"', ic: 'CheckListIcon', name: 'Test before done', sub: 'Test every code change', on: handoffs.uat !== false, off: false },
-    ];
+    ].concat(handoffs.writing_known ? [
+      { attr: 'data-flag="writing_model"', ic: 'Edit02Icon', name: 'Cheaper model for writing', sub: 'Docs on Sonnet / Terra, notes on Haiku / Luna',
+        on: handoffs.writing_model !== false, off: false },
+    ] : []);
   }
 
   // step 4: Agents & behaviour. Same data attributes and handlers as before; unavailable ones are dimmed

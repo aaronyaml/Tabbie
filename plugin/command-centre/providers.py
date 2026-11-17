@@ -463,8 +463,11 @@ def phase_instructions(phase: str, prebrief: bool = True) -> str:
 
 def _planner_prompt(phase: str, request: dict, manifest_text: str, prebrief: bool = True) -> str:
     transcript = "\n\n".join(f"### {t['role'].upper()}\n{t['content']}" for t in request["planning_transcript"])
+    from hmem import agents as agent_set
+    writing = ("\n- Writing steps (docs, notes, reports, write-ups) in the brief: tag them \"(writing: cheaper model)\"; "
+               "the executor hands those to Sonnet/Haiku or GPT Terra/Luna." if agent_set.writing_model_enabled() else "")
     return (
-        f"{PLANNER_ROLE}\n\n{phase_instructions(phase, prebrief)}\n\n"
+        f"{PLANNER_ROLE}{writing}\n\n{phase_instructions(phase, prebrief)}\n\n"
         f"PROJECT: {request.get('project') or '(none — not code-bound or not yet chosen)'}\n"
         + (f"ALSO IN THIS WORKSPACE: {', '.join(request.get('extra_dirs') or [])}\n" if request.get('extra_dirs') else "")
         + "\n"
@@ -659,6 +662,25 @@ UAT_RULES = """TEST BEFORE DONE (on unless this request says otherwise, e.g. "sk
 """
 
 
+WRITING_RULES = {
+    "claude": """CHEAPER MODEL FOR WRITING (on unless this request names a model):
+- Writing that is a self-contained part of a bigger job (a report, README, doc, notes, summary, email, release
+  notes, a write-up of what you found) goes to a subagent (Agent tool) with model "sonnet", or "haiku" for short
+  notes and summaries. Brief it with the facts, findings and file paths it needs and where to save the result;
+  check what it returns. Code, analysis and decisions stay with you.
+- Skip this for a few lines you can write inline, or when the writing needs reasoning only you have done.
+""",
+    "codex": """CHEAPER MODEL FOR WRITING (on unless this request names a model):
+- Writing that is a self-contained part of a bigger job (a report, README, doc, notes, summary, email, release
+  notes, a write-up of what you found) goes to a spawn_agent with model "gpt-6.1-terra", or "gpt-6-luna" for
+  short notes and summaries (the user has asked for this, so set the model field; if that model isn't offered,
+  write it yourself). Brief it with the facts, findings and file paths it needs and where to save the result;
+  check what it returns. Code, analysis and decisions stay with you.
+- Skip this for a few lines you can write inline, or when the writing needs reasoning only you have done.
+""",
+}
+
+
 DYNAMIC_RULES = """DYNAMIC AGENTS — your judgement:
 - You choose how to do this job: alone, with your own subagents ({own_subagents}), or by handing a
   self-contained part to {other} through the `delegate` tool (MCP server "tabbie"). None of these is
@@ -680,16 +702,19 @@ _DYN = {
 
 
 def worker_rules(provider: str = "claude", *, dynamic: bool = False, max_subagents=2,
-                 hints: list[str] | None = None, step_commits: bool | None = None, uat: bool | None = None) -> str:
+                 hints: list[str] | None = None, step_commits: bool | None = None, uat: bool | None = None,
+                 writing: bool | None = None) -> str:
     """The worker system rules. A few static variants per provider (dynamic, small commits, test before
     done: each on/off) keep the prompt prefix byte-identical across requests, so it caches.
-    hints: router.yaml dynamic_agents.hints. step_commits/uat: None = the agents.yaml setting."""
+    hints: router.yaml dynamic_agents.hints. step_commits/uat/writing: None = the agents.yaml setting."""
     from hmem import agents as agent_set
     base = WORKER_RULES.format(max_subagents=max_subagents)
     if agent_set.step_commits_enabled() if step_commits is None else step_commits:
         base += "\n" + STEP_COMMIT_RULES
     if agent_set.uat_enabled() if uat is None else uat:
         base += "\n" + UAT_RULES
+    if agent_set.writing_model_enabled() if writing is None else writing:
+        base += "\n" + WRITING_RULES["codex" if provider == "codex" else "claude"]
     if not dynamic:
         return base
     extra = "".join(f"- Hint: {str(h).strip()}\n" for h in (hints or []) if str(h).strip())

@@ -27,7 +27,7 @@ from .providers import (WORKER_RULES, claude_transcript_tail, codex_models, git_
                         run_planner, usage_limit_info, worker_rules)
 from .common import LOCKS_DIR, agents
 from .procutil import procutil
-from .router import ASTRA, CLAUDE, classify, hub_tool_request, interpret_reply, looks_like_chat
+from .router import ASTRA, CLAUDE, classify, hub_tool_request, interpret_reply, looks_like_chat, writing_task
 from .state import Request, active_planning_request, session_state, save_session_state, set_active
 
 _CTX = None
@@ -478,6 +478,35 @@ def _limit_text(agent: str, text: str, model: str | None = None) -> str:
     who = _WHO.get(agent, agent.title())
     when = re.search(r"(?i)(?:resets?|try again)\s+(?:at\s+|in\s+)?([^.;|\n]{1,40})", text or "")
     return f"{who} hit its usage limit" + (f" (resets {when.group(1).strip()})" if when else "")
+
+
+_TIER_RANK = {"fast": 0, "mid": 1, "top": 2}
+
+
+def _writing_choice(r: Request, choice: dict) -> dict:
+    """Agents & behaviour → Cheaper model for writing (default on): a request that is only writing runs on the
+    provider's mid model (documents: Sonnet / GPT Terra) or fast model (notes, summaries: Haiku / GPT Luna).
+    Never when the chat has its own model picked, on a linked model provider, or when it would mean a bigger
+    model than the chat's."""
+    try:
+        if not agents().writing_model_enabled() or not choice.get("default") or choice.get("provider") not in executor_choice.CATALOG:
+            return choice
+    except Exception:
+        return choice
+    kind = writing_task(r.data.get("raw_message") or r["original_prompt"] or "")
+    if not kind:
+        return choice
+    want = "fast" if kind == "note" else "mid"
+    prov = choice["provider"]
+    if _TIER_RANK.get(executor_choice.tier_of(prov, choice["model"]), 2) <= _TIER_RANK[want]:
+        return choice
+    usable = _codex_models_safe() if prov == "openai" else None
+    pick = next((m for m in executor_choice.CATALOG[prov]["models"]
+                 if m["tier"] == want and (usable is None or not usable or m["id"] in usable)), None)
+    if not pick:
+        return choice
+    log_decision(event="writing_model", request=r.id, kind=kind, frm=choice["model"], to=pick["id"])
+    return {**choice, "model": pick["id"], "name": pick["name"], "desc": pick.get("desc", ""), "writing": kind}
 
 
 def _codex_models_safe() -> list[str]:
@@ -1196,6 +1225,8 @@ def _run_request(r: Request, feed=None, force: dict | None = None) -> dict:
         choice = {**choice, "provider": force["provider"], "model": force["model"], "name": info["name"],
                   "worker": executor_choice.WORKER_NAME.get(executor_choice.worker_of(force["provider"]) or "", ""),
                   "effort": force.get("effort") or choice["effort"]}
+    if not force and not answer:
+        choice = _writing_choice(r, choice)
     # a linked model provider (DeepSeek, an API key, Ollama...): no subscription limits, its own sessions
     endpoint = choice["provider"] if executor_choice.is_endpoint(choice["provider"]) else None
     on_claude = executor_choice.worker_of(choice["provider"]) == "claude"

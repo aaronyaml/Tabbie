@@ -206,7 +206,7 @@
         "pwa-polish.js?v=6"
       ],
       "stylesheets": [
-        "pwa-polish.css?v=4"
+        "pwa-polish.css?v=5"
       ]
     },
     {
@@ -334,7 +334,7 @@
       "id": "model-picker",
       "name": "Model picker",
       "scripts": [
-        "model-picker.js?v=26"
+        "model-picker.js?v=27"
       ],
       "stylesheets": [
         "model-picker.css?v=14"
@@ -506,7 +506,7 @@
       "id": "setup-news",
       "name": "New in setup (offers setup steps an update added, once)",
       "scripts": [
-        "setup-news.js?v=2"
+        "setup-news.js?v=3"
       ],
       "stylesheets": [
         "setup-news.css?v=1"

@@ -25,6 +25,26 @@ PLAN = ["redesign an entire onboarding flow", "Design and build a new onboarding
         "migrate the backend from Express to Fastify", "make me a 30 second advert for my app",
         "rethink the entire landlord onboarding experience"]
 
+# A long brief that asks for an audit, an action plan and a feasibility study plans first, even though it
+# mentions "broken actions" (a small-fix word) along the way.
+BRIEF = ("launch optimum ephemeris and analyse the UI with both code review and screenshots, once done provide an "
+         "action plan on how we can deliver on an overall cleaner, faster experience where everything just works "
+         "always, the user shouldn't ever encounter any issues such as broken actions, laggy pages, slow loadtimes, it "
+         "should just be seamless, also investigate if there are any other backgrounds and/or styles to add support for"
+         "\n\nif you do make/propose any changes also make tests for these changes to ensure they work as expected, "
+         "again don't just rely on output for these tests, screenshot each stage and analyse\n\nadding onto all of "
+         "this investigate the feasability of me being able to screenshot my accounts from tradesyncer and then attach "
+         "them onto the site and then these pictures are automatically analysed for position, entry, exit, P/L etc.. so "
+         "it can be auto imported, or look into a way for me to hook up site to tradesyncer for free")
+PLAN += [BRIEF, "do a full UX audit of the app and give me an action plan",
+         "investigate the feasibility of syncing trades from Tradesyncer and propose an approach"]
+DIRECT += ["investigate if the export button is broken", "review this file", "check the feasibility note in README.md",
+           "fix the broken modal, the close button and the spacing on mobile",
+           "the save button is broken and the text overlaps the icon, and also the modal border looks off on phones, "
+           "and the spacing under the navbar is too big; please fix those plus the colour of the label in settings, and "
+           "the toast that says saved twice when you press the save button quickly on the profile page"]
+assert len(DIRECT[-1]) > router.LONG_BRIEF  # a long list of small fixes still goes straight to Claude
+
 def test_direct():
     for t in DIRECT:
         d = router.classify(t, CFG); assert d.route == "claude", (t, d)

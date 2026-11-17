@@ -134,10 +134,15 @@ Both are on by default, for Claude Code and Codex workers alike:
 - **Test before done**: any job that changes code writes acceptance tests for what changed (for UI,
   in a real browser), runs them with the project's existing tests, and fixes things until they pass.
   The reply's **Verified** line says what ran; a check that couldn't run is reported as not run.
+- **Cheaper model for writing**: a request that's only writing (a document, email, README, proposal,
+  release notes) runs on Sonnet 5.5 / GPT-6.1 Terra, and short notes and summaries on Haiku 5.5 / GPT-6 Luna,
+  instead of the chat's top model. In bigger jobs the worker hands its writing parts to a subagent on those
+  models, and the planner tags writing steps in its brief. A model you picked for the chat always wins, and
+  it never moves to a bigger model. The reply's model label shows what ran.
 
 Say otherwise in a request ("don't commit", "one commit", "skip tests") and that request follows
-you. To turn either off for good, use the **Small commits** or **Test before done** switch in the
-model picker's Agents row (`step_commits:` / `uat:` in `config/agents.yaml`).
+you. To turn any of them off for good, use its switch under the model picker's **Agents & behaviour**
+(`step_commits:` / `uat:` / `writing_model:` in `config/agents.yaml`).
 
 ### Hand-offs (dynamic agents)
 
@@ -794,7 +799,8 @@ Design notes: `docs/memory/ARCHITECTURE.md`, `docs/projects/ARCHITECTURE.md`.
   `OPENAI_API_KEY`). Set up in `bin/setup` (step 10), `bin/setup --only secrets`, or Settings → Accounts → Secrets.
 - **New setup steps after an update**: when an update adds a setup step this Mac hasn't been through (like
   Secrets), a small **New in Tabbie setup** card offers it once. **Set up** opens the place to do it; **Not now**
-  hides it for good. Optional steps say so, and a step that's already set up is never offered.
+  hides it for good and says where to find it later (Secrets: Settings → Accounts → Secrets, which always has
+  the full 1Password walkthrough until it's connected, or `bin/setup --only secrets`). Optional steps say so, and a step that's already set up is never offered.
 - **Sources, galleries, videos, follow-ups**: web facts the worker cites show as small source chips (site icon
   and name) right where they're stated, gathered into a **Sources** panel under the answer. Several pictures in
   a row become one gallery. A YouTube link on its own line becomes a video card that plays in place. Replies can
@@ -853,7 +859,7 @@ Design notes: `docs/memory/ARCHITECTURE.md`, `docs/projects/ARCHITECTURE.md`.
 | **Codex only** | Codex | Codex | no fallback agent |
 
 Change it any time from the composer's **model picker → Agents & behaviour** (Claude Code / Codex
-switches; at least one stays on; **Hand-offs**, **Takeover**, **Small commits** and **Test before done** sit below them). It applies on the next request with no restart. It's stored in
+switches; at least one stays on; **Hand-offs**, **Takeover**, **Small commits**, **Test before done** and **Cheaper model for writing** sit below them). It applies on the next request with no restart. It's stored in
 `config/agents.yaml`:
 
 ```yaml

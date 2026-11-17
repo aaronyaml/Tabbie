@@ -1,8 +1,8 @@
 /* Tabbie — "New in setup" card (plain JS, no build step). Pairs with setup-news.css.
  * When an update brings a setup step this Mac hasn't been through (hmem/setup_news.py: e.g. Secrets with
  * 1Password), a small card offers it once: "Set up" opens the place to do it (a Settings section), "Not now"
- * hides it for good. Optional steps say so. A step already set up some other way is never offered.
- *   GET  …/sidecar/setup-news       -> {steps: [{id, title, blurb, optional, open, terminal}]}
+ * hides it for good and says where to find it later (step.later, e.g. Settings → Accounts → Secrets). Optional steps say so. A step already set up some other way is never offered.
+ *   GET  …/sidecar/setup-news       -> {steps: [{id, title, blurb, optional, open, later, terminal}]}
  *   POST …/sidecar/setup-news/seen  {id}
  * It waits for the update card (#hxUpdate) to go away first, and never shows on top of it.
  */
@@ -59,6 +59,7 @@
       if (!b) return;
       seen(step.id);
       if (b.hasAttribute('data-go')) open(step.open);
+      else if (step.later && typeof window.showToast === 'function') window.showToast(step.later, 6000);
       hide();
     });
     document.body.appendChild(card);

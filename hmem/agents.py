@@ -67,6 +67,13 @@ def uat_enabled() -> bool:
     return _flag("uat")
 
 
+def writing_model_enabled() -> bool:
+    """Cheaper model for writing: documents, notes and write-ups run on Sonnet / GPT Terra (short notes on
+    Haiku / GPT Luna) instead of the chat's top model. Default ON; a model picked for the chat, or a request
+    that names a model, wins."""
+    return _flag("writing_model")
+
+
 def dynamic_allowed(linked: dict | None = None) -> bool:
     """The setting is on, both agents are enabled, and (when given) both are signed in."""
     on = enabled()
@@ -75,7 +82,8 @@ def dynamic_allowed(linked: dict | None = None) -> bool:
 
 
 def save(agents: list[str] | None = None, dynamic: bool | None = None, takeover: bool | None = None,
-         step_commits: bool | None = None, uat: bool | None = None) -> list[str]:
+         step_commits: bool | None = None, uat: bool | None = None,
+         writing_model: bool | None = None) -> list[str]:
     """Write config/agents.yaml. None for any argument keeps its current setting."""
     if agents is None:
         picked = enabled()
@@ -87,6 +95,7 @@ def save(agents: list[str] | None = None, dynamic: bool | None = None, takeover:
     take = takeover_enabled() if takeover is None else bool(takeover)
     steps = step_commits_enabled() if step_commits is None else bool(step_commits)
     test = uat_enabled() if uat is None else bool(uat)
+    write = writing_model_enabled() if writing_model is None else bool(writing_model)
     p = path()
     p.parent.mkdir(parents=True, exist_ok=True)
     tmp = p.with_suffix(".tmp")
@@ -100,6 +109,8 @@ def save(agents: list[str] | None = None, dynamic: bool | None = None, takeover:
                    "# Small commits: in a git project each working step is its own commit, touching only what the task needs.\n"
                    f"step_commits: {'true' if steps else 'false'}\n"
                    "# Test before done: acceptance tests are written and run for every code change before the reply.\n"
-                   f"uat: {'true' if test else 'false'}\n", encoding="utf-8")
+                   f"uat: {'true' if test else 'false'}\n"
+                   "# Cheaper model for writing: documents and notes run on Sonnet / GPT Terra (short notes on Haiku / Luna).\n"
+                   f"writing_model: {'true' if write else 'false'}\n", encoding="utf-8")
     os.replace(tmp, p)
     return picked
