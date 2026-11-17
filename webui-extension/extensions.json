@@ -334,10 +334,10 @@
       "id": "model-picker",
       "name": "Model picker",
       "scripts": [
-        "model-picker.js?v=27"
+        "model-picker.js?v=28"
       ],
       "stylesheets": [
-        "model-picker.css?v=14"
+        "model-picker.css?v=15"
       ]
     },
     {
@@ -423,7 +423,7 @@
         "custom-controls.js?v=3"
       ],
       "stylesheets": [
-        "custom-controls.css?v=3"
+        "custom-controls.css?v=5"
       ]
     },
     {

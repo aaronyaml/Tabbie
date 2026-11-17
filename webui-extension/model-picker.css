@@ -216,16 +216,7 @@
 .hx-mp-tog-tx { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 1px; }
 .hx-mp-tog-name { font: 500 14px/1.2 var(--font-ui); letter-spacing: -.01em; }
 .hx-mp-tog-sub { font: 400 12px/1.3 var(--font-ui); color: var(--hx-text-2); }
-.hx-mp-switch {
-  position: relative; width: 34px; height: 20px; flex-shrink: 0; border-radius: 999px;
-  background: var(--hx-fill-2); transition: background-color .2s var(--hx-ease);
-}
-.hx-mp-switch::after {
-  content: ""; position: absolute; top: 2px; left: 2px; width: 16px; height: 16px; border-radius: 50%;
-  background: #fff; box-shadow: 0 1px 2px rgba(0,0,0,.25); transition: transform .2s var(--hx-ease);
-}
-.hx-mp-tog.is-on .hx-mp-switch { background: var(--hx-accent); }
-.hx-mp-tog.is-on .hx-mp-switch::after { transform: translateX(14px); }
+/* the switch itself is the shared .hx-switch (sidebar.css), same as Settings › Liquid glass */
 .hx-mp-togs .hx-mp-tog.is-unavail { opacity: .5; cursor: not-allowed; }
 .hx-mp-togs .hx-mp-tog.is-unavail:hover { background: transparent; }
 .is-sheet .hx-mp-togs { margin: 2px 0; }
@@ -233,8 +224,4 @@
 .is-sheet .hx-mp-togs .hx-mp-tog + .hx-mp-tog::before { left: 50px; }
 .is-sheet .hx-mp-tog-name { font-size: 15px; }
 .is-sheet .hx-mp-tog-sub { font-size: 12.5px; }
-.is-sheet .hx-mp-switch { width: 46px; height: 28px; }
-.is-sheet .hx-mp-switch::after { width: 24px; height: 24px; }
-.is-sheet .hx-mp-tog.is-on .hx-mp-switch::after { transform: translateX(18px); }
 .is-sheet .hx-mp-group { text-align: left; }
-@media (prefers-reduced-motion: reduce) { .hx-mp-switch, .hx-mp-switch::after { transition: none; } }

@@ -10,7 +10,7 @@
  */
 
 /* ── checkbox + radio ─────────────────────────────────────────────────── */
-:where(input[type="checkbox"], input[type="radio"]):not(:where(.plugin-toggle-switch input, .file-input-visually-hidden, [data-hx-native] input)) {
+:where(input[type="checkbox"], input[type="radio"]):not(:where(.plugin-toggle-switch input, .file-input-visually-hidden, [data-hx-native] input, .settings-field label > input[type="checkbox"], .hxs-trim-snap > input[type="checkbox"], .hx-switch-input)) {
   -webkit-appearance: none !important; -moz-appearance: none !important; appearance: none !important;
   box-sizing: border-box !important; flex-shrink: 0; width: 18px; height: 18px;
   min-width: 16px !important; min-height: 16px !important; /* beats upstream's inline 14–15px */
@@ -20,44 +20,44 @@
   color: var(--hx-on-accent, #fff); -webkit-tap-highlight-color: transparent;
   transition: background-color .15s var(--hx-ease, ease), border-color .15s var(--hx-ease, ease), box-shadow .15s var(--hx-ease, ease);
 }
-:where(input[type="radio"]):not(:where(.plugin-toggle-switch input, .file-input-visually-hidden, [data-hx-native] input)) {
+:where(input[type="radio"]):not(:where(.plugin-toggle-switch input, .file-input-visually-hidden, [data-hx-native] input, .settings-field label > input[type="checkbox"], .hxs-trim-snap > input[type="checkbox"], .hx-switch-input)) {
   border-radius: 50% !important;
 }
-:root.dark :where(input[type="checkbox"], input[type="radio"]):not(:where(.plugin-toggle-switch input, .file-input-visually-hidden, [data-hx-native] input)):not(:checked):not([type="checkbox"]:indeterminate) {
+:root.dark :where(input[type="checkbox"], input[type="radio"]):not(:where(.plugin-toggle-switch input, .file-input-visually-hidden, [data-hx-native] input, .settings-field label > input[type="checkbox"], .hxs-trim-snap > input[type="checkbox"], .hx-switch-input)):not(:checked):not([type="checkbox"]:indeterminate) {
   background-color: var(--hx-fill, #1D1F25) !important;
 }
 
 /* hover: the boundary firms up */
-:where(input[type="checkbox"], input[type="radio"]):not(:where(.plugin-toggle-switch input, .file-input-visually-hidden, [data-hx-native] input)):not(:disabled):not(:checked):not([type="checkbox"]:indeterminate):hover {
+:where(input[type="checkbox"], input[type="radio"]):not(:where(.plugin-toggle-switch input, .file-input-visually-hidden, [data-hx-native] input, .settings-field label > input[type="checkbox"], .hxs-trim-snap > input[type="checkbox"], .hx-switch-input)):not(:disabled):not(:checked):not([type="checkbox"]:indeterminate):hover {
   border-color: var(--hx-text-2, #6B6B70) !important;
 }
 
 /* checked: accent fill + white tick */
-:where(input[type="checkbox"]):not(:where(.plugin-toggle-switch input, .file-input-visually-hidden, [data-hx-native] input)):checked {
+:where(input[type="checkbox"]):not(:where(.plugin-toggle-switch input, .file-input-visually-hidden, [data-hx-native] input, .settings-field label > input[type="checkbox"], .hxs-trim-snap > input[type="checkbox"], .hx-switch-input)):checked {
   border-color: var(--hx-fill-text, #3054FD) !important;
   background-color: var(--hx-fill-text, #3054FD) !important;
   background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 12 12' fill='none' stroke='%23fff' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M2.5 6.3l2.3 2.3 4.7-5'/%3E%3C/svg%3E") !important;
 }
 /* indeterminate (set from JS: el.indeterminate = true): accent fill + dash */
-:where(input[type="checkbox"]):not(:where(.plugin-toggle-switch input, .file-input-visually-hidden, [data-hx-native] input)):indeterminate {
+:where(input[type="checkbox"]):not(:where(.plugin-toggle-switch input, .file-input-visually-hidden, [data-hx-native] input, .settings-field label > input[type="checkbox"], .hxs-trim-snap > input[type="checkbox"], .hx-switch-input)):indeterminate {
   border-color: var(--hx-fill-text, #3054FD) !important;
   background-color: var(--hx-fill-text, #3054FD) !important;
   background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 12 12' fill='none' stroke='%23fff' stroke-width='2' stroke-linecap='round'%3E%3Cpath d='M3 6h6'/%3E%3C/svg%3E") !important;
 }
 /* radio checked: accent ring + white centre dot */
-:where(input[type="radio"]):not(:where(.plugin-toggle-switch input, .file-input-visually-hidden, [data-hx-native] input)):checked {
+:where(input[type="radio"]):not(:where(.plugin-toggle-switch input, .file-input-visually-hidden, [data-hx-native] input, .settings-field label > input[type="checkbox"], .hxs-trim-snap > input[type="checkbox"], .hx-switch-input)):checked {
   border-color: var(--hx-fill-text, #3054FD) !important;
   background: radial-gradient(circle, #fff 0 3px, var(--hx-fill-text, #3054FD) 3.5px) !important;
 }
 
 /* keyboard focus */
-:where(input[type="checkbox"], input[type="radio"]):not(:where(.plugin-toggle-switch input, .file-input-visually-hidden, [data-hx-native] input)):focus { outline: none; }
-:where(input[type="checkbox"], input[type="radio"]):not(:where(.plugin-toggle-switch input, .file-input-visually-hidden, [data-hx-native] input)):focus-visible {
+:where(input[type="checkbox"], input[type="radio"]):not(:where(.plugin-toggle-switch input, .file-input-visually-hidden, [data-hx-native] input, .settings-field label > input[type="checkbox"], .hxs-trim-snap > input[type="checkbox"], .hx-switch-input)):focus { outline: none; }
+:where(input[type="checkbox"], input[type="radio"]):not(:where(.plugin-toggle-switch input, .file-input-visually-hidden, [data-hx-native] input, .settings-field label > input[type="checkbox"], .hxs-trim-snap > input[type="checkbox"], .hx-switch-input)):focus-visible {
   outline: 2px solid var(--focus-ring-strong, var(--hx-ink, #3054FD)) !important; outline-offset: 2px !important;
 }
 
 /* disabled (read-only ticks in the cron/agent lists too) */
-:where(input[type="checkbox"], input[type="radio"]):not(:where(.plugin-toggle-switch input, .file-input-visually-hidden, [data-hx-native] input)):disabled {
+:where(input[type="checkbox"], input[type="radio"]):not(:where(.plugin-toggle-switch input, .file-input-visually-hidden, [data-hx-native] input, .settings-field label > input[type="checkbox"], .hxs-trim-snap > input[type="checkbox"], .hx-switch-input)):disabled {
   cursor: default; opacity: .45;
 }
 
@@ -134,4 +134,65 @@ select[aria-expanded="true"]:not([multiple]) { border-color: var(--hx-ink, #3054
 
 @media (prefers-reduced-motion: reduce) {
   .hx-cc-pop, .hx-cc-pop.is-sheet, .hx-cc-scrim { transition: none; }
+}
+
+
+/* ── on/off switches ─────────────────────────────────────────────────────────────────────────────────
+ * Every on/off setting in Tabbie looks like Settings › Appearance › Liquid glass (.hx-switch in sidebar.css):
+ * 40×24, white thumb that stretches into a pill on the way across, accent when on, wider while pressed.
+ * Settings checkboxes (upstream's .settings-field rows), Motion's "Snap to beats" and any .hx-switch-input are
+ * drawn as that switch straight on the <input> (it stays a real checkbox: same id, change events, keyboard);
+ * in Settings it sits on the right of its label like the Liquid glass row. Plugins' "Enabled" slider too. */
+:is(.settings-field label > input[type="checkbox"], .hxs-trim-snap > input[type="checkbox"], .hx-switch-input) {
+  --sw-w: 40px; --sw-h: 24px; --sw-pad: 2px; --sw-k: calc(var(--sw-h) - 2 * var(--sw-pad));
+  --sw-far: calc(var(--sw-w) - var(--sw-pad) - var(--sw-k));
+  -webkit-appearance: none !important; appearance: none !important; position: relative; flex: none;
+  box-sizing: border-box !important; width: var(--sw-w) !important; height: var(--sw-h) !important;
+  min-width: var(--sw-w) !important; min-height: var(--sw-h) !important; margin: 0 !important; padding: 0 !important;
+  vertical-align: middle; cursor: pointer; border: 0 !important; border-radius: 999px !important;
+  background: var(--hx-fill-2, rgba(120,120,128,.32)) none !important; accent-color: auto;
+  box-shadow: inset 0 0 0 0.5px rgba(0,0,0,.06) !important; -webkit-tap-highlight-color: transparent;
+  transition: background-color .28s cubic-bezier(.2,.8,.2,1) !important;
+}
+:is(.settings-field label > input[type="checkbox"], .hxs-trim-snap > input[type="checkbox"], .hx-switch-input)::after {
+  content: ''; position: absolute; top: var(--sw-pad); bottom: var(--sw-pad); left: var(--sw-pad); right: var(--sw-far);
+  border-radius: 999px; background: #fff;
+  box-shadow: 0 3px 8px rgba(0,0,0,.15), 0 3px 1px rgba(0,0,0,.06), 0 0 0 0.5px rgba(0,0,0,.04);
+  transition: left .3s cubic-bezier(.3,1.3,.5,1), right .3s cubic-bezier(.3,1.3,.5,1) .07s;
+}
+:is(.settings-field label > input[type="checkbox"], .hxs-trim-snap > input[type="checkbox"], .hx-switch-input):checked { background-color: var(--hx-accent, #34C759) !important; }
+:is(.settings-field label > input[type="checkbox"], .hxs-trim-snap > input[type="checkbox"], .hx-switch-input):checked::after { left: var(--sw-far); right: var(--sw-pad);
+  transition: right .3s cubic-bezier(.3,1.3,.5,1), left .3s cubic-bezier(.3,1.3,.5,1) .07s; }
+:is(.settings-field label > input[type="checkbox"], .hxs-trim-snap > input[type="checkbox"], .hx-switch-input):not(:disabled):active::after,
+label:active > :is(.settings-field label > input[type="checkbox"], .hxs-trim-snap > input[type="checkbox"], .hx-switch-input):not(:disabled)::after { right: calc(var(--sw-far) - 6px); }
+:is(.settings-field label > input[type="checkbox"], .hxs-trim-snap > input[type="checkbox"], .hx-switch-input):checked:not(:disabled):active::after,
+label:active > :is(.settings-field label > input[type="checkbox"], .hxs-trim-snap > input[type="checkbox"], .hx-switch-input):checked:not(:disabled)::after { left: calc(var(--sw-far) - 6px); right: var(--sw-pad); }
+:is(.settings-field label > input[type="checkbox"], .hxs-trim-snap > input[type="checkbox"], .hx-switch-input):focus { outline: none; }
+:is(.settings-field label > input[type="checkbox"], .hxs-trim-snap > input[type="checkbox"], .hx-switch-input):focus-visible { outline: 2px solid var(--focus-ring-strong, var(--hx-ink, #3054FD)) !important; outline-offset: 2px !important; }
+:is(.settings-field label > input[type="checkbox"], .hxs-trim-snap > input[type="checkbox"], .hx-switch-input):disabled { cursor: default; opacity: .45; }
+
+/* Settings rows: label text left, switch right (like Liquid glass) */
+.settings-field label:has(> input[type="checkbox"]) { display: flex !important; align-items: center !important;
+  justify-content: space-between; gap: 16px !important; width: 100%; }
+.settings-field label > input[type="checkbox"] { order: 2; margin-left: auto !important; }
+.hxs-trim-snap > input[type="checkbox"][type] { margin-right: 8px !important; }
+
+/* Plugins › "Enabled" (upstream slider): same switch */
+.plugin-toggle-switch { --sw-w: 40px; --sw-h: 24px; --sw-pad: 2px; --sw-k: calc(var(--sw-h) - 2 * var(--sw-pad));
+  --sw-far: calc(var(--sw-w) - var(--sw-pad) - var(--sw-k)); width: var(--sw-w) !important; height: var(--sw-h) !important; }
+.plugin-toggle-slider { border-radius: 999px !important; background: var(--hx-fill-2, rgba(120,120,128,.32)) !important;
+  box-shadow: inset 0 0 0 0.5px rgba(0,0,0,.06); transition: background-color .28s cubic-bezier(.2,.8,.2,1) !important; }
+.plugin-toggle-slider::before { top: var(--sw-pad) !important; bottom: var(--sw-pad) !important; left: var(--sw-pad) !important;
+  right: var(--sw-far) !important; width: auto !important; height: auto !important; border-radius: 999px !important; transform: none !important;
+  background: #fff !important; box-shadow: 0 3px 8px rgba(0,0,0,.15), 0 3px 1px rgba(0,0,0,.06), 0 0 0 0.5px rgba(0,0,0,.04) !important;
+  transition: left .3s cubic-bezier(.3,1.3,.5,1), right .3s cubic-bezier(.3,1.3,.5,1) .07s !important; }
+.plugin-toggle-switch input:checked + .plugin-toggle-slider { background: var(--hx-accent, #34C759) !important; }
+.plugin-toggle-switch input:checked + .plugin-toggle-slider::before { left: var(--sw-far) !important; right: var(--sw-pad) !important;
+  transition: right .3s cubic-bezier(.3,1.3,.5,1), left .3s cubic-bezier(.3,1.3,.5,1) .07s !important; }
+.plugin-toggle-switch:active .plugin-toggle-slider::before { right: calc(var(--sw-far) - 6px) !important; }
+.plugin-toggle-switch:active input:checked + .plugin-toggle-slider::before { left: calc(var(--sw-far) - 6px) !important; right: var(--sw-pad) !important; }
+.plugin-toggle-switch input:focus-visible + .plugin-toggle-slider { outline: 2px solid var(--focus-ring-strong, var(--hx-ink, #3054FD)); outline-offset: 2px; }
+
+@media (prefers-reduced-motion: reduce) {
+  :is(.settings-field label > input[type="checkbox"], .hxs-trim-snap > input[type="checkbox"], .hx-switch-input), :is(.settings-field label > input[type="checkbox"], .hxs-trim-snap > input[type="checkbox"], .hx-switch-input)::after, .plugin-toggle-slider, .plugin-toggle-slider::before { transition: none !important; }
 }

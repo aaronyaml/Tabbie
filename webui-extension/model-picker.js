@@ -378,7 +378,7 @@
     const tog = (attr, ic, name, sub, isOn, off) => `<button type="button" class="hx-mp-tog${isOn ? ' is-on' : ''}${off ? ' is-unavail' : ''}" ${attr}`
       + ` role="switch" aria-checked="${isOn}"${off ? ' aria-disabled="true" disabled' : ''}>`
       + `<span class="hx-mp-tog-ic">${icon(ic, 15)}</span><span class="hx-mp-tog-tx"><span class="hx-mp-tog-name">${name}</span>`
-      + `<span class="hx-mp-tog-sub">${esc(sub)}</span></span><span class="hx-mp-switch" aria-hidden="true"></span></button>`;
+      + `<span class="hx-mp-tog-sub">${esc(sub)}</span></span><i class="hx-switch" aria-hidden="true"></i></button>`;
     const agents = tog('data-agent="claude"', 'AiBrain01Icon', 'Claude Code', 'Claude plan', on.includes('claude'), false)
       + tog('data-agent="codex"', 'AiMagicIcon', 'Codex', 'ChatGPT plan', on.includes('codex'), false);
     const flags = handoffs.known ? flagStates().map((f) => tog(f.attr, f.ic, f.name, f.sub, f.on, f.off)).join('') : '';
