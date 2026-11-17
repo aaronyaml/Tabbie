@@ -405,10 +405,18 @@ if [ "$(sec_status)" = connected ]; then
 elif [ "$ASK" = 1 ] && [ -z "$ONLY" ] && ! yn "Set up 1Password for API keys now?" n; then
   dim "Skipped. Later: bin/setup --only secrets, or Settings → Accounts → Secrets."
 elif ! have op; then
-  warn "Needs the 1Password app and its command-line tool first:"
+  # Tabbie itself doesn't need the CLI (it uses 1Password's SDK); without it, the vault + service account are made by hand.
   say "  1. No account yet? https://1password.com/sign-up. Install the app from https://1password.com/downloads/mac and sign in."
-  say "  2. Install the CLI: https://developer.1password.com/docs/cli/get-started (or: brew install 1password-cli)."
-  dim "Then run: bin/setup --only secrets"
+  say "  2. In the app: ${B}File → New Vault${N}, name it ${B}Tabbie${N}."
+  say "  3. At my.1password.com: ${B}Developer → Directory${N}, then ${B}Other${N} (Infrastructure Secrets Management) → ${B}Create a Service Account${N}."
+  say "     Name it Tabbie, give it the \"Tabbie\" vault with ${B}Read + Write${N} (leave Share off), then Create, and copy the token (starts ops_)."
+  read -r -s -p "  Paste the token here (hidden) and press Return, or just Return to skip: " SA_TOKEN; echo
+  if [ -z "$SA_TOKEN" ]; then dim "Skipped. Later: Settings → Accounts → Secrets."
+  elif printf '%s' "$SA_TOKEN" | python3 -c "$SECPY
+s.save_token(sys.stdin.read())" 2>/dev/null && [ "$(sec_status)" = connected ]; then
+    ok "1Password connected. Add your keys in ${B}Settings → Accounts → Secrets${N} (names show, values never)."
+  else warn "Couldn't connect with that token. Check it (starts ops_) and the vault access, then: bin/setup --only secrets"; fi
+  unset SA_TOKEN
 else
   say "In the 1Password app: ${B}Settings → Developer → Integrate with 1Password CLI${N} (leave \"MCP clients\" off),"
   say "and ${B}Settings → Security → Touch ID${N} on."

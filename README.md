@@ -363,7 +363,7 @@ developer tools (git and Python). Leave the Terminal window open until the page 
 | 7. Background services | Installs and starts the services so Tabbie runs whenever your Mac is on |
 | 8. Secure address | Sets up `https://hermes.local` and offers to trust its certificate on this Mac |
 | 9. Motion studio | Optional. Installs Node.js (official build, Apple silicon or Intel) and creates the Motion studio from Tabbie's template, with its packages ([details](#motion-studio)) |
-| 10. Secrets (1Password) | Optional. Walks you through all of it: a 1Password account and app, its command-line tool, a "Tabbie" vault (made for you with Touch ID, or in the app), and a service account with Read + Write on that vault only (1Password.com → Developer → Directory → Other → Create a Service Account). Its token goes straight into your Mac's Keychain. Settings → Accounts → Secrets has the same walkthrough ([details](#attachments-agents-questions-takeover)) |
+| 10. Secrets (1Password) | Optional. Walks you through all of it: a 1Password account and app, a "Tabbie" vault (made for you with Touch ID, or in the app), and a service account with Read + Write on that vault only (1Password.com → Developer → Directory → Other → Create a Service Account). Its token goes straight into your Mac's Keychain. Settings → Accounts → Secrets has the same walkthrough ([details](#attachments-agents-questions-takeover)) |
 | 11. Your phone | Home Wi-Fi instructions, and optionally Tailscale for anywhere ([details](#use-tabbie-on-your-phone-anywhere-tailscale)) |
 | 12. Check | Runs `bin/hub health` and shows the address to open |
 
@@ -796,7 +796,10 @@ Design notes: `docs/memory/ARCHITECTURE.md`, `docs/projects/ARCHITECTURE.md`.
   (Resend, Cloudflare API tokens) makes a new key with the provider, saves it to 1Password and shows it once
   to copy. Workers run commands as `bin/with-secrets -- <command>`, which puts the keys into that one process
   (masked in its output) and never hands over the vault token; ask for a task that needs a key ("check my
-  Resend key works") and the worker uses it without you pasting anything. Keys you add straight in the
+  Resend key works") and the worker uses it without you pasting anything. Workers always check the store
+  first and only ask you when there's no store or the key isn't in it. Tabbie talks to 1Password through its
+  Python SDK, not the `op` command-line tool, so there are no macOS "would like to access data from other
+  apps" prompts and it works with nobody at the Mac. Keys you add straight in the
   1Password app (Tabbie vault) are picked up too: the variable comes from the title ("OpenAI API key" →
   `OPENAI_API_KEY`). Set up in `bin/setup` (step 10), `bin/setup --only secrets`, or Settings → Accounts → Secrets.
 - **New setup steps after an update**: when an update adds a setup step this Mac hasn't been through (like

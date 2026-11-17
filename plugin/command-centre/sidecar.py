@@ -605,7 +605,7 @@ def secrets_get(force: bool = False) -> tuple[int, dict]:
     hit = _SECRETS_CACHE.get("v")
     if hit and not force and time.time() - hit[0] < 30:
         return 200, hit[1]
-    st = {"op": bool(shutil.which("op")), "token": bool(secrets_store._token()), "connected": False,
+    st = {"op": secrets_store.available(), "token": bool(secrets_store._token()), "connected": False,
           "vault": secrets_store.VAULT, "error": ""}
     out = {"status": st, "providers": {k: {"label": v["label"], "env": v["env"], "rotate": v["rotate"]}
                                        for k, v in secrets_store.PROVIDERS.items()}, "items": []}

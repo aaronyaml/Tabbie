@@ -23,5 +23,5 @@ Rules:
 
 Secrets (1Password CLI, vault "Personal"):
 - NEVER run `op read`, `op item get`, `op inject` to stdout, or print environment variables (`echo $VAR`, `env`, `printenv`, `set`, `export -p`). Never read `.env` files.
-- ALWAYS run anything that needs a secret as `bin/with-secrets -- <command>` (Tabbie vault, via the service account; `--list` for names) or `op run --env-file=".env.tpl" -- <command>`: values go into that process's memory only, never into output, files, logs, git or memory. Never echo a secret even inside `op run` (it masks, but don't).
+- ALWAYS run anything that needs a secret as `bin/with-secrets -- <command>` (Tabbie vault, via the service account and 1Password's SDK; `--list` for names): values go into that process's memory only, never into output, files, logs, git or memory. Check `--list` before asking the user for a key. Don't call the `op` CLI from Tabbie work (it triggers macOS/1Password permission prompts nobody away from the Mac can answer); `op run --env-file=".env.tpl"` only when the user is at the Mac and asks. Never echo a secret even inside with-secrets (it masks, but don't).
 - New secret: add a reference line (`NAME="op://Personal/<item>/<field>"`) to `.env.tpl`; the user stores the value in 1Password. `op whoami` / `op vault list` are fine (no secret values).

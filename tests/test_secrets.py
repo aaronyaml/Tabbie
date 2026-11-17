@@ -178,3 +178,11 @@ def test_app_added_item_gets_a_name_and_its_hidden_field(op):
     assert row["env"] == "OPENAI_API_KEY" and row["provider"] == "openai"
     assert sec.env_refs()["OPENAI_API_KEY"] == f"op://{sec.VAULT}/{'z' * 26}/password"
     assert "sk-live" not in json.dumps(sec.items()) and "sk-live" not in sec.INDEX.read_text()
+
+
+def test_prompts_check_secret_store_before_asking():
+    providers = import_module("command_centre.providers")
+    questions = import_module("command_centre.questions")
+    assert "ALWAYS check the store FIRST" in providers.worker_rules("codex")
+    assert "with-secrets --list" in questions.QUESTION_RULES
+    assert "with-secrets --list" in providers.PLANNER_ROLE

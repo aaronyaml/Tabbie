@@ -2,8 +2,12 @@
 
 Where they live: a 1Password vault (default "Tabbie") that a 1Password service account can read and write.
 The service account token sits in the macOS Keychain (service ai.tabbie.1password); nothing here writes it to
-disk, logs it or returns it. Workers never get it either: bin/with-secrets runs their command under `op run`,
-which injects the secrets as environment variables of that one process and masks them in its output.
+disk, logs it or returns it. Workers never get it either: bin/with-secrets runs their command through op_sdk.py
+`run`, which injects the secrets as environment variables of that one process and masks them in its output.
+
+1Password is reached with its Python SDK (op_sdk.py), not the `op` CLI: `op` reads the 1Password app's data,
+which macOS guards with a permission prompt per background process ("would like to access data from other
+apps") and `op` hangs until it's clicked. The SDK never touches the app, so it works unattended.
 
 What the browser sees (Settings → Accounts → Secrets): each secret's name, its environment variable name and
 its provider. Never a value. The one exception is Rotate: the provider makes a new key, it's saved to
@@ -87,12 +91,36 @@ def op_env(token: str | None = None) -> dict:
     return env
 
 
+SDK_PIN = "onepassword-sdk==0.4.2"
+HELPER = Path(__file__).resolve().with_name("op_sdk.py")
+
+
+def _uv() -> str | None:
+    home = Path.home()
+    for c in (shutil.which("uv"), home / ".local/bin/uv", "/opt/homebrew/bin/uv", "/usr/local/bin/uv", home / ".cargo/bin/uv"):
+        if c and Path(c).is_file():
+            return str(c)
+    return None
+
+
+def sdk_cmd(args: list[str]) -> list[str]:
+    """The op_sdk.py helper with the SDK (uv caches it after the first run)."""
+    uv = _uv()
+    if not uv:
+        raise SecretError("uv isn't installed (Tabbie needs it to talk to 1Password).")
+    return [uv, "run", "-q", "--no-project", "--with", SDK_PIN, "python", "-I", str(HELPER), *args]
+
+
+def available() -> bool:
+    return bool(_uv())
+
+
 def _op(args: list[str], stdin: str | None = None, token: str | None = None) -> str:
     try:
-        r = subprocess.run(["op", *args], input=stdin, capture_output=True, text=True, timeout=OP_TIMEOUT,
+        r = subprocess.run(sdk_cmd(args), input=stdin, capture_output=True, text=True, timeout=OP_TIMEOUT,
                            env=op_env(token))
     except FileNotFoundError:
-        raise SecretError("The 1Password command-line tool (op) isn't installed.") from None
+        raise SecretError("uv isn't installed (Tabbie needs it to talk to 1Password).") from None
     except subprocess.TimeoutExpired:
         raise SecretError("1Password didn't answer in time.") from None
     if r.returncode != 0:
@@ -103,7 +131,7 @@ def _op(args: list[str], stdin: str | None = None, token: str | None = None) -> 
 
 # ── status + list (names only) ─────────────────────────────────────────────────────────────────────
 def status() -> dict:
-    out = {"op": bool(shutil.which("op")), "connected": False, "vault": VAULT, "error": ""}
+    out = {"op": available(), "connected": False, "vault": VAULT, "error": ""}
     if not out["op"]:
         return out
     if not _token():
@@ -187,11 +215,14 @@ def items(force: bool = False) -> list[dict]:
     return out
 
 
-def env_refs() -> dict[str, str]:
-    """{ENV_NAME: op://vault/item/credential} for `op run` (no values)."""
+def env_refs(strict: bool = False) -> dict[str, str]:
+    """{ENV_NAME: op://vault/item/credential} for op_sdk.py `run` (no values). strict: raise instead of {} when
+    1Password can't be reached, so `with-secrets --list` says why rather than "no secrets"."""
     try:
         rows = items()
     except SecretError:
+        if strict:
+            raise
         return {}
     out = {}
     for r in rows:  # first one wins if two items end up with the same name

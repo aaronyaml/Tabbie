@@ -496,7 +496,7 @@
       "id": "secrets",
       "name": "Secrets: API keys in 1Password (names only, never values)",
       "scripts": [
-        "secrets.js?v=6"
+        "secrets.js?v=7"
       ],
       "stylesheets": [
         "secrets.css?v=3"

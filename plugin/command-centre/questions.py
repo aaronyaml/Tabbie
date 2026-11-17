@@ -28,7 +28,8 @@ QUESTION_RULES = """- If you are BLOCKED on a decision only the user can make (i
     "options": [{"label": "1-5 words", "description": "What this choice means"}, ...]}]}
   ```
   1-4 questions, 2-4 options each (the user can also type their own answer). Put the
-  recommended option first. Do not ask about things you can decide or verify yourself. The
+  recommended option first. Do not ask about things you can decide or verify yourself (never ask
+  for an API key or how to get one before checking `~/hermes/bin/with-secrets --list`). The
   user's answers arrive as the next message in this same session; then continue the work."""
 
 # Codex output-schema (strict): every key required, no extras.

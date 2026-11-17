@@ -35,27 +35,25 @@
   const DOTS = '<span class="hx-sec-dots" aria-label="hidden value">••••••••••••</span>';
 
   // The whole 1Password setup, one step at a time (same steps as bin/setup's Secrets step). Ticks come from what
-  // Tabbie can check: the command-line tool is installed (st.op), a token is saved (st.token), it connects.
+  // Tabbie can check: a token is saved (st.token), it connects. (No 1Password CLI needed: Tabbie uses the SDK.)
   const LINKS = { signup: 'https://1password.com/sign-up', app: 'https://1password.com/downloads/mac',
-    cli: 'https://developer.1password.com/docs/cli/get-started/', web: 'https://my.1password.com/' };
+    web: 'https://my.1password.com/' };
   const link = (k, label) => `<a class="hx-st-btn hx-sec-link" href="${LINKS[k]}" target="_blank" rel="noopener noreferrer">${esc(label)}${icon('LinkSquare02Icon', 13)}</a>`;
   function setup(st) {
     const v = esc(st.vault);
     const step = (n, done, title, body, extra) => `<li class="${done ? 'is-done' : ''}"><span class="hx-sec-n">${done ? icon('Tick02Icon', 13) : n}</span><div><b>${title}</b>${body ? `<span>${body}</span>` : ''}${extra ? `<p class="hx-sec-links">${extra}</p>` : ''}</div></li>`;
-    const linked = st.op || st.token;
+    const linked = st.token || st.connected;
     return `<div class="hx-st-card hx-sec-setup"><div class="hx-st-main">
       <b class="hx-sec-title">Connect 1Password <span class="hx-st-pill">Optional</span></b>
       <span class="hx-st-dim">Keep API keys in 1Password and let Claude Code and Codex use them while they work, without anyone seeing them: not you in the chat, not the AI. Tabbie only ever shows their names. About 5 minutes.</span>
       <ol class="hx-sec-steps">
         ${step(1, linked, 'Get 1Password', 'A 1Password account and the Mac app, signed in. Any plan works, including Individual and Families.',
           link('signup', 'Sign up') + link('app', 'Download for Mac'))}
-        ${step(2, st.op, 'Install the 1Password command-line tool', st.op ? 'Installed.' : 'Tabbie uses it to hand a key to a command. Install the package from 1Password’s site, or in Terminal: <code>brew install 1password-cli</code>.',
-          st.op ? '' : link('cli', 'Get the CLI'))}
-        ${step(3, st.connected, `Make a vault called “${v}”`, `In the 1Password app: <b>File → New Vault</b> (or <b>+</b> next to Vaults), name it <b>${v}</b>. Tabbie can only see keys in this vault, never your others.`)}
-        ${step(4, st.token || st.connected, 'Create a service account (Tabbie’s access token)',
+        ${step(2, st.connected, `Make a vault called “${v}”`, `In the 1Password app: <b>File → New Vault</b> (or <b>+</b> next to Vaults), name it <b>${v}</b>. Tabbie can only see keys in this vault, never your others.`)}
+        ${step(3, st.token || st.connected, 'Create a service account (Tabbie’s access token)',
           `A separate login just for Tabbie, so it never needs your password. At 1Password.com: <b>Developer</b> → <b>Directory</b>, then <b>Other</b> under Infrastructure Secrets Management → <b>Create a Service Account</b>. Name it <b>Tabbie</b>, choose the <b>${v}</b> vault with <b>Read</b> and <b>Write</b> (leave Share off), then <b>Create</b>. Save the token in 1Password when it offers, and copy it: it starts <code>ops_</code> and is shown only once. Its access can’t be changed later; if you get it wrong, make a new one.`,
           link('web', 'Open 1Password.com'))}
-        ${step(5, st.connected, 'Paste the token here', 'It goes straight into your Mac’s Keychain. Tabbie checks it can open the vault, and never shows the token again.')}
+        ${step(4, st.connected, 'Paste the token here', 'It goes straight into your Mac’s Keychain. Tabbie checks it can open the vault, and never shows the token again.')}
       </ol>
       <form class="hx-sec-form" data-act="connect" autocomplete="off">
         <input type="password" name="token" placeholder="ops_…" autocomplete="new-password" data-1p-ignore data-lpignore="true" spellcheck="false" required aria-label="Service account token">
