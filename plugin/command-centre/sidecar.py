@@ -811,7 +811,7 @@ def agents_payload() -> dict:
             "dynamic": agent_set.dynamic_enabled(), "takeover": agent_set.takeover_enabled(),
             "step_commits": agent_set.step_commits_enabled(), "uat": agent_set.uat_enabled(),
             "writing_model": agent_set.writing_model_enabled(), "linked": linked,
-            "dynamic_available": agent_set.dynamic_allowed(linked)}
+            "dynamic_available": agent_set.dynamic_possible(linked)}
 
 
 def set_agents(body: dict) -> tuple[int, dict]:

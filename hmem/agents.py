@@ -74,11 +74,16 @@ def writing_model_enabled() -> bool:
     return _flag("writing_model")
 
 
+def dynamic_possible(linked: dict | None = None) -> bool:
+    """Hand-offs can be used here: both agents are enabled and (when given) both are signed in. The switch
+    is offered whenever this is true, whether it's on or off."""
+    on = enabled()
+    return "claude" in on and "codex" in on and (linked is None or all(linked.get(a) for a in AGENTS))
+
+
 def dynamic_allowed(linked: dict | None = None) -> bool:
     """The setting is on, both agents are enabled, and (when given) both are signed in."""
-    on = enabled()
-    both = "claude" in on and "codex" in on
-    return dynamic_enabled() and both and (linked is None or all(linked.get(a) for a in AGENTS))
+    return dynamic_enabled() and dynamic_possible(linked)
 
 
 def save(agents: list[str] | None = None, dynamic: bool | None = None, takeover: bool | None = None,

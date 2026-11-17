@@ -315,3 +315,12 @@ html.hx-glass #hxProjects .hxp-sheet {
 .hx-glass-set > label > button[role="switch"] { margin-left: auto; flex: none; display: inline-flex; align-items: center; }
 .hx-glass-set button[role="switch"] { border: 0; padding: 0; background: transparent; cursor: pointer; }
 .hx-glass-set .hx-glass-desc { font-size: 11px; color: var(--muted); margin-top: 4px; }
+
+/* Model picker sub-pages: the panel is the glass, so its header and Back button paint no surface of their
+   own (an opaque band and a glass circle read as dark boxes on the frosted panel). The header scrolls with
+   the page instead of pinning over it. */
+html.hx-glass .hx-mp-panel .hx-mp-head-2 { position: static; margin-top: 0; background: transparent !important; }
+html.hx-glass .hx-mp-panel .hx-back { border: 0 !important; background: transparent !important; box-shadow: none !important;
+  -webkit-backdrop-filter: none; backdrop-filter: none; }
+html.hx-glass .hx-mp-panel .hx-back:hover, html.hx-glass .hx-mp-panel .hx-back:focus-visible {
+  background: color-mix(in srgb, currentColor 10%, transparent) !important; }

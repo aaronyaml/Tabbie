@@ -58,6 +58,10 @@ def test_setting_default_on_and_round_trip():
     assert a.dynamic_allowed() is False  # one agent: no hand-offs
     a.save(["claude", "codex"])
     assert a.dynamic_allowed({"claude": True, "codex": True}) and not a.dynamic_allowed({"claude": True, "codex": False})
+    # switched off it's still offered (so it can be turned back on), just not used
+    a.save(dynamic=False)
+    assert a.dynamic_possible({"claude": True, "codex": True}) and not a.dynamic_allowed({"claude": True, "codex": True})
+    a.save(dynamic=True)
 
 
 def test_rule_variants_name_the_other_provider():
