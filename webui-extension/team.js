@@ -84,7 +84,10 @@
     const shown = made ? `<div class="hx-team-code hx-team-inv" aria-live="polite">
         <span class="hx-st-dim">Send this to <b>${esc(cap(made.for))}</b> (message or email). In Tabbie they paste it into <b>Settings → Accounts → Team</b>. Works once, for 24 hours.</span>
         <code class="hx-team-invcode">${esc(made.code)}</code>
-        <p class="hx-team-links"><button type="button" class="hx-st-btn is-primary" data-act="copy-invite">${copied ? 'Copied' : 'Copy code'}</button><button type="button" class="hx-st-btn" data-act="done-invite">Done</button></p>
+        <p class="hx-team-links"><button type="button" class="hx-st-btn is-primary" data-act="copy-invite">${copied === 'code' ? 'Copied' : 'Copy code'}</button>${made.enrol ? '' : '<button type="button" class="hx-st-btn" data-act="done-invite">Done</button>'}</p>
+        ${made.enrol ? `<span class="hx-st-dim">${esc(cap(made.for))} is new to the team, so send this link too. It sets up their passkey for the team site on their phone or browser. Works once, for 24 hours.</span>
+        <code class="hx-team-invcode hx-team-enrol">${esc(made.enrol)}</code>
+        <p class="hx-team-links"><button type="button" class="hx-st-btn is-primary" data-act="copy-enrol">${copied === 'enrol' ? 'Copied' : 'Copy link'}</button><button type="button" class="hx-st-btn" data-act="done-invite">Done</button></p>` : ''}
       </div>` : `<form class="hx-team-form" data-act="invite" autocomplete="off">
         <input name="for" value="${esc(typedFor)}" placeholder="Their team name, like leo" spellcheck="false" autocapitalize="off" required aria-label="Teammate’s team name">
         <button type="submit" class="hx-st-btn is-primary"${busy ? ' disabled' : ''}>${busy === 'invite' ? 'Making…' : 'Make invite code'}</button>
@@ -92,7 +95,7 @@
     const waiting = open.length && !made ? `<span class="hx-st-dim">Waiting for ${esc([...new Set(open.map((x) => cap(x.for)))].join(', '))} to use their code. Keep this Mac on so it can let them in.</span>` : '';
     return `<div class="hx-st-card hx-team-card"><div class="hx-st-main">
       <b>Invite a teammate</b>
-      <span class="hx-st-dim">One code links their Tabbie to the team and to this Mac. They need a team account first.</span>
+      <span class="hx-st-dim">One code links their Tabbie to the team and to this Mac. Someone new also gets a link to set up their team account.</span>
       ${shown}${waiting}
     </div></div>`;
   }
@@ -120,8 +123,15 @@
   function linkedCards(st) {
     const shared = new Set((st.projects || []).map((p) => p.toLowerCase()));
     const projects = st.all_projects || [];
-    const devs = (st.devices || []).map((d) => `<div class="hx-st-row"><div class="hx-st-main"><b>${esc(d.name)}</b><span class="hx-st-dim">Fingerprint <code>${esc(d.fingerprint)}</code></span></div></div>`).join('');
-    const macs = (st.macs || []).map((m) => `<div class="hx-st-row"><div class="hx-st-main"><b>${esc(cap(m.owner))}’s Mac</b><span class="hx-st-dim">Fingerprint <code>${esc(m.fingerprint)}</code></span></div></div>`).join('');
+    // Remove: your own browser or phone (new team key, it can't read anything new), or a teammate who left
+    const confirmRow = (key, q, yes) => asking === key
+      ? `<div class="hx-team-confirm"><span class="hx-team-q">${q}</span><button type="button" class="hx-st-btn is-danger" data-act="${yes}">Remove</button><button type="button" class="hx-st-btn" data-act="cancel">Keep</button></div>` : '';
+    const devs = (st.devices || []).map((d) => `<div class="hx-st-row hx-team-wrap"><div class="hx-st-main"><b>${esc(d.name)}</b><span class="hx-st-dim">Fingerprint <code>${esc(d.fingerprint)}</code></span></div>
+        <div class="hx-st-side"><button type="button" class="hx-st-btn" data-act="ask-remove-device" data-fp="${esc(d.fingerprint)}"${busy ? ' disabled' : ''}>${busy === 'remove-device:' + d.fingerprint ? 'Removing…' : 'Remove'}</button></div>
+        ${confirmRow('device:' + d.fingerprint, `Remove ${esc(d.name)}? It's signed out of your team's chats, and the team key changes so it can't read anything new.`, 'remove-device-yes')}</div>`).join('');
+    const macs = (st.macs || []).map((m) => `<div class="hx-st-row hx-team-wrap"><div class="hx-st-main"><b>${esc(cap(m.owner))}’s Mac</b><span class="hx-st-dim">Fingerprint <code>${esc(m.fingerprint)}</code></span></div>
+        <div class="hx-st-side"><button type="button" class="hx-st-btn" data-act="ask-remove-person" data-who="${esc(m.owner)}"${busy ? ' disabled' : ''}>${busy === 'remove:' + m.owner ? 'Removing…' : 'Remove from team'}</button></div>
+        ${confirmRow('person:' + m.owner, `Remove ${esc(cap(m.owner))} from the team? Their Mac, phone and browsers are signed out, and the team key changes so they can't read anything shared from now on. They keep what they already saw.`, 'remove-person-yes')}</div>`).join('');
     return `${(st.pending || []).length ? `<div class="hx-st-card hx-team-waiting">${waitingRows(st)}</div>` : ''}
       <div class="hx-st-card hx-st-list">
         <div class="hx-st-row"><div class="hx-st-main"><b>This Mac</b><span class="hx-st-dim">${esc(st.mac ? st.mac.name : '')} · fingerprint <code>${esc(st.mac ? st.mac.fingerprint : '')}</code></span></div>
@@ -211,18 +221,30 @@
     if (a === 'pair') act('pair', async () => { state = await post('pair', {}); });
     else if (a === 'by-hand') { byHand = true; render(); const i = box.querySelector('input[name="url"]'); if (i) i.focus(); }
     else if (a === 'done-invite') { made = null; copied = false; render(); }
-    else if (a === 'copy-invite' && made) {
-      const done = () => { copied = true; render(); };
-      if (navigator.clipboard && window.isSecureContext) navigator.clipboard.writeText(made.code).then(done, () => selectCode());
-      else selectCode();
+    else if ((a === 'copy-invite' || a === 'copy-enrol') && made) {
+      const which = a === 'copy-enrol' ? 'enrol' : 'code';
+      const done = () => { copied = which; render(); };
+      const text = which === 'enrol' ? made.enrol : made.code;
+      if (navigator.clipboard && window.isSecureContext) navigator.clipboard.writeText(text).then(done, () => selectCode(which));
+      else selectCode(which);
+    }
+    else if (a === 'ask-remove-device') { asking = 'device:' + b.dataset.fp; render(); }
+    else if (a === 'ask-remove-person') { asking = 'person:' + b.dataset.who; render(); }
+    else if (a === 'remove-device-yes' && asking.startsWith('device:')) {
+      const fp = asking.slice(7); asking = '';
+      act('remove-device:' + fp, async () => { state = await post('remove-device', { fingerprint: fp }); });
+    }
+    else if (a === 'remove-person-yes' && asking.startsWith('person:')) {
+      const who = asking.slice(7); asking = '';
+      act('remove:' + who, async () => { state = await post('remove', { who }); });
     }
     else if (a === 'disconnect') { asking = 'disconnect'; render(); }
     else if (a === 'retry') { err = ''; loading = false; render(); load(true); }
     else if (a === 'cancel') { asking = ''; render(); }
     else if (a === 'disconnect-yes') { asking = ''; act('disconnect', async () => { state = await post('disconnect'); }); }
   }
-  function selectCode() {  // no clipboard (plain http): select it so Cmd-C copies
-    const c = box.querySelector('.hx-team-invcode');
+  function selectCode(which) {  // no clipboard (plain http): select it so Cmd-C copies
+    const c = box.querySelector(which === 'enrol' ? '.hx-team-enrol' : '.hx-team-invcode');
     if (!c) return;
     const r = document.createRange(); r.selectNodeContents(c);
     const sel = getSelection(); sel.removeAllRanges(); sel.addRange(r);

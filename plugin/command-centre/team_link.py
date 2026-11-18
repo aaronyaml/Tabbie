@@ -164,6 +164,16 @@ def post(path: str, body: dict) -> tuple[int, dict]:
         if not c or len(c) > 600:
             return 400, {"ok": False, "error": "Paste the whole invite code. It starts with TT1-."}
         code, r = _json(["join", c, "--json"], timeout=180)  # a new Mac's first run also fetches tt's libraries
+    elif act == "remove":  # a teammate leaves: their devices are revoked and the team key changes
+        who = str(body.get("who") or "").strip().lower()
+        if not re.fullmatch(r"[a-z][a-z0-9-]{1,19}", who):
+            return 400, {"ok": False, "error": "Pick a teammate to remove."}
+        code, r = _json(["remove", who, "--json"], timeout=60)
+    elif act == "remove-device":  # one of this person's own browsers or phones
+        c = str(body.get("fingerprint") or "").strip().upper()
+        if not CODE.match(c.replace("-", "")) and not CODE.match(c):
+            return 400, {"ok": False, "error": "Pick a device to remove."}
+        code, r = _json(["revoke", c, "--json"], timeout=60)
     elif act == "disconnect":
         code, r = _json(["disconnect", "--json"])
     else:

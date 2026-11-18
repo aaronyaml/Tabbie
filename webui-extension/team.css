@@ -74,3 +74,7 @@ html.hx-glass .hx-team-sheet-c { background: linear-gradient(180deg, var(--glass
 @keyframes hx-team-spin { to { transform: rotate(1turn); } }
 @media (prefers-reduced-motion: reduce) { .hx-team-title .hx-team-spin { animation: none; } }
 @media (max-width: 640px) { .hx-team-join { align-items: stretch; } .hx-team-join textarea { font-size: 16px; } }
+/* a device or teammate row with its Remove confirmation underneath */
+.hx-team-wrap { flex-wrap: wrap; }
+.hx-team-confirm { flex: 1 1 100%; display: flex; flex-wrap: wrap; align-items: center; gap: 8px; padding-top: 8px; }
+.hx-team-enrol { word-break: break-all; }

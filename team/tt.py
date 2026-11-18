@@ -15,6 +15,8 @@ shared sessions show live on your team's devices. Set up from Settings → Team,
     tt mail draft ID|- "what to say"   a draft in the house standard (- for a new email); nothing is sent
     tt mail triage                     note, draft and suggest follow-ups now (normally 16:00 UK time daily)
     tt invite NAME                     one code for NAME's Tabbie: links their Mac and trusts both ways
+                                       (makes NAME's team account and a passkey link if they're new)
+    tt remove NAME                     remove someone from the team: revokes their devices, new team key
     tt join CODE                       use an invite code (connects, links this Mac, trusts the inviter)
     tt listen [ROOM]                   show a room live (verified + decrypted here)
     tt send ROOM TEXT                  send an encrypted, signed test message
@@ -364,20 +366,37 @@ def cmd_pair(args):
 
 def receive_wraps() -> int:
     """Team keys another trusted Mac wrapped for this one (e.g. Aaron's Mac sharing with Leo's)."""
+    return len(receive_new_keys())
+
+
+def receive_new_keys() -> list[str]:
+    """Like receive_wraps, returning the new key ids. The newest wrap becomes the current key."""
     m, _, xk = mac_keys()
     trust = load("trust.json")
     t = team()
-    n = 0
-    for w in api("GET", "/api/wraps")["wraps"]:
+    new = []
+    for w in sorted(api("GET", "/api/wraps")["wraps"], key=lambda w: w.get("created_at") or 0):
         wrapper = next((x for x in trust.get("macs", {}).values() if x["kid"] == w["wrapper_kid"]), None)
         if not wrapper or w["key_id"] in t["keys"]:
             continue
         t["keys"][w["key_id"]] = C.b64u(C.unwrap(w, m["kid"], xk, wrapper["sign_pub"]))
         t["current"] = w["key_id"]
-        n += 1
-    if n:
+        new.append(w["key_id"])
+    if new:
         save("team.json", t)
-    return n
+    return new
+
+
+def sync_keys() -> list[str]:
+    """A teammate's Mac changed the team key (a device was removed, or someone left): pick it up and pass it
+    on to this person's own approved browsers and phones, which only ever get keys from their own Mac."""
+    new = receive_new_keys()
+    if new:
+        trust = load("trust.json") or {}
+        rec = [(k, d["ecdh_pub"]) for k, d in trust.get("allow", {}).items()]
+        if rec:
+            api("POST", "/api/wraps", {"wraps": wraps_for(rec, new)})
+    return new
 
 
 def new_team_key() -> str:
@@ -462,13 +481,17 @@ def cmd_revoke(args):
     api("POST", f"/api/devices/{kid}/revoke", {"at": at, "sig": C.sign(sk, C.revoke_parts(kid, trust["owner"], at))})
     trust.setdefault("removed", {})[kid] = dict(trust["allow"].pop(kid), removed_at=at)
     save("trust.json", trust)
-    print(f"Removed {d['name']}.")
-    cmd_rotate([])
+    rotate()
     (HOME / "me.json").unlink(missing_ok=True)  # the removed device had the personal key too: make a new one
     share_me_key()
+    out({"ok": True, "message": f"Removed {d['name']}."}, f"Removed {d['name']}.")
 
 
 def cmd_rotate(_args):
+    print(rotate())
+
+
+def rotate() -> str:
     key_id = new_team_key()
     trust = load("trust.json")
     rec = [(k, d["ecdh_pub"]) for k, d in trust["allow"].items()]
@@ -479,7 +502,7 @@ def cmd_rotate(_args):
             rec.append((mac["kid"], r["ecdh_pub"]))
     if rec:
         api("POST", "/api/wraps", {"wraps": wraps_for(rec, [key_id])})
-    print(f"New team key {key_id}, shared with {len(rec)} device(s).")
+    return f"New team key {key_id}, shared with {len(rec)} device(s)."
 
 
 def cmd_trust(args):
@@ -511,21 +534,60 @@ def invite(for_name: str) -> dict:
     trust = load("trust.json") or {}
     if not team()["current"] or not trust.get("owner"):
         raise Fail("Link this Mac to the team first.")
+    name = for_name.strip().lower()
+    enrol = add_account(name)
     secret = os.urandom(32)
     tok = C.invite_token(secret)
-    r = api("POST", "/api/macs/invites", {"for": for_name.strip().lower(), "token_hash": C.token_hash(tok)})
+    r = api("POST", "/api/macs/invites", {"for": name, "token_hash": C.token_hash(tok)})
     inv = load("invites.json", {})
     inv[C.token_hash(tok)] = {"for": r["for"], "secret": C.b64u(secret), "at": C.now_ms()}
     save("invites.json", inv)
     code = C.make_invite(RELAY, r["for"], secret, {"owner": trust["owner"], "kid": m["kid"]})
-    return {"code": code, "for": r["for"], "expires_at": r["expires_at"]}
+    return {"code": code, "for": r["for"], "expires_at": r["expires_at"], "enrol": enrol}
+
+
+def add_account(name: str) -> str:
+    """Make sure `name` has a team account. Returns a one-time passkey link for their phone or browser when the
+    account has no passkey yet, else "". (An existing account never gets a link: no one can take one over.)"""
+    tok = C.b64u(os.urandom(32))
+    try:
+        r = api("POST", "/api/users", {"name": name, "token_hash": C.token_hash(tok)})
+    except Fail as e:
+        if "Not found" in str(e):  # an older relay: accounts are made with its scripts/invite.sh
+            return ""
+        raise
+    return f"{RELAY}/enrol#{tok}" if r.get("enrol") else ""
+
+
+def remove_teammate(name: str) -> str:
+    """Remove someone from the team: the relay revokes their devices and passkeys, then a new team key goes
+    only to the people who remain (they can't read anything shared from now on)."""
+    name = name.strip().lower()
+    trust = load("trust.json") or {}
+    if name == trust.get("owner"):
+        raise Fail("You can't remove yourself. Use Disconnect instead.")
+    api("POST", f"/api/users/{name}/remove", {})
+    trust.get("macs", {}).pop(name, None)
+    trust.setdefault("removed_people", []).append(name)
+    save("trust.json", trust)
+    rotate()
+    return f"Removed {name}. The team has a new key that {name} doesn't have."
+
+
+def cmd_remove(args):
+    if len(args) != 1:
+        raise Fail("usage: tt remove NAME")
+    msg = remove_teammate(args[0])
+    out({"ok": True, "message": msg}, msg)
 
 
 def cmd_invite(args):
     if len(args) != 1:
         raise Fail("usage: tt invite NAME")
     r = invite(args[0])
-    out(r, f"Send {r['for']} this code (works once, for {INVITE_HOURS} hours). Their Tabbie asks for it in setup or Settings → Team:\n\n{r['code']}\n")
+    extra = (f"\nThey also need this link to sign in on their phone or browser (works once, {INVITE_HOURS} hours):\n\n{r['enrol']}\n"
+             if r.get("enrol") else "")
+    out(r, f"Send {r['for']} this code (works once, for {INVITE_HOURS} hours). Their Tabbie asks for it in setup or Settings → Team:\n\n{r['code']}\n{extra}")
 
 
 def join(code: str, name: str | None = None) -> dict:
@@ -780,6 +842,20 @@ def start_invite_watch():
 
     _WATCH = threading.Thread(target=loop, daemon=True, name="invites")
     _WATCH.start()
+    threading.Thread(target=_key_loop, daemon=True, name="keys").start()
+
+
+KEY_EVERY = 60
+
+
+def _key_loop():
+    while True:
+        try:
+            for k in sync_keys():
+                print(f"daemon: received new team key {k} and shared it with this person's devices", flush=True)
+        except (Fail, OSError, ValueError, KeyError) as e:
+            print(f"daemon: key check failed ({type(e).__name__})", flush=True)
+        time.sleep(KEY_EVERY)
 
 
 def cmd_daemon(_args):
@@ -835,7 +911,7 @@ def cmd_unshare(args):
 
 COMMANDS = {"connect": cmd_connect, "disconnect": cmd_disconnect, "info": cmd_info, "pair": cmd_pair, "status": cmd_status, "approve": cmd_approve, "revoke": cmd_revoke, "rotate": cmd_rotate,
             "trust": cmd_trust, "listen": cmd_listen, "send": cmd_send, "daemon": cmd_daemon, "share": cmd_share, "unshare": cmd_unshare,
-            "pending": cmd_pending, "invite": cmd_invite, "join": cmd_join, "mail": cmd_mail}
+            "pending": cmd_pending, "invite": cmd_invite, "remove": cmd_remove, "join": cmd_join, "mail": cmd_mail}
 
 if __name__ == "__main__":
     sys.stdout.reconfigure(line_buffering=True)
