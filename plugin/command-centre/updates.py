@@ -145,11 +145,20 @@ def _save_state(d: dict) -> None:
     os.replace(tmp, STATE)
 
 
+# Plugin modules only the helper (cc-sidecar) loads: a change to just these restarts the helper (about a
+# second), not the WebUI and gateway (about 15 s). Anything else under plugin/ is treated as WebUI code.
+SIDECAR_ONLY = {f"plugin/command-centre/{m}.py" for m in ("sidecar", "connections", "hub_setup", "linkicons", "team_link", "usage_insights")}
+
+
 def _needs(files: list[str]) -> list[str]:
     need = set()
     for f in files:
-        if f.startswith(("plugin/", "hmem/", "config/router.yaml")):
+        if f in SIDECAR_ONLY:
+            need.add("sidecar")
+        elif f.startswith(("plugin/", "hmem/", "config/router.yaml")):
             need.update(("gateway", "webui", "sidecar"))
+        if f.startswith("team/") or f == "bin/tt":
+            need.add("team")
         if f == "services/Caddyfile":
             need.add("caddy")
         if f.startswith("webui-extension/"):
@@ -215,7 +224,7 @@ def apply() -> dict:
 
 
 def pending_restart() -> list[str]:
-    return [n for n in (_state().get("needs") or []) if n in ("gateway", "webui", "sidecar", "caddy")] \
+    return [n for n in (_state().get("needs") or []) if n in ("gateway", "webui", "sidecar", "caddy", "team")] \
         + (["services"] if _state().get("services") else [])
 
 
@@ -308,7 +317,10 @@ def _reinstall_changed(labels: list[str]) -> list[str]:
 
 def _workers_alive() -> bool:
     from .procutil import procutil
-    return bool(procutil.find(r"claude(\.exe|\.cmd|\.js)?\"? -p|codex(\.exe|\.cmd|\.js)?\"? exec|remotion render"))
+    pids = set(procutil.find(r"claude(\.exe|\.cmd|\.js)?\"? -p|codex(\.exe|\.cmd|\.js)?\"? exec|remotion render"))
+    # Team mail's short background calls (summaries, triage: no tools, --safe-mode) aren't work a restart cuts off
+    pids -= set(procutil.find(r"claude.* -p .*--safe-mode .*--strict-mcp-config"))
+    return bool(pids)
 
 
 INTERRUPTED = "Interrupted: Tabbie restarted while this was running. Send it again to retry."
@@ -466,6 +478,9 @@ def restart(after_reply=None) -> dict:
                          stdin=subprocess.DEVNULL, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL,
                          start_new_session=True)
         done.append("webui")
+    if "team" in needs and not win and _loaded("ai.hermes.team"):
+        subprocess.run(["launchctl", "kickstart", "-k", f"gui/{uid}/ai.hermes.team"], capture_output=True)
+        done.append("team")
     st = _state()
     if st.get("services") and not os.environ.get("TABBIE_NO_SERVICES"):
         if sys.platform == "darwin":
@@ -473,7 +488,7 @@ def restart(after_reply=None) -> dict:
         elif win and _winsvc().running():
             _winsvc().request_restart(["supervisor"], delay=3)
             done.append("supervisor")
-    st["needs"] = [n for n in st.get("needs", []) if n not in ("gateway", "webui", "caddy", "sidecar")]
+    st["needs"] = [n for n in st.get("needs", []) if n not in ("gateway", "webui", "caddy", "sidecar", "team")]
     st.pop("services", None)
     _save_state(st)
     if "sidecar" in needs and after_reply:
@@ -487,8 +502,8 @@ def restart(after_reply=None) -> dict:
 # workers keep their files open). Only the restart could cut something off, so it waits: for any
 # request, worker or Motion render to finish, then IDLE_GRACE seconds more so the hub can finish
 # writing its reply. The wish survives a sidecar restart (state file); the sidecar resumes it.
-IDLE_GRACE = 90
-POLL = 15
+IDLE_GRACE = 30
+POLL = 5
 _waiter: dict = {"thread": None}
 
 

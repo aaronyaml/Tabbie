@@ -77,7 +77,7 @@
   function finished(res) {
     const needs = res.needs || [];
     lastNeeds = needs;
-    const restart = needs.some((x) => x === 'gateway' || x === 'webui' || x === 'sidecar' || x === 'caddy');
+    const restart = needs.some((x) => x === 'gateway' || x === 'webui' || x === 'sidecar' || x === 'caddy' || x === 'team');
     const saved = res.backed_up && res.backed_up.files ? `<p class="hx-up-note">Your edits to ${res.backed_up.files.length} file${res.backed_up.files.length === 1 ? '' : 's'} were saved to <code>${esc(res.backed_up.dir)}</code>.</p>` : '';
     const setup = saved + (needs.includes('setup') ? '<p class="hx-up-note">This update changed setup steps: run <code>bin/setup</code> on the computer when convenient.</p>' : '');
     if (restart) {
@@ -90,7 +90,7 @@
     }
   }
   function waitingCard() {
-    show(`<div class="hx-up-head"><b>Restart scheduled</b></div><p class="hx-up-note">Tabbie is busy (a request, a worker or a Motion render), so nothing is restarted now. It restarts by itself a minute or so after everything finishes. Keep working.</p>`
+    show(`<div class="hx-up-head"><b>Restart scheduled</b></div><p class="hx-up-note">Tabbie is busy (a request, a worker or a Motion render), so nothing is restarted now. It restarts by itself about half a minute after everything finishes. Keep working.</p>`
       + `<div class="hx-up-btns"><button type="button" data-close>OK</button></div>`);
     watchRestart();
   }
@@ -139,17 +139,22 @@
   const nap = (ms) => new Promise((ok) => setTimeout(ok, ms));
   async function restartNow() {
     progress(0);
+    let did = null;  // what was restarted; null if the answer was cut off (the helper restarting itself)
     try {
       const r = await call('/restart', 'POST');
       if (r && r.waiting) { waitingCard(); return; }
+      did = (r && r.restarted) || [];
     } catch (err) {
       // the sidecar restarting itself can cut the answer off: that means it's restarting, not that it failed
       if (!/reach|fetch|network|502|503|504/i.test(String(err && err.message))) { error(err.message || 'Try again later.', 'restart'); return; }
     }
     const t0 = Date.now();
     let down = false;
-    // 1) wait to see them go down (or 15 s: a restart that only touched the gateway never takes the page down)
-    while (Date.now() - t0 < 15000) {
+    // only the helper or background services restarted: the WebUI never goes down, so don't wait for it to
+    const quick = did && !did.includes('webui');
+    // 1) wait to see them go down (a restart that never takes the page down: briefly, not 15 s)
+    const lookFor = !did || did.includes('webui') ? 15000 : did.includes('sidecar') ? 3000 : 0;
+    while (Date.now() - t0 < lookFor) {
       await nap(1000);
       const ok = (await up('api/extensions/status')) && (await up(API));
       if (!ok) { down = true; break; }
@@ -158,7 +163,7 @@
     // 2) both answer again, twice in a row (launchd may start the sidecar, then reload its service)
     let streak = 0;
     while (Date.now() - t0 < 120000) {
-      await nap(down ? 1500 : 500);
+      await nap(down ? (quick ? 500 : 1500) : 500);
       const ok = (await up('api/extensions/status')) && (await up(API));
       streak = ok ? streak + 1 : 0;
       if (streak >= 2) break;
