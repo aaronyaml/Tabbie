@@ -223,7 +223,9 @@ mkdir -p state/logs state/requests state/ca general workspaces && chmod 700 stat
 [ -f config/projects.yaml ] || cp config/projects.example.yaml config/projects.yaml
 ok "config/projects.yaml"
 if [ ! -d hermes-webui ]; then
-  git clone -q https://github.com/nesquena/hermes-webui.git hermes-webui && ok "WebUI downloaded (hermes-webui/)" || fail "Couldn't download the WebUI (check your internet), then re-run"
+  WPIN="$(sed -n 's/^webui=\([0-9a-f]\{40\}\)$/\1/p' config/upstream.lock 2>/dev/null | head -1)"
+  git clone -q https://github.com/nesquena/hermes-webui.git hermes-webui \
+    && { [ -z "$WPIN" ] || git -C hermes-webui checkout -q --detach "$WPIN"; } && ok "WebUI downloaded (hermes-webui/)" || fail "Couldn't download the WebUI (check your internet), then re-run"
 else
   ok "WebUI (hermes-webui/)"
 fi

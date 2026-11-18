@@ -1,7 +1,7 @@
 name: tests
 
-# Windows only: the macOS suite runs on the Mac before every push, and hosted macOS runners
-# never got picked up for this repo (every run sat queued, then was cancelled).
+# Tabbie is built and used on one Mac, then installed on others: a different chip, Python, account and
+# history. These jobs run it the way other people's computers will.
 on:
   push:
     branches: [main]
@@ -24,3 +24,55 @@ jobs:
       - name: Tests
         shell: bash
         run: uv run -q --no-project --with pytest --with ruamel.yaml python -m pytest tests -q -p no:cacheprovider -rfE --tb=short
+
+  mac:
+    # Apple silicon and Intel, oldest and newest Python Tabbie supports
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [macos-15, macos-15-intel]
+        python: ["3.12", "3.14"]
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 50
+      - uses: astral-sh/setup-uv@v6
+      - name: The services' packages install on this chip (ready-made builds only)
+        run: |
+          uname -m
+          bin/tt --preflight
+          bin/cc-sidecar --preflight
+          bin/lock-deps check
+      - name: Tests
+        env:
+          TABBIE_NO_SERVICES: "1"
+        run: >
+          uv run -q --no-project --python ${{ matrix.python }} --with pytest --with ruamel.yaml
+          --with-requirements requirements/team.txt python -m pytest tests -q -p no:cacheprovider -rfE --tb=short
+      - name: The updater runs on Apple's own Python 3.9 (no packages)
+        run: |
+          /usr/bin/python3 --version || true
+          uv run -q --no-project --python 3.9 python -I bin/tabbie-update status
+          uv run -q --no-project --python 3.9 python -I -c "import sys; sys.path.insert(0, '.'); import hmem.cli"
+
+  mac-fresh:
+    # A brand-new user: no ~/hermes history, nothing installed or signed in. Then an update from an older
+    # version to this one, through the real updater (preflight included), and a rollback.
+    runs-on: macos-15-intel
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 50
+      - uses: astral-sh/setup-uv@v6
+      - name: Fresh setup (local files step, no services)
+        run: |
+          export HOME="$RUNNER_TEMP/home"; mkdir -p "$HOME"
+          git clone -q "$GITHUB_WORKSPACE" "$HOME/hermes"
+          cd "$HOME/hermes" && bin/setup-terminal --yes --only files
+          test -f config/projects.yaml && test -d hermes-webui/.git
+          bin/upstream status || true
+      - name: Update from an older version (old and new updater), then roll back
+        run: tests/ci/update-from-old.sh "$GITHUB_WORKSPACE" 5 "$RUNNER_TEMP/upd"
