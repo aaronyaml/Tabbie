@@ -26,16 +26,35 @@ def iso(days_ago):
     return (dt.datetime.now(dt.timezone.utc) - dt.timedelta(days=days_ago)).isoformat()
 
 
-def test_triage_runs_once_a_day_from_4pm_uk(tmp_path):
+def test_triage_runs_once_a_day_from_4pm_local(tmp_path):
     tt = FakeTT(tmp_path)
-    at = lambda h, m=0: dt.datetime(2026, 11, 18, h, m, tzinfo=M.UK)  # noqa: E731
-    assert not M.triage_due(tt, at(15, 59))
-    assert M.triage_due(tt, at(16, 0))
-    s = M.state(tt)
-    s["last_triage"] = "2026-11-18"
-    M.save_state(tt, s)
-    assert not M.triage_due(tt, at(18))
-    assert M.triage_due(tt, dt.datetime(2026, 11, 19, 16, 5, tzinfo=M.UK))
+    for tz in (M.UK, dt.timezone(dt.timedelta(hours=-8))):  # same rule whatever this Mac's time zone
+        (tmp_path / "mail.json").unlink(missing_ok=True)
+        at = lambda h, m=0, d=18: dt.datetime(2026, 11, d, h, m, tzinfo=tz)  # noqa: E731
+        assert not M.triage_due(tt, at(15, 59))
+        assert M.triage_due(tt, at(16, 0))
+        s = M.state(tt)
+        s["last_triage"] = "2026-11-18"
+        M.save_state(tt, s)
+        assert not M.triage_due(tt, at(18))
+        assert not M.triage_due(tt, at(9, d=19))   # yesterday's ran: wait for 16:00
+        assert M.triage_due(tt, at(16, 5, d=19))
+        assert M.triage_due(tt, at(9, d=20))        # a whole day missed (asleep at 16:00): run on waking
+
+
+def test_failed_triage_retries_then_gives_up_for_the_day(tmp_path):
+    tt = FakeTT(tmp_path)
+    t0 = dt.datetime(2026, 11, 18, 16, 0, tzinfo=M.UK)
+    assert M.triage_due(tt, t0)
+    assert M.triage_failed(tt, t0) == 1
+    assert not M.triage_due(tt, t0 + dt.timedelta(minutes=10))
+    t1 = t0 + dt.timedelta(minutes=31)
+    assert M.triage_due(tt, t1)
+    M.triage_failed(tt, t1)
+    t2 = t1 + dt.timedelta(minutes=31)
+    M.triage_failed(tt, t2)
+    assert not M.triage_due(tt, t2 + dt.timedelta(hours=2))      # three strikes: done for today
+    assert M.triage_due(tt, dt.datetime(2026, 11, 19, 16, 0, tzinfo=M.UK))
 
 
 def test_triage_notes_drafts_follows_up_and_skips_noted_mail(tmp_path, monkeypatch):

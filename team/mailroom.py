@@ -10,7 +10,7 @@ the relay. Requests are "mail.req" {rid, op, ...}; answers "mail.res" {rid, ok, 
 through live, never stored on the relay.
 
 Tabbie (Claude, on this Mac's own subscription, with no tools) answers questions about your mail, writes drafts,
-and once a day at 16:00 UK time triages new mail: a note on every email it reads, a draft reply for the ones that
+and once a day at 16:00 on this Mac's clock (its own time zone) triages new mail: a note on every email it reads, a draft reply for the ones that
 need one (you review and send), and a suggested follow-up where a thread went quiet or is too old to answer.
 Notes, drafts and suggestions live on this Mac (mail.json in the team folder). Emails that have a note are
 not read again unless you ask.
@@ -34,7 +34,13 @@ from zoneinfo import ZoneInfo
 import ttcore as C
 
 UK = ZoneInfo("Europe/London")
-TRIAGE_AT = (16, 0)
+TRIAGE_AT = (16, 0)  # local time on this Mac: a teammate abroad gets theirs in their afternoon
+TRIAGE_TRIES = 3     # a failed run is tried again after TRIAGE_RETRY_S, up to this many times a day
+TRIAGE_RETRY_S = 1800
+
+
+def _local_now() -> dt.datetime:
+    return dt.datetime.now().astimezone()
 TRIAGE_DAYS = 14  # mail older than this is never triaged (it's history)
 TRIAGE_MAX = 40   # threads per run, newest first
 OLD_DAYS = 10     # a thread whose last message is older than this gets a follow-up suggestion, not a reply
@@ -255,15 +261,38 @@ def triage(tt, force: bool = False, log=print) -> dict:
             done["skipped"] += 1
         save_state(tt, s)
     s = state(tt)
-    s["last_triage"] = dt.datetime.now(UK).date().isoformat()
+    s["last_triage"] = _local_now().date().isoformat()
+    s.pop("triage_failed", None)
     save_state(tt, s)
     log(f"mail triage: read {done['read']}, drafts {done['drafts']}, follow-ups {done['followups']}, no reply needed {done['skipped']}")
     return done
 
 
 def triage_due(tt, now: dt.datetime | None = None) -> bool:
-    now = now or dt.datetime.now(UK)
-    return (now.hour, now.minute) >= TRIAGE_AT and state(tt)["last_triage"] != now.date().isoformat()
+    """Due at TRIAGE_AT local time each day; straight away if a whole day was missed (the Mac was asleep or
+    off at that time: it runs on waking); after a failure, again TRIAGE_RETRY_S later, up to TRIAGE_TRIES."""
+    now = now or _local_now()
+    st = state(tt)
+    today = now.date().isoformat()
+    if st["last_triage"] == today:
+        return False
+    fail = st.get("triage_failed") or {}
+    if fail.get("day") == today and (fail.get("n", 0) >= TRIAGE_TRIES or now.timestamp() - fail.get("at", 0) < TRIAGE_RETRY_S):
+        return False
+    yesterday = (now.date() - dt.timedelta(days=1)).isoformat()
+    missed_a_day = bool(st["last_triage"]) and st["last_triage"] < yesterday
+    return (now.hour, now.minute) >= TRIAGE_AT or missed_a_day
+
+
+def triage_failed(tt, now: dt.datetime | None = None) -> int:
+    """Record a failed run; returns how many times it has failed today."""
+    now = now or _local_now()
+    s = state(tt)
+    f = s.get("triage_failed") or {}
+    n = (f.get("n", 0) if f.get("day") == now.date().isoformat() else 0) + 1
+    s["triage_failed"] = {"day": now.date().isoformat(), "n": n, "at": now.timestamp()}
+    save_state(tt, s)
+    return n
 
 
 # ---------- summaries: a line or two per email, written in the background by a small model, kept for next time ----------
@@ -456,10 +485,9 @@ class MailRoom:
                 if triage_due(self.tt):
                     await asyncio.to_thread(triage, self.tt, False, lambda m: print(m, flush=True))
             except Exception as e:  # noqa: BLE001
-                print(f"mail triage failed ({type(e).__name__}: {str(e)[:120]})", flush=True)
-                s = state(self.tt)
-                s["last_triage"] = dt.datetime.now(UK).date().isoformat()  # don't loop on a broken day
-                save_state(self.tt, s)
+                n = triage_failed(self.tt)
+                again = f"trying again in {TRIAGE_RETRY_S // 60} minutes" if n < TRIAGE_TRIES else "skipping today"
+                print(f"mail triage failed ({type(e).__name__}: {str(e)[:120]}); {again}", flush=True)
             await asyncio.sleep(60)
 
     async def listen(self):
