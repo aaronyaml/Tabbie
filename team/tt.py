@@ -324,6 +324,7 @@ def pair_finish() -> dict:
         new_team_key()
         made = True
     (HOME / "pairing.json").unlink(missing_ok=True)
+    run_hook("trusted", owner, m["kid"], m["sign_pub"])  # e.g. this Mac's mailbox, after linking again with new keys
     return {"state": "linked", "owner": owner, "fingerprint": C.fingerprint(m["sign_pub"]), "new_team_key": made}
 
 
@@ -638,16 +639,60 @@ def cmd_join(args):
 
 
 def run_hook(name: str, *args: str):
-    """config.json "hooks": {"trusted": ["cmd", "arg"...]}: run after this Mac trusts a teammate's Mac (OWNER KID SIGN_PUB),
-    e.g. to give that Mac its mailbox. Public data only. Runs in the background; output goes to the daemon log."""
+    """config.json "hooks": {"trusted": ["cmd", "arg"...]}: run after this Mac trusts a Mac (OWNER KID SIGN_PUB: a
+    teammate's, or this Mac itself after linking again), e.g. to give that Mac its mailbox. Public data only.
+    Queued in hooks.json and retried (1 min, 2, 4 ... up to 6 h) until it succeeds, so a hook that fails once
+    (offline, a service down) isn't lost. The daemon runs the queue every minute."""
     cmd = (config().get("hooks") or {}).get(name)
     if not isinstance(cmd, list) or not cmd:
         return
+    q = load("hooks.json", {"pending": []})
+    q["pending"] = [p for p in q["pending"] if not (p["name"] == name and p["args"][:1] == list(args[:1]))]  # newest per owner
+    q["pending"].append({"name": name, "args": list(args), "tries": 0, "next": 0})
+    save("hooks.json", q)
+    import threading
+    threading.Thread(target=run_pending_hooks, daemon=True, name="hooks").start()
+
+
+_HOOK_LOCK = __import__("threading").Lock()
+
+
+def run_pending_hooks(now: float | None = None) -> list[str]:
+    """Run queued hooks that are due. Returns the names that succeeded."""
     import subprocess
+    if not _HOOK_LOCK.acquire(blocking=False):
+        return []
     try:
-        subprocess.Popen([*map(str, cmd), *args], stdin=subprocess.DEVNULL)
-    except OSError as e:
-        print(f"hook {name}: couldn't run ({type(e).__name__})", flush=True)
+        q = load("hooks.json", {"pending": []})
+        hooks, done, keep = config().get("hooks") or {}, [], []
+        for p in q["pending"]:
+            cmd = hooks.get(p["name"])
+            if not isinstance(cmd, list) or not cmd:
+                continue  # hook removed from config: drop it
+            if (now or time.time()) < p.get("next", 0):
+                keep.append(p)
+                continue
+            try:
+                r = subprocess.run([*map(str, cmd), *p["args"]], stdin=subprocess.DEVNULL, capture_output=True, text=True, timeout=180)
+                ok, why = r.returncode == 0, (r.stdout + r.stderr).strip()[-200:]
+            except (OSError, subprocess.TimeoutExpired) as e:
+                ok, why = False, type(e).__name__
+            if ok:
+                done.append(p["name"])
+                print(f"hook {p['name']} {p['args'][0] if p['args'] else ''}: done", flush=True)
+                continue
+            p["tries"] = p.get("tries", 0) + 1
+            p["next"] = (now or time.time()) + min(60 * 2 ** (p["tries"] - 1), 6 * 3600)
+            p["error"] = why
+            print(f"hook {p['name']} {p['args'][0] if p['args'] else ''}: failed ({why[:120]}); trying again later", flush=True)
+            keep.append(p)
+        q2 = load("hooks.json", {"pending": []})  # keep anything queued while these ran
+        had = {(x["name"], tuple(x["args"])) for x in q["pending"]}
+        q["pending"] = keep + [x for x in q2["pending"] if (x["name"], tuple(x["args"])) not in had]
+        save("hooks.json", q)
+        return done
+    finally:
+        _HOOK_LOCK.release()
 
 
 def settle_invites() -> list[str]:
@@ -850,6 +895,10 @@ KEY_EVERY = 60
 
 def _key_loop():
     while True:
+        try:
+            run_pending_hooks()
+        except (OSError, ValueError, KeyError) as e:
+            print(f"daemon: hook queue failed ({type(e).__name__})", flush=True)
         try:
             for k in sync_keys():
                 print(f"daemon: received new team key {k} and shared it with this person's devices", flush=True)

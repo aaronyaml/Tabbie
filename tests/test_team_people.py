@@ -118,3 +118,23 @@ def test_remove_teammate_rotates_without_them(tt, monkeypatch):
     assert "leo" not in tt.load("trust.json")["macs"]
     with pytest.raises(tt.Fail):
         tt.remove_teammate("aaron")
+
+
+def test_a_failed_hook_is_retried_until_it_works(tt, tmp_path, monkeypatch):
+    flag = tmp_path / "ok"
+    script = tmp_path / "hook.sh"
+    script.write_text(f'#!/bin/sh\n[ -f "{flag}" ] || {{ echo "service down" >&2; exit 1; }}\necho "$@" >> "{tmp_path}/ran"\n')
+    script.chmod(0o755)
+    cfg = tt.config()
+    cfg["hooks"] = {"trusted": [str(script)]}
+    tt.save("config.json", cfg)
+    monkeypatch.setattr(tt.threading if hasattr(tt, "threading") else __import__("threading"), "Thread",
+                        lambda *a, **k: type("T", (), {"start": lambda self: None})())
+    tt.run_hook("trusted", "sam", "kid1", "pub1")
+    assert tt.run_pending_hooks(now=1000) == []
+    p = tt.load("hooks.json")["pending"][0]
+    assert p["tries"] == 1 and "service down" in p["error"] and p["next"] == 1060
+    assert tt.run_pending_hooks(now=1030) == []  # not due yet
+    flag.write_text("")
+    assert tt.run_pending_hooks(now=1061) == ["trusted"]
+    assert tt.load("hooks.json")["pending"] == [] and (tmp_path / "ran").read_text().strip() == "sam kid1 pub1"

@@ -76,6 +76,9 @@ def call(tt, op: str, **args) -> dict:
             msg = json.loads(e.read() or b"{}").get("error")
         except ValueError:
             msg = None
+        if e.code in (401, 403):  # the mail service doesn't know this Mac's key (new Mac, or linked again)
+            raise MailError("This Mac's mailbox isn't set up yet. It's set up from the team's mail admin Mac, "
+                            "which does it automatically when it's on; try again later.") from None
         raise MailError(msg or f"The mail service said {e.code}.") from None
     except (urllib.error.URLError, OSError) as e:
         raise MailError(f"Couldn't reach the mail service ({type(getattr(e, 'reason', e)).__name__}).") from None
