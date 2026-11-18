@@ -2,12 +2,22 @@
 # launchd entrypoint: Command Centre WebUI sidecar (agents panel, projects API), 127.0.0.1:8794.
 # It reads config/*.yaml, so it needs a YAML library. macOS's own python3 has none, so run it through
 # uv with PyYAML (cached after the first start). Fallbacks: a python3 that already has YAML, then any.
+#
+# pywebpush (phone notifications) is optional: if its components can't be installed, the helper starts
+# without it (push just stays off) instead of not starting at all. cryptography stays on 48.0.1 because 49
+# and later publish no Intel Mac wheels (uv would try to compile it and fail).
 export PATH="$HOME/.hermes/bin:$HOME/.local/bin:/opt/homebrew/bin:/usr/local/bin:/usr/bin:/bin"
 SIDECAR="$HOME/hermes/plugin/command-centre/sidecar.py"
 cd "$HOME/hermes" || exit 1
 UV="$(command -v uv || ls -d "$HOME"/.hermes/tools/uv-*/uv 2>/dev/null | tail -1)"
 if [ -n "$UV" ] && [ -x "$UV" ]; then
-  exec "$UV" run --no-project -q --with pyyaml --with ruamel.yaml --with pywebpush python -I "$SIDECAR"
+  CORE=(--with pyyaml --with ruamel.yaml)
+  PUSH=(--with pywebpush==2.5.0 --with cryptography==48.0.1 --no-build-package cryptography)
+  if "$UV" run --no-project -q "${CORE[@]}" "${PUSH[@]}" python -I -c "import yaml, pywebpush" 2>/dev/null; then
+    exec "$UV" run --no-project -q "${CORE[@]}" "${PUSH[@]}" python -I "$SIDECAR"
+  fi
+  echo "cc-sidecar: phone notifications' components couldn't be installed; starting without them" >&2
+  exec "$UV" run --no-project -q "${CORE[@]}" python -I "$SIDECAR"
 fi
 for py in python3 /usr/bin/python3; do
   "$py" -I -c "import yaml" 2>/dev/null && exec "$py" -I "$SIDECAR"

@@ -29,3 +29,9 @@ def test_team_code_restarts_the_team_service():
     u = _updates()
     assert u._needs(["team/mailroom.py"]) == ["team"]
     assert u._needs(["bin/tt"]) == ["team"]
+
+
+def test_launcher_changes_restart_what_they_launch():
+    u = _updates()
+    assert u._needs(["bin/cc-sidecar"]) == ["sidecar"]
+    assert u._needs(["bin/hermes-webui-run"]) == ["webui"]

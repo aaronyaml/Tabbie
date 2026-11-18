@@ -798,7 +798,9 @@ Design notes: `docs/memory/ARCHITECTURE.md`, `docs/projects/ARCHITECTURE.md`.
   answer protocol `tt1`; the name shown comes from the relay). Then **Get a code**, sign in on the relay's
   site with your passkey and enter it there, comparing this Mac's fingerprint. Switch on the projects to share:
   every chat in them streams to your team's devices (prompts, replies as they're written, progress), signed by
-  this Mac and encrypted with a team key the relay never sees; other projects never leave the Mac. When a new
+  this Mac and encrypted with a team key the relay never sees; other projects never leave the Mac. Joining a
+  team that already exists takes an invite code (`TT1-…`, **Invite** on a teammate's Mac): the team key comes
+  from their Mac, so signing in with **Get a code** alone shows **One more step** and asks for that code. When a new
   phone or laptop asks to see your sessions, Tabbie asks **A new device wants in**: type the code that device
   shows to approve it (Tabbie never shows the code itself). After an update Tabbie offers this once. Under the
   hood it's `bin/tt` (`team/`), also usable by hand: `tt connect URL`, `tt pair`, `tt approve CODE`,
@@ -1114,7 +1116,7 @@ Use Claude Code's own permission settings for hard limits.
 ## Tests
 
 ```bash
-uv run -q --no-project --with pytest --with ruamel.yaml --with cryptography==50.0.2 --with websockets==17.4 python -m pytest tests -q
+uv run -q --no-project --with pytest --with ruamel.yaml --with cryptography==48.0.1 --with websockets==17.4 python -m pytest tests -q
 ```
 
 The tests use temporary folders only and never touch your memory or state.

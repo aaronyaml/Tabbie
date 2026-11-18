@@ -48,8 +48,16 @@ def warm():
 
 
 def _err(stderr: str) -> str:
-    line = (stderr or "").strip().splitlines()[-1:] or ["Something went wrong."]
-    return re.sub(r"^tt:\s*", "", line[0])[:300]
+    text = (stderr or "").strip()
+    if re.search(r"Failed to build|No solution found|Failed to download|building source distributions is disabled|"
+                 r"no wheels|maturin failed|Could not find directory of OpenSSL", text, re.I):
+        # uv couldn't set up Team's components: the last line would be one of uv's hints, which means nothing to anyone
+        return ("Tabbie couldn't install Team's components on this Mac. Update Tabbie (Settings → Updates) and try again; "
+                "if it keeps happening, send Tabbie's support logs.")
+    lines = [l for l in text.splitlines() if l.strip() and not l.lstrip().startswith(("hint:", "help:", "warning:"))]
+    tt_lines = [l for l in lines if l.startswith("tt:")]
+    line = (tt_lines or lines)[-1:] or ["Something went wrong."]
+    return re.sub(r"^tt:\s*", "", line[0].strip())[:300]
 
 
 def _json(args: list[str], timeout: int = 40) -> tuple[int, dict]:

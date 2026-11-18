@@ -60,7 +60,23 @@
       <b class="hx-team-title"><span class="hx-team-spin" aria-hidden="true"></span>Almost done</b>
       <span class="hx-st-dim">You’re in the team. Now waiting for ${esc(who)}’s Mac to hand over the team key. It does that by itself within a minute, as long as it’s switched on with Tabbie running.</span>
       <span class="hx-st-dim">You can close this and carry on: it finishes in the background.</span>
-    </div></div>`;
+    </div></div>
+    <div class="hx-team-foot"><button type="button" class="hx-st-btn" data-act="disconnect-yes">Cancel and start again</button></div>`;
+  }
+
+  function needsInviteCard(st) {
+    // signed in on a team that already exists: its key has to come from a teammate's Mac, by an invite code
+    const mates = (st.pairing.teammates || []).map(cap);
+    const who = mates.length ? mates.join(' or ') : 'a teammate';
+    return `<div class="hx-st-card hx-team-card"><div class="hx-st-main">
+      <b class="hx-team-title">One more step</b>
+      <span class="hx-st-dim">You’re signed in. To see the team’s shared chats, this Mac needs the team’s key from ${esc(who)}. Ask them for an invite code: on their Mac, <b>Settings → Accounts → Team → Invite</b>. Paste it here.</span>
+      <form class="hx-team-form hx-team-join" data-act="join" autocomplete="off">
+        <textarea name="code" rows="2" placeholder="TT1-…" spellcheck="false" autocapitalize="off" autocomplete="off" required aria-label="Invite code">${esc(typedInvite)}</textarea>
+        <button type="submit" class="hx-st-btn is-primary"${busy ? ' disabled' : ''}>${busy === 'join' ? 'Joining…' : 'Join'}</button>
+      </form>
+    </div></div>
+    <div class="hx-team-foot"><button type="button" class="hx-st-btn" data-act="disconnect-yes">Use a different relay</button></div>`;
   }
 
   function inviteCard() {
@@ -126,7 +142,7 @@
   function render() {
     if (!box) return;
     if (!state) {
-      box.innerHTML = `<section class="hx-st-group"><h3>Team</h3>${err ? `<p class="hx-st-note">${esc(err)}</p>` : '<div class="hx-st-card hx-st-skel"><i></i><i></i></div>'}</section>`;
+      box.innerHTML = `<section class="hx-st-group"><h3>Team</h3>${err ? `<p class="hx-st-note">${esc(err)}</p><p class="hx-team-links"><button type="button" class="hx-st-btn" data-act="retry">Try again</button></p>` : '<div class="hx-st-card hx-st-skel"><i></i><i></i></div>'}</section>`;
       return;
     }
     const st = state;
@@ -134,9 +150,10 @@
     if (!st.installed) body = '<p class="hx-st-note">Team isn’t available in this copy of Tabbie (bin/tt is missing). Update Tabbie to get it.</p>';
     else if (!st.relay) body = connectCard();
     else if (!st.linked && st.pairing && st.pairing.state === 'joining') body = joiningCard(st);
+    else if (!st.linked && st.pairing && st.pairing.state === 'needs_invite') body = needsInviteCard(st);
     else if (!st.linked) body = pairCard(st) + `<div class="hx-team-foot"><button type="button" class="hx-st-btn" data-act="disconnect-yes">Use a different relay</button></div>`;
     else body = linkedCards(st);
-    const pill = st.relay ? `<span class="hx-st-pill ${st.linked ? 'is-ok' : 'is-warn'}">${esc(st.name || host(st.relay))}${st.linked ? ' · ' + esc(cap(st.owner)) : (st.pairing && st.pairing.state === 'joining' ? ' · joining' : ' · not linked')}</span>` : '';
+    const pill = st.relay ? `<span class="hx-st-pill ${st.linked ? 'is-ok' : 'is-warn'}">${esc(st.name || host(st.relay))}${st.linked ? ' · ' + esc(cap(st.owner)) : (st.pairing && st.pairing.state === 'joining' ? ' · joining' : (st.pairing && st.pairing.state === 'needs_invite' ? ' · needs invite' : ' · not linked'))}</span>` : '';
     const f = box.contains(document.activeElement) && document.activeElement.name ? document.activeElement : null;
     const keep = f ? { name: f.name, form: f.form && f.form.dataset.act, a: f.selectionStart, b: f.selectionEnd } : null;
     box.innerHTML = `<section class="hx-st-group">
@@ -170,7 +187,10 @@
     try { state = await get(force); err = ''; }
     catch (e) {
       if ((!e.status || e.status >= 502) && (tries || 0) < 4) { setTimeout(() => load(force, (tries || 0) + 1), 1500); return; }
-      err = e.status === 404 ? 'Tabbie’s helper is out of date: restart it to set up Team.' : (e.status === 403 ? 'Allow Tabbie’s helper (Settings → Extensions) to set up Team.' : 'Couldn’t reach Tabbie’s helper.');
+      err = e.status === 404 ? 'Tabbie’s helper is out of date: restart it to set up Team.'
+        : e.status === 403 ? 'Allow Tabbie’s helper (Settings → Extensions) to set up Team.'
+        : e.status === 400 && e.message ? e.message  // Team itself answered: say what it said
+        : 'Couldn’t reach Tabbie’s helper. It may still be starting.';
     }
     loading = false;
     render();
@@ -197,6 +217,7 @@
       else selectCode();
     }
     else if (a === 'disconnect') { asking = 'disconnect'; render(); }
+    else if (a === 'retry') { err = ''; loading = false; render(); load(true); }
     else if (a === 'cancel') { asking = ''; render(); }
     else if (a === 'disconnect-yes') { asking = ''; act('disconnect', async () => { state = await post('disconnect'); }); }
   }

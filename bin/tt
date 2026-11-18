@@ -2,11 +2,26 @@
 # Tabbie Team: connect this Tabbie to a team relay so shared sessions show live on your team's devices.
 # Usually driven from Settings → Team; also usable by hand (tt connect URL, tt pair, tt approve CODE, tt status).
 # Needs cryptography and websockets, so it runs through uv (cached after the first run).
+#
+# cryptography stays on 48.0.1: 49 and later publish no Intel Mac wheels, so on an Intel Mac uv would try to
+# compile it (Rust + OpenSSL) and fail. --no-build-package makes that fail at once instead of compiling.
 export PATH="$HOME/.hermes/bin:$HOME/.local/bin:/opt/homebrew/bin:/usr/local/bin:/usr/bin:/bin"
-TT="$(cd "$(dirname "$(readlink -f "$0")")/.." && pwd)/team/tt.py"
+SELF="$0"
+while [ -L "$SELF" ]; do  # follow links by hand: readlink -f is missing on older macOS
+  T="$(readlink "$SELF")"
+  case "$T" in /*) SELF="$T" ;; *) SELF="$(dirname "$SELF")/$T" ;; esac
+done
+TT="$(cd "$(dirname "$SELF")/.." && pwd)/team/tt.py"
 UV="$(command -v uv || ls -d "$HOME"/.hermes/tools/uv-*/uv 2>/dev/null | tail -1)"
 if [ -z "$UV" ] || [ ! -x "$UV" ]; then
-  echo "tt: needs uv. Run: bin/install-tool uv" >&2
+  echo "tt: Tabbie is missing a component it needs (uv). Update Tabbie, or run: bin/install-tool uv" >&2
+  [ "$1" = "daemon" ] && sleep 600  # under launchd: don't restart every 10 s while it can't work
   exit 1
 fi
-exec "$UV" run --no-project -q --with cryptography==50.0.2 --with websockets==17.4 python -I "$TT" "$@"
+DEPS=(--with cryptography==48.0.1 --with websockets==17.4 --no-build-package cryptography)
+if [ "$1" = "daemon" ] && ! "$UV" run --no-project -q "${DEPS[@]}" python -I -c "import cryptography, websockets" 2>/dev/null; then
+  echo "tt: couldn't install Team's components (cryptography, websockets); trying again in 10 minutes" >&2
+  sleep 600  # under launchd: don't retry every 10 s
+  exit 1
+fi
+exec "$UV" run --no-project -q "${DEPS[@]}" python -I "$TT" "$@"

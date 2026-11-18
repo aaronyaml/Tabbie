@@ -524,7 +524,7 @@
       "id": "team",
       "name": "Team: share chosen projects live with your team (any tt1 relay)",
       "scripts": [
-        "team.js?v=8"
+        "team.js?v=9"
       ],
       "stylesheets": [
         "team.css?v=3"

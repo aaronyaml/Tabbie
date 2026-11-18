@@ -92,6 +92,7 @@ def op_env(token: str | None = None) -> dict:
 
 
 SDK_PIN = "onepassword-sdk==0.4.2"
+SDK_PYTHON = ">=3.9,<3.14"  # 0.4.2 ships wheels for CPython 3.9 to 3.13 only: on 3.14 uv would try to build it
 HELPER = Path(__file__).resolve().with_name("op_sdk.py")
 
 
@@ -108,7 +109,7 @@ def sdk_cmd(args: list[str]) -> list[str]:
     uv = _uv()
     if not uv:
         raise SecretError("uv isn't installed (Tabbie needs it to talk to 1Password).")
-    return [uv, "run", "-q", "--no-project", "--with", SDK_PIN, "python", "-I", str(HELPER), *args]
+    return [uv, "run", "-q", "--no-project", "--python", SDK_PYTHON, "--with", SDK_PIN, "python", "-I", str(HELPER), *args]
 
 
 def available() -> bool:

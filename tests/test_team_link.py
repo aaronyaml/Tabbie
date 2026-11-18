@@ -72,3 +72,13 @@ def test_no_team_answers_without_running_tt(monkeypatch):
     monkeypatch.setattr(team_link, "_config", lambda: {})
     code, st = team_link.status(force=True)
     assert code == 200 and st["relay"] is None and st["all_projects"] == ["Demo", "Private"] and not calls
+
+
+def test_component_install_failure_reads_plainly():
+    err = "   Compiling openssl-sys\n  Could not find directory of OpenSSL installation\n💥 maturin failed\nhint: Build failures usually indicate a problem"
+    msg = team_link._err(err)
+    assert "couldn't install Team's components" in msg and "hint" not in msg
+
+
+def test_uv_hints_never_become_the_message():
+    assert team_link._err("tt: No linked Mac for leo has that code.\nhint: something\n") == "No linked Mac for leo has that code."

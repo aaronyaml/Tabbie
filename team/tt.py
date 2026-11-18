@@ -238,7 +238,7 @@ def cmd_connect(args):
 
 def cmd_disconnect(_args):
     """Forget the relay and this Mac's keys here (the relay keeps history; remove the Mac there too)."""
-    for f in ("mac.json", "trust.json", "team.json", "token.json", "seen.json", "mirror.json", "pairing.json", "me.json", "joining.json", "invites.json"):
+    for f in ("mac.json", "trust.json", "team.json", "token.json", "seen.json", "mirror.json", "pairing.json", "me.json", "joining.json", "invites.json", "needkey.json"):
         (HOME / f).unlink(missing_ok=True)
     cfg = config()
     for k in ("relay", "name"):
@@ -281,6 +281,13 @@ def pair_check() -> dict:
     m = load("mac.json")
     if m and team()["current"] and load("trust.json"):
         return {"state": "linked", "owner": load("trust.json")["owner"], "fingerprint": C.fingerprint(m["sign_pub"])}
+    nk = load("needkey.json")
+    if m and nk and load("trust.json"):  # signed in, waiting for an invite code from a teammate
+        if receive_wraps():
+            (HOME / "needkey.json").unlink(missing_ok=True)
+            return {"state": "linked", "owner": load("trust.json")["owner"], "fingerprint": C.fingerprint(m["sign_pub"])}
+        return {"state": "needs_invite", "owner": load("trust.json")["owner"], "teammates": nk.get("teammates", []),
+                "fingerprint": C.fingerprint(m["sign_pub"])}
     j = load("joining.json")
     if m and j:
         if receive_wraps():
@@ -307,10 +314,21 @@ def pair_finish() -> dict:
     save("trust.json", trust)
     made = False
     if not team()["current"] and not receive_wraps():
+        mates = teammates(owner)
+        if mates:  # the team already exists: its key has to come from a teammate's Mac, by an invite. Never start a second one.
+            save("needkey.json", {"teammates": mates, "at": C.now_ms()})
+            (HOME / "pairing.json").unlink(missing_ok=True)
+            return {"state": "needs_invite", "owner": owner, "teammates": mates, "fingerprint": C.fingerprint(m["sign_pub"])}
         new_team_key()
         made = True
     (HOME / "pairing.json").unlink(missing_ok=True)
     return {"state": "linked", "owner": owner, "fingerprint": C.fingerprint(m["sign_pub"]), "new_team_key": made}
+
+
+def teammates(owner: str) -> list[str]:
+    """Other people with a linked Mac on this relay (so the team, and its key, already exist)."""
+    return sorted({d["owner"] for d in api("GET", "/api/directory")["devices"]
+                   if d.get("kind") == "mac" and d.get("status") == "approved" and d.get("owner") and d["owner"] != owner})
 
 
 def cmd_pair(args):
@@ -320,6 +338,9 @@ def cmd_pair(args):
         out(r, r["state"])
         return
     r = pair_start(name)
+    if r["state"] == "needs_invite":
+        out(r, f"Signed in as {r['owner']}. The team's key comes from a teammate's Mac: ask {' or '.join(r.get('teammates') or ['a teammate'])} for an invite code (Settings → Team → Invite on their Mac), then run: tt join CODE")
+        return
     if "--start" in args or r["state"] == "linked":
         out(r, f"Code {r.get('code')}" if r["state"] == "waiting" else f"Linked as {r['owner']}.")
         return
@@ -330,6 +351,9 @@ def cmd_pair(args):
         r = pair_check()
         if r["state"] == "linked":
             break
+        if r["state"] == "needs_invite":
+            print("  " + f"Signed in as {r['owner']}. The team's key comes from a teammate's Mac: ask {' or '.join(r.get('teammates') or ['a teammate'])} for an invite code (Settings → Team → Invite on their Mac), then run: tt join CODE")
+            return
         if r["state"] != "waiting":
             raise Fail("Timed out. Run tt pair again.")
         time.sleep(3)
@@ -519,6 +543,9 @@ def join(code: str, name: str | None = None) -> dict:
     cfg.update(info_)
     save("config.json", cfg)
     RELAY = info_["relay"]
+    if not team()["current"]:  # an earlier sign-in or join without the key: start this Mac afresh (the relay won't relink a linked Mac)
+        for f in ("mac.json", "needkey.json", "joining.json"):
+            (HOME / f).unlink(missing_ok=True)
     for f in ("pairing.json", "token.json", "trust.json"):
         (HOME / f).unlink(missing_ok=True)
     m = ensure_mac_keys(name or platform.node().split(".")[0] or "Mac")
@@ -649,7 +676,7 @@ def info() -> dict:
     d["devices"] = [{"name": x["name"], "fingerprint": C.fingerprint(x["sign_pub"])} for x in trust.get("allow", {}).values()]
     d["macs"] = [{"owner": o, "fingerprint": C.fingerprint(x["sign_pub"])} for o, x in trust.get("macs", {}).items()]
     d["invites"] = [{"for": x["for"], "at": x["at"]} for x in (load("invites.json", {}) or {}).values()]
-    if load("joining.json") and m and not team()["current"]:
+    if (load("joining.json") or load("needkey.json")) and m and not team()["current"]:
         d["pairing"] = pair_check()
         d["linked"] = d["pairing"]["state"] == "linked"
     return d

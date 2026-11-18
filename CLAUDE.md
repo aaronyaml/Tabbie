@@ -11,7 +11,7 @@ Hub that routes requests to Claude Code / Astra. Code is the source of truth; th
 | Memory system | `hmem/` code, `memory/README.md` map, `docs/memory/ARCHITECTURE.md` design |
 | Memory CLI | `bin/hmem search|read|propose|proposals|approve|dream|stats|doctor` |
 | Services | `services/*.plist` (LaunchAgents) |
-| Tests | `uv run -q --no-project --with pytest --with ruamel.yaml --with cryptography==50.0.2 --with websockets==17.4 python -m pytest tests -q` |
+| Tests | `uv run -q --no-project --with pytest --with ruamel.yaml --with cryptography==48.0.1 --with websockets==17.4 python -m pytest tests -q` |
 | UI testing (browser, reload, iPhone) | `docs/testing/UI_TESTING.md`, helpers `docs/testing/ui_helpers.py` |
 
 Rules:
