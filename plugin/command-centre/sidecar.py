@@ -887,7 +887,16 @@ def update_payload(force: bool = False) -> dict:
     if not s.get("check", True):
         return {"available": False, "disabled": True}
     return {**updates.check(force), "pending_restart": updates.pending_restart(), "restart_waiting": updates.waiting(),
-            "last_failure": updates.last_failure(), "upstream": _upstream_status()}
+            "last_failure": updates.last_failure(), "upstream": _upstream_status(), "cli": _cli_problems()}
+
+
+def _cli_problems() -> list[str]:
+    """Settings → Updates: an installed agent that's missing options Tabbie passes it (cli_flags.py)."""
+    try:
+        cli_flags = importlib.import_module("cc_sidecar_pkg.cli_flags")
+        return cli_flags.problems(tuple(a for a in agent_set.enabled() if a in cli_flags.NEEDS))
+    except Exception:  # noqa: BLE001 (never break the updates panel)
+        return []
 
 
 _UPS = {"at": 0.0, "v": None}

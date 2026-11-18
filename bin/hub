@@ -3,6 +3,7 @@
 #   hub              open Hermes WebUI (https://hermes.local)
 #   hub cli          Hermes in the terminal (same config, routing, sessions)
 #   hub health       lightweight health check of every component
+#   hub doctor       check Claude Code and Codex still have the options Tabbie uses
 #   hub restart      install any missing service, then restart gateway + WebUI + proxy + mDNS
 #   hub services     install any background service that's missing (e.g. one added by an update)
 #   hub logs [name]  tail logs: webui | gateway | caddy | mdns | sidecar | decisions
@@ -20,6 +21,9 @@ opt()   { if eval "$2" >/dev/null 2>&1; then ok "$1"; else printf '  \033[33m!\0
 case "${1:-open}" in
   open) open "https://$HOST" ;;
   cli) shift; exec hermes "$@" ;;
+  doctor)  # do Claude Code / Codex still have the options Tabbie uses? (they update themselves)
+    echo "Agents"
+    /usr/bin/python3 -I "$HOME/hermes/plugin/command-centre/cli_flags.py" ;;
   health)
     echo "Hermes command centre"
     check "Hermes gateway (launchd)"  "hermes gateway status | grep -q -E 'running|supervised'" "hermes gateway install"

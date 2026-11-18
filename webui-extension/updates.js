@@ -290,6 +290,11 @@
       const drift = (u.problems && u.problems.length) ? ` · WebUI or Hermes Agent changed something Tabbie uses (bin/upstream status)`
         : (u.patches_missing && u.patches_missing.length) ? ` · ${u.patches_missing.length} WebUI fix${u.patches_missing.length === 1 ? '' : 'es'} not applied (bin/upstream sync)` : '';
       ver.textContent = (j.available ? `Version ${v} · an update is available` : j.note ? `Version ${v} · ${j.note}` : `Version ${v} · up to date`) + failed + drift;
+      let cli = row.querySelector('[data-cli]');
+      if (j.cli && j.cli.length) {
+        if (!cli) { cli = document.createElement('span'); cli.dataset.cli = '1'; cli.className = 'hx-upd-cli'; cli.setAttribute('role', 'status'); ver.after(cli); }
+        cli.textContent = j.cli.join(' ');
+      } else if (cli) cli.remove();
       if (j.available) { btn.textContent = 'See update'; btn.dataset.offer = '1'; info = j; }
     };
     paintSettings = say;
