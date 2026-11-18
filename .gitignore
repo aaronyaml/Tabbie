@@ -76,3 +76,6 @@ config/.*.yaml.*
 !webui-extension/worker-tokens.js
 !webui-extension/worker-tokens.css
 config/providers.yaml
+
+# This Mac only: settings that override config/router.yaml here (see plugin/command-centre/common.py load_config)
+/config/router.local.yaml

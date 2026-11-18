@@ -1020,6 +1020,7 @@ the moments, approve a storyboard, and Claude Code builds and renders the film w
 | File | What | Tracked? |
 |---|---|---|
 | `config/router.yaml` | Router, planner and executor settings, memory and Dreamer options. Re-read on every request | yes (defaults) |
+| `config/router.local.yaml` | Optional: this Mac's own overrides of `router.yaml` (same keys, merged on top), so an update never conflicts with them | no |
 | `config/agents.yaml` | Which coding agents to use: Claude Code, Codex or both | no (written by `bin/setup` / the WebUI) |
 | `config/projects.yaml` | Named folders and workspaces for routing | no (from `.example`) |
 | `hermes-webui/.env` | WebUI host, port and password | no (from `config/webui.env.example`) |
@@ -1029,6 +1030,10 @@ the moments, approve a storyboard, and Claude Code builds and renders the film w
 | `~/.hermes/team/` | Team: relay address, shared projects, this Mac's keys and trusted devices (0600 files) | outside the repo, never in git |
 
 To change the planner, edit `config/router.yaml`; it applies on the next request.
+
+`executor.max_parallel` (how many Claude Code jobs run at once) is fitted to the Mac: about one per 2 GB of
+memory, never more than its cores, at least 2. So an 8 GB Mac runs 4. Set it in `config/router.local.yaml`
+to choose the number yourself.
 
 ```yaml
 planner:

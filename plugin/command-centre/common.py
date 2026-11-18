@@ -5,6 +5,7 @@ from __future__ import annotations
 import contextlib
 import json
 import os
+import sys
 import tempfile
 import time
 from pathlib import Path
@@ -62,8 +63,64 @@ def _dump_yaml(path: Path, data: dict) -> None:
         raise
 
 
+def _merge(base: dict, over: dict) -> dict:
+    out = dict(base)
+    for k, v in over.items():
+        out[k] = _merge(out[k], v) if isinstance(v, dict) and isinstance(out.get(k), dict) else v
+    return out
+
+
+def hardware() -> dict:
+    """This Mac's memory (GB) and CPU cores, for defaults that should fit it."""
+    cores = os.cpu_count() or 4
+    gb = 16.0
+    try:
+        if sys.platform == "darwin":
+            import subprocess
+            gb = int(subprocess.run(["/usr/sbin/sysctl", "-n", "hw.memsize"], capture_output=True, text=True, timeout=5).stdout) / 2**30
+        elif hasattr(os, "sysconf") and "SC_PHYS_PAGES" in os.sysconf_names:
+            gb = os.sysconf("SC_PAGE_SIZE") * os.sysconf("SC_PHYS_PAGES") / 2**30
+        elif sys.platform == "win32":
+            import ctypes
+
+            class MS(ctypes.Structure):
+                _fields_ = [("l", ctypes.c_ulong), ("load", ctypes.c_ulong), ("total", ctypes.c_ulonglong), ("rest", ctypes.c_ulonglong * 6)]
+            m = MS()
+            m.l = ctypes.sizeof(MS)
+            ctypes.windll.kernel32.GlobalMemoryStatusEx(ctypes.byref(m))  # type: ignore[attr-defined]
+            gb = m.total / 2**30
+    except Exception:  # noqa: BLE001
+        pass
+    return {"gb": round(gb, 1), "cores": cores}
+
+
+def fit_parallel(wanted: int, hw: dict) -> int:
+    """Each Claude Code job is a Node process (about 0.5-1 GB with its tools). Shared defaults assume a big Mac;
+    this keeps an 8 GB laptop from swapping: about one job per 2 GB, never more than the cores, at least 2."""
+    return max(2, min(int(wanted), int(hw["gb"] // 2), int(hw["cores"]))) if int(wanted) > 2 else int(wanted)
+
+
+_HW: dict = {}
+
+
 def load_config() -> dict:
-    return _load_yaml(CONFIG_DIR / "router.yaml")
+    """config/router.yaml (shared, in git), then config/router.local.yaml (this Mac only, git-ignored) on top.
+    executor.max_parallel from the shared file is fitted to this Mac's memory; set it in router.local.yaml to
+    choose it exactly."""
+    cfg = _load_yaml(CONFIG_DIR / "router.yaml")
+    local_path = CONFIG_DIR / "router.local.yaml"
+    local = _load_yaml(local_path) if local_path.exists() else {}
+    if isinstance(local, dict) and local:
+        cfg = _merge(cfg if isinstance(cfg, dict) else {}, local)
+    ex = cfg.get("executor") if isinstance(cfg, dict) else None
+    if isinstance(ex, dict) and "max_parallel" in ex and "max_parallel" not in ((local or {}).get("executor") or {}):
+        if not _HW:
+            _HW.update(hardware())
+        try:
+            ex["max_parallel"] = fit_parallel(int(ex["max_parallel"]), _HW)
+        except (TypeError, ValueError):
+            pass
+    return cfg
 
 
 def load_projects_file() -> dict:
