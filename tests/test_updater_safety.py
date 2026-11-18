@@ -110,7 +110,7 @@ def test_rollback_keeps_local_edits(tmp_path, monkeypatch):
     (local / "ok.py").write_text("x = 'mine'\n")
     monkeypatch.setattr(up, "restart_detached_wait", lambda max_wait=3600: {"ok": True})
     assert up.rollback("test")["ok"]
-    assert (local / "ok.py").read_text() == "x = 'mine'\n"
+    assert (local / "ok.py").read_text(encoding="utf-8") == "x = 'mine'\n"
     assert not (local / "plugin" / "command-centre" / "sidecar.py").exists()
 
 
@@ -132,17 +132,17 @@ def test_backoff_waits_longer_each_fast_failure(tmp_path):
 
 def test_launchers_use_backoff_and_have_preflight():
     for name in ("cc-sidecar", "tt", "hermes-webui-run"):
-        assert "tabbie_backoff" in (ROOT / "bin" / name).read_text(), name
+        assert "tabbie_backoff" in (ROOT / "bin" / name).read_text(encoding="utf-8"), name
     for name in ("cc-sidecar", "tt"):
-        assert "--preflight" in (ROOT / "bin" / name).read_text(), name
+        assert "--preflight" in (ROOT / "bin" / name).read_text(encoding="utf-8"), name
 
 
 def test_updater_is_standard_library_only():
     import ast
-    src = (ROOT / "plugin" / "command-centre" / "updates.py").read_text()
+    src = (ROOT / "plugin" / "command-centre" / "updates.py").read_text(encoding="utf-8")
     mods = {n.names[0].name.split(".")[0] for n in ast.walk(ast.parse(src)) if isinstance(n, ast.Import)}
     mods |= {n.module.split(".")[0] for n in ast.walk(ast.parse(src)) if isinstance(n, ast.ImportFrom) and n.module and not n.level}
     import sys
     assert mods <= set(sys.stdlib_module_names) | {"hmem"}, mods - set(sys.stdlib_module_names)
-    tpl = (ROOT / "services" / "ai.hermes.updater.plist.template").read_text()
+    tpl = (ROOT / "services" / "ai.hermes.updater.plist.template").read_text(encoding="utf-8")
     assert "/usr/bin/python3" in tpl and "tabbie-update" in tpl and "KeepAlive" not in tpl

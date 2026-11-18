@@ -15,7 +15,7 @@ from pathlib import Path
 
 from .common import ROOT
 
-LOCK = ROOT / "config" / "upstream.lock"
+LOCK = Path(__file__).resolve().parents[2] / "config" / "upstream.lock"  # this checkout's lock
 _SHA = re.compile(r"^[0-9a-f]{40}$")
 
 

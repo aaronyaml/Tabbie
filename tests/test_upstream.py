@@ -42,7 +42,7 @@ def test_contract_spots_a_changed_database(tmp_path, monkeypatch):
     for _, rel, text in us.AGENT_NEEDS:
         (agent / rel).parent.mkdir(parents=True, exist_ok=True)
         p = agent / rel
-        p.write_text((p.read_text() if p.exists() else "") + text + "\n")
+        p.write_text((p.read_text(encoding="utf-8") if p.exists() else "") + text + "\n")
     home = tmp_path / "home"
     home.mkdir()
     db = sqlite3.connect(home / "state.db")
@@ -62,9 +62,9 @@ def test_contract_spots_a_changed_database(tmp_path, monkeypatch):
 
 
 def test_setup_installs_the_tested_versions():
-    assert "--commit" in (ROOT / "bin" / "install-tool").read_text() and "upstream.lock" in (ROOT / "bin" / "install-tool").read_text()
-    assert "bin/upstream sync" in (ROOT / "bin" / "setup-terminal").read_text()
-    win = (ROOT / "setup" / "windows.py").read_text()
+    assert "--commit" in (ROOT / "bin" / "install-tool").read_text(encoding="utf-8") and "upstream.lock" in (ROOT / "bin" / "install-tool").read_text(encoding="utf-8")
+    assert "bin/upstream sync" in (ROOT / "bin" / "setup-terminal").read_text(encoding="utf-8")
+    win = (ROOT / "setup" / "windows.py").read_text(encoding="utf-8")
     assert "-Commit" in win and '_pin("webui")' in win
 
 

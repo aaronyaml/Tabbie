@@ -14,13 +14,13 @@ REQS = sorted((ROOT / "requirements").glob("*.txt"))
 def test_cryptography_pinned_below_49():
     assert REQS
     for f in LAUNCHERS + REQS:
-        for v in re.findall(r"cryptography==([\d.]+)", f.read_text()):
+        for v in re.findall(r"cryptography==([\d.]+)", f.read_text(encoding="utf-8")):
             assert int(v.split(".")[0]) < 49, f"{f.name} pins cryptography {v}: no Intel Mac wheels"
 
 
 def test_every_package_is_locked_with_hashes():
     for f in REQS:
-        s = f.read_text()
+        s = f.read_text(encoding="utf-8")
         pkgs = re.findall(r"^([a-z0-9][a-z0-9._-]*)(==|\s)", s, re.M)
         assert pkgs and all(op == "==" for _, op in pkgs), f"{f.name}: every package needs an exact version"
         assert s.count("--hash=sha256:") >= len(pkgs), f"{f.name}: hashes missing"
@@ -29,7 +29,7 @@ def test_every_package_is_locked_with_hashes():
 
 def test_launchers_install_from_the_lockfiles():
     for f in (ROOT / "bin" / "tt", ROOT / "bin" / "cc-sidecar", ROOT / "hmem" / "winsvc.py"):
-        s = f.read_text()
+        s = f.read_text(encoding="utf-8")
         assert "--with-requirements" in s and not re.search(r"--with\b(?!-)", s.replace('"--with", "', '--with ')), f.name
 
 
@@ -44,7 +44,7 @@ def test_locked_packages_install_on_intel_and_apple_silicon():
 
 
 def test_sidecar_starts_without_push_libraries():
-    s = (ROOT / "bin" / "cc-sidecar").read_text()
+    s = (ROOT / "bin" / "cc-sidecar").read_text(encoding="utf-8")
     assert s.count("exec \"$UV\" run") == 2, "cc-sidecar must fall back to starting without pywebpush"
 
 
@@ -55,7 +55,7 @@ PY_RANGE = ">=3.12,<3.15"
 
 def test_every_uv_run_names_a_python():
     for f in UV_LAUNCHERS:
-        s = f.read_text()
+        s = f.read_text(encoding="utf-8")
         arrays = dict(re.findall(r"^\s*(\w+)=\((.*)\)\s*(?:#.*)?$", s, re.M))
         for line in s.splitlines():
             if "--no-project" not in line or line.lstrip().startswith(("#", "rem ")):
@@ -63,7 +63,7 @@ def test_every_uv_run_names_a_python():
             used = re.findall(r"\$\{(\w+)\[@\]\}", line)
             ok = "--python" in line or any("--python" in arrays.get(a, "") for a in used)
             assert ok, f"{f.name}: uv run without --python: {line.strip()[:100]}"
-    assert PY_RANGE in (ROOT / "bin" / "tt").read_text() and PY_RANGE in (ROOT / "hmem" / "winsvc.py").read_text()
+    assert PY_RANGE in (ROOT / "bin" / "tt").read_text(encoding="utf-8") and PY_RANGE in (ROOT / "hmem" / "winsvc.py").read_text(encoding="utf-8")
 
 
 def test_code_parses_on_oldest_supported_python():
