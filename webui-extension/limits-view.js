@@ -28,7 +28,7 @@
     return {
       asOf: (Number(d.as_of) || Date.now() / 1000) * 1000,
       rows: d.rows.map((r) => ({
-        service: r.service || '', window: r.window || '—', pct: r.pct, used: r.used, limit: r.limit,
+        service: r.service || '', window: r.window || '-', pct: r.pct, used: r.used, limit: r.limit,
         resetsAt: r.resets_at ? Date.parse(r.resets_at) : null, note: r.note || '', stale: r.stale_seconds,
       })),
     };
@@ -59,7 +59,7 @@
       const st = r.note.match(/;?\s*stale ([\dhdm ]+) \(last Codex session\)/);
       if (st) { r.stale = durMs(st[1]) / 1000; r.note = r.note.replace(st[0], '').trim(); }
       if (/^reset$/.test(resets)) r.resetsAt = asOf;
-      else if (resets && resets !== '—') {
+      else if (resets && resets !== '-') {
         const rel = durMs(resets.split('(')[0]);
         if (rel) {
           r.resetsAt = asOf + rel; // "3d 15h" is rounded; snap to the exact "(Sun 09:00)" clock time
@@ -134,7 +134,7 @@
   function rowHtml(r) {
     const note = r.note || '';
     // not connected / unavailable: a quiet line with the fix
-    if (r.window === '—' || (r.pct == null && r.used == null && !/credits left/.test(note))) {
+    if (r.window === '-' || (r.pct == null && r.used == null && !/credits left/.test(note))) {
       const slow = /timed out|TimeoutExpired/i.test(note);
       let fix = note.match(/`([^`]+)`/);
       if (slow || (fix && /^\/limit/.test(fix[1]))) fix = null; // the ↻ button is the retry

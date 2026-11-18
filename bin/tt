@@ -1,0 +1,12 @@
+#!/bin/bash
+# Tabbie Team: connect this Tabbie to a team relay so shared sessions show live on your team's devices.
+# Usually driven from Settings → Team; also usable by hand (tt connect URL, tt pair, tt approve CODE, tt status).
+# Needs cryptography and websockets, so it runs through uv (cached after the first run).
+export PATH="$HOME/.hermes/bin:$HOME/.local/bin:/opt/homebrew/bin:/usr/local/bin:/usr/bin:/bin"
+TT="$(cd "$(dirname "$(readlink -f "$0")")/.." && pwd)/team/tt.py"
+UV="$(command -v uv || ls -d "$HOME"/.hermes/tools/uv-*/uv 2>/dev/null | tail -1)"
+if [ -z "$UV" ] || [ ! -x "$UV" ]; then
+  echo "tt: needs uv. Run: bin/install-tool uv" >&2
+  exit 1
+fi
+exec "$UV" run --no-project -q --with cryptography==50.0.2 --with websockets==17.4 python -I "$TT" "$@"

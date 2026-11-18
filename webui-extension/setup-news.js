@@ -28,19 +28,33 @@
     const c = card; card = null;
     setTimeout(() => c.remove(), 220);
   }
+  // Scroll to the section and keep it in view while sections above it finish loading and grow (Secrets talks to
+  // 1Password), for up to 8 s or until the user scrolls or touches the page themselves.
+  function follow(el) {
+    let last = null, n = 0, stop = false;
+    const quit = () => { stop = true; };
+    ['wheel', 'touchstart', 'keydown'].forEach((e) => addEventListener(e, quit, { once: true, passive: true }));
+    const go = () => {
+      if (stop || !el.isConnected || ++n > 20) return;
+      const top = Math.round(el.getBoundingClientRect().top);
+      if (last === null || Math.abs(top - last) > 4) { el.scrollIntoView({ block: 'start', behavior: last === null ? 'smooth' : 'auto' }); last = Math.round(el.getBoundingClientRect().top); }
+      setTimeout(go, 400);
+    };
+    go();
+  }
   function open(target) {
     const [kind, where] = String(target || '').split(':');
     if (kind !== 'settings') return;
     try {
       if (typeof window.switchPanel === 'function') window.switchPanel('settings');
-      const section = { secrets: 'providers' }[where] || where;
+      const section = { secrets: 'providers', team: 'providers' }[where] || where;
       setTimeout(() => {
         if (typeof window.switchSettingsSection === 'function') window.switchSettingsSection(section);
         // the section's own block, once it has drawn (Secrets loads from 1Password)
         let n = 0;
         const iv = setInterval(() => {
-          const el = document.getElementById({ secrets: 'hxSecrets' }[where] || '');
-          if (el || ++n > 75) { clearInterval(iv); if (el) el.scrollIntoView({ block: 'start', behavior: 'smooth' }); }
+          const el = document.getElementById({ secrets: 'hxSecrets', team: 'hxTeam' }[where] || '');
+          if (el || ++n > 75) { clearInterval(iv); if (el) follow(el); }
         }, 200);
       }, 60);
     } catch (_) {}

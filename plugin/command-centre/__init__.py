@@ -19,7 +19,7 @@ import threading
 import time
 from pathlib import Path
 
-from . import executor_choice, limits_gate, projects, providers, questions, review, worker_profile
+from . import executor_choice, limits_gate, prep, projects, providers, questions, review, worker_profile
 from .agents import AgentRun, attach_docs, strip_attach
 from .attachments import Manifest, find_candidates, kind_of
 from .common import REQUESTS_DIR, STATE_DIR, load_config, log_decision, read_json, write_json
@@ -175,6 +175,37 @@ def _chat_attachments(sid: str) -> Path | None:
         return None
     home = Path(os.environ.get("HERMES_WEBUI_STATE_DIR") or Path.home() / ".hermes" / "webui").expanduser()
     return home / "attachments" / sid
+
+
+def _prep(r: Request, cfg: dict, *, worker: str, provider: str, model: str | None, cwd: str, add_dirs: list[str],
+          reopen_ctx: int | None, skip: bool, feed=None) -> dict:
+    """A cheaper model reads ahead when it pays off (prep.py): notes go into the worker prompt via r["prep_notes"].
+    Returns the plan ({"reopen": False} means start fresh instead of reopening the old session)."""
+    r.data.pop("prep_notes", None)
+    msg = r.data.get("raw_message") or r["original_prompt"] or ""
+    sid = r["session_id"] or ""
+    convo = ""
+    if sid and re.fullmatch(r"[A-Za-z0-9_-]{4,64}", sid):
+        home = Path(os.environ.get("HERMES_WEBUI_STATE_DIR") or Path.home() / ".hermes" / "webui").expanduser()
+        convo = prep.conversation_text((read_json(home / "sessions" / f"{sid}.json", {}) or {}).get("messages") or [], msg)
+    try:
+        what = prep.plan(cfg, worker=worker, provider=provider, model=model, message=msg, conversation_chars=len(convo),
+                         reopen_ctx=reopen_ctx, project=bool(r["project"]), skip=skip)
+    except Exception as exc:  # noqa: BLE001
+        log_decision(event="prep_failed", request=r.id, error=str(exc)[:200])
+        return {"reopen": reopen_ctx is not None}
+    if not what.get("model"):
+        return what
+    out = prep.run(cfg, what, worker=worker, message=msg, conversation=convo, cwd=cwd, add_dirs=add_dirs,
+                   on_progress=feed)
+    log_decision(event="prep", request=r.id, model=what["model"], digest=out["digest"], scout=out["scout"],
+                 seconds=out["seconds"], reopen=what["reopen"])
+    if out["notes"]:
+        r.data["prep_notes"] = out["notes"]
+        r.data["prep_shared"] = bool(out["digest"] and prep.split_shared(msg))
+    elif not what["reopen"] and reopen_ctx is not None:
+        what = {**what, "reopen": True}  # the digest didn't come back: reopen the old session after all
+    return what
 
 
 def _with_docs(r: Request, text: str) -> str:
@@ -585,7 +616,7 @@ def _directive_execute_approved(r: Request) -> str:
 
 def _directive_ask_project(r: Request) -> str:
     return (
-        f"{TAG} {_route_line(r)} — but no project is selected, and this looks like project work.\n"
+        f"{TAG} {_route_line(r)}. But no project is selected, and this looks like project work.\n"
         f"ACTION: ask the user ONE short question: which project? Known: {_known_projects_hint()}. "
         f"They can answer with a name or path (or `/cc project <name>`). Do not do anything else."
     )
@@ -1065,8 +1096,12 @@ def _route_motion(session_id: str, user_message, text: str):
 # --------------------------------------------------------------------------- tools
 
 def _claude_prompt(r: Request, manifest: Manifest, history: bool = False) -> str:
+    ask = r["original_prompt"]
+    shared = prep.split_shared(ask or "") if r.data.get("prep_shared") else None
+    if shared:  # sent from the team site: its history is in the digest below, not repeated here
+        ask = shared[1]
     parts = [f"COMMAND CENTRE REQUEST {r.id}", _route_line(r), _project_lines(r),
-             "", "ORIGINAL USER REQUEST (verbatim):", r["original_prompt"]]
+             "", "ORIGINAL USER REQUEST (verbatim" + (", sent from the shared team chat" if shared else "") + "):", ask]
     if r["route"] == ASTRA:
         replies = [t["content"] for t in r["planning_transcript"] if t["role"] == "user"]
         if replies:
@@ -1075,9 +1110,12 @@ def _claude_prompt(r: Request, manifest: Manifest, history: bool = False) -> str
                       f"{r.data.get('approved_at')}). Follow it; the original request and attachments "
                       f"above/below remain the source of truth if anything is ambiguous:",
                   r["brief"]]
-    recent = _recent_block(r) if history else ""
+    notes = r.data.get("prep_notes") or ""
+    recent = _recent_block(r) if history and "THE CONVERSATION SO FAR" not in notes else ""
     if recent:
         parts += ["", recent]
+    if notes:
+        parts += ["", notes]
     parts += ["", manifest.render(), "", _memory_context(r)]
     parts += ["", f"IMAGES FOR THE USER: save screenshots/renders to show under {(r.dir / 'attach').resolve()} "
                   "(or inside the project folders above), then write `ATTACH: <absolute path>` on its own line. "
@@ -1294,6 +1332,13 @@ def _run_request(r: Request, feed=None, force: dict | None = None) -> dict:
             if (prev and time.time() - prev.get("at", 0) < 60 * int(ecfg.get("resume_max_age_minutes", 120))
                     and (prev.get("ctx") or 0) < int(ecfg.get("resume_max_context", 120000))):
                 resume = prev.get("session_id")  # past the cap a fresh session + recent turns costs far less
+        if not cont:
+            reopen_ctx = int((sessions.get(rkey) or {}).get("ctx") or 0) if resume else None
+            plan = _prep(r, cfg, worker="claude", provider="anthropic", model=claude_model or ecfg.get("model"), cwd=cwd,
+                         add_dirs=([str(manifest.dir)] if manifest.items else []) + list(r.data.get("extra_dirs") or []),
+                         reopen_ctx=reopen_ctx, skip=bool(studio or endpoint), feed=feed)
+            if resume and not plan.get("reopen", True):
+                resume = None  # a big session: start fresh from the digest instead of re-reading all of it
         prompt = _claude_prompt(r, manifest, history=not resume)
         r.write_text("claude_prompt.md", prompt)
     r["status"] = "executing"
@@ -1493,7 +1538,8 @@ def _takeover_prompt(r: Request) -> str:
              "ALWAYS cite every web source you used inline as [Site](url) (source chips + a Sources panel); "
              "attach relevant pictures and add charts for comparable numbers on your own, unasked; a YouTube link alone on a line plays as a video; "
              "ALWAYS end the final message with a ```tabbie-followups block (2-3 short next steps or questions, one per line, "
-             "as the user would say them); they show as tappable suggestions.",
+             "as the user would say them); they show as tappable suggestions. "
+             "Never use em dashes (the long dash): use a comma, colon, full stop or brackets.",
              questions.QUESTION_RULES,
              "", _claude_prompt(r, Manifest(r.dir)),
              "", "RECENT SESSION CONVERSATION (compacted):", convo or "(none)",
@@ -1547,6 +1593,8 @@ def _astra_takeover(r: Request, reason: str, choice: dict | None = None, feed=No
         prompt = questions.answer_prompt(r.data.get("question") or {}, answer)
         r.write_text(f"answer-{len(r.data.get('question_log') or [])}.md", prompt)
     elif choice:
+        _prep(r, cfg, worker="codex", provider="openai", model=model, cwd=cwd, add_dirs=add_dirs, reopen_ctx=None,
+              skip=bool(endpoint), feed=feed)
         prompt = _codex_worker_prompt(r, dynamic=bool(delegate)) + (
             f"\n\nTHE USER ANSWERED YOUR QUESTIONS:\n{answer}" if answer else "")
         r.write_text("codex_prompt.md", prompt)
@@ -1705,7 +1753,7 @@ def _cmd_takeover(raw_args: str = "", session_id: str = "", session_key: str = "
             except Exception:
                 pass
         log_decision(event="takeover_disabled", session=sid)
-        return f"Takeover off — Claude executes again.{stopped}"
+        return f"Takeover off. Claude executes again.{stopped}"
     if not agents().has("codex"):
         return "Takeover needs Codex, and only Claude Code is enabled on this computer (Settings → Agents)."
     st["takeover"], st["takeover_declined"] = True, False
@@ -1718,11 +1766,11 @@ def _cmd_takeover(raw_args: str = "", session_id: str = "", session_key: str = "
         try:
             if _CTX is not None and _CTX.inject_message(
                     f"{TAG}-resume Continue request {rid} with Codex (takeover).", session_key=session_key or None):
-                return f"Takeover on — Codex is continuing {rid}."
+                return f"Takeover on. Codex is continuing {rid}."
         except Exception:
             pass
         return f"Takeover on. Say 'continue' to have Codex resume {rid}."
-    return "Takeover on — Codex executes in this session until you type /takeover again."
+    return "Takeover on. Codex executes in this session until you type /takeover again."
 
 
 def _plan_display(r: Request, data: dict, cfg: dict) -> str:
@@ -1890,7 +1938,7 @@ def _status_text() -> str:
     exposed = planner.get("model") in codex_models() if planner.get("provider") == "codex-cli" else None
     recent = sorted((STATE_DIR / "requests").glob("*/request.json"))[-5:]
     lines = [f"Project: {projects.current() or '(none)'}",
-             f"Planner: {_planner_label(cfg)}" + ("" if exposed is None else f" — exposed: {exposed}"),
+             f"Planner: {_planner_label(cfg)}" + ("" if exposed is None else f" · exposed: {exposed}"),
              f"Executor: Claude Code (claude -p), max_parallel={cfg.get('executor', {}).get('max_parallel', 1)}",
              "Recent requests:"]
     for f in reversed(recent):
@@ -1932,7 +1980,7 @@ def _cmd_cc(raw_args: str = "", session_id: str = "", **kwargs):
         return f"Cancelled {r.id}."
     if sub == "route":
         d = classify(rest, load_config())
-        return f"Would route: {d.route} — {d.reason} (score {d.score}{', forced' if d.forced else ''})"
+        return f"Would route: {d.route}: {d.reason} (score {d.score}{', forced' if d.forced else ''})"
     if sub == "planner":
         cfg = load_config()
         return f"{_planner_label(cfg)}\nCodex models exposed to your ChatGPT login: {', '.join(codex_models())}"

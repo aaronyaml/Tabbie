@@ -2,7 +2,7 @@
  * Upstream labels a turn's activity "Processed 14m 39s" both while it runs (ticking) and when
  * it settles. Like Claude Code: while live, one "-ing" word for the whole reply ("Pondering...", dots
  * filling in . .. ... with a small bounce, no timer), with a small line under it showing the latest step from the live feed (Claude's status
- * lines, tool steps, "Still working: …" heartbeats). Once settled: "Completed – 14m 39s".
+ * lines, tool steps, "Still working: …" heartbeats). Once settled: "Completed in 14m 39s".
  * Labels are rewritten in place; upstream keeps ticking the original text, which we re-translate.
  */
 (function () {
@@ -10,7 +10,6 @@
   const WORDS = ['Thinking', 'Pondering', 'Crafting', 'Brewing', 'Tinkering', 'Wrangling', 'Composing',
     'Conjuring', 'Untangling', 'Synthesizing', 'Percolating', 'Mulling', 'Orchestrating', 'Assembling',
     'Sketching', 'Polishing', 'Noodling', 'Cooking', 'Weaving', 'Calibrating'];
-  const DASH = ' – ';
   // Upstream texts we translate: "Processed 3m 2s", "Processed", "Running", "Thinking…", "Working".
   const UPSTREAM = /^(Processed|Running|Thinking…?|Working)(?:\s+(?:for\s+)?(.+))?$/;
   const LABELS = '.tool-call-group-label, .tool-worklog-label';
@@ -68,7 +67,7 @@
     if (!live && !elapsed) return;
     // While live the -ing word lives in the bottom status line (like Claude Code); the group
     // header stays quiet.
-    const want = live ? 'Working' : `Completed${DASH}${elapsed}`;
+    const want = live ? 'Working' : `Completed in ${elapsed}`;
     if (label.textContent !== want) {
       label.textContent = want;
       label.setAttribute('data-sweep-label', want);

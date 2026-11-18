@@ -330,6 +330,24 @@
     });
   }
 
+  // A new chat in this project that starts with `text`, as if typed.
+  async function taskWith(p, text) {
+    await act(async () => {
+      if (!p.folders.length) throw new Error('Add a folder first, so Hermes knows where the work happens.');
+      const wid = await ensureWebuiProject(p);
+      close();
+      if (typeof newSession === 'function') await newSession(false, { project_id: wid, workspace: p.workspace, worktree: false });
+      try { if (typeof renderSessionList === 'function') renderSessionList({ deferWhileInteracting: false }); } catch (_) {}
+      for (let i = 0; i < 40 && !document.getElementById('msg'); i++) await new Promise((r) => setTimeout(r, 100));
+      const ta = document.getElementById('msg');
+      const go = window.send || (typeof send === 'function' ? send : null);
+      if (!ta || !go) throw new Error('Couldn’t open a new chat. Try again.');
+      ta.value = text;
+      ta.dispatchEvent(new Event('input', { bubbles: true }));
+      await go();
+    });
+  }
+
   // ── render ──
   function render() {
     if (!root || !isOpen()) return;
@@ -396,7 +414,7 @@
     return wrap;
   }
 
-  const TABS = [['folders', 'Folders', 'Folder01Icon'], ['motion', 'Motion', 'Video01Icon'], ['sessions', 'Sessions', 'Clock01Icon'], ['memory', 'Memory', 'Brain01Icon'],
+  const TABS = [['folders', 'Folders', 'Folder01Icon'], ['motion', 'Motion', 'Video01Icon'], ['posts', 'Posts', 'Image01Icon'], ['sessions', 'Sessions', 'Clock01Icon'], ['memory', 'Memory', 'Brain01Icon'],
                 ['dreamer', 'Dreamer', 'Moon02Icon'], ['skills', 'Skills', 'SparklesIcon'], ['instructions', 'Instructions', 'FileTextIcon'],
                 ['architecture', 'Architecture', 'Layers01Icon'], ['settings', 'Settings', 'Settings02Icon']];
 
@@ -449,7 +467,7 @@
     const d = S.cache[S.tab];
     if (d && d.error) body.append(h('p', { class: 'hxp-err', text: d.error }));
     else if (S.tab === 'motion' && document.documentElement.classList.contains('hx-no-motion')) body.append(h('p', { class: 'hxp-muted', text: 'Motion needs Claude Code. Link Claude and turn it on in the model picker → Agents.' }));
-    else body.append(({ folders: tabFolders, motion: tabMotion, sessions: tabSessions, memory: tabMemory, dreamer: tabDreamer, skills: tabSkills,
+    else body.append(({ folders: tabFolders, motion: tabMotion, posts: tabPosts, sessions: tabSessions, memory: tabMemory, dreamer: tabDreamer, skills: tabSkills,
                         instructions: tabInstructions, architecture: tabArchitecture, settings: tabSettings })[S.tab](p, d));
     main.append(body);
     wrap.append(main);
@@ -538,6 +556,39 @@
       }
     }).catch(() => { list.textContent = ''; list.append(h('p', { class: 'hxp-err', text: 'Couldn’t list the films.' })); });
     return out;
+  }
+
+  // Picture posts: a brief becomes a chat that makes the image(s) and a caption per platform, using the
+  // project's post kit (a post-kit folder in its folders) when it has one.
+  const PLATFORMS = ['Instagram', 'LinkedIn', 'Facebook', 'TikTok', 'X'];
+  function postPrompt(f) {
+    const what = f.kind === 'single' ? 'a single picture' : `a carousel of ${f.slides} slides`;
+    const plats = PLATFORMS.filter((x) => f.plat.has(x));
+    return `Make a picture post for this project: ${what}, for ${plats.join(', ')}.\n\nWhat it’s about:\n${f.about.trim()}\n\n`
+      + 'Use the project’s post kit: find the post-kit folder in this project’s folders and follow its README.md exactly (house style, render script, caption rules). '
+      + 'If the project has no post kit, design it in the project’s own brand style at 1080×1350.\n\n'
+      + 'Reply with every image attached, in order, then a ready-to-paste caption for each platform. Don’t post or schedule anything.';
+  }
+  function tabPosts(p) {
+    const f = S.post || (S.post = { about: '', kind: 'carousel', slides: 5, plat: new Set(['Instagram', 'LinkedIn']) });
+    const about = h('textarea', { rows: '4', maxlength: '2000', placeholder: 'e.g. how sharing a shortlist with your housemates works, aimed at students starting their house hunt', value: f.about,
+      oninput: (e) => { f.about = e.target.value; go.disabled = !ready(); } });
+    const ready = () => f.about.trim().length > 3 && f.plat.size > 0 && p.status === 'active' && !S.busy;
+    const seg = h('div', { class: 'hxp-seg' },
+      btn(`hxp-seg-b${f.kind === 'single' ? ' is-on' : ''}`, 'Single picture', () => { f.kind = 'single'; render(); }),
+      btn(`hxp-seg-b${f.kind === 'carousel' ? ' is-on' : ''}`, 'Carousel', () => { f.kind = 'carousel'; render(); }));
+    const step = (d) => h('button', { type: 'button', class: 'hxp-step-b', text: d < 0 ? '−' : '+', 'aria-label': d < 0 ? 'Fewer slides' : 'More slides',
+      disabled: (d < 0 ? f.slides <= 2 : f.slides >= 10) || null, onclick: () => { f.slides = Math.min(10, Math.max(2, f.slides + d)); render(); } });
+    const count = h('div', { class: 'hxp-step', role: 'group', 'aria-label': 'Slides' }, step(-1), h('output', { text: `${f.slides} slides`, 'aria-live': 'polite' }), step(1));
+    const plats = h('div', { class: 'hxp-chips hxp-plats' }, ...PLATFORMS.map((x) => h('button', { type: 'button', class: `hxp-chip${f.plat.has(x) ? ' is-on' : ''}`, 'aria-pressed': String(f.plat.has(x)),
+      text: x, onclick: () => { f.plat.has(x) ? f.plat.delete(x) : f.plat.add(x); render(); } })));
+    const go = btn('hxp-primary', 'Make post', () => { const text = postPrompt(f); f.about = ''; taskWith(p, text); }, 'SparklesIcon', { disabled: !ready() || null });
+    return h('div', { class: 'hxp-form hxp-posts' },
+      h('p', { class: 'hxp-muted', text: 'Describe the post and Tabbie makes the picture or carousel in this project’s style, with a caption for each platform. Nothing gets posted.' }),
+      h('label', {}, h('span', { text: 'What’s it about?' }), about),
+      h('div', { class: 'hxp-pf' }, h('span', { class: 'hxp-pf-l', text: 'Format' }), h('div', { class: 'hxp-fmt' }, seg, f.kind === 'carousel' ? count : null)),
+      h('div', { class: 'hxp-pf' }, h('span', { class: 'hxp-pf-l', text: 'Captions for' }), plats),
+      h('div', { class: 'hxp-row hxp-row-end' }, go));
   }
 
   function tabSessions(p, d) {

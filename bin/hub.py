@@ -76,9 +76,9 @@ def check(label: str, ok: bool, fix: str = "", optional: bool = False) -> bool:
     if ok:
         print(f"  {G}✓{N} {label}")
     elif optional:
-        print(f"  {Y}!{N} {label} (optional){' — ' + fix if fix else ''}")
+        print(f"  {Y}!{N} {label} (optional){': ' + fix if fix else ''}")
     else:
-        print(f"  {R}✗{N} {label}{' — ' + fix if fix else ''}")
+        print(f"  {R}✗{N} {label}{': ' + fix if fix else ''}")
     return ok
 
 

@@ -52,7 +52,7 @@
     // upstream's fallback when settings haven't loaded (or bot_name is unset)
     if (!window._botName || window._botName === OLD) window._botName = NAME;
     if (document.title === OLD) document.title = NAME;
-    else if (/ — Hermes$/.test(document.title)) document.title = document.title.replace(/ — Hermes$/, ` — ${NAME}`);
+    else if (/ — Hermes$/.test(document.title)) document.title = document.title.replace(/ — Hermes$/, ` · ${NAME}`);
     const ta = document.getElementById('msg');
     if (ta && /^Message Hermes/.test(ta.placeholder || '')) ta.placeholder = ta.placeholder.replace(OLD, NAME);
     for (const [sel, from, to] of TEXT) {

@@ -45,6 +45,8 @@ On top of that:
   writes and runs acceptance tests before it says it's done. On by default.
 - **Fast and lean**: workers start with a slim profile and the reply is relayed verbatim, so a small
   job finishes in about 10–15 s.
+- **Team** (optional): share chosen projects live with someone else. Their phone or laptop shows your
+  chats as they happen, end-to-end encrypted through a team relay you connect in Settings → Accounts → Team.
 
 Tabbie is built on two open-source projects and runs entirely on your machine:
 
@@ -441,6 +443,7 @@ bin/hub health            # one line per component, with the fix command
 | `ai.hermes.mdns` | Bonjour name `hermes.local` → your Mac's LAN IP |
 | `ai.hermes.cc-sidecar` | Tabbie's helper for the WebUI extension on `127.0.0.1:8794` (token-protected): agents panel, Stop, Hand-offs, Projects, Motion, updates. Runs through `uv` with PyYAML |
 | `ai.hermes.dreamer` | Nightly Dreamer run (03:30, low priority) |
+| `ai.hermes.team` | Team mirror (`bin/tt daemon`): idles until a team relay is connected and a project is shared, then sends those chats to the relay, signed and encrypted |
 
 The templates live in `services/*.plist.template`. **New services install themselves:** when an update
 adds one, Tabbie installs it the next time it starts (and `bin/hub update`, `bin/hub restart` and
@@ -790,6 +793,16 @@ Design notes: `docs/memory/ARCHITECTURE.md`, `docs/projects/ARCHITECTURE.md`.
   indicator; tap it for the same details.
 - **Replies type out live**: while Claude Code writes its answer, the words appear in the chat as they come
   (like ChatGPT), above the live status line; the finished reply then takes their place.
+- **Team** (optional, Settings → Accounts → Team): share projects live with your team. Tabbie knows no team
+  by name: you type your team relay's address and Tabbie checks it is one (`/.well-known/tabbie-team` must
+  answer protocol `tt1`; the name shown comes from the relay). Then **Get a code**, sign in on the relay's
+  site with your passkey and enter it there, comparing this Mac's fingerprint. Switch on the projects to share:
+  every chat in them streams to your team's devices (prompts, replies as they're written, progress), signed by
+  this Mac and encrypted with a team key the relay never sees; other projects never leave the Mac. When a new
+  phone or laptop asks to see your sessions, Tabbie asks **A new device wants in**: type the code that device
+  shows to approve it (Tabbie never shows the code itself). After an update Tabbie offers this once. Under the
+  hood it's `bin/tt` (`team/`), also usable by hand: `tt connect URL`, `tt pair`, `tt approve CODE`,
+  `tt share PROJECT`, `tt status`. Protocol and relay API: [docs/team/PROTOCOL.md](docs/team/PROTOCOL.md).
 - **Secrets in 1Password** (optional): API keys live in a 1Password vault ("Tabbie") that a 1Password service
   account can use; its token sits in the macOS Keychain. **Settings → Accounts → Secrets** lists each key by
   name and variable (`RESEND_API_KEY`), never its value; add, replace or delete keys there. **Rotate**
@@ -982,6 +995,7 @@ the moments, approve a storyboard, and Claude Code builds and renders the film w
 | `webui-extension/local.js` | Your home path and name for the extension | no (from `local.example.js`) |
 | `config/motion.yaml` | Optional: a Motion studio folder of your own (default `motion/` in Tabbie) | no (from `.example`) |
 | `~/.hermes/config.yaml`, `~/.hermes/SOUL.md` | Hermes Agent's own config and hub rules | outside the repo |
+| `~/.hermes/team/` | Team: relay address, shared projects, this Mac's keys and trusted devices (0600 files) | outside the repo, never in git |
 
 To change the planner, edit `config/router.yaml`; it applies on the next request.
 
@@ -1100,7 +1114,7 @@ Use Claude Code's own permission settings for hard limits.
 ## Tests
 
 ```bash
-uv run -q --no-project --with pytest --with ruamel.yaml python -m pytest tests -q
+uv run -q --no-project --with pytest --with ruamel.yaml --with cryptography==50.0.2 --with websockets==17.4 python -m pytest tests -q
 ```
 
 The tests use temporary folders only and never touch your memory or state.

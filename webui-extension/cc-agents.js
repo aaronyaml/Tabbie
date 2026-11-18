@@ -1041,7 +1041,7 @@
   // Upstream's reply footer shows the HUB's tokens ("39.6k in · 95 out") next to the model chip, which
   // worker-label.js renames to the worker (e.g. Opus 5.5): those tokens were the hub's routing and relay,
   // not the worker's. On replies a worker did (a "Route: …" line that isn't Tabbie itself), label them.
-  const ROUTE_RX = /Route:\s*([^—\n]+?)\s+—/;
+  const ROUTE_RX = /Route:\s*([^—·\n]+?)\s+[—·]/;
   function labelHubUsage() {
     document.querySelectorAll('#messages .assistant-turn').forEach((turn) => {
       const m = ROUTE_RX.exec((turn.textContent || '').slice(0, 400));

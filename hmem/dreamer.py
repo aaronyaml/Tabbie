@@ -1156,7 +1156,7 @@ def _collect(trigger: str) -> dict:
 
 
 def report_md(r: dict) -> str:
-    lines = [f"# Dream cycle {r['cycle']}" + (f" — project {r['project']}" if r.get("project") else ""), "",
+    lines = [f"# Dream cycle {r['cycle']}" + (f" · project {r['project']}" if r.get("project") else ""), "",
              f"- trigger: {r['trigger']} · {r['at']} · {r['seconds']} s · traces analysed: {r['traces_analysed']}",
              f"- proposals created: {len(r['proposals'])} ({', '.join(r['proposals']) or 'none'})", ""]
     by = collections.defaultdict(list)
@@ -1166,9 +1166,9 @@ def report_md(r: dict) -> str:
         lines += [f"## {name} ({len(fs)})", ""]
         for f in sorted(fs, key=lambda x: -x["support"]["conversations"])[:15]:
             s = f["support"]
-            lines.append(f"- **{f['title']}** — {s['conversations']} conversations · {s['days']} days · "
+            lines.append(f"- **{f['title']}**: {s['conversations']} conversations · {s['days']} days · "
                          f"projects {', '.join(s['projects']) or '-'}{' · tainted' if s['tainted'] else ''}"
-                         + (f" — {f['detail']}" if f.get("detail") else ""))
+                         + (f". {f['detail']}" if f.get("detail") else ""))
             for e in f["evidence"][:3]:
                 lines.append(f"  - {json.dumps(e, ensure_ascii=False)[:200]}")
         lines.append("")

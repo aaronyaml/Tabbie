@@ -44,14 +44,14 @@
         "apple-skin.js?v=12"
       ],
       "stylesheets": [
-        "apple-skin.css?v=18"
+        "apple-skin.css?v=19"
       ]
     },
     {
       "id": "brand",
       "name": "Tabbie name",
       "scripts": [
-        "brand.js?v=4"
+        "brand.js?v=5"
       ],
       "stylesheets": []
     },
@@ -99,7 +99,15 @@
       "id": "status-words",
       "name": "Status words",
       "scripts": [
-        "status-words.js?v=27"
+        "status-words.js?v=28"
+      ],
+      "stylesheets": []
+    },
+    {
+      "id": "no-dashes",
+      "name": "No em dashes",
+      "scripts": [
+        "no-dashes.js?v=2"
       ],
       "stylesheets": []
     },
@@ -110,7 +118,7 @@
         "files.js?v=4"
       ],
       "stylesheets": [
-        "files.css?v=6"
+        "files.css?v=7"
       ]
     },
     {
@@ -177,7 +185,7 @@
       "id": "cc-agents",
       "name": "Agents & questions",
       "scripts": [
-        "cc-agents.js?v=26"
+        "cc-agents.js?v=27"
       ],
       "stylesheets": [
         "cc-agents.css?v=16"
@@ -188,6 +196,16 @@
         "health_path": "/health",
         "proxy_auth": "token-v1"
       }
+    },
+    {
+      "id": "chat-files",
+      "name": "Files in this chat",
+      "scripts": [
+        "chat-files.js?v=1"
+      ],
+      "stylesheets": [
+        "chat-files.css?v=2"
+      ]
     },
     {
       "id": "cc-narration",
@@ -275,7 +293,7 @@
       "scripts": [
         "motion.js?v=11",
         "motion-scrub.js?v=6",
-        "motion-studio.js?v=70"
+        "motion-studio.js?v=71"
       ],
       "stylesheets": [
         "motion.css?v=9",
@@ -286,10 +304,10 @@
       "id": "projects",
       "name": "Projects (multi-folder, memory, Dreamer)",
       "scripts": [
-        "projects.js?v=18"
+        "projects.js?v=21"
       ],
       "stylesheets": [
-        "projects.css?v=12"
+        "projects.css?v=18"
       ]
     },
     {
@@ -362,7 +380,7 @@
       "id": "message-queue",
       "name": "Message queue & send now",
       "scripts": [
-        "message-queue.js?v=6"
+        "message-queue.js?v=7"
       ],
       "stylesheets": [
         "message-queue.css?v=4"
@@ -372,7 +390,7 @@
       "id": "limits-view",
       "name": "Usage limit cards",
       "scripts": [
-        "limits-view.js?v=7"
+        "limits-view.js?v=8"
       ],
       "stylesheets": [
         "limits-view.css?v=2"
@@ -392,7 +410,7 @@
       "id": "worker-label",
       "name": "Reply model label",
       "scripts": [
-        "worker-label.js?v=2"
+        "worker-label.js?v=3"
       ],
       "stylesheets": []
     },
@@ -466,7 +484,7 @@
       "id": "charts",
       "name": "Charts drawn inside replies (```chart blocks)",
       "scripts": [
-        "charts.js?v=4"
+        "charts.js?v=5"
       ],
       "stylesheets": [
         "charts.css?v=7"
@@ -503,10 +521,20 @@
       ]
     },
     {
+      "id": "team",
+      "name": "Team: share chosen projects live with your team (any tt1 relay)",
+      "scripts": [
+        "team.js?v=6"
+      ],
+      "stylesheets": [
+        "team.css?v=3"
+      ]
+    },
+    {
       "id": "setup-news",
       "name": "New in setup (offers setup steps an update added, once)",
       "scripts": [
-        "setup-news.js?v=3"
+        "setup-news.js?v=6"
       ],
       "stylesheets": [
         "setup-news.css?v=1"

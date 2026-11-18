@@ -11,7 +11,7 @@
 
   const CHIPS = '.lf-model, .msg-gateway-inline, .msg-used-model-inline';
   // "Route: Claude Opus 5.5 (low) — x", "Route: Astra → approval → Codex GPT-6.1 Sol — x", "Route: Astra (takeover) — x"
-  const ROUTE = /Route:\s*(?:Astra\s*→\s*approval\s*→\s*)?([^—\n]+?)\s+—/;
+  const ROUTE = /Route:\s*(?:Astra\s*→\s*approval\s*→\s*)?([^—·\n]+?)\s+[—·]/;
 
   function worker(turn) {
     const m = ROUTE.exec((turn.textContent || '').slice(0, 400));

@@ -52,13 +52,13 @@
   }
 
   const fmt = (spec, v) => {
-    if (v == null) return '—';
+    if (v == null) return '-';
     const a = Math.abs(v);
     const s = a >= 1e9 ? `${+(v / 1e9).toFixed(1)}B` : a >= 1e6 ? `${+(v / 1e6).toFixed(1)}M` : a >= 1e4 ? `${+(v / 1e3).toFixed(1)}k`
       : (+v.toFixed(2)).toLocaleString('en-GB');
     return `${spec.prefix}${s}${spec.unit}`;
   };
-  const full = (spec, v) => (v == null ? '—' : `${spec.prefix}${(+v.toFixed(4)).toLocaleString('en-GB')}${spec.unit}`);
+  const full = (spec, v) => (v == null ? '-' : `${spec.prefix}${(+v.toFixed(4)).toLocaleString('en-GB')}${spec.unit}`);
   function colorOf(spec, i) {
     return spec.series[i].color || spec.colors[i] || (isDark() ? DARK : LIGHT)[i % 8];
   }

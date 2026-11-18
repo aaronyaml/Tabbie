@@ -517,6 +517,10 @@ input[type="checkbox"], input[type="radio"] { accent-color: var(--hx-accent); }
 .tool-call-group-summary:hover { color: var(--hx-text) !important; background: transparent !important; }
 .tool-call-group-label { font-weight: 500 !important; }
 .agent-activity-group, .activity { margin: 2px 0 10px !important; }
+/* "Completed in 2m 41s" sits right above its reply: no stacked margins/padding between them when collapsed */
+.agent-activity-group.tool-call-group-collapsed > .tool-worklog-summary { margin-bottom: 0 !important; }
+.assistant-turn-blocks > .agent-activity-group { margin-bottom: 4px !important; }
+.assistant-turn-blocks > .agent-activity-group + .assistant-segment > .msg-body { padding-top: 0 !important; }
 .tool-call-group-body { border-left: 0 !important; padding-left: 0 !important; margin-top: 4px; }
 /* the inner "Ran N tools" disclosure is redundant once the outer line says it */
 .tool-worklog-tools .tool-group-head { display: none !important; }

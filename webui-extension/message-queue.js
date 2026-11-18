@@ -497,7 +497,7 @@
       nowBtn.className = 'hxq-composer-now';
       nowBtn.innerHTML = icon('ArrowUp02Icon', 14) + '<span>Send now</span>';
       nowBtn.title = `Push into the running reply (${CHORD})`;
-      nowBtn.setAttribute('aria-label', 'Send now — push into the running reply');
+      nowBtn.setAttribute('aria-label', 'Send now: push into the running reply');
       nowBtn.addEventListener('mousedown', (e) => e.preventDefault()); // keep composer focus
       nowBtn.addEventListener('click', () => { composerPushNow(); });
       send.parentElement.insertBefore(nowBtn, send);

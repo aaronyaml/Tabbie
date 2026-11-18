@@ -911,7 +911,7 @@
         ['Beats', `${beats} beats, ${downs} downbeats (bar starts)`],
         ['Words', (a.words || []).length ? `${a.words.length} words timed${a.stems ? ' on the isolated vocals' : ''}` : 'No vocals found'],
         ['Drops', drops.length ? drops.map((d) => fmt(d.ms)).join(', ') : 'None'],
-        ['Sounds', notable.length ? notable.map((x) => `${x.id} ${x.label.replace(/-like$/, '')} ×${x.count || used[x.id] || 1}`).join(' · ') : '—'],
+        ['Sounds', notable.length ? notable.map((x) => `${x.id} ${x.label.replace(/-like$/, '')} ×${x.count || used[x.id] || 1}`).join(' · ') : '-'],
       ],
     };
   }
@@ -1845,7 +1845,7 @@ ${editSystem(s)}
     const moves = (g.rhythm || g.pacing) ? `<dl class="hxs-gp-l">${row('Rhythm', g.rhythm)}${row('Pacing', g.pacing)}${row('Easing', g.easing)}${row('Density', g.density)}</dl>${(g.movement || []).length ? `<ul class="hxs-es-chips">${g.movement.map((x) => `<li>${esc(x)}</li>`).join('')}</ul>` : ''}` : '';
     const seqHtml = seq.length ? `<ol class="hxs-seq">${seq.map((b) => `<li class="hxs-seq-b"><i style="width:${Math.round(((b.share || 0) / tot) * 100)}%"></i><b>${esc(cap(b.id))}</b><span>${esc(b.archetypes.join(' · '))}${b.purpose ? `<small>${esc(b.purpose)}</small>` : ''}</span>${b.out ? `<em>${icon('ArrowRight01Icon', 11)}${esc(b.out)}</em>` : ''}</li>`).join('')}</ol>${s.cutRhythm ? `<p class="hxs-note">${esc(s.cutRhythm)}</p>` : ''}` : '';
     const cuts = (s.presets || []).length ? `<ul class="hxs-es-list">${s.presets.map((p) => `<li><b>${esc(p.name)}</b> <i>${esc(String(p.kind || '').replace(/-/g, ' '))}</i><span>${esc(p.build)}</span></li>`).join('')}</ul>` : (s.signature || []).length ? `<ul class="hxs-es-list">${s.signature.map((x) => `<li><span>${esc(cap(x))}</span></li>`).join('')}</ul>` : '';
-    const arch = (s.archetypes || []).length ? `<ol class="hxs-es-list hxs-es-arch">${s.archetypes.map((a, i) => `<li><b><i>${'ABCDE'[i] || i + 1}</i>${esc(a.name)}</b><span>${esc(a.purpose)}${a.motion ? ` — ${esc(a.motion)}` : ''}</span></li>`).join('')}</ol>` : '';
+    const arch = (s.archetypes || []).length ? `<ol class="hxs-es-list hxs-es-arch">${s.archetypes.map((a, i) => `<li><b><i>${'ABCDE'[i] || i + 1}</i>${esc(a.name)}</b><span>${esc(a.purpose)}${a.motion ? `: ${esc(a.motion)}` : ''}</span></li>`).join('')}</ol>` : '';
     const exHtml = ex.length ? `${s.example.title ? `<p class="hxs-note">${esc(s.example.title)}</p>` : ''}<ol class="hxs-es-list hxs-es-ex">${ex.map((sc) => `<li><b>${esc(sc.archetype)}</b> <i>${esc(sc.beat)}</i><span>${esc(sc.action)}</span>${sc.out ? `<em>${icon('ArrowRight01Icon', 11)}${esc(sc.out)}</em>` : ''}</li>`).join('')}</ol>` : '';
     const el = s.elements || {}, elHtml = Object.keys(el).length ? `<dl class="hxs-gp-l">${Object.entries(el).map(([k, v]) => row(cap(k), v)).join('')}</dl>` : '';
     const au = s.audio || {}, snd = (au.drive && au.drive.length) || au.sync || s.sound ? `<dl class="hxs-gp-l">${row('Driven by', (au.drive || []).join(', '))}${row('Sync', au.sync)}${row('Sounds', s.sound)}</dl>` : '';

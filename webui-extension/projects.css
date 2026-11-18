@@ -260,3 +260,23 @@ html.hx-proj-open .nav-tab.active:not(.hxp-nav) svg[data-hi] { stroke-width: 1.5
 .hxp-sugg:empty { display: none; }
 .hxp-sugg-h { margin: 6px 2px 0; font-size: 12.5px; font-weight: 500; color: var(--hx-text-2, #6B6B70); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .hxp-item > .hxp-sugg-add { color: var(--hx-ink, #3054FD); flex: none; }
+/* A row of buttons sits clear of the list or card under it (the glass list draws its own card). */
+.hxp-row + .hxp-list, .hxp-row + .hxp-card { margin-top: 16px; }
+/* Posts tab: format and platform pickers */
+.hxp-posts { max-width: 640px; }
+.hxp-pf { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; }
+.hxp-pf-l { font-size: 13px; font-weight: 500; color: var(--hx-text-2, #6B6B70); min-width: 96px; }
+.hxp-pf .hxp-seg { flex: 0 1 280px; }
+.hxp-pf select { height: 38px; padding: 0 10px; border-radius: 10px; font: inherit; font-size: 13px; }
+.hxp-plats { max-height: none; overflow: visible; }
+.hxp-plats .hxp-chip { height: 32px; padding: 0 14px; cursor: pointer; background: var(--hx-fill, rgba(127,127,127,.1)); color: var(--hx-text-2, #6B6B70); }
+.hxp-plats .hxp-chip.is-on { background: var(--hx-ink, #3054FD); color: #fff; }
+@media (max-width: 640px) { .hxp-pf { align-items: stretch; flex-direction: column; gap: 8px; } .hxp-fmt { max-width: none; } .hxp-pf .hxp-seg { flex: none; width: 100%; } }
+.hxp-fmt { display: flex; align-items: center; gap: 8px; flex: 1 1 auto; min-width: 0; max-width: 440px; }
+.hxp-pf .hxp-fmt .hxp-seg { flex: 1 1 auto; min-width: 0; width: auto; }
+.hxp-step { display: flex; align-items: center; gap: 2px; padding: 3px; border-radius: 12px; background: var(--hx-fill, rgba(127,127,127,.1)); flex: none; }
+.hxp-step-b { width: 32px; height: 32px; border: 0; border-radius: 9px; background: transparent; color: var(--hx-text, inherit); font-size: 17px; line-height: 1; cursor: pointer; }
+.hxp-step-b:hover:not(:disabled) { background: var(--hx-raised, #fff); }
+:root.dark .hxp-step-b:hover:not(:disabled) { background: var(--hx-fill-2, #2a2b31); }
+.hxp-step-b:disabled { opacity: .35; cursor: default; }
+.hxp-step output { min-width: 68px; text-align: center; font-size: 13px; font-weight: 500; font-variant-numeric: tabular-nums; }

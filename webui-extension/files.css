@@ -109,9 +109,9 @@ html.hx-viewer-open, html.hx-viewer-open body { overflow: hidden; }
 .hx-v-scroll { flex: 1; min-height: 0; overflow: auto; -webkit-overflow-scrolling: touch; overscroll-behavior: contain; }
 .hx-v-note { margin: auto; padding: 24px; color: var(--hx-text-2, #6B6B70); font-size: 13px; }
 
-.hx-v-img { flex: 1; min-height: 0; overflow: hidden; display: grid; place-items: center; cursor: zoom-in; }
+.hx-v-img { flex: 1; min-height: 0; overflow: hidden; display: grid; grid-template: minmax(0, 1fr) / minmax(0, 1fr); place-items: center; padding: 12px; box-sizing: border-box; cursor: zoom-in; }
 .hx-v-img img { max-width: 100%; max-height: 100%; object-fit: contain; display: block; }
-.hx-v-img.zoomed { overflow: auto; place-items: start; cursor: zoom-out; }
+.hx-v-img.zoomed { overflow: auto; grid-template: none; padding: 0; place-items: start; cursor: zoom-out; }
 .hx-v-img.zoomed img { max-width: none; max-height: none; width: auto; min-width: 200%; }
 
 .hx-v-video { flex: 1; min-height: 0; width: 100%; background: #000; display: block; }

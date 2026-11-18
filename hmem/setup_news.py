@@ -25,6 +25,11 @@ STEPS = [
               "while they work without anyone seeing them. Needs a 1Password account.",
      "open": "settings:secrets", "terminal": "bin/setup --only secrets",
      "later": "No problem. Set up 1Password any time in Settings → Accounts → Secrets."},
+    {"id": "team", "title": "Team (shared sessions)", "added": "2026-11-18", "optional": True,
+     "blurb": "Work with someone else: the projects you choose show live on your team's phones and laptops, "
+              "end-to-end encrypted. If a teammate sent you an invite code, paste it in and Tabbie does the rest.",
+     "open": "settings:team", "terminal": "bin/tt join CODE",
+     "later": "No problem. Connect a team any time in Settings → Accounts → Team."},
 ]
 IDS = [s["id"] for s in STEPS]
 

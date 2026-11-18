@@ -144,9 +144,9 @@ step "Tools" "The programs Tabbie runs on. Missing ones can be installed for you
 # tool, why, install command ("" = manual), required (1/0)
 tool() {
   local t="$1" why="$2" cmd="$3" req="$4"
-  if have "$t"; then ok "$t — $why"; return 0; fi
+  if have "$t"; then ok "$t: $why"; return 0; fi
   if [ -z "$cmd" ]; then
-    [ "$req" = 1 ] && fail "$t missing — $why" || warn "$t missing (optional) — $why"
+    [ "$req" = 1 ] && fail "$t missing: $why" || warn "$t missing (optional): $why"
     return 1
   fi
   if yn "$t is missing ($why). Install it now?" "$([ "$req" = 1 ] && echo y || echo n)"; then
@@ -178,12 +178,12 @@ fi
 if want signin; then
 step "Sign in" "Each provider uses its own login in your browser. No API keys."
 signin() {  # label, check command, login command
-  if eval "$2" >/dev/null 2>&1; then ok "$1 — signed in"; return; fi
+  if eval "$2" >/dev/null 2>&1; then ok "$1: signed in"; return; fi
   if yn "Sign in to $1 now? (opens your browser)" y && [ "$ASK" = 1 ]; then
     run bash -c "$3"
-    eval "$2" >/dev/null 2>&1 && ok "$1 — signed in" || warn "$1 — not signed in yet. Later: $3"
+    eval "$2" >/dev/null 2>&1 && ok "$1: signed in" || warn "$1: not signed in yet. Later: $3"
   else
-    warn "$1 — not signed in. Later: $3"
+    warn "$1: not signed in. Later: $3"
   fi
 }
 # The hub (chat + routing) runs on the same subscription login as the agents: ChatGPT (openai-codex)

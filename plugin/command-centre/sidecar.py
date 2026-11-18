@@ -28,6 +28,7 @@ POST /executor {id, provider, model, effort} -> set it (composer model picker)
 POST /executor {default: true, provider, model, effort} -> the model new chats start on (Settings → Preferences;
                                      a composer pick also sets it)
 GET /agents, POST /agents {enabled}  -> which coding agents this install uses (Claude Code, Codex, both)
+GET /team, POST /team/<connect|pair|pair-check|share|approve|disconnect> -> Settings → Team (team_link.py, bin/tt)
 GET /setup-news, POST /setup-news/seen {id} -> setup steps added since install, offered once (hmem/setup_news.py)
 GET /secrets[?force=1], POST /secrets/{add,update,delete,rotate,connect} -> Settings → Accounts → Secrets (secrets.py):
                                      1Password vault names/variables only; values go in, never out (rotate
@@ -87,6 +88,7 @@ updates = importlib.import_module("cc_sidecar_pkg.updates")
 needs = importlib.import_module("cc_sidecar_pkg.needs")
 hub_setup = importlib.import_module("cc_sidecar_pkg.hub_setup")
 secrets_store = importlib.import_module("cc_sidecar_pkg.secrets")
+team_link = importlib.import_module("cc_sidecar_pkg.team_link")
 push = importlib.import_module("cc_sidecar_pkg.push")
 usage_insights = importlib.import_module("cc_sidecar_pkg.usage_insights")
 linkicons = importlib.import_module("cc_sidecar_pkg.linkicons")
@@ -623,7 +625,7 @@ def secrets_get(force: bool = False) -> tuple[int, dict]:
 def _setup_done() -> dict:
     """Setup steps already done some other way (so they're never offered): 1Password = a token in the Keychain."""
     try:
-        return {"secrets": bool(secrets_store._token())}
+        return {"secrets": bool(secrets_store._token()), "team": team_link.done()}
     except Exception:  # noqa: BLE001
         return {}
 
@@ -985,6 +987,8 @@ class Handler(BaseHTTPRequestHandler):
                 return self._send(200, session_payload(sid))
             if u.path == "/secrets":
                 return self._send(*secrets_get(q.get("force") == "1"))
+            if u.path == "/team":
+                return self._send(*team_link.status(q.get("force") == "1"))
             if u.path == "/setup-news":
                 return self._send(200, {"steps": setup_news.pending(_setup_done())})
             if u.path == "/draft":
@@ -1129,6 +1133,8 @@ class Handler(BaseHTTPRequestHandler):
             if u.path == "/setup-news/seen" and isinstance(body, dict):
                 setup_news.mark([str(body.get("id") or "")])
                 return self._send(200, {"ok": True, "steps": setup_news.pending(_setup_done())})
+            if u.path.startswith("/team/") and isinstance(body, dict):
+                return self._send(*team_link.post(u.path, body))
             if u.path.startswith("/secrets/") and isinstance(body, dict):
                 return self._send(*secrets_post(u.path, body))
             if u.path == "/update":
