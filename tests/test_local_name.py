@@ -2,6 +2,7 @@
 import os
 import re
 import shutil
+import sys
 import subprocess
 from pathlib import Path
 
@@ -37,6 +38,7 @@ def test_updater_fills_the_saved_admin_port(tmp_path, monkeypatch):
     assert up._render(t) == f"<s>{Path.home()} localhost:2029</s>"
 
 
+@pytest.mark.skipif(sys.platform == "win32", reason="bash script")
 def test_address_is_always_hermes_local():
     out = subprocess.run([str(ROOT / "bin" / "tabbie-host")], capture_output=True, text=True, timeout=30).stdout.strip()
     assert out == "hermes.local"

@@ -2,6 +2,10 @@
 import sys
 from pathlib import Path
 
+import pytest
+
+posix = pytest.mark.skipif(sys.platform == "win32", reason="fake agents are shell scripts")
+
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT / "plugin"))
 
@@ -23,6 +27,7 @@ def _fake(tmp_path, monkeypatch, name, help_text):
     monkeypatch.setenv("PATH", f"{b}:/usr/bin:/bin")
 
 
+@posix
 def test_reports_missing_options_and_says_how_to_update(tmp_path, monkeypatch):
     m = _mod(tmp_path, monkeypatch)
     need = m.NEEDS["claude"][1]
@@ -33,6 +38,7 @@ def test_reports_missing_options_and_says_how_to_update(tmp_path, monkeypatch):
     assert m.missing("codex") is None  # not installed: not a problem here
 
 
+@posix
 def test_a_current_agent_is_fine_and_cached(tmp_path, monkeypatch):
     m = _mod(tmp_path, monkeypatch)
     _fake(tmp_path, monkeypatch, "claude", "Usage: claude\n" + "\n".join(f"  {f}  something" for f in m.NEEDS["claude"][1]) + "\n" + "x" * 300)
