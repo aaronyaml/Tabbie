@@ -192,7 +192,7 @@ html.hx-glass.hx-proj-open #hxProjects::before, html.hx-glass.hx-studio-open #hx
   html.hx-glass main.main::before, html.hx-glass #hxProjects::before, html.hx-glass #hxStudio::before { animation: none; }
 }
 /* chip-tier cards */
-html.hx-glass :is(.hx-ins-card, #insightsContent > .insights-card, .hxp-card, .hxs-card, .hx-st-card, .hx-lim-card, #hxUpdSettings, #mainSettings .plugin-card, #mainSettings .extension-gallery-card,
+html.hx-glass :is(.hx-ins-card, #insightsContent > .insights-card, .hxp-card, .hxs-card, .hx-st-card, .hx-lim-card, #hxUpdSettings, #hxSupport, #mainSettings .plugin-card, #mainSettings .extension-gallery-card,
   main.main .detail-card, main.main .profile-card, main.main .kanban-card, #mainSettings .settings-field) {
   background: linear-gradient(180deg, var(--glass-tint-top), var(--glass-tint-bottom)) !important;
   border: 1px solid var(--glass-border) !important;
@@ -200,7 +200,7 @@ html.hx-glass :is(.hx-ins-card, #insightsContent > .insights-card, .hxp-card, .h
   -webkit-backdrop-filter: blur(6px) saturate(125%);
   backdrop-filter: blur(6px) saturate(125%);
 }
-html.hx-glass:not(.dark) :is(.hx-ins-card, #insightsContent > .insights-card, .hxp-card, .hxs-card, .hx-st-card, .hx-lim-card, #hxUpdSettings, #mainSettings .plugin-card, #mainSettings .extension-gallery-card,
+html.hx-glass:not(.dark) :is(.hx-ins-card, #insightsContent > .insights-card, .hxp-card, .hxs-card, .hx-st-card, .hx-lim-card, #hxUpdSettings, #hxSupport, #mainSettings .plugin-card, #mainSettings .extension-gallery-card,
   main.main .detail-card, main.main .profile-card, main.main .kanban-card, #mainSettings .settings-field) {
   background: linear-gradient(180deg, rgba(255,255,255,.62), rgba(255,255,255,.4)) !important;
   box-shadow: 0 6px 18px rgba(30,33,45,.07), inset 0 1px 0 var(--glass-rim-top), inset 0 0 0 1px var(--glass-rim-hairline) !important;

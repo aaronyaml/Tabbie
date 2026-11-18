@@ -1008,6 +1008,11 @@ class Handler(BaseHTTPRequestHandler):
                 except OSError:
                     n = ""
                 return self._send(200, {"host": f"{n or 'hermes'}.local"})
+            if u.path == "/support":
+                if _SUP["running"]:
+                    return self._send(200, {"running": True})
+                code, res = _SUP["result"] or (200, {"running": False})
+                return self._send(code, res)
             if u.path == "/push/key":
                 return self._send(200, {"key": push.public_key(), **push.status(q.get("endpoint", ""))})
             if u.path == "/push/latest":
@@ -1127,6 +1132,11 @@ class Handler(BaseHTTPRequestHandler):
             body = json.loads(self.rfile.read(n) or b"{}") if n else {}
             if u.path.startswith("/projects"):
                 return self._send(*projects_api.handle("POST", u.path, None, body))
+            if u.path == "/support":  # Settings → System → Save support logs (takes ~10 s: poll GET /support)
+                if not _SUP["running"]:
+                    _SUP.update(running=True, result=None)
+                    threading.Thread(target=lambda: _SUP.update(result=_support_bundle(), running=False), daemon=True).start()
+                return self._send(202, {"started": True})
             if u.path == "/executor" and isinstance(body, dict):
                 return self._send(*set_executor(body))
             if u.path == "/providers" and isinstance(body, dict):
@@ -1190,7 +1200,42 @@ class Handler(BaseHTTPRequestHandler):
         return self._send(404, {"error": "not found"})
 
 
+_SUP: dict = {"running": False, "result": None}
+
+
+def _support_bundle() -> tuple[int, dict]:
+    """bin/tabbie-support: a zip of Tabbie's logs (secrets blanked) on the Desktop, shown in Finder."""
+    tool = Path(__file__).resolve().parents[2] / "bin" / "tabbie-support"
+    py = "/usr/bin/python3" if Path("/usr/bin/python3").exists() else sys.executable
+    try:
+        r = subprocess.run([py, "-I", str(tool)], capture_output=True, text=True, timeout=240, stdin=subprocess.DEVNULL)
+    except (OSError, subprocess.SubprocessError) as e:
+        return 500, {"error": f"Couldn't make the support logs ({type(e).__name__})."}
+    path = (r.stdout.strip().splitlines() or [""])[-1]
+    if r.returncode != 0 or not path or not Path(path).exists():
+        print(f"support logs failed: {r.stderr.strip()[-1500:]}", file=sys.stderr, flush=True)
+        return 500, {"error": "Couldn't make the support logs: " + ((r.stderr.strip().splitlines() or ["unknown error"])[-1])[:200]}
+    if sys.platform == "darwin":
+        subprocess.Popen(["open", "-R", path], stdin=subprocess.DEVNULL, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+    p = Path(path)
+    where = "Desktop" if p.parent == Path.home() / "Desktop" else str(p.parent).replace(str(Path.home()), "~")
+    return 200, {"ok": True, "name": p.name, "where": where}
+
+
+def _stamp_logs() -> None:
+    """Date and time on every log line (team/logstamp.py, shared with the Team service)."""
+    try:
+        import importlib.util
+        spec = importlib.util.spec_from_file_location("tabbie_logstamp", Path(__file__).resolve().parents[2] / "team" / "logstamp.py")
+        mod = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(mod)
+        mod.install()
+    except Exception:  # noqa: BLE001 (logs without times beat no helper)
+        pass
+
+
 def main():
+    _stamp_logs()
     try:
         team_link.warm()
     except Exception:  # noqa: BLE001

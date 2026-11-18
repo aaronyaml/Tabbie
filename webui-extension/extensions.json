@@ -72,7 +72,7 @@
         "glass.js?v=3"
       ],
       "stylesheets": [
-        "glass.css?v=19"
+        "glass.css?v=20"
       ]
     },
     {
@@ -322,10 +322,10 @@
       "id": "updates",
       "name": "Tabbie updates (asks before downloading)",
       "scripts": [
-        "updates.js?v=16"
+        "updates.js?v=17"
       ],
       "stylesheets": [
-        "updates.css?v=7"
+        "updates.css?v=8"
       ]
     },
     {

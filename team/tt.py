@@ -944,7 +944,10 @@ def _key_loop():
 
 def cmd_daemon(_args):
     """Keep shared sessions mirrored to the relay (run by the LaunchAgent)."""
+    import logstamp
     import mirror
+
+    logstamp.install()
 
     global RELAY
     idle = False

@@ -1159,6 +1159,12 @@ The tests use temporary folders only and never touch your memory or state.
 
 - `bin/hub health` checks every component and prints the fix command.
 - `bin/hub logs webui|gateway|caddy|mdns|sidecar|decisions` shows logs.
+- **Helping someone else's Tabbie**: they press **Settings → System → Save support logs** (or run `bin/tabbie-support`).
+  It saves one zip on their Desktop: a header saying what the Mac is (Tabbie version, macOS, chip, memory, tool
+  versions, services, last update, anything `bin/hub health`, `bin/hub doctor` and `bin/upstream status` found) and
+  the end of each log, with passwords, keys, tokens and email addresses blanked. Service logs carry the time on every
+  line and are rotated at 5 MB (one old copy kept).
+- `bin/hub doctor` checks Claude Code and Codex still have every option Tabbie uses.
 - **Page hangs in a Mac browser**: System Settings › Privacy & Security › Local Network → allow the browser.
 - **Wrong route**: `/cc route <text>` shows the score. Tune the signals in `router.py` or `router.plan_threshold`.
 - **Claude refuses to run**: `claude auth status` must show a `claude.ai` login. A stray `ANTHROPIC_API_KEY` is ignored on purpose; to use an API key, add it in **model picker → More models**.

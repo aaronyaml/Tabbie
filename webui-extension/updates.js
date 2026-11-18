@@ -19,6 +19,7 @@
   window.__hxUpdates = true;
 
   const API = 'api/extensions/cc-agents/sidecar/update';
+  const SIDE = 'api/extensions/cc-agents/sidecar/';
   const KEY = 'hx-update-dismissed';
   const EVERY = 5 * 60 * 1000;
   const SOON = 2 * 60 * 1000;
@@ -310,6 +311,34 @@
         else if (j.available) { fresh(); offer(j); }
       } catch (e) { ver.textContent = `Couldn't check (${(e && e.message) || e}).`; }
       btn.disabled = false; btn.textContent = btn.dataset.offer ? 'See update' : 'Check for updates';
+    });
+    mountSupport(row);
+  }
+
+  // Settings → System: Save support logs. A zip of Tabbie's logs (passwords and keys blanked) on the Mac's
+  // Desktop, to send to whoever is helping. It takes a few seconds: start it, then ask until it's ready.
+  function mountSupport(after) {
+    if (document.getElementById('hxSupport')) return;
+    const sup = document.createElement('div');
+    sup.id = 'hxSupport';
+    sup.className = 'hx-support';
+    sup.innerHTML = `<div><b>Support logs</b><span data-sup>A zip of Tabbie's logs and what this Mac is, with passwords and keys taken out. Send it to whoever is helping you.</span></div>`
+      + `<button type="button" class="settings-action-btn" data-save>Save support logs</button>`;
+    after.after(sup);
+    const say = sup.querySelector('[data-sup]'), b = sup.querySelector('[data-save]');
+    const sidecar = (path, method) => fetch(SIDE + path, { method: method || 'GET', credentials: 'same-origin', cache: 'no-store',
+      headers: method === 'POST' ? { 'Content-Type': 'application/json' } : undefined, body: method === 'POST' ? '{}' : undefined })
+      .then(async (r) => { const j = await r.json().catch(() => ({})); if (!r.ok) throw new Error(j.error || String(r.status)); return j; });
+    b.addEventListener('click', async () => {
+      b.disabled = true; b.textContent = 'Saving…';
+      try {
+        await sidecar('support', 'POST');
+        let j = { running: true };
+        for (let i = 0; i < 120 && j.running; i++) { await new Promise((r) => setTimeout(r, 1500)); j = await sidecar('support'); }
+        if (j.running) throw new Error('it is taking too long');
+        say.textContent = `Saved on the Mac's ${j.where}: “${j.name}”. Send that file to whoever is helping you.`;
+      } catch (e) { say.textContent = `Couldn't save the support logs (${(e && e.message) || e}).`; }
+      b.disabled = false; b.textContent = 'Save support logs';
     });
   }
 

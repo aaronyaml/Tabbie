@@ -876,12 +876,39 @@ def last_failure() -> dict | None:
 HEAL_AFTER = 600
 
 
+LOG_MAX = 5 * 2**20  # a service log over this is moved to NAME.log.1 (one old copy kept)
+
+
+def rotate_logs(dirs=None, limit: int = LOG_MAX) -> list[str]:
+    """launchd appends service output to a file forever. Copy a big one to .1 and empty it in place (the
+    service keeps writing to the same open file). Caddy rotates its own server log."""
+    dirs = dirs or [ROOT / "state" / "logs", Path.home() / ".hermes"]
+    done = []
+    for d in dirs:
+        try:
+            files = sorted(Path(d).glob("*.log"))
+        except OSError:
+            continue
+        for f in files:
+            try:
+                if f.name.startswith("caddy-server") or f.stat().st_size <= limit:
+                    continue
+                shutil.copyfile(f, f.with_name(f.name + ".1"))
+                with open(f, "r+b") as fh:
+                    fh.truncate(0)
+                done.append(f.name)
+            except OSError:
+                continue
+    return done
+
+
 def watch() -> str:
     """Background check that doesn't depend on the helper running:
     - a health check whose process died mid-way is run again;
     - a restart that was waiting for Tabbie to go idle happens even if the helper is down;
     - if the helper has been down HEAL_AFTER seconds: install a newer version if there is one (it may
       be the fix), else go back from an update made in the last day."""
+    rotate_logs()
     st = _state()
     v = st.get("verify")
     if v and time.time() - v.get("at", 0) > VERIFY_S + 60:

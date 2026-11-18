@@ -1,0 +1,143 @@
+#!/usr/bin/env python3
+"""Tabbie's support logs: one zip someone helping you can read, with a header saying what this Mac is.
+
+    tabbie-support            write it to the Desktop (and state/support/) and print its path
+
+What's in it: a header (Tabbie version, macOS, chip, memory, tool versions, service states, last update,
+anything Tabbie found wrong) and the last few thousand lines of each Tabbie log. Never: passwords, keys,
+tokens, .env files, Team keys, chats or memory. Lines that look like a secret are blanked before writing.
+Stdlib only, so it works even when nothing else does (run with /usr/bin/python3 -I).
+"""
+from __future__ import annotations
+
+import json
+import os
+import platform
+import re
+import subprocess
+import sys
+import time
+import zipfile
+from pathlib import Path
+
+ROOT = Path(__file__).resolve().parents[1]
+HOME = Path.home()
+TAIL = 3000
+LOGS = [*sorted((ROOT / "state" / "logs").glob("*.log")), HOME / ".hermes" / "webui.log",
+        HOME / ".hermes" / "logs" / "agent.log", HOME / ".hermes" / "logs" / "errors.log",
+        HOME / ".hermes" / "logs" / "gateway.error.log", HOME / ".hermes" / "gateway-starts.log"]
+SECRET = [
+    (re.compile(r"(?i)\b(bearer|basic)\s+[A-Za-z0-9._~+/=-]{8,}"), r"\1 [hidden]"),
+    (re.compile(r"\b(sk|pk|rk|ghp|gho|ghs|xox[abpr]|op|eyJ)[A-Za-z0-9_-]{12,}[A-Za-z0-9._-]*"), "[hidden]"),
+    (re.compile(r"(?i)((?:pass(?:word)?|token|secret|api[_-]?key|authorization|cookie|session|signature|sig)[\"']?\s*[:=]\s*[\"']?)[^\s\"',;&]+"), r"\1[hidden]"),
+    (re.compile(r"(?i)([?&](?:token|key|sig|code|t)=)[^&\s\"']+"), r"\1[hidden]"),
+    (re.compile(r"(?<![A-Za-z0-9_-])(?![0-9a-f]{40}(?![A-Za-z0-9_-]))[A-Za-z0-9_-]{40,}"), "[hidden]"),  # long keys and tokens (a git commit id stays)
+    (re.compile(r"[\w.+-]+@[\w-]+\.[\w.-]+"), "[email]"),
+]
+
+
+def scrub(line: str) -> str:
+    for rx, rep in SECRET:
+        line = rx.sub(rep, line)
+    return line.replace(str(HOME), "~")
+
+
+def sh(*cmd: str, timeout: int = 20) -> str:
+    try:
+        r = subprocess.run(list(cmd), capture_output=True, text=True, encoding="utf-8", errors="replace", timeout=timeout,
+                           stdin=subprocess.DEVNULL)
+        return (r.stdout or r.stderr).strip()
+    except (OSError, subprocess.SubprocessError) as e:
+        return f"({type(e).__name__})"
+
+
+def tail(p: Path, n: int = TAIL) -> str:
+    try:
+        size = p.stat().st_size
+        with open(p, "rb") as f:
+            f.seek(max(0, size - 4 * 2**20))  # the end is what matters; never read a 200 MB log whole
+            lines = f.read().decode("utf-8", "replace").splitlines()[-n:]
+    except OSError as e:
+        return f"(couldn't read: {type(e).__name__})"
+    return "\n".join(scrub(x) for x in lines)
+
+
+def header() -> str:
+    env = {**os.environ, "PATH": f"{HOME}/.hermes/bin:{HOME}/.local/bin:/opt/homebrew/bin:/usr/local/bin:/usr/bin:/bin"}
+    def ver(*cmd):
+        try:
+            r = subprocess.run(list(cmd), capture_output=True, text=True, timeout=20, env=env, stdin=subprocess.DEVNULL)
+            return ((r.stdout or r.stderr).strip().splitlines() or ["?"])[0][:120]
+        except (OSError, subprocess.SubprocessError):
+            return "not found"
+    git = lambda *a: sh("git", "-C", str(ROOT), *a)  # noqa: E731
+    mem = sh("/usr/sbin/sysctl", "-n", "hw.memsize")
+    rows = [
+        ("Made", time.strftime("%Y-%m-%d %H:%M:%S %Z")),
+        ("Tabbie", f"{git('rev-parse', '--short', 'HEAD')} on {git('rev-parse', '--abbrev-ref', 'HEAD')}"
+                   f"{' (local changes)' if git('status', '--porcelain', '--untracked-files=no') else ''}"),
+        ("macOS", f"{platform.mac_ver()[0] or platform.platform()} on {platform.machine()}"),
+        ("Chip", sh("/usr/sbin/sysctl", "-n", "machdep.cpu.brand_string")),
+        ("Memory", f"{int(mem) // 2**30} GB, {os.cpu_count()} cores" if mem.isdigit() else "?"),
+        ("Address", (ROOT / "state" / "local-name").read_text().strip() + ".local" if (ROOT / "state" / "local-name").exists() else "hermes.local"),
+        ("Time zone", time.strftime("%z") + " " + (time.tzname[0] or "")),
+        ("uv", ver("uv", "--version")), ("Node", ver("node", "--version")), ("Claude Code", ver("claude", "--version")),
+        ("Codex", ver("codex", "--version")), ("Caddy", ver("caddy", "version")), ("Hermes Agent", ver("hermes", "--version")),
+        ("System Python", ver("/usr/bin/python3", "--version")),
+    ]
+    out = ["Tabbie support logs", "=" * 19, *[f"{k:<14}{scrub(v)}" for k, v in rows], ""]
+    out += ["Services (launchd)", "-" * 18]
+    for line in sh("launchctl", "list").splitlines():
+        if "ai.hermes" in line:
+            pid, code, label = (line.split("\t") + ["", "", ""])[:3]
+            out.append(f"  {label:<26} {'running' if pid != '-' else 'stopped'}  last exit {code}")
+    for name, cmd in (("Upstream (bin/upstream status)", [str(ROOT / "bin" / "upstream"), "status"]),
+                      ("Agents (bin/hub doctor)", ["/usr/bin/python3", "-I", str(ROOT / "plugin" / "command-centre" / "cli_flags.py")]),
+                      ("Health (bin/hub health)", [str(ROOT / "bin" / "hub"), "health"])):
+        out += ["", name, "-" * len(name), scrub(re.sub(r"\x1b\[[0-9;]*m", "", sh(*cmd, timeout=60)))]
+    for name, p in (("Last update", ROOT / "state" / "updates.json"), ("Team clock", HOME / ".hermes" / "team" / "clock.json"),
+                    ("Team hooks waiting", HOME / ".hermes" / "team" / "hooks.json")):
+        try:
+            out += ["", name, "-" * len(name), scrub(json.dumps(json.loads(p.read_text()), indent=1)[:4000])]
+        except (OSError, ValueError):
+            pass
+    try:  # Team: where and who, never keys
+        cfg = json.loads((HOME / ".hermes" / "team" / "config.json").read_text())
+        out += ["", "Team", "----", f"relay {re.sub(r'^https?://', '', str(cfg.get('relay') or 'none'))}, "
+                f"{len(cfg.get('projects') or [])} shared project(s), mail {'on' if cfg.get('mail') else 'off'}"]
+    except (OSError, ValueError):
+        pass
+    return "\n".join(out) + "\n"
+
+
+def main() -> int:
+    stamp = time.strftime("%Y-%m-%d %H.%M.%S")
+    work = ROOT / "state" / "support"
+    work.mkdir(parents=True, exist_ok=True)
+    for old in sorted(work.glob("Tabbie support *.zip"))[:-3]:  # keep the last few here
+        old.unlink(missing_ok=True)
+    # Built here, not on the Desktop: an iCloud-synced Desktop refuses a background process's seeks while it
+    # syncs (EDEADLK), and a zip is written with seeks. The finished file is then copied in one pass.
+    built = work / f"Tabbie support {stamp}.zip"
+    with zipfile.ZipFile(built, "w", zipfile.ZIP_DEFLATED) as z:
+        z.writestr("README.txt", header())
+        for p in LOGS:
+            if p.exists():
+                z.writestr(f"logs/{p.name}", tail(p))
+    desk = HOME / "Desktop"
+    if desk.is_dir():
+        try:
+            dest = desk / built.name
+            with open(built, "rb") as src, open(dest, "wb") as out:
+                while chunk := src.read(1 << 20):
+                    out.write(chunk)
+            print(dest)
+            return 0
+        except OSError:
+            pass
+    print(built)
+    return 0
+
+
+if __name__ == "__main__":
+    sys.exit(main())
