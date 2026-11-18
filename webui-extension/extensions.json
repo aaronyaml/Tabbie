@@ -514,7 +514,7 @@
       "id": "secrets",
       "name": "Secrets: API keys in 1Password (names only, never values)",
       "scripts": [
-        "secrets.js?v=7"
+        "secrets.js?v=8"
       ],
       "stylesheets": [
         "secrets.css?v=3"
@@ -524,7 +524,7 @@
       "id": "team",
       "name": "Team: share chosen projects live with your team (any tt1 relay)",
       "scripts": [
-        "team.js?v=6"
+        "team.js?v=8"
       ],
       "stylesheets": [
         "team.css?v=3"

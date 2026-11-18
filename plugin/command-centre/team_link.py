@@ -39,6 +39,14 @@ def _run(args: list[str], timeout: int = 40) -> tuple[int, str, str]:
     return r.returncode, r.stdout, r.stderr
 
 
+def warm():
+    """Run tt once in the background when the helper starts, so its libraries are fetched and cached before anyone
+    presses Join (on a new Mac that first run can take a minute)."""
+    import threading
+
+    threading.Thread(target=lambda: _run(["info"], timeout=300), daemon=True).start()
+
+
 def _err(stderr: str) -> str:
     line = (stderr or "").strip().splitlines()[-1:] or ["Something went wrong."]
     return re.sub(r"^tt:\s*", "", line[0])[:300]
@@ -147,7 +155,7 @@ def post(path: str, body: dict) -> tuple[int, dict]:
         c = "".join(str(body.get("code") or "").split())
         if not c or len(c) > 600:
             return 400, {"ok": False, "error": "Paste the whole invite code. It starts with TT1-."}
-        code, r = _json(["join", c, "--json"], timeout=60)
+        code, r = _json(["join", c, "--json"], timeout=180)  # a new Mac's first run also fetches tt's libraries
     elif act == "disconnect":
         code, r = _json(["disconnect", "--json"])
     else:

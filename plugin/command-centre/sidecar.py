@@ -1159,6 +1159,10 @@ class Handler(BaseHTTPRequestHandler):
 
 
 def main():
+    try:
+        team_link.warm()
+    except Exception:  # noqa: BLE001
+        pass
     ThreadingHTTPServer.allow_reuse_address = True
     srv = ThreadingHTTPServer((HOST, PORT), Handler)
     srv.daemon_threads = True

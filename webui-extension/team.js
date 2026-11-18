@@ -39,23 +39,19 @@
 
   // ── Settings section ──────────────────────────────────────────────────────────────────────────────
   function connectCard() {
-    const invite = `<div class="hx-st-card hx-team-card"><div class="hx-st-main">
+    // One box: the team site's link (default: then Get a code) or an invite code (TT1-…), whichever was sent.
+    return `<div class="hx-st-card hx-team-card"><div class="hx-st-main">
       <b class="hx-team-title">Join your team</b>
-      <span class="hx-st-dim">Paste the invite code a teammate sent you. It starts with <b>TT1-</b>. Tabbie does the rest by itself.</span>
+      <span class="hx-st-dim">Paste your team’s link from the team site (like <b>https://team.example.com</b>), then press <b>Get a code</b> and type it on the site. An invite code (starts with <b>TT1-</b>) works here too.</span>
       <form class="hx-team-form hx-team-join" data-act="join" autocomplete="off">
-        <textarea name="code" rows="3" placeholder="TT1-…" spellcheck="false" autocapitalize="off" autocomplete="off" required aria-label="Invite code">${esc(typedInvite)}</textarea>
-        <button type="submit" class="hx-st-btn is-primary"${busy ? ' disabled' : ''}>${busy === 'join' ? 'Joining…' : 'Join'}</button>
+        <textarea name="code" rows="2" placeholder="https://team.example.com" spellcheck="false" autocapitalize="off" autocomplete="off" required aria-label="Team link or invite code">${esc(typedInvite)}</textarea>
+        <button type="submit" class="hx-st-btn is-primary"${busy ? ' disabled' : ''}>${busy === 'join' || busy === 'connect' ? 'Connecting…' : 'Connect'}</button>
       </form>
     </div></div>`;
-    const hand = byHand ? `<div class="hx-st-card hx-team-card"><div class="hx-st-main">
-      <b class="hx-team-title">Connect with an address</b>
-      <span class="hx-st-dim">For whoever sets up the team: connect Tabbie to your team’s relay and the projects you choose show live on your team’s phones and laptops, end-to-end encrypted.</span>
-      <form class="hx-team-form" data-act="connect" autocomplete="off">
-        <input name="url" type="url" inputmode="url" value="${esc(typedUrl)}" placeholder="https://team.example.com" spellcheck="false" autocapitalize="off" required aria-label="Team relay address">
-        <button type="submit" class="hx-st-btn is-primary"${busy ? ' disabled' : ''}>${busy === 'connect' ? 'Checking…' : 'Connect'}</button>
-      </form>
-    </div></div>` : '<p class="hx-team-alt"><button type="button" class="hx-team-later" data-act="by-hand">No invite? Set up with an address instead</button></p>';
-    return invite + hand;
+  }
+  function teamUrl(v) {  // any link on the team site works: keep its address only
+    const t = String(v || '').trim();
+    try { const u = new URL(/^https?:\/\//i.test(t) ? t : 'https://' + t); return u.origin; } catch (_) { return ''; }
   }
 
   function joiningCard(st) {
@@ -141,12 +137,18 @@
     else if (!st.linked) body = pairCard(st) + `<div class="hx-team-foot"><button type="button" class="hx-st-btn" data-act="disconnect-yes">Use a different relay</button></div>`;
     else body = linkedCards(st);
     const pill = st.relay ? `<span class="hx-st-pill ${st.linked ? 'is-ok' : 'is-warn'}">${esc(st.name || host(st.relay))}${st.linked ? ' · ' + esc(cap(st.owner)) : (st.pairing && st.pairing.state === 'joining' ? ' · joining' : ' · not linked')}</span>` : '';
+    const f = box.contains(document.activeElement) && document.activeElement.name ? document.activeElement : null;
+    const keep = f ? { name: f.name, form: f.form && f.form.dataset.act, a: f.selectionStart, b: f.selectionEnd } : null;
     box.innerHTML = `<section class="hx-st-group">
       <div class="hx-st-head"><h3>Team</h3>${pill}</div>
       ${err ? `<p class="hx-st-fix hx-team-err" role="alert">${esc(err)}</p>` : ''}
       ${st.relay_error ? `<p class="hx-st-fix hx-team-err">Couldn’t reach ${esc(st.name || 'the relay')}: ${esc(st.relay_error)}</p>` : ''}
       ${body}
     </section>`;
+    if (keep) {  // a redraw never takes away what's being typed, or the place in it
+      const el = box.querySelector(`form[data-act="${keep.form}"] [name="${keep.name}"]`) || box.querySelector(`[name="${keep.name}"]`);
+      if (el) { el.focus({ preventScroll: true }); try { el.setSelectionRange(keep.a, keep.b); } catch (_) {} }
+    }
     // while a code is showing, check every 3 s whether it has been entered
     clearTimeout(pairTimer);
     if (st.pairing && st.pairing.state === 'waiting' && box.dataset.on) pairTimer = setTimeout(checkPair, 3000);
@@ -210,13 +212,34 @@
     const p = i.dataset.project;
     act('share:' + p, async () => { state = await post('share', { project: p, on: i.checked }); });
   }
+  function onInput(e) {  // remember what's typed, so a redraw puts it back
+    const t = e.target;
+    const act = t.form && t.form.dataset.act;
+    if (act === 'join' && t.name === 'code') typedInvite = t.value;
+    else if (act === 'connect' && t.name === 'url') typedUrl = t.value;
+    else if (act === 'invite' && t.name === 'for') typedFor = t.value;
+    else if (act === 'approve' && t.name === 'code') typedCode = t.value;
+  }
   function onSubmit(e) {
     const f = e.target.closest('form[data-act]');
     if (!f) return;
     e.preventDefault();
     const data = Object.fromEntries(new FormData(f).entries());
     if (f.dataset.act === 'connect') { typedUrl = data.url; act('connect', async () => { state = await post('connect', { url: data.url }); typedUrl = ''; }); }
-    else if (f.dataset.act === 'join') { typedInvite = data.code; act('join', async () => { state = await post('join', { code: data.code }); typedInvite = ''; }); }
+    else if (f.dataset.act === 'join') {
+      typedInvite = data.code;
+      const v = String(data.code || '').replace(/\s+/g, '');
+      if (/^TT1-/i.test(v)) act('join', async () => { state = await post('join', { code: v }); typedInvite = ''; });
+      else {
+        const url = teamUrl(v);
+        if (!url) { err = 'Paste the team site’s link, like https://team.example.com, or an invite code starting TT1-.'; render(); return; }
+        act('connect', async () => {
+          state = await post('connect', { url });
+          typedInvite = '';
+          if (state && !state.linked && !(state.pairing && state.pairing.code)) state = await post('pair', {});  // show the code straight away
+        });
+      }
+    }
     else if (f.dataset.act === 'invite') { typedFor = data.for; act('invite', async () => { const r = await post('invite', { for: data.for }); made = r.result; copied = false; state = r; typedFor = ''; }); }
     else if (f.dataset.act === 'approve') { typedCode = data.code; act('approve', async () => { state = await post('approve', { code: data.code }); typedCode = ''; }); }
   }
@@ -230,11 +253,13 @@
       box.addEventListener('click', onClick);
       box.addEventListener('change', onChange);
       box.addEventListener('submit', onSubmit);
+      box.addEventListener('input', onInput);
       pane.appendChild(box);
       render();
     }
     const sec = document.getElementById('hxSecrets');  // sits right after Secrets, at the end of Accounts
-    if (sec && sec.nextElementSibling !== box) sec.after(box);
+    // moving it takes focus out of whatever is being typed in and jumps the page: only when needed, never mid-typing
+    if (sec && sec.nextElementSibling !== box && !box.contains(document.activeElement)) sec.after(box);
     const on = pane.classList.contains('active') && !document.hidden;
     if (on && !box.dataset.on) { box.dataset.on = '1'; load(true); }
     if (!on && box.dataset.on) { delete box.dataset.on; asking = ''; err = ''; clearTimeout(pairTimer); }

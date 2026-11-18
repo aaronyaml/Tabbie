@@ -218,7 +218,9 @@
       box.addEventListener('change', onInput);
       pane.appendChild(box);
       render();
-    } else if (box.nextElementSibling) pane.appendChild(box);  // stays last, under Accounts
+    } else if (box.nextElementSibling && box.nextElementSibling.id !== 'hxTeam' && !box.contains(document.activeElement)) {
+      pane.appendChild(box);  // stays last under Accounts (Team sits right after it); never moved while typing in it
+    }
     const on = pane.classList.contains('active') && !document.hidden;
     if (on && !box.dataset.on) { box.dataset.on = '1'; load(false); }
     if (!on && box.dataset.on) { delete box.dataset.on; forget(); render(); }
