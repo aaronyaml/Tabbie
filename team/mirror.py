@@ -29,6 +29,7 @@ SESS = WEBUI / "sessions"
 SIDECAR = os.environ.get("TT_SIDECAR", "http://127.0.0.1:8794")
 TICK = 0.15  # seconds between file checks: well under the 300 ms target
 MAX_TEXT = 200_000
+MAX_EVENT = 250_000  # the relay closes the socket on an event over 256 KiB, so a bigger one could never be sent
 # Files: every file a chat attaches (your uploads, and files a reply hands over with MEDIA:) goes to the team,
 # encrypted like everything else, in chunks that fit the relay's event size. Paths merely mentioned in text never
 # do, and neither do key and secret files, wherever a reply points.
@@ -134,6 +135,18 @@ def read_json(p: Path, default=None):
         return json.loads(p.read_text())
     except (OSError, ValueError):
         return default
+
+
+def fit_event(payload: dict, size: int) -> dict | None:
+    """A payload whose sealed event came to `size` bytes, over MAX_EVENT: the same with its text cut to fit
+    (with a note saying so), or None when there's no text to cut."""
+    for key in ("text", "add"):
+        t = payload.get(key)
+        if isinstance(t, str) and len(t) > 1000:
+            keep = max(500, int(len(t) * (MAX_EVENT * 0.9) / size) - 200)
+            note = "\n\n[Shortened for the team: the full message is on the Mac it came from.]"
+            return {**payload, key: t[:keep] + note}
+    return None
 
 
 class Sidecar:
@@ -567,9 +580,19 @@ class Mirror:
                     t = self.tt.team()
                     entry = await sock(room)
                     e = C.seal(room, type_, self.owner, m["kid"], sk, t["current"], C.unb64u(t["keys"][t["current"]]), payload, prev=entry[2])
+                    raw = json.dumps(e)
+                    if len(raw) > MAX_EVENT:  # too big for the relay: shorten its text, or skip it, never retry forever
+                        smaller = fit_event(payload, len(raw))
+                        if smaller is None:
+                            print(f"mirror: a {type_} event was too big for the team relay ({len(raw)} bytes); skipped", flush=True)
+                            if done:
+                                done()
+                            break
+                        payload = smaller
+                        continue
                     if type_ not in ("delta", "typing", "presence"):
                         entry[3][e["nonce"]] = (room, type_, payload, done)  # done() once the relay echoes it back
-                    await entry[0].send(json.dumps(e))
+                    await entry[0].send(raw)
                     entry[1] = time.time()
                     break
                 except Exception as exc:  # noqa: BLE001 (reconnect and retry)

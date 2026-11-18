@@ -138,3 +138,15 @@ def test_a_failed_hook_is_retried_until_it_works(tt, tmp_path, monkeypatch):
     flag.write_text("")
     assert tt.run_pending_hooks(now=1061) == ["trusted"]
     assert tt.load("hooks.json")["pending"] == [] and (tmp_path / "ran").read_text().strip() == "sam kid1 pub1"
+
+
+def test_a_wrong_clock_is_noticed_from_the_relays_date(tt):
+    from email.utils import formatdate
+    import time as _t
+    tt._note_clock(formatdate(_t.time() - 600, usegmt=True))  # this Mac is 10 minutes fast
+    w = tt.clock_warning()
+    assert w and "10 minutes fast" in w and "Date & Time" in w
+    tt._note_clock(formatdate(_t.time(), usegmt=True))
+    assert tt.clock_warning() is None
+    tt._note_clock("not a date")
+    assert tt.clock_warning() is None

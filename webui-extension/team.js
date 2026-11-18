@@ -59,6 +59,8 @@
     return `<div class="hx-st-card hx-team-card"><div class="hx-st-main" aria-live="polite">
       <b class="hx-team-title"><span class="hx-team-spin" aria-hidden="true"></span>Almost done</b>
       <span class="hx-st-dim">You’re in the team. Now waiting for ${esc(who)}’s Mac to hand over the team key. It does that by itself within a minute, as long as it’s switched on with Tabbie running.</span>
+      ${st.pairing.expired ? `<span class="hx-st-fix">It’s been over a day, so that invite has run out. Ask ${esc(who)} for a new invite code, then press Cancel and start again.</span>`
+        : (st.pairing.waited_min >= 15 ? `<span class="hx-st-fix">Still waiting after ${st.pairing.waited_min >= 120 ? Math.floor(st.pairing.waited_min / 60) + ' hours' : st.pairing.waited_min + ' minutes'}. Ask ${esc(who)} to open their Mac and check Tabbie is running.</span>` : '')}
       <span class="hx-st-dim">You can close this and carry on: it finishes in the background.</span>
     </div></div>
     <div class="hx-team-foot"><button type="button" class="hx-st-btn" data-act="disconnect-yes">Cancel and start again</button></div>`;
@@ -169,6 +171,7 @@
     box.innerHTML = `<section class="hx-st-group">
       <div class="hx-st-head"><h3>Team</h3>${pill}</div>
       ${err ? `<p class="hx-st-fix hx-team-err" role="alert">${esc(err)}</p>` : ''}
+      ${st.clock_warning ? `<p class="hx-st-fix hx-team-err">${esc(st.clock_warning)}</p>` : ''}
       ${st.relay_error ? `<p class="hx-st-fix hx-team-err">Couldn’t reach ${esc(st.name || 'the relay')}: ${esc(st.relay_error)}</p>` : ''}
       ${body}
     </section>`;

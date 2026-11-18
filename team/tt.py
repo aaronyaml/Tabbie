@@ -140,12 +140,41 @@ def http(method: str, path: str, body=None, token: str | None = None):
         req.add_header("authorization", f"Bearer {token}")
     try:
         with urllib.request.urlopen(req, timeout=20) as r:
+            _note_clock(r.headers.get("date"))
             return r.status, json.loads(r.read() or b"{}")
     except urllib.error.HTTPError as e:
+        _note_clock(e.headers.get("date") if e.headers else None)
         try:
             return e.code, json.loads(e.read() or b"{}")
         except ValueError:
             return e.code, {}
+
+
+CLOCK_WARN_S = 120  # signed requests and messages carry times; a clock this far off gets them refused
+
+
+def _note_clock(date_header: str | None):
+    """Compare this Mac's clock with the relay's (its Date header). Kept in clock.json for Settings → Team."""
+    if not date_header:
+        return
+    from email.utils import parsedate_to_datetime
+    try:
+        skew = round(time.time() - parsedate_to_datetime(date_header).timestamp())
+    except (TypeError, ValueError):
+        return
+    old = load("clock.json") or {}
+    if abs(skew - old.get("skew_s", 0)) > 5 or not old:
+        save("clock.json", {"skew_s": skew, "at": C.now_ms()})
+
+
+def clock_warning() -> str | None:
+    c = load("clock.json") or {}
+    s = c.get("skew_s", 0)
+    if abs(s) < CLOCK_WARN_S or C.now_ms() - c.get("at", 0) > 86400_000:
+        return None
+    mins = round(abs(s) / 60)
+    return (f"This Mac's clock is {mins} minute{'s' if mins != 1 else ''} {'fast' if s > 0 else 'slow'}, so the team relay may refuse it. "
+            "Open System Settings → General → Date & Time and turn on Set time and date automatically.")
 
 
 def token(force=False) -> str:
@@ -295,7 +324,9 @@ def pair_check() -> dict:
         if receive_wraps():
             (HOME / "joining.json").unlink(missing_ok=True)
             return {"state": "linked", "owner": load("trust.json")["owner"], "fingerprint": C.fingerprint(m["sign_pub"])}
-        return {"state": "joining", "inviter": j["inviter"], "fingerprint": C.fingerprint(m["sign_pub"])}
+        waited = max(0, C.now_ms() - j.get("at", C.now_ms())) // 60_000
+        return {"state": "joining", "inviter": j["inviter"], "fingerprint": C.fingerprint(m["sign_pub"]),
+                "waited_min": waited, "expired": waited > INVITE_HOURS * 60}
     p = load("pairing.json")
     if not m or not p:
         return {"state": "none"}
@@ -786,6 +817,10 @@ def info() -> dict:
     if (load("joining.json") or load("needkey.json")) and m and not team()["current"]:
         d["pairing"] = pair_check()
         d["linked"] = d["pairing"]["state"] == "linked"
+    if d["relay"]:
+        w = clock_warning()
+        if w:
+            d["clock_warning"] = w
     return d
 
 

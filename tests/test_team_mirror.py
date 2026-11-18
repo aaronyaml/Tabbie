@@ -152,3 +152,24 @@ def test_fork_meta_links_a_shared_parent_and_marks_the_fork_point(tmp_path):
             metas[p["title"]] = p
     assert metas["Fork"]["parent"] == metas["Parent"]["id"] and metas["Fork"]["forkAt"] == "a1"
     assert "parent" not in metas["Parent"]
+
+
+def test_a_message_too_big_for_the_relay_is_shortened_not_retried_forever():
+    import json as _json
+    import os as _os
+    import mirror as Mi
+    import ttcore as Cc
+    sk = Cc.new_key()
+    kid = Cc.kid_of(Cc.pub_raw(sk.public_key()))
+    key = _os.urandom(32)
+    payload = {"id": "m1", "role": "assistant", "text": "é" * 199_000, "at": 1}
+    e = Cc.seal("room", "message", "aaron", kid, sk, "k1", key, payload, prev="")
+    size = len(_json.dumps(e))
+    assert size > Mi.MAX_EVENT
+    for _ in range(4):  # the send loop reseals until it fits
+        payload = Mi.fit_event(payload, size)
+        size = len(_json.dumps(Cc.seal("room", "message", "aaron", kid, sk, "k1", key, payload, prev="")))
+        if size <= Mi.MAX_EVENT:
+            break
+    assert size <= Mi.MAX_EVENT and payload["text"].endswith("on the Mac it came from.]")
+    assert Mi.fit_event({"fid": "x", "data": "z" * 10}, 300_000) is None
