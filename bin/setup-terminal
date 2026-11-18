@@ -333,6 +333,8 @@ if { [ "$ASK" = 0 ] && [ -n "$SERVICES" ]; } || { [ "$ASK" = 1 ] && yn "$Q" "$DE
   if ! grep -qE '^HERMES_WEBUI_PASSWORD=.+' "$ENVF" 2>/dev/null; then
     fail "Set a WebUI password first (step 6), then run bin/setup again."
   else
+    bin/link-tools 2>/dev/null | while read -r l; do ok "Background services: $l"; done
+    bin/link-tools --check >/dev/null || warn "Background services can't find Claude Code or Codex. Install one (step 3), then run bin/setup --services again."
     CADDY="$(command -v caddy || echo "$HOME/.local/bin/caddy")"
     THOST="$(bin/tabbie-host --choose).local"; CADMIN="$(bin/tabbie-host --admin)"
     [ "$THOST" = hermes.local ] || warn "Another Mac on this network is already hermes.local, so this one is $THOST"

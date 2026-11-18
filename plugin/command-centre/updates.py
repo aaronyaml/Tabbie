@@ -243,6 +243,7 @@ def apply() -> dict:
     upstream_note = _sync_upstream(files)
     if upstream_note:
         pf.setdefault("warnings", []).append(upstream_note)
+    _link_tools()
     installed = ensure_services()  # new services: nothing runs in them yet, so install right away
     changed = sorted({f[len("services/"):-len(".plist.template")] for f in files
                       if f.startswith("services/") and f.endswith(".plist.template")} - set(installed))
@@ -253,6 +254,14 @@ def apply() -> dict:
     _cache.update(at=0.0, result=None)
     return {"ok": True, "from": before[:7], "to": after[:7], "files": len(files), "needs": needs,
             "installed": installed, "backed_up": saved, "warnings": pf.get("warnings") or []}
+
+
+def _link_tools() -> None:
+    """Re-link claude, codex, node ... into ~/.hermes/bin for the background services (bin/link-tools): an
+    update of Node or Claude Code through nvm and similar moves them to a new folder launchd can't see."""
+    tool = ROOT / "bin" / "link-tools"
+    if sys.platform == "darwin" and tool.exists() and not os.environ.get("TABBIE_NO_SERVICES"):
+        _run_check([str(tool)], timeout=60)
 
 
 def _sync_upstream(files: list[str]) -> str:

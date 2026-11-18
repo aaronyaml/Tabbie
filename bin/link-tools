@@ -1,0 +1,39 @@
+#!/bin/bash
+# Background services (launchd) don't read your shell's setup, so a command your Terminal finds (claude
+# installed with nvm, fnm, volta, asdf, a custom npm prefix ...) can be missing for them. This finds each
+# tool the way your login shell does and links it into ~/.hermes/bin, which is first on every service's PATH.
+# Run by setup and after every update; safe to run any time. Prints what it linked.
+#   link-tools            link what's needed
+#   link-tools --check    list agents the services can't find; exit 1 if neither Claude Code nor Codex is found
+DEST="$HOME/.hermes/bin"
+SVC_PATH="$DEST:$HOME/.local/bin:/opt/homebrew/bin:/usr/local/bin:/usr/bin:/bin"
+TOOLS=(claude codex node npm npx uv caddy)
+missing=0
+shell_finds() {  # the tool as the person's own login shell resolves it (zsh by default, bash otherwise)
+  local sh="${SHELL:-/bin/zsh}"
+  case "$sh" in */zsh|*/bash) ;; *) sh=/bin/zsh ;; esac
+  "$sh" -lic "command -v $1" 2>/dev/null </dev/null | tail -1
+}
+for t in "${TOOLS[@]}"; do
+  svc="$(PATH="$SVC_PATH" command -v "$t" 2>/dev/null)"
+  if [ -L "$DEST/$t" ] && [ ! -e "$DEST/$t" ]; then rm -f "$DEST/$t"; svc=""; fi  # its target was removed
+  [ -n "$svc" ] && continue
+  p="$(shell_finds "$t")"
+  if [ -z "$p" ]; then
+    for c in "$HOME/.claude/local/$t" "$HOME"/.nvm/versions/node/*/bin/"$t" "$HOME"/.volta/bin/"$t" "$HOME"/.npm-global/bin/"$t" \
+             "$HOME"/.local/share/fnm/aliases/default/bin/"$t" "$HOME"/.asdf/shims/"$t" "$HOME"/.hermes/tools/*/"$t"; do
+      [ -x "$c" ] && p="$c"
+    done
+  fi
+  case "$p" in /*) ;; *) p="" ;; esac
+  if [ -n "$p" ] && [ -x "$p" ]; then
+    [ "$1" = --check ] && continue
+    mkdir -p "$DEST" && ln -sfn "$p" "$DEST/$t" && echo "linked $t -> $p"
+  else
+    case "$t" in claude|codex) ;; *) continue ;; esac  # the rest come with these, or have their own installers
+    [ "$1" = --check ] && echo "missing: $t"
+    missing=$((missing + 1))
+  fi
+done
+[ "$1" = --check ] && [ "$missing" -ge 2 ] && exit 1  # neither agent: nothing can run
+exit 0
