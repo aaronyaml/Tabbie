@@ -4,6 +4,8 @@
  *   POST …/sidecar/update          -> start the download (fast-forward; local edits are never overwritten)
  *   GET  …/sidecar/update/result   -> {running, result} until it's done (a big download outlasts the proxy's 10 s)
  *   POST …/sidecar/update/restart  -> restart what it touched now, or once nothing is running ({waiting: true})
+ * An update installs what the new version needs before switching to it, and bin/tabbie-update checks the
+ * services come back afterwards (going back to the previous version if they don't): last_failure says so.
  * A background check (on load, every 5 min, and on coming back to the tab) shows the card by itself as soon
  * as a new version is out, plus a dot on Settings and "See update" in Settings → System. "Later" snoozes that
  * version for a day (a newer version shows again straight away); "Later" on a downloaded update
@@ -25,6 +27,7 @@
   const WKEY = 'hx-update-restart-watch';   // set while a scheduled restart is pending (survives a reload)
   const RSNOOZE = 4 * 3600 * 1000;
   const WATCH = 30 * 1000;
+  const FKEY = 'hx-update-failure-seen';    // the last_failure.at the user has already been told about
   // dismissed this exact version within the last day (older builds stored just the commit: not snoozed)
   const snoozed = (remote) => { try { const d = JSON.parse(get(KEY) || 'null'); return !!d && d.remote === remote && Date.now() < d.until; } catch (_) { return false; } };
   const esc = (s) => String(s == null ? '' : s).replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
@@ -79,7 +82,8 @@
     lastNeeds = needs;
     const restart = needs.some((x) => x === 'gateway' || x === 'webui' || x === 'sidecar' || x === 'caddy' || x === 'team');
     const saved = res.backed_up && res.backed_up.files ? `<p class="hx-up-note">Your edits to ${res.backed_up.files.length} file${res.backed_up.files.length === 1 ? '' : 's'} were saved to <code>${esc(res.backed_up.dir)}</code>.</p>` : '';
-    const setup = saved + (needs.includes('setup') ? '<p class="hx-up-note">This update changed setup steps: run <code>bin/setup</code> on the computer when convenient.</p>' : '');
+    const warn = (res.warnings || []).map((w) => `<p class="hx-up-note">${esc(w)}</p>`).join('');
+    const setup = saved + warn + (needs.includes('setup') ? '<p class="hx-up-note">This update changed setup steps: run <code>bin/setup</code> on the computer when convenient.</p>' : '');
     if (restart) {
       show(`<div class="hx-up-head"><b>Update downloaded</b>${res.from ? `<span>${esc(res.from)} → ${esc(res.to)}</span>` : ''}</div>`
         + `<p class="hx-up-note">Restart Tabbie's services to finish. If anything is running (a request, a worker or a Motion render) it waits until that's done, so nothing is cut off.</p>${setup}`
@@ -120,6 +124,18 @@
     if (card) { card.remove(); card = null; }
     show(`<div class="hx-up-head"><b>Tabbie restarted</b></div><p class="hx-up-note">The update is finished. Reload to use the new version.</p>`
       + `<div class="hx-up-btns"><button type="button" data-close>Not now</button><button type="button" class="hx-up-go" data-reload>Reload</button></div>`);
+  }
+
+  // The last update didn't work: either it was never switched to (a preflight step failed), or it was and a
+  // service didn't come back, so Tabbie went back to the version before. Told once per failure.
+  function failedCard(f) {
+    set(FKEY, String(f.at || 0));
+    const what = f.rolled_back
+      ? `After the update, ${esc(f.step.replace(/^starting /, ''))} didn't start, so Tabbie went back to the version you had before. Everything you had is as it was.`
+      : `Tabbie didn't install it because a step failed: ${esc(f.step)}. Nothing changed.`;
+    show(`<div class="hx-up-head"><b>The update didn't finish</b></div><p class="hx-up-note">${what}</p>`
+      + `<p class="hx-up-note">If it happens again, send Tabbie's support logs (Settings → System).</p>`
+      + `<div class="hx-up-btns"><button type="button" data-close>OK</button></div>`);
   }
 
   function error(msg, retry) {
@@ -185,7 +201,7 @@
     if (t.hasAttribute('data-close')) { hide(); return; }
     if (t.hasAttribute('data-reload')) { location.reload(); return; }
     if (t.hasAttribute('data-update')) {
-      busy('Downloading…');
+      busy('Downloading and installing…');
       if (card && !card.querySelector('.hx-up-bar')) card.querySelector('.hx-up-btns').insertAdjacentHTML('beforebegin', '<div class="hx-up-bar is-wait" role="progressbar" aria-label="Downloading"><i></i></div>');
       try {
         let r = await call('', 'POST');
@@ -212,6 +228,8 @@
     try { j = await call(force ? '?force=1' : '', 'GET'); }
     catch (err) { console.warn('[Tabbie updates] check failed:', err && err.message); return; }  // sidecar down / not allowed yet
     if (j.note) console.info('[Tabbie updates]', j.note);
+    const f = j.last_failure;
+    if (f && f.at && String(f.at) !== get(FKEY) && Date.now() / 1000 - f.at < 7 * 86400) { failedCard(f); return; }
     if (j.pending_restart && j.pending_restart.length) {
       if (j.restart_waiting) { if (!watchT) watchRestart(); return; }  // scheduled: watch quietly (also after a reload)
       if (force || !restartSnoozed(j.pending_restart)) finished({ needs: j.pending_restart });
@@ -266,7 +284,9 @@
     const ver = row.querySelector('[data-ver]'), btn = row.querySelector('[data-check]');
     const say = (j) => {
       const v = j.local ? j.local.slice(0, 7) : '';
-      ver.textContent = j.available ? `Version ${v} · an update is available` : j.note ? `Version ${v} · ${j.note}` : `Version ${v} · up to date`;
+      const f = j.last_failure;
+      const failed = f && f.step ? ` · last update ${f.rolled_back ? 'undone' : 'not installed'} (${f.step})` : '';
+      ver.textContent = (j.available ? `Version ${v} · an update is available` : j.note ? `Version ${v} · ${j.note}` : `Version ${v} · up to date`) + failed;
       if (j.available) { btn.textContent = 'See update'; btn.dataset.offer = '1'; info = j; }
     };
     paintSettings = say;

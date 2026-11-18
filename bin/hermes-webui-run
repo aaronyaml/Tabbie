@@ -1,5 +1,6 @@
 #!/bin/bash
 # launchd entrypoint for Hermes WebUI: same bootstrap ctl.sh uses, in the foreground.
+[ -f "$HOME/hermes/bin/tabbie-backoff" ] && . "$HOME/hermes/bin/tabbie-backoff" && tabbie_backoff webui
 cd "$HOME/hermes/hermes-webui" || exit 1
 set -a; [ -f .env ] && . ./.env; set +a
 export PATH="$HOME/.local/bin:/opt/homebrew/bin:/usr/local/bin:/usr/bin:/bin:/usr/sbin:/sbin"

@@ -886,7 +886,8 @@ def update_payload(force: bool = False) -> dict:
     s = updates.settings()
     if not s.get("check", True):
         return {"available": False, "disabled": True}
-    return {**updates.check(force), "pending_restart": updates.pending_restart(), "restart_waiting": updates.waiting()}
+    return {**updates.check(force), "pending_restart": updates.pending_restart(), "restart_waiting": updates.waiting(),
+            "last_failure": updates.last_failure()}
 
 
 # Downloading an update (ls-remote + fetch + services) can take longer than the WebUI proxy's 10 s, which then

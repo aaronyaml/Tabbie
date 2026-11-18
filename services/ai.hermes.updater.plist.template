@@ -1,0 +1,16 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<!-- Template: bin/setup --services fills __HOME__ and installs it into ~/Library/LaunchAgents.
+     Tabbie's updater (bin/tabbie-update watch), every 2 minutes. Standard library only, separate from the
+     helper: finishes restarts and health checks, and if the helper stops starting, installs a newer
+     version or goes back to the previous one. -->
+<plist version="1.0"><dict>
+  <key>Label</key><string>ai.hermes.updater</string>
+  <key>ProgramArguments</key><array><string>/usr/bin/python3</string><string>-I</string><string>__HOME__/hermes/bin/tabbie-update</string><string>watch</string></array>
+  <key>EnvironmentVariables</key><dict><key>HOME</key><string>__HOME__</string><key>PATH</key><string>__HOME__/.hermes/bin:__HOME__/.local/bin:/opt/homebrew/bin:/usr/local/bin:/usr/bin:/bin:/usr/sbin:/sbin</string></dict>
+  <key>RunAtLoad</key><true/>
+  <key>StartInterval</key><integer>120</integer>
+  <key>ProcessType</key><string>Background</string>
+  <key>StandardOutPath</key><string>__HOME__/hermes/state/logs/updater.log</string>
+  <key>StandardErrorPath</key><string>__HOME__/hermes/state/logs/updater.log</string>
+</dict></plist>

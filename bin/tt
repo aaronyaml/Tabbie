@@ -15,11 +15,18 @@ TT="$(cd "$(dirname "$SELF")/.." && pwd)/team/tt.py"
 UV="$(command -v uv || ls -d "$HOME"/.hermes/tools/uv-*/uv 2>/dev/null | tail -1)"
 if [ -z "$UV" ] || [ ! -x "$UV" ]; then
   echo "tt: Tabbie is missing a component it needs (uv). Update Tabbie, or run: bin/install-tool uv" >&2
+  [ "$1" = "--preflight" ] && { echo "Tabbie is missing uv" >&2; exit 1; }
   [ "$1" = "daemon" ] && sleep 600  # under launchd: don't restart every 10 s while it can't work
   exit 1
 fi
 TABBIE_PY=">=3.12,<3.15"  # websockets 17 needs 3.11+, Tabbie code needs 3.12+; uv downloads it if missing
 DEPS=(--python "$TABBIE_PY" --with cryptography==48.0.1 --with websockets==17.4 --no-build-package cryptography)
+if [ "$1" = "--preflight" ]; then  # the updater installs these before switching to new code
+  exec "$UV" run --no-project -q "${DEPS[@]}" python -I -c "import cryptography, websockets"
+fi
+if [ "$1" = "daemon" ]; then
+  B="$(dirname "$TT")/../bin/tabbie-backoff"; [ -f "$B" ] && . "$B" && tabbie_backoff team
+fi
 if [ "$1" = "daemon" ] && ! "$UV" run --no-project -q "${DEPS[@]}" python -I -c "import cryptography, websockets" 2>/dev/null; then
   echo "tt: couldn't install Team's components (cryptography, websockets); trying again in 10 minutes" >&2
   sleep 600  # under launchd: don't retry every 10 s

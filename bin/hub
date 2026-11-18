@@ -108,6 +108,8 @@ else:
     if not res["ok"]:
         print(res["error"]); sys.exit(1)
     print(f"Updated {res['from']} → {res['to']} ({res['files']} files).")
+    for w in res.get("warnings") or []:
+        print(f"Note: {w}")
     if res.get("backed_up"):
         print(f"Your edits to {', '.join(res['backed_up']['files'])} were saved to {res['backed_up']['dir']}.")
     if "setup" in res["needs"]:

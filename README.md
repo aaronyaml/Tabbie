@@ -647,6 +647,11 @@ checker existed need one manual update first: `cd ~/hermes && git pull`, then `b
   a newer one shows straight away. Settings → System → **Check for updates** works any time.
 - **In the Terminal**, run `bin/hub update`. It shows the changes and asks before downloading.
 
+Before switching to the new version, Tabbie unpacks it to one side and installs everything it needs
+(packages as ready-made builds for your Mac's chip, a matching Python if needed) and checks its code
+and HTTPS settings. If any of that fails, the update isn't installed and nothing changes; the card
+says which step failed. That way new code never starts before what it needs is on your Mac.
+
 After downloading:
 - **Restart now**, or answer yes in the Terminal, restarts the services that changed. Updating never
   interrupts work: downloading leaves running jobs (and the Motion studio folder) alone, and if a
@@ -657,6 +662,15 @@ After downloading:
 - New background services an update brings are installed automatically (see
   [Start the services](#start-the-services)). If the update changed other setup steps, it tells you
   to run `bin/setup` again.
+
+After a restart, Tabbie checks for up to two minutes that every restarted service is answering. If
+one isn't, it goes back to the version you had before (your own edits stay), restarts again, and
+tells you the update didn't finish. A separate updater (`bin/tabbie-update`, the `ai.hermes.updater`
+service, standard Python only) does this, so it works even when the helper itself is what broke. If
+the helper stops starting for 10 minutes, the updater installs a newer version if there is one, or
+else goes back from an update made in the last day. Services that keep stopping straight after
+starting wait longer before each retry (up to 10 minutes) instead of restarting every 10 seconds.
+By hand: `bin/tabbie-update status`, `bin/tabbie-update rollback`.
 
 If an update changes a file you've edited, your copy is saved to `backups/update-<time>/` and
 then replaced, so the update always lands. Edits to files the update doesn't touch stay. To check another repo or

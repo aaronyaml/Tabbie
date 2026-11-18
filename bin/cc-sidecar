@@ -6,13 +6,22 @@
 # pywebpush (phone notifications) is optional: if its components can't be installed, the helper starts
 # without it (push just stays off) instead of not starting at all. cryptography stays on 48.0.1 because 49
 # and later publish no Intel Mac wheels (uv would try to compile it and fail).
+#   cc-sidecar --preflight   install what it needs and exit (the updater runs this before switching code)
 export PATH="$HOME/.hermes/bin:$HOME/.local/bin:/opt/homebrew/bin:/usr/local/bin:/usr/bin:/bin"
 SIDECAR="$HOME/hermes/plugin/command-centre/sidecar.py"
-cd "$HOME/hermes" || exit 1
 UV="$(command -v uv || ls -d "$HOME"/.hermes/tools/uv-*/uv 2>/dev/null | tail -1)"
+CORE=(--python ">=3.12,<3.15" --with pyyaml --with ruamel.yaml)
+PUSH=(--with pywebpush==2.5.0 --with cryptography==48.0.1 --no-build-package cryptography)
+if [ "$1" = "--preflight" ]; then
+  [ -n "$UV" ] && [ -x "$UV" ] || { echo "optional: uv is missing, so the helper runs on the Mac's own Python"; exit 0; }
+  "$UV" run --no-project -q "${CORE[@]}" python -I -c "import yaml, ruamel.yaml" || exit 1
+  "$UV" run --no-project -q "${CORE[@]}" "${PUSH[@]}" python -I -c "import yaml, pywebpush" 2>/dev/null \
+    || echo "optional: phone notifications' components couldn't be installed; the helper will start without them"
+  exit 0
+fi
+[ -f "$HOME/hermes/bin/tabbie-backoff" ] && . "$HOME/hermes/bin/tabbie-backoff" && tabbie_backoff cc-sidecar
+cd "$HOME/hermes" || exit 1
 if [ -n "$UV" ] && [ -x "$UV" ]; then
-  CORE=(--python ">=3.12,<3.15" --with pyyaml --with ruamel.yaml)
-  PUSH=(--with pywebpush==2.5.0 --with cryptography==48.0.1 --no-build-package cryptography)
   if "$UV" run --no-project -q "${CORE[@]}" "${PUSH[@]}" python -I -c "import yaml, pywebpush" 2>/dev/null; then
     exec "$UV" run --no-project -q "${CORE[@]}" "${PUSH[@]}" python -I "$SIDECAR"
   fi

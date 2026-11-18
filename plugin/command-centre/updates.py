@@ -2,12 +2,17 @@
 
 check()    compares this install's commit with the repo's branch on GitHub (git ls-remote, plus the
            public compare API for the list of changes). Read-only; cached for 10 minutes.
-apply()    fast-forwards this checkout to that commit (git fetch + merge --ff-only). Your own edits
-           (e.g. config/router.yaml) stay; git refuses if the update would overwrite one, or if the
-           history has diverged, so nothing is ever lost.
+apply()    fetches that commit, unpacks it in state/update-stage and runs its preflight there (installs
+           every package the new code needs, ready-made builds only; checks the Caddyfile), and only
+           then fast-forwards this checkout (git merge --ff-only). A failed preflight changes nothing.
+           Your own edits (e.g. config/router.yaml) stay; git refuses if the update would overwrite
+           one, or if the history has diverged, so nothing is ever lost.
 restart()  restarts what the update touched (gateway, WebUI, HTTPS proxy, sidecar), only when no
            worker or chat is running. WebUI chats run the router plugin inside the WebUI process, so
            plugin changes need the WebUI restarted too. WebUI extension files need just a page reload.
+verify()   after a restart, waits up to ~90 s for every restarted service to answer; if one doesn't,
+           rollback() returns to the previous version and restarts again. bin/tabbie-update runs this
+           outside the helper (and its own background service), so a broken helper can't block a fix.
 Settings: `updates:` in config/router.yaml (repo, branch, check). No tokens: the repo is public.
 """
 from __future__ import annotations
@@ -208,9 +213,21 @@ def apply() -> dict:
             return {"ok": False, "error": f"Switch to the {s['branch']} branch to update."}
         before = _git("rev-parse", "HEAD")
         _git("fetch", "--quiet", _url(s), s["branch"], timeout=120)
+        target = _git("rev-parse", "FETCH_HEAD")
+    except Exception as exc:
+        last = (str(exc).strip().splitlines() or [""])[-1]
+        return {"ok": False, "error": f"Update failed, nothing changed ({last[:160]})"}
+    pf = preflight(target)
+    if not pf["ok"]:
+        _save_state({**_state(), "failed": {"to": target, "step": pf["step"], "detail": pf["detail"], "at": int(time.time()),
+                                            "rolled_back": False}})
+        return {"ok": False, "error": f"Update not installed, nothing changed: {pf['step']} failed ({pf['detail'][:160]})",
+                "preflight": pf}
+    try:
         saved = _overwrite_clashes(before)
         _git("merge", "--ff-only", "--quiet", "FETCH_HEAD", timeout=60)
         after = _git("rev-parse", "HEAD")
+        shutil.rmtree(ROOT / "state" / "update-stage", ignore_errors=True)  # checked and switched to: not needed now
         files = [f for f in _git("diff", "--name-only", before, after).splitlines() if f]
     except Exception as exc:
         last = (str(exc).strip().splitlines() or [""])[-1]
@@ -221,10 +238,112 @@ def apply() -> dict:
                       if f.startswith("services/") and f.endswith(".plist.template")} - set(installed))
     if sys.platform == "win32" and any(f in ("hmem/winsvc.py", "bin/tabbie-mdns.py") for f in files):
         changed = ["supervisor"]  # the service list lives in code there
-    _save_state({"from": before, "to": after, "at": int(time.time()), "needs": needs, "services": changed})
+    _save_state({"from": before, "to": after, "at": int(time.time()), "needs": needs, "services": changed,
+                 "warnings": pf.get("warnings") or []})
     _cache.update(at=0.0, result=None)
     return {"ok": True, "from": before[:7], "to": after[:7], "files": len(files), "needs": needs,
-            "installed": installed, "backed_up": saved}
+            "installed": installed, "backed_up": saved, "warnings": pf.get("warnings") or []}
+
+
+# ---------------------------------------------------------------- preflight (before switching code)
+# "Install around the time the code needs it": everything the new version needs is installed while the
+# old version is still running, from the new version's own launchers. Only if that works does the code
+# switch over. uv caches what it installs, so the services start straight away afterwards.
+def _stage(sha: str) -> Path:
+    """Unpack commit `sha` (already fetched) into state/update-stage/<sha> and return that folder."""
+    stage = ROOT / "state" / "update-stage"
+    dest = stage / sha[:12]
+    if (dest / ".complete").exists():
+        return dest
+    shutil.rmtree(stage, ignore_errors=True)  # one stage at a time: old ones are never needed again
+    dest.mkdir(parents=True)
+    arch = subprocess.run(["git", "-C", str(ROOT), "archive", "--format=tar", sha], capture_output=True, timeout=120)
+    if arch.returncode:
+        raise RuntimeError((arch.stderr or b"git archive failed").decode("utf-8", "replace").strip()[-200:])
+    import io
+    import tarfile
+    with tarfile.open(fileobj=io.BytesIO(arch.stdout)) as tf:
+        for m in tf.getmembers():  # our own commit, but never write outside the stage folder
+            if m.name.startswith(("/", "..")) or "/../" in m.name or m.issym() or m.islnk():
+                continue
+            tf.extract(m, dest, **({"filter": "data"} if hasattr(tarfile, "data_filter") else {}))
+    (dest / ".complete").touch()
+    return dest
+
+
+def _run_check(argv: list[str], timeout: int = 900) -> tuple[bool, str]:
+    try:
+        r = subprocess.run(argv, capture_output=True, text=True, encoding="utf-8", errors="replace", timeout=timeout,
+                           stdin=subprocess.DEVNULL)
+    except subprocess.TimeoutExpired:
+        return False, "took too long"
+    except OSError as exc:
+        return False, str(exc)
+    out = "\n".join(x for x in (r.stdout + "\n" + r.stderr).splitlines() if x.strip())
+    return r.returncode == 0, out[-400:]
+
+
+def preflight(sha: str) -> dict:
+    """Run the new version's checks before switching to it. {ok, step, detail, warnings, steps}."""
+    warnings, steps = [], []
+    if os.environ.get("TABBIE_SKIP_PREFLIGHT"):
+        return {"ok": True, "step": "", "detail": "", "warnings": [], "steps": []}
+    try:
+        stage = _stage(sha)
+    except Exception as exc:  # noqa: BLE001
+        return {"ok": False, "step": "unpacking the new version", "detail": str(exc), "warnings": [], "steps": []}
+
+    def fail(step, detail):
+        return {"ok": False, "step": step, "detail": detail, "warnings": warnings, "steps": steps}
+
+    # 1. every Python file parses (a syntax error would stop a service starting)
+    import ast
+    for p in stage.rglob("*.py"):
+        if "node_modules" in p.parts:
+            continue
+        try:
+            ast.parse(p.read_text(encoding="utf-8"), str(p))
+        except SyntaxError as exc:
+            return fail("checking the new code", f"{p.relative_to(stage)} line {exc.lineno}: {exc.msg}")
+        except (OSError, UnicodeDecodeError):
+            continue
+    steps.append("code")
+    if sys.platform != "win32":
+        # 2. the packages each service needs, installed now (ready-made builds only) by its own launcher
+        for name, launcher, required in (("the helper", "cc-sidecar", True), ("Team", "tt", _team_installed())):
+            exe = stage / "bin" / launcher
+            if not exe.exists() or "--preflight" not in exe.read_text(encoding="utf-8", errors="replace"):
+                continue  # (a launcher without a preflight mode would start the service itself)
+            os.chmod(exe, 0o755)
+            ok, out = _run_check([str(exe), "--preflight"])
+            if ok:
+                steps.append(launcher)
+                if "optional:" in out:
+                    warnings.append(out.split("optional:", 1)[1].strip().splitlines()[0][:200])
+            elif required:
+                return fail(f"installing {name}'s components", out)
+            else:
+                warnings.append(f"{name}'s components couldn't be installed yet ({out[-120:]})")
+        # 3. the HTTPS proxy's config
+        caddy = shutil.which("caddy") or str(Path.home() / ".local/bin/caddy")
+        cf = stage / "services" / "Caddyfile"
+        if cf.exists() and Path(caddy).exists() and _caddyfile_changed(sha):
+            ok, out = _run_check([caddy, "validate", "--config", str(cf), "--adapter", "caddyfile"], timeout=60)
+            if not ok:
+                return fail("checking the HTTPS settings (Caddyfile)", out)
+            steps.append("caddy")
+    return {"ok": True, "step": "", "detail": "", "warnings": warnings, "steps": steps}
+
+
+def _caddyfile_changed(sha: str) -> bool:
+    try:
+        return bool(_git("diff", "--name-only", "HEAD", sha, "--", "services/Caddyfile"))
+    except Exception:  # noqa: BLE001
+        return True
+
+
+def _team_installed() -> bool:
+    return sys.platform == "darwin" and _loaded("ai.hermes.team") and (Path.home() / ".hermes" / "team" / "mac.json").exists()
 
 
 def pending_restart() -> list[str]:
@@ -498,6 +617,8 @@ def restart(after_reply=None) -> dict:
     if "sidecar" in needs and after_reply:
         after_reply()
         done.append("sidecar")
+    if after_reply is not _kick_sidecar:  # from the helper: a separate process checks everything came back
+        schedule_verify(done)
     return {"ok": True, "restarted": done}
 
 
@@ -550,3 +671,209 @@ def resume(after_reply=None) -> None:
     _waiter["thread"] = threading.Thread(target=watch, daemon=True, name="tabbie-update-restart")
     _waiter["thread"].start()
 
+
+
+# ---------------------------------------------------------------- health check and rollback
+# After a restart, every service it touched must answer within VERIFY_S. If one doesn't, go back to the
+# version before the update (git reset --keep: local edits stay), restart again and record what failed,
+# so Settings → Updates can say so. bin/tabbie-update runs this in its own process: the helper restarts
+# itself during an update, so it can't be the one checking it came back.
+VERIFY_S = 120
+_LABELS = {"gateway": "ai.hermes.gateway", "webui": "ai.hermes.webui", "sidecar": "ai.hermes.cc-sidecar",
+           "caddy": "ai.hermes.caddy", "team": "ai.hermes.team"}
+_TEAM_BROKEN = "couldn't install Team's components"
+
+
+def _http_ok(url: str) -> bool:
+    try:
+        with urllib.request.urlopen(url, timeout=4) as r:
+            return r.status < 500
+    except Exception:  # noqa: BLE001
+        return False
+
+
+def _job_state(label: str) -> str:
+    """'running', 'waiting' (loaded, not running) or '' (not installed)."""
+    r = _launchctl("print", f"gui/{_uid()}/{label}")
+    if r.returncode:
+        return ""
+    m = re.search(r"^\s*state = (\S+)", r.stdout, re.M)
+    return "running" if m and m.group(1) == "running" else "waiting"
+
+
+def _log_size(name: str) -> int:
+    try:
+        return (STATE_DIR / "logs" / name).stat().st_size
+    except OSError:
+        return 0
+
+
+def _healthy(name: str, since: dict) -> bool | None:
+    """True/False, or None when this Mac doesn't run that service (nothing to check)."""
+    webui_port = os.environ.get("HERMES_WEBUI_PORT") or "8787"
+    if name == "sidecar":
+        return _http_ok(f"http://127.0.0.1:{os.environ.get('CC_SIDECAR_PORT') or '8794'}/health")
+    if name == "webui":
+        return _http_ok(f"http://127.0.0.1:{webui_port}/health")
+    if sys.platform != "darwin":
+        return None
+    st = _job_state(_LABELS.get(name, ""))
+    if not st:
+        return None
+    if name == "team":
+        try:
+            with open(STATE_DIR / "logs" / "team.log", "rb") as f:
+                f.seek(since.get("team.log", 0))
+                if _TEAM_BROKEN in f.read().decode("utf-8", "replace"):
+                    return False
+        except OSError:
+            pass
+    return st == "running"
+
+
+def verify(needs: list[str] | None = None, *, rollback_on_fail: bool = True, timeout: float = VERIFY_S,
+           since: dict | None = None) -> dict:
+    """Wait for the restarted services to come back. {ok, failed: [names]}; rolls back on failure."""
+    st = _state()
+    needs = [n for n in (needs if needs is not None else st.get("verify", {}).get("needs", [])) if n in _LABELS]
+    since = since if since is not None else st.get("verify", {}).get("since", {})
+    deadline, good_since = time.time() + timeout, None
+    bad: list[str] = []
+    while True:
+        bad = [n for n in needs if _healthy(n, since) is False]
+        if not bad:
+            good_since = good_since or time.time()
+            if time.time() - good_since >= 15:  # still up 15 s later: not a crash loop
+                break
+        else:
+            good_since = None
+        if time.time() > deadline:
+            break
+        time.sleep(3)
+    st = _state()
+    st.pop("verify", None)
+    if not bad:
+        st["verified"] = {"to": st.get("to"), "at": int(time.time())}
+        st.pop("failed", None) if (st.get("failed") or {}).get("to") == st.get("to") else None
+        _save_state(st)
+        return {"ok": True, "failed": []}
+    names = {"sidecar": "the helper", "webui": "the WebUI", "gateway": "the gateway", "caddy": "HTTPS", "team": "Team"}
+    step = "starting " + ", ".join(names.get(n, n) for n in bad)
+    st["failed"] = {"to": st.get("to"), "step": step, "detail": "", "at": int(time.time()), "rolled_back": False}
+    _save_state(st)
+    if rollback_on_fail and not st.get("rollback"):
+        rb = rollback(step)
+        return {"ok": False, "failed": bad, "rolled_back": rb.get("ok", False), "rollback": rb}
+    return {"ok": False, "failed": bad}
+
+
+def rollback(reason: str = "") -> dict:
+    """Return to the version before the last update and restart what that changes back."""
+    st = _state()
+    frm, to = st.get("from"), st.get("to")
+    if not (frm and to and _SHA.match(frm) and _SHA.match(to)):
+        return {"ok": False, "error": "No earlier version recorded."}
+    try:
+        if _git("rev-parse", "HEAD") != to:
+            return {"ok": False, "error": "The code changed after that update, so it can't go back automatically."}
+        files = [f for f in _git("diff", "--name-only", frm, to).splitlines() if f]
+        _git("reset", "--keep", frm, timeout=60)
+    except Exception as exc:  # noqa: BLE001
+        return {"ok": False, "error": f"Couldn't go back ({(str(exc).splitlines() or [''])[-1][:160]})"}
+    changed = sorted({f[len("services/"):-len(".plist.template")] for f in files
+                      if f.startswith("services/") and f.endswith(".plist.template")})
+    failed = {**(st.get("failed") or {}), "to": to, "rolled_back": True, "reason": reason, "at": int(time.time())}
+    _save_state({"from": to, "to": frm, "at": int(time.time()), "needs": _needs(files), "services": changed,
+                 "rollback": True, "failed": failed})
+    _cache.update(at=0.0, result=None)
+    res = restart_detached_wait()
+    return {"ok": True, "to": frm[:7], "restart": res}
+
+
+def _kick_sidecar() -> None:
+    if sys.platform == "win32":
+        _winsvc().request_restart(["sidecar"], delay=1)
+    else:
+        subprocess.run(["launchctl", "kickstart", "-k", f"gui/{_uid()}/ai.hermes.cc-sidecar"], capture_output=True)
+
+
+def restart_detached_wait(max_wait: float = 3600) -> dict:
+    """From bin/tabbie-update (not the helper): wait until nothing is running, restart, verify."""
+    end = time.time() + max_wait
+    while busy() and time.time() < end:
+        time.sleep(POLL)
+    need = pending_restart()
+    since = {"team.log": _log_size("team.log")}
+    res = restart(after_reply=_kick_sidecar)
+    if not res.get("ok"):
+        return res
+    svc = [n for n in need if n in _LABELS]
+    return {**res, "verify": verify(svc, since=since, rollback_on_fail=not _state().get("rollback"))}
+
+
+def schedule_verify(needs: list[str]) -> None:
+    """Called by restart(): hand the health check to a separate process that outlives the helper."""
+    st = _state()
+    st["verify"] = {"needs": [n for n in needs if n in _LABELS], "since": {"team.log": _log_size("team.log")},
+                    "at": int(time.time())}
+    _save_state(st)
+    if os.environ.get("TABBIE_NO_SERVICES"):
+        return
+    tool = ROOT / "bin" / "tabbie-update"
+    if tool.exists():
+        subprocess.Popen([sys.executable if sys.platform == "win32" else "/usr/bin/env", *([] if sys.platform == "win32" else ["python3"]),
+                          str(tool), "verify"], stdin=subprocess.DEVNULL, stdout=subprocess.DEVNULL,
+                         stderr=subprocess.DEVNULL, start_new_session=True, cwd=str(ROOT))
+
+
+def last_failure() -> dict | None:
+    f = _state().get("failed")
+    return f if isinstance(f, dict) and f.get("step") else None
+
+
+# ---------------------------------------------------------------- watch (ai.hermes.updater, every 2 min)
+HEAL_AFTER = 600
+
+
+def watch() -> str:
+    """Background check that doesn't depend on the helper running:
+    - a health check whose process died mid-way is run again;
+    - a restart that was waiting for Tabbie to go idle happens even if the helper is down;
+    - if the helper has been down HEAL_AFTER seconds: install a newer version if there is one (it may
+      be the fix), else go back from an update made in the last day."""
+    st = _state()
+    v = st.get("verify")
+    if v and time.time() - v.get("at", 0) > VERIFY_S + 60:
+        return f"verify: {verify()}"
+    if sys.platform != "darwin" or not _loaded("ai.hermes.webui"):
+        return "no services"
+    helper = _healthy("sidecar", {})
+    if helper:
+        if st.get("helper_down_since"):
+            st.pop("helper_down_since", None)
+            _save_state(st)
+        return "ok"
+    if st.get("restart_when_idle") and pending_restart() and not busy():
+        st.pop("restart_when_idle", None)
+        _save_state(st)
+        return f"restart: {restart_detached_wait()}"
+    down = st.get("helper_down_since") or int(time.time())
+    if not st.get("helper_down_since"):
+        st["helper_down_since"] = down
+        _save_state(st)
+    if time.time() - down < HEAL_AFTER:
+        return "helper down, waiting"
+    st = _state()
+    if st.get("healed_at") and time.time() - st["healed_at"] < 6 * 3600:
+        return "helper down, already tried"
+    st["healed_at"] = int(time.time())
+    _save_state(st)
+    info = check(force=True)
+    if info.get("available") and info.get("remote") != (st.get("failed") or {}).get("to"):
+        res = apply()
+        if res.get("ok"):
+            return f"healed by update: {restart_detached_wait()}"
+        return f"update failed: {res.get('error')}"
+    if st.get("to") and not st.get("rollback") and time.time() - st.get("at", 0) < 86400:
+        return f"rolled back: {rollback('the helper stopped starting after this update')}"
+    return "helper down, nothing to do"

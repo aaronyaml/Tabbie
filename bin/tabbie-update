@@ -1,0 +1,81 @@
+#!/usr/bin/env python3
+"""Tabbie's updater, separate from the helper (cc-sidecar) so a broken helper can still be fixed.
+Uses only Python's standard library: it runs on the Mac's own python3, without uv or any package.
+
+  tabbie-update status     what's installed, and whether the last update worked
+  tabbie-update check      is there a newer version?
+  tabbie-update apply      download it, install what it needs (preflight), switch, restart when idle, check
+  tabbie-update verify     check the services the last restart touched (rolls back if they don't come back)
+  tabbie-update rollback   go back to the version before the last update
+  tabbie-update watch      one background pass (the ai.hermes.updater service runs this every 2 minutes)
+"""
+import importlib
+import importlib.util
+import json
+import os
+import sys
+import time
+
+ROOT = os.path.dirname(os.path.dirname(os.path.realpath(__file__)))
+PKG = os.path.join(ROOT, "plugin", "command-centre")
+
+
+def _updates():
+    spec = importlib.util.spec_from_file_location("cc", os.path.join(PKG, "__init__.py"), submodule_search_locations=[PKG])
+    sys.modules["cc"] = importlib.util.module_from_spec(spec)  # submodules only; the plugin itself isn't loaded
+    return importlib.import_module("cc.updates")
+
+
+def _lock():
+    """One updater at a time (the service, a verify started by the helper, someone in Terminal)."""
+    sys.path.insert(0, PKG)
+    from flockcompat import fcntl  # noqa: E402
+    os.makedirs(os.path.join(ROOT, "state"), exist_ok=True)
+    f = open(os.path.join(ROOT, "state", "updater.lock"), "w")
+    try:
+        fcntl.flock(f, fcntl.LOCK_EX | fcntl.LOCK_NB)
+    except OSError:
+        print("another update step is running")
+        sys.exit(0)
+    return f
+
+
+def main(argv):
+    cmd = argv[0] if argv else "status"
+    stamp = time.strftime("%Y-%m-%d %H:%M:%S")
+    u = _updates()
+    if cmd == "status":
+        st = u._state()
+        print(json.dumps({"head": u._git("rev-parse", "HEAD")[:7], "last_update": {k: st.get(k) for k in ("from", "to", "at")},
+                          "pending_restart": u.pending_restart(), "last_failure": u.last_failure()}, indent=2))
+        return 0
+    if cmd == "check":
+        r = u.check(force=True)
+        print(f"update available ({r['remote'][:7]})" if r["available"] else (r["note"] or "up to date"))
+        return 0
+    lock = _lock()  # noqa: F841
+    if cmd == "apply":
+        r = u.apply()
+        print(f"{stamp} apply: {json.dumps(r)}")
+        if not r.get("ok"):
+            return 1
+        print(f"{stamp} restart: {json.dumps(u.restart_detached_wait())}")
+        return 0
+    if cmd == "verify":
+        time.sleep(2)  # let the helper finish answering and exit before checking it
+        print(f"{stamp} verify: {json.dumps(u.verify())}")
+        return 0
+    if cmd == "rollback":
+        print(f"{stamp} rollback: {json.dumps(u.rollback('asked for by hand'))}")
+        return 0
+    if cmd == "watch":
+        res = u.watch()
+        if res not in ("ok", "no services", "helper down, waiting"):
+            print(f"{stamp} watch: {res}")
+        return 0
+    print(__doc__)
+    return 2
+
+
+if __name__ == "__main__":
+    sys.exit(main(sys.argv[1:]))

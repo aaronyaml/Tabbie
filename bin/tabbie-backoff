@@ -1,0 +1,21 @@
+# Sourced by the launchd launchers (cc-sidecar, tt daemon, hermes-webui-run); not run by itself.
+# launchd restarts a service 10 s after it exits, forever. If a service keeps stopping within a minute of
+# starting, wait longer before each new try (20 s, 40 s, 80 s, ... up to 10 minutes), so a broken
+# install doesn't spin the Mac's fans, and say so in the service's log. One quick restart (an update,
+# a kickstart) never waits.
+tabbie_backoff() {
+  local f="$HOME/hermes/state/run/$1.starts" now last=0 n=0 wait
+  mkdir -p "$(dirname "$f")" 2>/dev/null
+  now=$(date +%s)
+  [ -f "$f" ] && read -r last n < "$f" 2>/dev/null
+  case "$last" in ''|*[!0-9]*) last=0 ;; esac
+  case "$n" in ''|*[!0-9]*) n=0 ;; esac
+  if [ $((now - last)) -lt 60 ]; then n=$((n + 1)); else n=0; fi
+  [ "$n" -gt 10 ] && n=10
+  if [ "$n" -gt 1 ]; then
+    wait=$((10 * (1 << (n - 1)))); [ "$wait" -gt 600 ] && wait=600
+    echo "$(date '+%Y-%m-%d %H:%M:%S') $1: stopped $n times in a row within a minute of starting; trying again in ${wait}s" >&2
+    sleep "$wait"
+  fi
+  echo "$(date +%s) $n" > "$f" 2>/dev/null
+}
