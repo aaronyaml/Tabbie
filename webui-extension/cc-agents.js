@@ -109,7 +109,7 @@
   const statusOf = (a) => (isStopped(a) ? 'stopped' : a.status);
   const isBg = (a) => a.kind === 'background';  // a background shell task: muted row, not an agent
   const PROVIDER_LABEL = (p) => (/astra|codex/i.test(String(p || '')) ? 'Codex' : 'Claude');
-  const shown = (n) => String(n == null ? '' : n).replace(/(?<!GPT-[\d.]+ )\bAstra\b/g, 'Codex'); // internal planner name → what users know; model names ("GPT-6 Astra") stay
+  const shown = (n) => String(n == null ? '' : n).replace(/(GPT-[\d.]+ )?\bAstra\b/g, (m, model) => (model ? m : 'Codex')); // internal planner name → what users know; model names ("GPT-6 Astra") stay. No lookbehind: iOS before 16.4 can't parse it, which kills the whole file
 
   function agentRow(a, list) {
     // depth: a delegate's own subagents nest one level deeper than the delegate row

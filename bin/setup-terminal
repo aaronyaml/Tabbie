@@ -140,7 +140,15 @@ want agents && ok "Using: $LIST"
 # ── 3. tools ──────────────────────────────────────────────────────────────────────────────────────
 if want tools; then
 step "Tools" "The programs Tabbie runs on. Missing ones can be installed for you."
-[ "$(uname)" = Darwin ] && ok "macOS" || warn "Not macOS: background services (launchd, Bonjour) won't work; the rest may"
+if [ "$(uname)" = Darwin ]; then
+  MACV="$(sw_vers -productVersion 2>/dev/null)"; MACMAJ="${MACV%%.*}"; MACMIN="$(echo "$MACV" | cut -d. -f2)"
+  # Node 26 (Claude Code, Codex, Motion) needs macOS 13.5 or later, and so do current Caddy and uv's Pythons
+  if [ "${MACMAJ:-0}" -lt 13 ] || { [ "$MACMAJ" = 13 ] && [ "${MACMIN:-0}" -lt 5 ]; }; then
+    fail "macOS $MACV is too old for Tabbie: it needs macOS 13.5 (Ventura) or later. Update macOS (System Settings → General → Software Update), then run bin/setup again."
+    exit 1
+  fi
+fi
+[ "$(uname)" = Darwin ] && ok "macOS ${MACV:-}" || warn "Not macOS: background services (launchd, Bonjour) won't work; the rest may"
 # tool, why, install command ("" = manual), required (1/0)
 tool() {
   local t="$1" why="$2" cmd="$3" req="$4"
