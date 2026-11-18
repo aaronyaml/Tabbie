@@ -1,10 +1,10 @@
 #!/bin/bash
-# Publishes this Mac's Tabbie name (hermes.local, or the one setup chose: bin/tabbie-host) on the home
+# Publishes hermes.local on the home
 # network via Bonjour, for every Wi-Fi and Ethernet address it has. Not just the default route's: with a
 # VPN on, the default route is the tunnel, which phones on the Wi-Fi can't reach. Rechecks every 10 s, so
 # a new network, a wake from sleep or a VPN switching on or off is picked up. The Mac's own hostname is
 # untouched. Run by launchd.
-NAME="${HERMES_MDNS_NAME:-$("$(dirname "$0")/tabbie-host" 2>/dev/null || echo hermes.local)}"
+NAME="${HERMES_MDNS_NAME:-hermes.local}"
 PIDS=(); ips=""
 cleanup() { for p in "${PIDS[@]}"; do kill "$p" 2>/dev/null; done; exit 0; }
 trap cleanup TERM INT

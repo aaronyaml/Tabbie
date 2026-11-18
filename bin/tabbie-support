@@ -79,7 +79,6 @@ def header() -> str:
         ("macOS", f"{platform.mac_ver()[0] or platform.platform()} on {platform.machine()}"),
         ("Chip", sh("/usr/sbin/sysctl", "-n", "machdep.cpu.brand_string")),
         ("Memory", f"{int(mem) // 2**30} GB, {os.cpu_count()} cores" if mem.isdigit() else "?"),
-        ("Address", (ROOT / "state" / "local-name").read_text().strip() + ".local" if (ROOT / "state" / "local-name").exists() else "hermes.local"),
         ("Time zone", time.strftime("%z") + " " + (time.tzname[0] or "")),
         ("uv", ver("uv", "--version")), ("Node", ver("node", "--version")), ("Claude Code", ver("claude", "--version")),
         ("Codex", ver("codex", "--version")), ("Caddy", ver("caddy", "version")), ("Hermes Agent", ver("hermes", "--version")),

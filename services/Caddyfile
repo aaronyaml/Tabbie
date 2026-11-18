@@ -1,4 +1,4 @@
-# hermes.local (or this Mac's own name, bin/tabbie-host) -> Hermes WebUI (127.0.0.1:8787). LAN / Tailscale only; everything else is dropped.
+# hermes.local -> Hermes WebUI (127.0.0.1:8787). LAN / Tailscale only; everything else is dropped.
 {
 	admin {$TABBIE_CADDY_ADMIN:localhost:2019}
 	local_certs
@@ -166,7 +166,7 @@
 	}
 }
 
-https://{$TABBIE_HOST:hermes.local} {
+https://hermes.local {
 	import lan_only
 	tls internal
 	import hermes_site
@@ -179,7 +179,7 @@ http://:8788 {
 	import hermes_site
 }
 
-http://{$TABBIE_HOST:hermes.local} {
+http://hermes.local {
 	import lan_only
 	# One-time iPhone setup: download + trust this local CA so HTTPS has no warnings.
 	handle /hermes-ca.crt {
@@ -188,6 +188,6 @@ http://{$TABBIE_HOST:hermes.local} {
 		file_server
 	}
 	handle {
-		redir https://{$TABBIE_HOST:hermes.local}{uri} 308
+		redir https://hermes.local{uri} 308
 	}
 }

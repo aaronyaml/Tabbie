@@ -51,7 +51,7 @@
       "id": "brand",
       "name": "Tabbie name",
       "scripts": [
-        "brand.js?v=6"
+        "brand.js?v=7"
       ],
       "stylesheets": []
     },

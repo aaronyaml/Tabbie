@@ -1002,12 +1002,6 @@ class Handler(BaseHTTPRequestHandler):
         try:
             if u.path.startswith(("/projects", "/fs/")):
                 return self._send(*projects_api.handle("GET", u.path, q))
-            if u.path == "/local-host":  # this Mac's name on the home network (bin/tabbie-host)
-                try:
-                    n = (updates.ROOT / "state" / "local-name").read_text(encoding="utf-8").strip()
-                except OSError:
-                    n = ""
-                return self._send(200, {"host": f"{n or 'hermes'}.local"})
             if u.path == "/support":
                 if _SUP["running"]:
                     return self._send(200, {"running": True})
