@@ -20,7 +20,8 @@ if [ -z "$UV" ] || [ ! -x "$UV" ]; then
   exit 1
 fi
 TABBIE_PY=">=3.12,<3.15"  # websockets 17 needs 3.11+, Tabbie code needs 3.12+; uv downloads it if missing
-DEPS=(--python "$TABBIE_PY" --with cryptography==48.0.1 --with websockets==17.4 --no-build-package cryptography)
+# exact versions of everything, locked for both Mac chips: requirements/team.txt (bin/lock-deps)
+DEPS=(--python "$TABBIE_PY" --with-requirements "$(dirname "$TT")/../requirements/team.txt" --no-build-package cryptography)
 if [ "$1" = "--preflight" ]; then  # the updater installs these before switching to new code
   exec "$UV" run --no-project -q "${DEPS[@]}" python -I -c "import cryptography, websockets"
 fi

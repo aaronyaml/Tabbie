@@ -165,6 +165,10 @@ def _needs(files: list[str]) -> list[str]:
             need.update(("gateway", "webui", "sidecar"))
         if f.startswith("team/") or f == "bin/tt":
             need.add("team")
+        if f.startswith("requirements/team"):
+            need.add("team")
+        if f.startswith("requirements/sidecar"):
+            need.add("sidecar")
         if f == "bin/cc-sidecar":  # its launcher decides which libraries it starts with
             need.add("sidecar")
         if f == "bin/hermes-webui-run":

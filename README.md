@@ -672,6 +672,14 @@ else goes back from an update made in the last day. Services that keep stopping 
 starting wait longer before each retry (up to 10 minutes) instead of restarting every 10 seconds.
 By hand: `bin/tabbie-update status`, `bin/tabbie-update rollback`.
 
+**Package and tool versions.** Every Python package Tabbie's services install, including the ones
+those pull in, is locked to an exact version with checksums in `requirements/*.txt`, chosen so each
+installs as a ready-made build on Apple silicon and Intel Macs (Python 3.12 to 3.14). After changing a
+`requirements/*.in` file, run `bin/lock-deps`: it re-locks and checks every package on both chips. The
+Motion studio's npm packages are locked in its `package-lock.json` (installed with `npm ci`), and
+`bin/install-tool` installs the tested versions of Caddy, Node, uv, Codex and Claude Code
+(`TOOL_LATEST=1` for the newest).
+
 **WebUI and Hermes Agent versions.** Tabbie is built on two other projects and reads some of their
 internals, so `config/upstream.lock` records the versions it was tested with. Setup installs exactly
 those, an update that moves the lock moves the WebUI forward to match (never back), and Tabbie's small
@@ -1137,7 +1145,7 @@ Use Claude Code's own permission settings for hard limits.
 ## Tests
 
 ```bash
-uv run -q --no-project --with pytest --with ruamel.yaml --python ">=3.12,<3.15" --with cryptography==48.0.1 --with websockets==17.4 python -m pytest tests -q
+uv run -q --no-project --with pytest --with ruamel.yaml --python ">=3.12,<3.15" --with-requirements requirements/team.txt python -m pytest tests -q
 ```
 
 The tests use temporary folders only and never touch your memory or state.

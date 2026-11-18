@@ -13,6 +13,16 @@ case "$ARCH" in arm64|aarch64) RUST=aarch64; GO=arm64; NODE=arm64 ;; x86_64) RUS
   *) echo "Unsupported processor: $ARCH"; exit 1 ;; esac
 TMP="$(mktemp -d)"; trap 'rm -rf "$TMP"' EXIT
 
+# Tested versions: what Tabbie was last tested with, installed on every Mac so they all match. Claude Code
+# and Codex update themselves afterwards (bin/hub doctor checks they still have the options Tabbie uses).
+# TOOL_LATEST=1 installs the newest instead (to test a newer one before changing these).
+CADDY_V=2.11.7
+NODE_V=v26.12.1
+CODEX_V=0.162.1
+CLAUDE_V=2.1.327
+UV_V=0.11.19
+[ "${TOOL_LATEST:-}" = 1 ] && CADDY_V= NODE_V= CODEX_V= CLAUDE_V= UV_V=
+
 latest_tag() {  # owner/repo -> its latest release tag, from GitHub's redirect (no API rate limit)
   curl -fsSLI -o /dev/null -w '%{url_effective}' "https://github.com/$1/releases/latest" | sed 's#.*/tag/##'
 }
@@ -23,16 +33,18 @@ case "${1:-}" in
     PIN="$(sed -n 's/^agent=\([0-9a-f]\{40\}\)$/\1/p' "$(dirname "$0")/../config/upstream.lock" 2>/dev/null | head -1)"
     curl -fsSL https://hermes-agent.nousresearch.com/install.sh | bash -s -- --non-interactive ${PIN:+--commit "$PIN"} ;;
   claude)  # Claude Code's official native installer
-    curl -fsSL https://claude.ai/install.sh | bash ;;
+    curl -fsSL https://claude.ai/install.sh | bash -s ${CLAUDE_V:+"$CLAUDE_V"} ;;
   uv)
-    curl -LsSf https://astral.sh/uv/install.sh | sh ;;
+    curl -LsSf "https://astral.sh/uv/${UV_V:+$UV_V/}install.sh" | sh ;;
   codex)   # OpenAI's release build for this processor (no Node needed)
     echo "Downloading Codex for ${RUST}-apple-darwin…"
-    curl -fsSL -o "$TMP/codex.tgz" "https://github.com/openai/codex/releases/latest/download/codex-$RUST-apple-darwin.tar.gz"
+    URL="https://github.com/openai/codex/releases/latest/download/codex-$RUST-apple-darwin.tar.gz"
+    [ -n "$CODEX_V" ] && URL="https://github.com/openai/codex/releases/download/rust-v$CODEX_V/codex-$RUST-apple-darwin.tar.gz"
+    curl -fsSL -o "$TMP/codex.tgz" "$URL"
     tar -xzf "$TMP/codex.tgz" -C "$TMP"
     install -m 755 "$TMP/codex-$RUST-apple-darwin" "$BIN/codex" ;;
   caddy)   # Caddy's release build for this processor
-    TAG="$(latest_tag caddyserver/caddy)"; V="${TAG#v}"
+    TAG="${CADDY_V:+v$CADDY_V}"; [ -n "$TAG" ] || TAG="$(latest_tag caddyserver/caddy)"; V="${TAG#v}"
     [ -n "$V" ] || { echo "Couldn't find Caddy's latest version"; exit 1; }
     echo "Downloading Caddy $V for mac_${GO}…"
     curl -fsSL -o "$TMP/caddy.tgz" "https://github.com/caddyserver/caddy/releases/download/$TAG/caddy_${V}_mac_${GO}.tar.gz"
@@ -40,7 +52,7 @@ case "${1:-}" in
     install -m 755 "$TMP/caddy" "$BIN/caddy" ;;
   node)    # Node.js LTS, nodejs.org's official build for this processor, checked against its SHASUMS256.txt.
            # Lands in ~/.local/node with node, npm and npx linked into ~/.local/bin (Motion studio renders with it).
-    V="$(curl -fsSL https://nodejs.org/dist/index.json | /usr/bin/python3 -c 'import json,sys; print(next(r["version"] for r in json.load(sys.stdin) if r.get("lts")))')"
+    V="$NODE_V"; [ -n "$V" ] || V="$(curl -fsSL https://nodejs.org/dist/index.json | /usr/bin/python3 -c 'import json,sys; print(next(r["version"] for r in json.load(sys.stdin) if r.get("lts")))')"
     [ -n "$V" ] || { echo "Couldn't find Node's latest LTS version"; exit 1; }
     F="node-$V-darwin-$NODE.tar.gz"
     echo "Downloading Node.js $V for darwin-${NODE}…"

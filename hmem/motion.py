@@ -209,7 +209,9 @@ def npm_install(p: Path | None = None, wait: bool = False) -> dict:
             log = logs / "motion-npm.log"
             env = {**os.environ, "PATH": os.pathsep.join([str(Path(npm).parent), os.environ.get("PATH", ""), *EXTRA])}
             with open(log, "w", encoding="utf-8") as f:
-                proc = subprocess.Popen([npm, "install", "--no-audit", "--no-fund", "--loglevel=error"], cwd=str(p),
+                # package-lock.json (from the template) pins every package for both chips: npm ci installs exactly that
+                verb = "ci" if (p / "package-lock.json").exists() else "install"
+                proc = subprocess.Popen([npm, verb, "--no-audit", "--no-fund", "--loglevel=error"], cwd=str(p),
                                         stdout=f, stderr=subprocess.STDOUT, stdin=subprocess.DEVNULL, env=env)
             job = _npm[key] = {"proc": proc, "at": time.time(), "log": str(log)}
     if wait:

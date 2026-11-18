@@ -35,3 +35,9 @@ def test_launcher_changes_restart_what_they_launch():
     u = _updates()
     assert u._needs(["bin/cc-sidecar"]) == ["sidecar"]
     assert u._needs(["bin/hermes-webui-run"]) == ["webui"]
+
+
+def test_locked_package_changes_restart_their_service():
+    u = _updates()
+    assert u._needs(["requirements/team.txt"]) == ["team"]
+    assert u._needs(["requirements/sidecar-push.txt"]) == ["sidecar"]

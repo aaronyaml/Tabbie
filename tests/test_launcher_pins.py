@@ -8,17 +8,39 @@ ROOT = Path(__file__).resolve().parents[1]
 LAUNCHERS = [ROOT / "bin" / "tt", ROOT / "bin" / "cc-sidecar", ROOT / "hmem" / "winsvc.py"]
 
 
+REQS = sorted((ROOT / "requirements").glob("*.txt"))
+
+
 def test_cryptography_pinned_below_49():
-    for f in LAUNCHERS:
+    assert REQS
+    for f in LAUNCHERS + REQS:
         for v in re.findall(r"cryptography==([\d.]+)", f.read_text()):
             assert int(v.split(".")[0]) < 49, f"{f.name} pins cryptography {v}: no Intel Mac wheels"
 
 
-def test_pywebpush_is_pinned_with_cryptography():
-    for f in LAUNCHERS:
+def test_every_package_is_locked_with_hashes():
+    for f in REQS:
         s = f.read_text()
-        if "pywebpush" in s:
-            assert re.search(r"pywebpush==", s) and "cryptography==" in s, f"{f.name}: pin pywebpush and cryptography"
+        pkgs = re.findall(r"^([a-z0-9][a-z0-9._-]*)(==|\s)", s, re.M)
+        assert pkgs and all(op == "==" for _, op in pkgs), f"{f.name}: every package needs an exact version"
+        assert s.count("--hash=sha256:") >= len(pkgs), f"{f.name}: hashes missing"
+        assert (f.with_suffix(".in")).exists(), f"{f.name} has no .in source"
+
+
+def test_launchers_install_from_the_lockfiles():
+    for f in (ROOT / "bin" / "tt", ROOT / "bin" / "cc-sidecar", ROOT / "hmem" / "winsvc.py"):
+        s = f.read_text()
+        assert "--with-requirements" in s and not re.search(r"--with\b(?!-)", s.replace('"--with", "', '--with ')), f.name
+
+
+def test_locked_packages_install_on_intel_and_apple_silicon():
+    """Slow and needs the internet: CI sets TABBIE_LOCK_CHECK=1 (and bin/lock-deps runs it when re-locking)."""
+    import os, shutil, subprocess
+    import pytest
+    if not os.environ.get("TABBIE_LOCK_CHECK") or not shutil.which("uv") or os.name == "nt":
+        pytest.skip("set TABBIE_LOCK_CHECK=1")
+    r = subprocess.run([str(ROOT / "bin" / "lock-deps"), "check"], capture_output=True, text=True, timeout=900)
+    assert r.returncode == 0, r.stdout + r.stderr
 
 
 def test_sidecar_starts_without_push_libraries():

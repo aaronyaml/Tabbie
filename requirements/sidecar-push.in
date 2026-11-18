@@ -1,0 +1,4 @@
+pyyaml
+ruamel.yaml
+pywebpush==2.5.0
+cryptography==48.0.1

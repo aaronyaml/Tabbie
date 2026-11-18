@@ -10,8 +10,10 @@
 export PATH="$HOME/.hermes/bin:$HOME/.local/bin:/opt/homebrew/bin:/usr/local/bin:/usr/bin:/bin"
 SIDECAR="$HOME/hermes/plugin/command-centre/sidecar.py"
 UV="$(command -v uv || ls -d "$HOME"/.hermes/tools/uv-*/uv 2>/dev/null | tail -1)"
-CORE=(--python ">=3.12,<3.15" --with pyyaml --with ruamel.yaml)
-PUSH=(--with pywebpush==2.5.0 --with cryptography==48.0.1 --no-build-package cryptography)
+# Exact versions of every package (and what they pull in), locked for both Mac chips: requirements/ (bin/lock-deps).
+REQ="$(cd "$(dirname "$0")/../requirements" && pwd)"
+CORE=(--python ">=3.12,<3.15" --with-requirements "$REQ/sidecar.txt")
+PUSH=(--with-requirements "$REQ/sidecar-push.txt" --no-build-package cryptography)
 if [ "$1" = "--preflight" ]; then
   [ -n "$UV" ] && [ -x "$UV" ] || { echo "optional: uv is missing, so the helper runs on the Mac's own Python"; exit 0; }
   "$UV" run --no-project -q "${CORE[@]}" python -I -c "import yaml, ruamel.yaml" || exit 1

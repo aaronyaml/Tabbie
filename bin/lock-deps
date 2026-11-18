@@ -1,0 +1,36 @@
+#!/bin/bash
+# Re-lock the Python packages Tabbie's services install (requirements/*.in -> requirements/*.txt), then check
+# every locked package installs on each kind of computer Tabbie runs on, without compiling anything that
+# needs a compiler. Run after changing a requirements/*.in file; commit both.
+#   bin/lock-deps          lock and check
+#   bin/lock-deps check    check only (the tests run this when uv is installed)
+set -euo pipefail
+cd "$(dirname "$0")/../requirements"
+# Packages with compiled parts: always ready-made builds (wheels). Pure-Python ones may come as source.
+NOBUILD=(--only-binary cryptography --only-binary cffi --only-binary pyyaml --only-binary websockets
+         --only-binary pillow --only-binary zeroconf --only-binary ruamel-yaml-clib --only-binary aiohttp
+         --only-binary yarl --only-binary multidict --only-binary frozenlist --only-binary propcache --only-binary charset-normalizer)
+PLATFORMS=(aarch64-apple-darwin x86_64-apple-darwin x86_64-pc-windows-msvc)
+PYTHONS=(3.12 3.13 3.14)
+if [ "${1:-}" != check ]; then
+  for f in *.in; do
+    uv pip compile -q --universal --python-version 3.12 "${NOBUILD[@]}" --generate-hashes --no-header \
+      --custom-compile-command "bin/lock-deps" "$f" -o "${f%.in}.txt"
+  done
+fi
+rc=0
+TMP="$(mktemp -d)"; trap 'rm -rf "$TMP"' EXIT
+for f in *.txt; do
+  case "$f" in *windows*) plats=(x86_64-pc-windows-msvc) ;; *) plats=("${PLATFORMS[@]}") ;; esac
+  for p in "${plats[@]}"; do
+    for py in "${PYTHONS[@]}"; do
+      if ! uv pip compile -q --python-platform "$p" --python-version "$py" "${NOBUILD[@]}" "$f" -o "$TMP/out.txt" 2>"$TMP/err"; then
+        echo "FAIL $f on $p, Python $py: $(tail -3 "$TMP/err" | tr '\n' ' ')"; rc=1
+      elif ! diff -q <(grep -E '^[a-z]' "$TMP/out.txt" | sed 's/ .*//' | sort) <(grep -E '^[a-z]' "$f" | sed 's/ .*//' | sort) >/dev/null; then
+        [ "$(grep -cE '^[a-z]' "$TMP/out.txt")" -le "$(grep -cE '^[a-z]' "$f")" ] || { echo "FAIL $f on $p, Python $py: resolves differently"; rc=1; }
+      fi
+    done
+  done
+done
+[ $rc = 0 ] && echo "All locked packages install on Apple silicon and Intel Macs (and Windows), Python ${PYTHONS[*]}."
+exit $rc
