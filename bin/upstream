@@ -1,0 +1,69 @@
+#!/bin/bash
+# Hermes WebUI and Hermes Agent versions, against config/upstream.lock (the versions Tabbie was tested with).
+#   bin/upstream status   installed vs tested, missing WebUI patches, and anything Tabbie relies on that changed
+#   bin/upstream sync     move each one forward to the tested version (never back), then apply the WebUI patches
+#   bin/upstream lock     record what's installed now as tested (after you've tested it)
+set -u
+ROOT="$(cd "$(dirname "$0")/.." && pwd)"
+LOCK="$ROOT/config/upstream.lock"
+WEB="$ROOT/hermes-webui"
+AGENT="${HERMES_AGENT_DIR:-$HOME/.hermes/hermes-agent}"
+want() { sed -n "s/^$1=\([0-9a-f]\{40\}\)$/\1/p" "$LOCK" 2>/dev/null | head -1; }
+PY=(/usr/bin/env python3 -I)
+
+case "${1:-status}" in
+  status)
+    "${PY[@]}" - "$ROOT" <<'PY'
+import importlib, importlib.util, json, os, sys
+pkg = os.path.join(sys.argv[1], "plugin", "command-centre")
+spec = importlib.util.spec_from_file_location("cc", os.path.join(pkg, "__init__.py"), submodule_search_locations=[pkg])
+sys.modules["cc"] = importlib.util.module_from_spec(spec)
+s = importlib.import_module("cc.upstream").status()
+words = {"same": "the tested version", "behind": "older than tested (bin/upstream sync)", "ahead": "newer than tested",
+         "other": "a different branch than tested", "unknown": "not checked", "missing": "not installed"}
+for n, v in s["versions"].items():
+    print(f"{'WebUI' if n == 'webui' else 'Hermes Agent'}: {v['installed'] or '?'} · {words.get(v['relation'], v['relation'])} ({v['tested']})")
+for p in s["patches_missing"]:
+    print(f"WebUI patch not applied: {p}")
+for p in s["problems"]:
+    print(f"Changed upstream: {p}")
+if not s["problems"] and not s["patches_missing"]:
+    print("Everything Tabbie relies on is there.")
+sys.exit(0 if s["ok"] else 1)
+PY
+    ;;
+  sync)
+    rc=0
+    for pair in "webui:$WEB" "agent:$AGENT"; do
+      name="${pair%%:*}"; dir="${pair#*:}"; sha="$(want "$name")"
+      [ -n "$sha" ] && [ -d "$dir/.git" ] || continue
+      head="$(git -C "$dir" rev-parse HEAD 2>/dev/null)"
+      [ "$head" = "$sha" ] && { echo "$name: tested version"; continue; }
+      git -C "$dir" cat-file -e "$sha^{commit}" 2>/dev/null || git -C "$dir" fetch -q origin 2>/dev/null
+      if ! git -C "$dir" merge-base --is-ancestor "$head" "$sha" 2>/dev/null; then
+        echo "$name: newer than or different from the tested version; left as it is"; continue
+      fi
+      if [ "$name" = webui ]; then
+        # our patches are the only edits Tabbie makes there: take them off, move, put them back
+        for p in "$ROOT"/webui-patches/*.patch; do git -C "$dir" apply --reverse --check "$p" 2>/dev/null && git -C "$dir" apply --reverse "$p"; done
+        if [ -n "$(git -C "$dir" status --porcelain --untracked-files=no)" ]; then
+          echo "webui: has edits that aren't Tabbie's patches; not moving it"; "$ROOT/bin/webui-patches" >/dev/null; rc=1; continue
+        fi
+        git -C "$dir" checkout -q --detach "$sha" && echo "webui: moved to the tested version ${sha:0:10}" || rc=1
+      else
+        # the Agent's own updater also reinstalls its Python packages; use it pinned to the tested commit
+        if command -v hermes >/dev/null && hermes update --help 2>/dev/null | grep -q -- "--commit"; then
+          hermes update --commit "$sha" >/dev/null 2>&1 && echo "agent: moved to the tested version ${sha:0:10}" || { echo "agent: update failed"; rc=1; }
+        else
+          echo "agent: older than tested; update it with: hermes update"
+        fi
+      fi
+    done
+    [ -d "$WEB/.git" ] && { "$ROOT/bin/webui-patches" | grep -v "^applied   " ; true; }
+    "$0" status >/dev/null || rc=1
+    exit $rc ;;
+  lock)
+    { sed -n '/^#/p' "$LOCK"; echo "webui=$(git -C "$WEB" rev-parse HEAD)"; echo "agent=$(git -C "$AGENT" rev-parse HEAD)"; } > "$LOCK.tmp" && mv "$LOCK.tmp" "$LOCK"
+    cat "$LOCK" ;;
+  *) sed -n 2,5p "$0" ;;
+esac

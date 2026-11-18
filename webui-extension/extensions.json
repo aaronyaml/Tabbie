@@ -322,7 +322,7 @@
       "id": "updates",
       "name": "Tabbie updates (asks before downloading)",
       "scripts": [
-        "updates.js?v=14"
+        "updates.js?v=15"
       ],
       "stylesheets": [
         "updates.css?v=6"

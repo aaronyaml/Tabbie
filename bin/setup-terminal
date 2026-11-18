@@ -227,6 +227,9 @@ if [ ! -d hermes-webui ]; then
 else
   ok "WebUI (hermes-webui/)"
 fi
+if [ -d hermes-webui/.git ]; then  # the version Tabbie was tested with (config/upstream.lock), plus Tabbie's patches
+  bin/upstream sync 2>&1 | grep -v ": tested version$" | sed 's/^/  /'
+fi
 if [ -d hermes-webui ] && [ ! -f hermes-webui/.env ]; then
   sed "s|__HOME__|$HOME|g" config/webui.env.example > hermes-webui/.env
 fi

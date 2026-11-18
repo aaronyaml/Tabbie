@@ -19,7 +19,9 @@ latest_tag() {  # owner/repo -> its latest release tag, from GitHub's redirect (
 
 case "${1:-}" in
   hermes)  # Hermes Agent's official installer; --non-interactive skips its own setup (Tabbie does that)
-    curl -fsSL https://hermes-agent.nousresearch.com/install.sh | bash -s -- --non-interactive ;;
+    # pinned to the version Tabbie was tested with (config/upstream.lock)
+    PIN="$(sed -n 's/^agent=\([0-9a-f]\{40\}\)$/\1/p' "$(dirname "$0")/../config/upstream.lock" 2>/dev/null | head -1)"
+    curl -fsSL https://hermes-agent.nousresearch.com/install.sh | bash -s -- --non-interactive ${PIN:+--commit "$PIN"} ;;
   claude)  # Claude Code's official native installer
     curl -fsSL https://claude.ai/install.sh | bash ;;
   uv)

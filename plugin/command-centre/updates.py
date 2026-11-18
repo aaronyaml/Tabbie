@@ -152,7 +152,8 @@ def _save_state(d: dict) -> None:
 
 # Plugin modules only the helper (cc-sidecar) loads: a change to just these restarts the helper (about a
 # second), not the WebUI and gateway (about 15 s). Anything else under plugin/ is treated as WebUI code.
-SIDECAR_ONLY = {f"plugin/command-centre/{m}.py" for m in ("sidecar", "connections", "hub_setup", "linkicons", "team_link", "usage_insights")}
+SIDECAR_ONLY = {f"plugin/command-centre/{m}.py" for m in ("sidecar", "connections", "hub_setup", "linkicons", "team_link", "usage_insights",
+                                                              "upstream")}
 
 
 def _needs(files: list[str]) -> list[str]:
@@ -170,6 +171,8 @@ def _needs(files: list[str]) -> list[str]:
             need.add("webui")
         if f == "services/Caddyfile":
             need.add("caddy")
+        if f.startswith("webui-patches/") or f == "config/upstream.lock":  # applied to hermes-webui/ on update
+            need.add("webui")
         if f.startswith("webui-extension/"):
             need.add("reload")
         if f.startswith(("bin/setup", "services/")) and f != "services/Caddyfile":
@@ -233,6 +236,9 @@ def apply() -> dict:
         last = (str(exc).strip().splitlines() or [""])[-1]
         return {"ok": False, "error": f"Update failed, nothing changed ({last[:160]})"}
     needs = _needs(files)
+    upstream_note = _sync_upstream(files)
+    if upstream_note:
+        pf.setdefault("warnings", []).append(upstream_note)
     installed = ensure_services()  # new services: nothing runs in them yet, so install right away
     changed = sorted({f[len("services/"):-len(".plist.template")] for f in files
                       if f.startswith("services/") and f.endswith(".plist.template")} - set(installed))
@@ -243,6 +249,22 @@ def apply() -> dict:
     _cache.update(at=0.0, result=None)
     return {"ok": True, "from": before[:7], "to": after[:7], "files": len(files), "needs": needs,
             "installed": installed, "backed_up": saved, "warnings": pf.get("warnings") or []}
+
+
+def _sync_upstream(files: list[str]) -> str:
+    """After switching: move the WebUI to the tested version if the lock moved, and (re)apply Tabbie's WebUI
+    patches. They only take effect when the WebUI restarts. Returns a warning, or ''."""
+    if sys.platform == "win32" or not (ROOT / "hermes-webui" / ".git").exists():
+        return ""
+    cmd = "upstream" if "config/upstream.lock" in files else "webui-patches"
+    tool = ROOT / "bin" / cmd
+    if not tool.exists():
+        return ""
+    ok, out = _run_check([str(tool), *(["sync"] if cmd == "upstream" else [])], timeout=300)
+    bad = [x for x in out.splitlines() if "CONFLICT" in x or "not moving" in x or "failed" in x]
+    if bad:
+        return "Some of Tabbie's WebUI changes no longer fit this WebUI version: " + "; ".join(bad)[:200]
+    return ""
 
 
 # ---------------------------------------------------------------- preflight (before switching code)

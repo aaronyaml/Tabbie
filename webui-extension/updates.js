@@ -286,7 +286,10 @@
       const v = j.local ? j.local.slice(0, 7) : '';
       const f = j.last_failure;
       const failed = f && f.step ? ` · last update ${f.rolled_back ? 'undone' : 'not installed'} (${f.step})` : '';
-      ver.textContent = (j.available ? `Version ${v} · an update is available` : j.note ? `Version ${v} · ${j.note}` : `Version ${v} · up to date`) + failed;
+      const u = j.upstream || {};
+      const drift = (u.problems && u.problems.length) ? ` · WebUI or Hermes Agent changed something Tabbie uses (bin/upstream status)`
+        : (u.patches_missing && u.patches_missing.length) ? ` · ${u.patches_missing.length} WebUI fix${u.patches_missing.length === 1 ? '' : 'es'} not applied (bin/upstream sync)` : '';
+      ver.textContent = (j.available ? `Version ${v} · an update is available` : j.note ? `Version ${v} · ${j.note}` : `Version ${v} · up to date`) + failed + drift;
       if (j.available) { btn.textContent = 'See update'; btn.dataset.offer = '1'; info = j; }
     };
     paintSettings = say;

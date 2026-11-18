@@ -1,0 +1,5 @@
+# The upstream versions Tabbie was last tested with. Setup installs exactly these; bin/upstream sync
+# moves an install forward to them (never back: their data formats may only go forward). Change them
+# only after testing a newer version (bin/upstream status shows what's installed).
+webui=516321171c74e817f2c8d84773fc1067e8792fde
+agent=8e88790c3ca4fed8bb7d7db414769b454bd48608

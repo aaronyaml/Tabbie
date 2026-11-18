@@ -219,8 +219,22 @@ def install_node() -> None:
     add_user_path(dest)
 
 
+def _pin(name: str) -> str:
+    """The upstream commit Tabbie was tested with (config/upstream.lock)."""
+    import re
+    try:
+        for line in (ROOT / "config" / "upstream.lock").read_text(encoding="utf-8").splitlines():
+            m = re.match(rf"^{name}=([0-9a-f]{{40}})$", line.strip())
+            if m:
+                return m.group(1)
+    except OSError:
+        pass
+    return ""
+
+
 INSTALL = {
-    "hermes": lambda: ps("iex (irm https://hermes-agent.nousresearch.com/install.ps1)"),
+    "hermes": lambda: ps("& ([scriptblock]::Create((irm https://hermes-agent.nousresearch.com/install.ps1)))"
+                         + (f" -Commit {_pin('agent')}" if _pin("agent") else "")),
     "claude": lambda: ps("irm https://claude.ai/install.ps1 | iex"),
     "uv": lambda: ps("irm https://astral.sh/uv/install.ps1 | iex"),
     "codex": install_codex, "caddy": install_caddy, "node": install_node,
@@ -368,6 +382,8 @@ def s_files() -> None:
     web = ROOT / "hermes-webui"
     if not web.is_dir():
         if run(["git", "clone", "-q", "https://github.com/nesquena/hermes-webui.git", str(web)]) == 0:
+            if _pin("webui"):  # the version Tabbie was tested with
+                run(["git", "-C", str(web), "checkout", "-q", "--detach", _pin("webui")])
             ok("WebUI downloaded (hermes-webui\\)")
         else:
             fail("Couldn't download the WebUI (check your internet), then re-run")

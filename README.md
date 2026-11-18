@@ -672,6 +672,13 @@ else goes back from an update made in the last day. Services that keep stopping 
 starting wait longer before each retry (up to 10 minutes) instead of restarting every 10 seconds.
 By hand: `bin/tabbie-update status`, `bin/tabbie-update rollback`.
 
+**WebUI and Hermes Agent versions.** Tabbie is built on two other projects and reads some of their
+internals, so `config/upstream.lock` records the versions it was tested with. Setup installs exactly
+those, an update that moves the lock moves the WebUI forward to match (never back), and Tabbie's small
+WebUI fixes (`webui-patches/`) are applied at setup and after every update. Settings → System says if
+a fix no longer fits or if something Tabbie relies on has changed. `bin/upstream status` shows the
+details; `bin/upstream sync` moves both forward to the tested versions.
+
 If an update changes a file you've edited, your copy is saved to `backups/update-<time>/` and
 then replaced, so the update always lands. Edits to files the update doesn't touch stay. To check another repo or
 branch (e.g. your fork), or to turn checking off, edit `updates:` in `config/router.yaml`.

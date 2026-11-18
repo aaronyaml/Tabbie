@@ -887,7 +887,23 @@ def update_payload(force: bool = False) -> dict:
     if not s.get("check", True):
         return {"available": False, "disabled": True}
     return {**updates.check(force), "pending_restart": updates.pending_restart(), "restart_waiting": updates.waiting(),
-            "last_failure": updates.last_failure()}
+            "last_failure": updates.last_failure(), "upstream": _upstream_status()}
+
+
+_UPS = {"at": 0.0, "v": None}
+
+
+def _upstream_status() -> dict:
+    """WebUI / Agent versions vs config/upstream.lock, and anything Tabbie relies on that changed (10 min cache)."""
+    if _UPS["v"] is None or time.time() - _UPS["at"] > 600:
+        try:
+            s = importlib.import_module("cc_sidecar_pkg.upstream").status()
+            _UPS["v"] = {"problems": s["problems"], "patches_missing": s["patches_missing"],
+                         "versions": s["versions"]}
+        except Exception:  # noqa: BLE001
+            _UPS["v"] = {"problems": [], "patches_missing": [], "versions": {}}
+        _UPS["at"] = time.time()
+    return _UPS["v"]
 
 
 # Downloading an update (ls-remote + fetch + services) can take longer than the WebUI proxy's 10 s, which then
