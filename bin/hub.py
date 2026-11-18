@@ -201,7 +201,7 @@ def main(argv: list[str]) -> int:
         return logs(argv[1] if len(argv) > 1 else "webui")
     elif cmd == "import":
         uv = shutil.which("uv")
-        return subprocess.call([uv, "run", "--no-project", "-q", "--with", "ruamel.yaml", "python",
+        return subprocess.call([uv, "run", "--no-project", "-q", "--python", ">=3.12,<3.15", "--with", "ruamel.yaml", "python",
                                 str(ROOT / "bin" / "cc-import-projects"), *argv[1:]] if uv else
                                [sys.executable, str(ROOT / "bin" / "cc-import-projects"), *argv[1:]])
     elif cmd == "limits":

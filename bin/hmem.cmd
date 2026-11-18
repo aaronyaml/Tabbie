@@ -4,4 +4,4 @@ setlocal
 set "PYTHONPATH=%~dp0..;%PYTHONPATH%"
 set PYTHONUTF8=1
 where python >nul 2>nul && (python -m hmem.cli %* & exit /b %errorlevel%)
-uv run --no-project -q python -m hmem.cli %*
+uv run --no-project -q --python ">=3.12,<3.15" python -m hmem.cli %*

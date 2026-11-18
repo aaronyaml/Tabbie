@@ -1116,7 +1116,7 @@ Use Claude Code's own permission settings for hard limits.
 ## Tests
 
 ```bash
-uv run -q --no-project --with pytest --with ruamel.yaml --with cryptography==48.0.1 --with websockets==17.4 python -m pytest tests -q
+uv run -q --no-project --with pytest --with ruamel.yaml --python ">=3.12,<3.15" --with cryptography==48.0.1 --with websockets==17.4 python -m pytest tests -q
 ```
 
 The tests use temporary folders only and never touch your memory or state.

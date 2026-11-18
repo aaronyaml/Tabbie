@@ -33,6 +33,7 @@ RUN_KEY = r"Software\Microsoft\Windows\CurrentVersion\Run"
 VALUE = "Tabbie"
 NAMES = ("webui", "caddy", "sidecar", "mdns")
 DREAM_AT = (3, 30)
+PY_RANGE = ">=3.12,<3.15"  # Pythons Tabbie supports; uv downloads one if the machine has none
 NO_WINDOW = 0x08000000  # CREATE_NO_WINDOW: the supervisor is pythonw, children get no console window
 _POLL = 2.0
 
@@ -86,11 +87,11 @@ def specs() -> dict[str, dict]:
                         "cwd": ROOT, "log": LOGS / "caddy.log"}
     uv = _exe("uv")
     sidecar = str(ROOT / "plugin" / "command-centre" / "sidecar.py")
-    out["sidecar"] = {"argv": ([uv, "run", "--no-project", "-q", "--with", "pyyaml", "--with", "ruamel.yaml",
+    out["sidecar"] = {"argv": ([uv, "run", "--no-project", "-q", "--python", PY_RANGE, "--with", "pyyaml", "--with", "ruamel.yaml",
                                 "--with", "pywebpush==2.5.0", "--with", "cryptography==48.0.1", "--with", "pillow", "python", "-I", sidecar] if uv else [_python(), "-I", sidecar]),
                       "cwd": ROOT, "log": LOGS / "cc-sidecar.log"}
     if uv:  # hermes.local over mDNS (python-zeroconf; dns-sd does this on macOS)
-        out["mdns"] = {"argv": [uv, "run", "--no-project", "-q", "--with", "zeroconf", "python", "-I",
+        out["mdns"] = {"argv": [uv, "run", "--no-project", "-q", "--python", PY_RANGE, "--with", "zeroconf", "python", "-I",
                                 str(ROOT / "bin" / "tabbie-mdns.py")], "cwd": ROOT, "log": LOGS / "mdns.log"}
     return out
 

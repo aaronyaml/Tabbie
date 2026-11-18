@@ -180,9 +180,10 @@ def draft(tt, instructions: str, thread_id: str | None = None, to: list[str] | N
     box = call(tt, "list", folder="inbox", limit=1)
     std = standard(tt)
     ctx = thread_text(call(tt, "thread", id=thread_id, peek=True)) if thread_id else ""
+    thread_part = ("The thread you are replying to:\n" + ctx) if ctx else ""  # no backslash inside f-string braces: 3.11 can't parse it
     out = _json_out(claude(
         f"Write an email. {UNTRUSTED}\n{me_line(tt, box)}\n\nHouse standard for our emails (follow it):\n{std or '(none set: plain, warm, short, UK English, no em dashes)'}\n\n"
-        f"{('The thread you are replying to:\n' + ctx) if ctx else ''}\n\nWhat to write: {instructions[:3000] or 'a reply to the latest message'}\n"
+        f"{thread_part}\n\nWhat to write: {instructions[:3000] or 'a reply to the latest message'}\n"
         f"{('Send to: ' + ', '.join(to)) if to else ''}\n\nAnswer with JSON only: "
         '{"to": ["..."], "cc": [], "subject": "...", "text": "the body, without a signature (it is added on sending)"}'))
     d = {"to": [str(x) for x in out.get("to") or to or []][:20], "cc": [str(x) for x in out.get("cc") or []][:20],

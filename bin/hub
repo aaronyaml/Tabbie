@@ -73,10 +73,10 @@ PY
       sidecar|cc-sidecar) tail -n 40 ~/hermes/state/logs/cc-sidecar.log ;;
       decisions) tail -n 30 ~/hermes/state/decisions.jsonl ;;
     esac ;;
-  import) uv run --no-project -q --with ruamel.yaml python ~/hermes/bin/cc-import-projects "${@:2}" ;;
+  import) uv run --no-project -q --python ">=3.12,<3.15" --with ruamel.yaml python ~/hermes/bin/cc-import-projects "${@:2}" ;;
   limits) python3 ~/hermes/plugin/limits/__init__.py "${@:2}" ;;
   update)
-    PY=(python3); command -v uv >/dev/null && PY=(uv run -q --no-project --with ruamel.yaml python)
+    PY=(python3); command -v uv >/dev/null && PY=(uv run -q --no-project --python ">=3.12,<3.15" --with ruamel.yaml python)
     "${PY[@]}" - <<'PY'
 import importlib.util, os, sys, time
 pkg = os.path.expanduser("~/hermes/plugin/command-centre")

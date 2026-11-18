@@ -11,7 +11,7 @@ SIDECAR="$HOME/hermes/plugin/command-centre/sidecar.py"
 cd "$HOME/hermes" || exit 1
 UV="$(command -v uv || ls -d "$HOME"/.hermes/tools/uv-*/uv 2>/dev/null | tail -1)"
 if [ -n "$UV" ] && [ -x "$UV" ]; then
-  CORE=(--with pyyaml --with ruamel.yaml)
+  CORE=(--python ">=3.12,<3.15" --with pyyaml --with ruamel.yaml)
   PUSH=(--with pywebpush==2.5.0 --with cryptography==48.0.1 --no-build-package cryptography)
   if "$UV" run --no-project -q "${CORE[@]}" "${PUSH[@]}" python -I -c "import yaml, pywebpush" 2>/dev/null; then
     exec "$UV" run --no-project -q "${CORE[@]}" "${PUSH[@]}" python -I "$SIDECAR"
