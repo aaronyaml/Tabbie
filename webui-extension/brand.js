@@ -85,8 +85,10 @@
     if (location.port !== '8787' || document.getElementById('hxBareNudge')) return;
     const n = document.createElement('a');
     n.id = 'hxBareNudge';
-    n.href = 'https://hermes.local' + location.pathname;
-    n.textContent = 'Open Tabbie at https://hermes.local for the full app';
+    const show = (h) => { n.href = 'https://' + h + location.pathname; n.textContent = 'Open Tabbie at https://' + h + ' for the full app'; };
+    show('hermes.local');
+    fetch('api/extensions/cc-agents/sidecar/local-host', { credentials: 'same-origin', cache: 'no-store' })
+      .then((r) => (r.ok ? r.json() : null)).then((j) => { if (j && /^[a-z0-9-]+\.local$/.test(j.host || '')) show(j.host); }).catch(() => {});
     n.style.cssText = 'position:fixed;left:50%;top:10px;transform:translateX(-50%);z-index:2000;padding:8px 14px;border-radius:10px;'
       + 'background:var(--hx-accent,#3054FD);color:#fff;font:500 13px/1.2 var(--font-ui,system-ui);text-decoration:none;box-shadow:0 6px 18px rgba(0,0,0,.2)';
     document.body.appendChild(n);

@@ -11,13 +11,14 @@
 #   hub update       check GitHub for a newer Tabbie, and download it if you say yes
 export PATH="$HOME/.hermes/bin:$HOME/.local/bin:/opt/homebrew/bin:/usr/local/bin:$PATH"
 UID_=$(id -u)
+HOST="$("$HOME/hermes/bin/tabbie-host" 2>/dev/null || echo hermes.local)"
 ok()   { printf '  \033[32m✓\033[0m %s\n' "$1"; }
 bad()  { printf '  \033[31m✗\033[0m %s\n' "$1"; }
 check() { if eval "$2" >/dev/null 2>&1; then ok "$1"; else bad "$1${3:+: $3}"; fi; }
 opt()   { if eval "$2" >/dev/null 2>&1; then ok "$1"; else printf '  \033[33m!\033[0m %s\n' "$1 (optional)${3:+: $3}"; fi; }
 
 case "${1:-open}" in
-  open) open "https://hermes.local" ;;
+  open) open "https://$HOST" ;;
   cli) shift; exec hermes "$@" ;;
   health)
     echo "Hermes command centre"
@@ -25,8 +26,8 @@ case "${1:-open}" in
     check "Hermes WebUI"              "curl -sf -m 5 http://127.0.0.1:8787/health" "hub logs webui"
     check "HTTPS proxy (Caddy)"       "launchctl list ai.hermes.caddy | grep -q '\"PID\"'" "hub logs caddy"
     check "Tabbie helper (cc-sidecar)" "launchctl list ai.hermes.cc-sidecar | grep -q '\"PID\"'" "bin/setup --services (installs it), then hub logs sidecar"
-    check "hermes.local (mDNS)"       "dscacheutil -q host -a name hermes.local | grep -q ip_address" "hub logs mdns"
-    check "WebUI via hermes.local"    "curl -sk -m 5 -o /dev/null -w '%{http_code}' https://hermes.local/login | grep -q 200"
+    check "$HOST (mDNS)"       "dscacheutil -q host -a name $HOST | grep -q ip_address" "hub logs mdns"
+    check "WebUI via $HOST"    "curl -sk -m 5 -o /dev/null -w '%{http_code}' https://$HOST/login | grep -q 200"
     PL="$(hermes plugins list 2>/dev/null)"
     for p in command-centre fragment-memory limits workboard; do
       check "Plugin $p enabled"       "printf '%s' \"\$PL\" | grep -E '^. $p ' | grep -q enabled" "hermes plugins enable $p, then bin/hub restart"

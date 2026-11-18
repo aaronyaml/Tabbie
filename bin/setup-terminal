@@ -334,11 +334,17 @@ if { [ "$ASK" = 0 ] && [ -n "$SERVICES" ]; } || { [ "$ASK" = 1 ] && yn "$Q" "$DE
     fail "Set a WebUI password first (step 6), then run bin/setup again."
   else
     CADDY="$(command -v caddy || echo "$HOME/.local/bin/caddy")"
+    THOST="$(bin/tabbie-host --choose).local"; CADMIN="$(bin/tabbie-host --admin)"
+    [ "$THOST" = hermes.local ] || warn "Another Mac on this network is already hermes.local, so this one is $THOST"
+    for p in 80 443 8787 8794; do  # ports Tabbie needs: say which app holds one, instead of a service that won't start
+      who="$(lsof -nP -iTCP:$p -sTCP:LISTEN -Fc 2>/dev/null | sed -n 's/^c//p' | head -1)"
+      case "$who" in ""|caddy|Python|python*|uv|hermes*) ;; *) warn "Port $p is used by $who. Quit it (or change its port), then run bin/setup --services again." ;; esac
+    done
     for t in services/*.plist.template; do
       label="$(basename "$t" .plist.template)"
       [ -n "$MISSING" ] && case " $MISSING " in *" $label "*) ;; *) continue ;; esac
       dest="$HOME/Library/LaunchAgents/$label.plist"
-      sed -e "s|__HOME__|$HOME|g" -e "s|__CADDY__|$CADDY|g" "$t" > "$dest"
+      sed -e "s|__HOME__|$HOME|g" -e "s|__CADDY__|$CADDY|g" -e "s|__HOST__|$THOST|g" -e "s|__CADDYADMIN__|$CADMIN|g" "$t" > "$dest"
       launchctl bootout "gui/$(id -u)/$label" 2>/dev/null || true
       launchctl bootstrap "gui/$(id -u)" "$dest" && ok "$label" || fail "$label didn't start (bin/hub logs)"
     done

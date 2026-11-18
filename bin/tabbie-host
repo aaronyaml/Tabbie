@@ -1,0 +1,38 @@
+#!/bin/bash
+# Tabbie's address on the home network, e.g. hermes.local. Usually "hermes"; setup picks "hermes-<you>" when
+# another Mac on the same network already answers to hermes.local (two Tabbie Macs in one house/office).
+#   tabbie-host            print it (hermes.local)
+#   tabbie-host --choose   setup: pick and save one if none is saved yet
+#   tabbie-host --admin    the Caddy admin address (localhost:2019 unless something else holds that port)
+STATE="$(cd "$(dirname "$0")/.." && pwd)/state"
+f="$STATE/local-name"
+mine() { ifconfig 2>/dev/null | awk '/inet /{print $2}'; }
+taken_by_other() {  # does another device already answer to $1.local? (asks Bonjour for 3 s)
+  local out ip
+  out="$( (/usr/bin/dns-sd -G v4 "$1.local" & p=$!; sleep 3; kill $p) 2>/dev/null)"
+  ip="$(printf '%s\n' "$out" | awk '/Add/ && $6 ~ /^[0-9.]+$/ {print $6; exit}')"
+  [ -n "$ip" ] && ! mine | grep -qx "$ip"
+}
+case "$1" in
+  --choose)
+    [ -s "$f" ] && { cat "$f"; exit 0; }
+    name=hermes
+    if taken_by_other hermes; then
+      u="$(id -un | tr 'A-Z' 'a-z' | tr -cd 'a-z0-9-' | cut -c1-20)"
+      name="hermes-${u:-mac}"
+      n=2; while taken_by_other "$name"; do name="hermes-${u:-mac}$n"; n=$((n + 1)); done
+    fi
+    mkdir -p "$STATE" && printf '%s\n' "$name" > "$f" && echo "$name" ;;
+  --admin)
+    a="$(cat "$STATE/caddy-admin" 2>/dev/null)"
+    if [ -z "$a" ]; then
+      for p in 2019 2029 2039 2049 2059; do
+        who="$(lsof -nP -iTCP:$p -sTCP:LISTEN -Fc 2>/dev/null | sed -n 's/^c//p' | head -1)"
+        { [ -z "$who" ] || [ "$who" = caddy ]; } && { a="localhost:$p"; break; }
+      done
+      a="${a:-localhost:2019}"
+      mkdir -p "$STATE" && printf '%s\n' "$a" > "$STATE/caddy-admin"
+    fi
+    echo "$a" ;;
+  *) n="$(cat "$f" 2>/dev/null)"; echo "${n:-hermes}.local" ;;
+esac

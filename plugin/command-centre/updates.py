@@ -400,6 +400,12 @@ def _render(template: Path) -> str | None:
         if not Path(caddy).exists():
             return None  # setup installs Caddy first; leave this service to it
         text = text.replace("__CADDY__", caddy)
+    def saved(name: str, default: str) -> str:  # chosen once by setup (bin/tabbie-host); never re-probed here
+        try:
+            return (ROOT / "state" / name).read_text(encoding="utf-8").strip() or default
+        except OSError:
+            return default
+    text = text.replace("__HOST__", saved("local-name", "hermes") + ".local").replace("__CADDYADMIN__", saved("caddy-admin", "localhost:2019"))
     return text.replace("__HOME__", str(Path.home()))
 
 

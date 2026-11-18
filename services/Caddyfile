@@ -1,12 +1,12 @@
-# hermes.local -> Hermes WebUI (127.0.0.1:8787). LAN / Tailscale only; everything else is dropped.
+# hermes.local (or this Mac's own name, bin/tabbie-host) -> Hermes WebUI (127.0.0.1:8787). LAN / Tailscale only; everything else is dropped.
 {
-	admin localhost:2019
+	admin {$TABBIE_CADDY_ADMIN:localhost:2019}
 	local_certs
 	skip_install_trust
 	# Rotated server log (launchd's caddy.log only catches start-up failures now). Streams the browser
 	# closes mid-reply log "aborting with incomplete response" a lot: harmless, and capped here.
 	log {
-		output file {$HOME}/hermes/state/logs/caddy-server.log {
+		output file "{$HOME}/hermes/state/logs/caddy-server.log" {
 			roll_size 5MiB
 			roll_keep 2
 		}
@@ -21,7 +21,7 @@
 # Apple skin brand assets (~/hermes/brand, rebuilt by brand/build-icons.sh). These exact
 # paths shadow the WebUI's own icons/manifest/login script; everything else proxies.
 (brand_file) {
-	root * {$HOME}/hermes/brand
+	root * "{$HOME}/hermes/brand"
 	header Cache-Control "no-cache"
 	file_server
 }
@@ -85,7 +85,7 @@
 	}
 	handle @pwa_boot {
 		rewrite * /motion-boot.js
-		root * {$HOME}/hermes/webui-extension
+		root * "{$HOME}/hermes/webui-extension"
 		header Cache-Control "no-cache"
 		file_server
 	}
@@ -131,7 +131,7 @@
 		import brand_file
 	}
 	handle_path /hx-brand/* {
-		root * {$HOME}/hermes/brand
+		root * "{$HOME}/hermes/brand"
 		try_files /web/{path} /icons/{path} =404
 		header Cache-Control "no-cache"
 		file_server
@@ -166,7 +166,7 @@
 	}
 }
 
-https://hermes.local {
+https://{$TABBIE_HOST:hermes.local} {
 	import lan_only
 	tls internal
 	import hermes_site
@@ -179,15 +179,15 @@ http://:8788 {
 	import hermes_site
 }
 
-http://hermes.local {
+http://{$TABBIE_HOST:hermes.local} {
 	import lan_only
 	# One-time iPhone setup: download + trust this local CA so HTTPS has no warnings.
 	handle /hermes-ca.crt {
-		root * {$HOME}/hermes/state/ca
+		root * "{$HOME}/hermes/state/ca"
 		header Content-Type application/x-x509-ca-cert
 		file_server
 	}
 	handle {
-		redir https://hermes.local{uri} 308
+		redir https://{$TABBIE_HOST:hermes.local}{uri} 308
 	}
 }

@@ -363,7 +363,7 @@ developer tools (git and Python). Leave the Terminal window open until the page 
 | 5. Local files | Folders, settings, the WebUI, the private memory store, plugins, and the hub's worker timeout (your Hermes config is backed up first) |
 | 6. WebUI password | Asks for a password (hidden as you type) and saves it where only you can read it |
 | 7. Background services | Installs and starts the services so Tabbie runs whenever your Mac is on |
-| 8. Secure address | Sets up `https://hermes.local` and offers to trust its certificate on this Mac |
+| 8. Secure address | Sets up `https://hermes.local` and offers to trust its certificate on this Mac. If another Mac on the network already answers to `hermes.local`, this one becomes `hermes-<you>.local` (`bin/tabbie-host` prints it) |
 | 9. Motion studio | Optional. Installs Node.js (official build, Apple silicon or Intel) and creates the Motion studio from Tabbie's template, with its packages ([details](#motion-studio)) |
 | 10. Secrets (1Password) | Optional. Walks you through all of it: a 1Password account and app, a "Tabbie" vault (made for you with Touch ID, or in the app), and a service account with Read + Write on that vault only (1Password.com → Developer → Directory → Other → Create a Service Account). Its token goes straight into your Mac's Keychain. Settings → Accounts → Secrets has the same walkthrough ([details](#attachments-agents-questions-takeover)) |
 | 11. Your phone | Home Wi-Fi instructions, and optionally Tailscale for anywhere ([details](#use-tabbie-on-your-phone-anywhere-tailscale)) |
@@ -440,7 +440,7 @@ bin/hub health            # one line per component, with the fix command
 | `ai.hermes.gateway` | Hermes gateway (installed by `hermes gateway install`) |
 | `ai.hermes.webui` | WebUI on `127.0.0.1:8787` |
 | `ai.hermes.caddy` | HTTPS for `hermes.local`; LAN and Tailscale addresses only, everything else is dropped |
-| `ai.hermes.mdns` | Bonjour name `hermes.local` → your Mac's LAN IP |
+| `ai.hermes.mdns` | Bonjour name `hermes.local` → every Wi-Fi/Ethernet address this Mac has (rechecked every 10 s, so a VPN or a new network doesn't break it) |
 | `ai.hermes.cc-sidecar` | Tabbie's helper for the WebUI extension on `127.0.0.1:8794` (token-protected): agents panel, Stop, Hand-offs, Projects, Motion, updates. Runs through `uv` with PyYAML |
 | `ai.hermes.dreamer` | Nightly Dreamer run (03:30, low priority) |
 | `ai.hermes.team` | Team mirror (`bin/tt daemon`): idles until a team relay is connected and a project is shared, then sends those chats to the relay, signed and encrypted |
