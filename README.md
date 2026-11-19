@@ -831,7 +831,12 @@ Design notes: `docs/memory/ARCHITECTURE.md`, `docs/projects/ARCHITECTURE.md`.
   team that already exists takes an invite code (`TT1-…`, **Invite** on a teammate's Mac): the team key comes
   from their Mac, so signing in with **Get a code** alone shows **One more step** and asks for that code. When a new
   phone or laptop asks to see your sessions, Tabbie asks **A new device wants in**: type the code that device
-  shows to approve it (Tabbie never shows the code itself). After an update Tabbie offers this once. Under the
+  shows to approve it (Tabbie never shows the code itself). A shared project you made is also set up on each
+  teammate's Mac by itself: their Tabbie clones its GitHub repos (into `~/Tabbie Team/<project>`, or uses a clone
+  they already have), makes the project with your instructions and memories, keeps the clones fast-forwarded,
+  and tells their agent to work on its own branch and open pull requests. Your copy stays the main one; folders
+  not on GitHub stay on your Mac, and if their GitHub sign-in can't open a repo, Settings → Team says so.
+  After an update Tabbie offers this once. Under the
   hood it's `bin/tt` (`team/`), also usable by hand: `tt connect URL`, `tt pair`, `tt approve CODE`,
   `tt share PROJECT`, `tt status`. Protocol and relay API: [docs/team/PROTOCOL.md](docs/team/PROTOCOL.md).
 - **Secrets in 1Password** (optional): API keys live in a 1Password vault ("Tabbie") that a 1Password service

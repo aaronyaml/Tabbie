@@ -76,5 +76,6 @@ html.hx-glass .hx-team-sheet-c { background: linear-gradient(180deg, var(--glass
 @media (max-width: 640px) { .hx-team-join { align-items: stretch; } .hx-team-join textarea { font-size: 16px; } }
 /* a device or teammate row with its Remove confirmation underneath */
 .hx-team-wrap { flex-wrap: wrap; }
+.hx-team-wrap > .hx-st-fix { flex-basis: 100%; margin: 2px 0 0; padding-top: 0; }
 .hx-team-confirm { flex: 1 1 100%; display: flex; flex-wrap: wrap; align-items: center; gap: 8px; padding-top: 8px; }
 .hx-team-enrol { word-break: break-all; }

@@ -125,6 +125,10 @@
   function linkedCards(st) {
     const shared = new Set((st.projects || []).map((p) => p.toLowerCase()));
     const projects = st.all_projects || [];
+    // set up here from a teammate's Mac (their copy is the main one), and anything that needs this person
+    const got = new Map((st.team_projects || []).map((r) => [String(r.name || '').toLowerCase(), r]));
+    const needs = (r) => (r && r.problems && r.problems.length ? r.problems.map((why) => `<p class="hx-st-fix hx-team-err">${esc(why)}</p>`).join('') : '');
+    const notYet = [...got.values()].filter((r) => r.problems && r.problems.length && !projects.some((p) => p.toLowerCase() === String(r.name || '').toLowerCase()));
     // Remove: your own browser or phone (new team key, it can't read anything new), or a teammate who left
     const confirmRow = (key, q, yes) => asking === key
       ? `<div class="hx-team-confirm"><span class="hx-team-q">${q}</span><button type="button" class="hx-st-btn is-danger" data-act="${yes}">Remove</button><button type="button" class="hx-st-btn" data-act="cancel">Keep</button></div>` : '';
@@ -141,10 +145,12 @@
       </div>
       ${inviteCard()}
       <h4 class="hx-team-h">Shared projects</h4>
-      <div class="hx-st-card hx-st-list">${projects.length ? projects.map((p) => `<div class="hx-st-row"><label class="hx-team-sw"><span class="hx-st-main"><b>${esc(p)}</b><span class="hx-st-dim">${shared.has(p.toLowerCase()) ? 'Live for your team' : 'Private'}</span></span>
-          <input type="checkbox" class="hx-switch-input" data-act="share" data-project="${esc(p)}"${shared.has(p.toLowerCase()) ? ' checked' : ''}${busy === 'share:' + p ? ' disabled' : ''}></label></div>`).join('')
+      <div class="hx-st-card hx-st-list">${projects.length || notYet.length ? projects.map((p) => `<div class="hx-st-row${needs(got.get(p.toLowerCase())) ? ' hx-team-wrap' : ''}"><label class="hx-team-sw"><span class="hx-st-main"><b>${esc(p)}</b><span class="hx-st-dim">${got.has(p.toLowerCase()) ? `From ${esc(cap(got.get(p.toLowerCase()).from))}’s Mac · ` : ''}${shared.has(p.toLowerCase()) ? 'Live for your team' : 'Private'}</span></span>
+          <input type="checkbox" class="hx-switch-input" data-act="share" data-project="${esc(p)}"${shared.has(p.toLowerCase()) ? ' checked' : ''}${busy === 'share:' + p ? ' disabled' : ''}></label>${needs(got.get(p.toLowerCase()))}</div>`).join('')
+        + notYet.map((r) => `<div class="hx-st-row hx-team-wrap"><div class="hx-st-main"><b>${esc(r.name)}</b><span class="hx-st-dim">From ${esc(cap(r.from))}’s Mac · not set up yet</span></div>${needs(r)}</div>`).join('')
         : '<p class="hx-st-note hx-team-empty">No projects yet. Make one and it shows up here to share.</p>'}</div>
       <p class="hx-st-note">Every chat in a shared project shows live on your team’s devices: prompts, replies as they’re written, and progress. Chats in other projects never leave this Mac.</p>
+      <p class="hx-st-note">A shared project you made is also set up on your teammates’ Macs by itself: its GitHub repos, instructions and memories. They work on their own branches and send you pull requests. Folders that aren’t on GitHub stay on this Mac.</p>
       ${devs || macs ? `<h4 class="hx-team-h">Trusted devices</h4><div class="hx-st-card hx-st-list">${devs}${macs}</div>` : ''}
       <div class="hx-team-foot">${asking === 'disconnect'
         ? `<span class="hx-team-q">Disconnect? This Mac forgets its team keys; shared history stays on the relay. Remove this Mac on the site too.</span><button type="button" class="hx-st-btn is-danger" data-act="disconnect-yes">Disconnect</button><button type="button" class="hx-st-btn" data-act="cancel">Keep</button>`

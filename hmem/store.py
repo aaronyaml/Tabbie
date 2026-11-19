@@ -116,8 +116,8 @@ def can_write(actor: str, scope: str, project: str | None = None, agent: str | N
         return True
     if actor == "user" or actor.startswith("proposal:"):  # an approved proposal applies on the user's authority
         return True
-    if scope == "project":
-        return actor == f"manager:{project}"
+    if scope == "project":  # team:<owner> = a teammate's copy of this project's memories (team/teamprojects.py)
+        return actor == f"manager:{project}" or actor.startswith("team:")
     if scope == "agent":
         return actor == f"agent:{agent}"
     return False  # global: user only

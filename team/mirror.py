@@ -212,6 +212,7 @@ class Mirror:
         self.started = time.time()
         self.outbox: asyncio.Queue = asyncio.Queue()
         self.dirty = False
+        self.follower = None  # teamprojects.Follower, set in run()
 
     # ---------- which sessions ----------
     def projects(self) -> list[dict]:
@@ -615,6 +616,10 @@ class Mirror:
 
         sender = asyncio.ensure_future(self.send())
         r = runner.Runner(self)
+        import teamprojects
+
+        self.follower = teamprojects.Follower(self.tt, self.owner, r.webui)
+        follow = asyncio.ensure_future(self.follower.run(self))
         listener = asyncio.ensure_future(r.listen())
         models = asyncio.ensure_future(r.publish_models())
         import mailroom
@@ -627,3 +632,4 @@ class Mirror:
             listener.cancel()
             models.cancel()
             mail.cancel()
+            follow.cancel()

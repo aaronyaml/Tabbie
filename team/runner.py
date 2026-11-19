@@ -306,7 +306,7 @@ class Runner:
                 wait = min(wait * 2, 30)
 
     def on_index(self, msg: dict, seq: int):
-        if msg.get("type") not in ("session.meta", "queue"):
+        if msg.get("type") not in ("session.meta", "queue", "status"):
             return
         try:
             e = json.loads(msg["body"])
@@ -316,6 +316,10 @@ class Runner:
         if not o:
             return
         p = o["payload"] if isinstance(o["payload"], dict) else {}
+        if msg["type"] == "status":  # a teammate's Mac publishing a project (teamprojects.py)
+            if getattr(self.m, "follower", None) and p.get("kind") == "project":
+                self.m.follower.offer(e, p)
+            return
         if msg["type"] == "session.meta":
             if ROOM_RX.match(str(p.get("id", ""))):
                 self.metas[p["id"]] = {"title": str(p.get("title") or "Shared chat")[:120], "project": str(p.get("project") or ""),
@@ -379,6 +383,8 @@ class Runner:
         if fresh:
             pid_local = None
             if meta.get("project"):
+                if getattr(self.m, "follower", None):  # a teammate's project: start from their latest code
+                    await asyncio.to_thread(self.m.follower.freshen_project, meta["project"])
                 for pr in self.m.projects():
                     if str(pr.get("name", "")).lower() == meta["project"].lower():
                         pid_local = pr.get("project_id")

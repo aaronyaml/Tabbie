@@ -524,10 +524,10 @@
       "id": "team",
       "name": "Team: share chosen projects live with your team (any tt1 relay)",
       "scripts": [
-        "team.js?v=11"
+        "team.js?v=12"
       ],
       "stylesheets": [
-        "team.css?v=4"
+        "team.css?v=6"
       ]
     },
     {

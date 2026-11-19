@@ -20,7 +20,8 @@ shared sessions show live on your team's devices. Set up from Settings → Team,
     tt join CODE                       use an invite code (connects, links this Mac, trusts the inviter)
     tt listen [ROOM]                   show a room live (verified + decrypted here)
     tt send ROOM TEXT                  send an encrypted, signed test message
-    tt share [PROJECT] / unshare P     which Tabbie projects are shared live (none until you pick)
+    tt share [PROJECT] / unshare P     which Tabbie projects are shared live (none until you pick). A shared project
+                                       with GitHub repos is also set up on teammates' Macs (team/teamprojects.py)
     tt daemon                          mirror shared sessions to the relay (the LaunchAgent runs this)
 
 Keys and settings live in ~/.hermes/team (0600 files), never in the relay or in git. TT_RELAY / TT_HOME
@@ -269,7 +270,7 @@ def cmd_connect(args):
 
 def cmd_disconnect(_args):
     """Forget the relay and this Mac's keys here (the relay keeps history; remove the Mac there too)."""
-    for f in ("mac.json", "trust.json", "team.json", "token.json", "seen.json", "mirror.json", "pairing.json", "me.json", "joining.json", "invites.json", "needkey.json"):
+    for f in ("mac.json", "trust.json", "team.json", "token.json", "seen.json", "mirror.json", "pairing.json", "me.json", "joining.json", "invites.json", "needkey.json", "follow.json", "published.json"):
         (HOME / f).unlink(missing_ok=True)
     cfg = config()
     for k in ("relay", "name"):
@@ -817,11 +818,18 @@ def info() -> dict:
     if (load("joining.json") or load("needkey.json")) and m and not team()["current"]:
         d["pairing"] = pair_check()
         d["linked"] = d["pairing"]["state"] == "linked"
+    d["team_projects"] = received_projects()
     if d["relay"]:
         w = clock_warning()
         if w:
             d["clock_warning"] = w
     return d
+
+
+def received_projects() -> list[dict]:
+    """Projects set up here from a teammate's Mac (team/teamprojects.py), and anything that needs the person."""
+    return [{"name": st.get("name"), "from": st.get("from"), "repos": len(st.get("paths") or {}),
+             "problems": list((st.get("errors") or {}).values())[:5]} for st in (load("follow.json", {}) or {}).values()]
 
 
 def cmd_info(_args):
@@ -842,6 +850,10 @@ def cmd_status(_args):
         print(f"  {d['name']}  {C.fingerprint(d['sign_pub'])}")
     for o, mac in trust.get("macs", {}).items():
         print(f"Trusted Mac: {o}  {C.fingerprint(mac['sign_pub'])}")
+    for r in received_projects():
+        print(f"Project from {r['from']}: {r['name']} ({r['repos']} repos ready)")
+        for why in r["problems"]:
+            print(f"  needs you: {why}")
 
 
 async def _ws(room: str, on_open=None, follow=True):
